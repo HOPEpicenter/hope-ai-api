@@ -1,0 +1,24 @@
+﻿{
+  "name": "hope-ai-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Azure Functions v4 (Node.js + TypeScript) backend for HOPE",
+  "main": "dist/index.js",
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "start": "npm run build && func start",
+    "lint": "echo \"(optional) add eslint later\""
+  },
+  "dependencies": {
+    "@azure/data-tables": "^13.3.0",
+    "@azure/functions": "^4.5.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/uuid": "^9.0.8",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.5.4"
+  }
+}

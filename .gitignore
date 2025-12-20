@@ -1,0 +1,6 @@
+﻿node_modules/
+dist/
+local.settings.json
+.env
+.DS_Store
+.vscode/

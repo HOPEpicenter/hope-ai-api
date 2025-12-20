@@ -3,6 +3,7 @@ import { TableClient } from "@azure/data-tables";
 import { v4 as uuidv4 } from "uuid";
 
 const TABLE_NAME = "Visitors";
+const PARTITION_KEY = "VISITOR";
 
 function getTableClient(): TableClient {
   const conn = process.env.STORAGE_CONNECTION_STRING;
@@ -16,13 +17,21 @@ async function ensureTableExists(client: TableClient): Promise<void> {
   try {
     await client.createTable();
   } catch (err: any) {
-    // 409 = table already exists
-    if (err?.statusCode !== 409) throw err;
+    if (err?.statusCode !== 409) throw err; // 409 = already exists
   }
 }
 
 function badRequest(message: string): HttpResponseInit {
   return { status: 400, jsonBody: { error: message } };
+}
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+// Simple email sanity check (not perfect, but good enough)
+function looksLikeEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 app.http("createVisitor", {
@@ -38,10 +47,13 @@ app.http("createVisitor", {
     }
 
     const name = typeof body?.name === "string" ? body.name.trim() : "";
-    const email = typeof body?.email === "string" ? body.email.trim() : "";
+    const rawEmail = typeof body?.email === "string" ? body.email : "";
 
     if (!name) return badRequest("Field 'name' is required.");
-    if (!email) return badRequest("Field 'email' is required.");
+    if (!rawEmail) return badRequest("Field 'email' is required.");
+
+    const email = normalizeEmail(rawEmail);
+    if (!looksLikeEmail(email)) return badRequest("Field 'email' must be a valid email address.");
 
     const visitorId = uuidv4();
     const createdAt = new Date().toISOString();
@@ -49,23 +61,36 @@ app.http("createVisitor", {
     const table = getTableClient();
     await ensureTableExists(table);
 
-    // Azure Tables require PartitionKey + RowKey
+    // Enforce uniqueness by using RowKey = normalized email
     const entity = {
-      partitionKey: "VISITOR",
-      rowKey: visitorId,
+      partitionKey: PARTITION_KEY,
+      rowKey: email,
       visitorId,
       name,
       email,
       createdAt
     };
 
-    await table.createEntity(entity);
+    try {
+      await table.createEntity(entity);
+      context.log(`Visitor created: ${visitorId} (${email})`);
+      return { status: 201, jsonBody: { visitorId } };
+    } catch (err: any) {
+      // 409 = entity already exists => duplicate email
+      if (err?.statusCode === 409) {
+        const existing = await table.getEntity<any>(PARTITION_KEY, email);
+        const existingVisitorId = existing?.visitorId ?? null;
 
-    context.log(`Visitor created: ${visitorId}`);
-
-    return {
-      status: 201,
-      jsonBody: { visitorId }
-    };
+        context.log(`Duplicate email prevented: ${email} -> ${existingVisitorId}`);
+        return {
+          status: 409,
+          jsonBody: {
+            error: "Email already exists.",
+            visitorId: existingVisitorId
+          }
+        };
+      }
+      throw err;
+    }
   }
 });

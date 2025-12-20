@@ -1,4 +1,4 @@
-﻿import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+﻿    import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { TableClient } from "@azure/data-tables";
 import { v4 as uuidv4 } from "uuid";
 
@@ -8,7 +8,7 @@ const PARTITION_KEY = "VISITOR";
 function getTableClient(): TableClient {
   const conn = process.env.STORAGE_CONNECTION_STRING;
   if (!conn) {
-    throw new Error("Missing STORAGE_CONNECTION_STRING in App Settings / local.settings.json");
+    throw new Error("Missing STORAGE_CONNECTION_STRING in App Settings");
   }
   return TableClient.fromConnectionString(conn, TABLE_NAME);
 }
@@ -17,7 +17,8 @@ async function ensureTableExists(client: TableClient): Promise<void> {
   try {
     await client.createTable();
   } catch (err: any) {
-    if (err?.statusCode !== 409) throw err; // 409 = already exists
+    // 409 = already exists
+    if (err?.statusCode !== 409) throw err;
   }
 }
 
@@ -29,7 +30,6 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-// Simple email sanity check (not perfect, but good enough)
 function looksLikeEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -38,7 +38,10 @@ app.http("createVisitor", {
   methods: ["POST"],
   authLevel: "anonymous",
   route: "visitors",
-  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+  handler: async (
+    req: HttpRequest,
+    context: InvocationContext
+  ): Promise<HttpResponseInit> => {
     let body: any;
     try {
       body = await req.json();
@@ -53,7 +56,9 @@ app.http("createVisitor", {
     if (!rawEmail) return badRequest("Field 'email' is required.");
 
     const email = normalizeEmail(rawEmail);
-    if (!looksLikeEmail(email)) return badRequest("Field 'email' must be a valid email address.");
+    if (!looksLikeEmail(email)) {
+      return badRequest("Field 'email' must be a valid email address.");
+    }
 
     const visitorId = uuidv4();
     const createdAt = new Date().toISOString();
@@ -61,10 +66,9 @@ app.http("createVisitor", {
     const table = getTableClient();
     await ensureTableExists(table);
 
-    // Enforce uniqueness by using RowKey = normalized email
     const entity = {
       partitionKey: PARTITION_KEY,
-      rowKey: email,
+      rowKey: email, // enforce uniqueness
       visitorId,
       name,
       email,
@@ -74,23 +78,33 @@ app.http("createVisitor", {
     try {
       await table.createEntity(entity);
       context.log(`Visitor created: ${visitorId} (${email})`);
-      return { status: 201, jsonBody: { visitorId } };
+
+      return {
+        status: 201,
+        jsonBody: {
+          visitorId,
+          alreadyExists: false
+        }
+      };
     } catch (err: any) {
-      // 409 = entity already exists => duplicate email
+      // Duplicate email → idempotent success
       if (err?.statusCode === 409) {
         const existing = await table.getEntity<any>(PARTITION_KEY, email);
         const existingVisitorId = existing?.visitorId ?? null;
 
-        context.log(`Duplicate email prevented: ${email} -> ${existingVisitorId}`);
+        context.log(`Duplicate email (idempotent): ${email}`);
+
         return {
-          status: 409,
+          status: 200,
           jsonBody: {
-            error: "Email already exists.",
-            visitorId: existingVisitorId
+            visitorId: existingVisitorId,
+            alreadyExists: true
           }
         };
       }
+
       throw err;
     }
   }
 });
+

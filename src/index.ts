@@ -108,3 +108,44 @@ app.http("createVisitor", {
   }
 });
 
+app.http("getVisitorByEmail", {
+  methods: ["GET"],
+  authLevel: "anonymous",
+  route: "visitors",
+  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+    const rawEmail = req.query.get("email") ?? "";
+
+    if (!rawEmail) {
+      return badRequest("Query parameter 'email' is required.");
+    }
+
+    const email = normalizeEmail(rawEmail);
+    if (!looksLikeEmail(email)) {
+      return badRequest("Query parameter 'email' must be a valid email address.");
+    }
+
+    const table = getTableClient();
+
+    try {
+      const existing = await table.getEntity<any>(PARTITION_KEY, email);
+
+      // Return only what you need
+      return {
+        status: 200,
+        jsonBody: {
+          visitorId: existing?.visitorId ?? null,
+          name: existing?.name ?? null,
+          email: existing?.email ?? email,
+          createdAt: existing?.createdAt ?? null
+        }
+      };
+    } catch (err: any) {
+      if (err?.statusCode === 404) {
+        return { status: 404, jsonBody: { error: "Visitor not found." } };
+      }
+      context.error("getVisitorByEmail failed", err);
+      throw err;
+    }
+  }
+});
+

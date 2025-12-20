@@ -1,21 +1,33 @@
 ﻿# hope-ai-api
 
-## Production API Base URL
+Azure Functions backend for HOPE.
+
+---
+
+## Production API
+
+**Base URL**
 https://hope-ai-api-dehmhzbxcybuaqhz.eastus-01.azurewebsites.net
+
+---
 
 ## Endpoints
 
-### POST /api/visitors
-URL:
+### Create Visitor
+**POST** `/api/visitors`
+
+**Full URL**
 https://hope-ai-api-dehmhzbxcybuaqhz.eastus-01.azurewebsites.net/api/visitors
 
-Body:
+**Request Body**
 {
   "name": "string",
   "email": "string"
 }
 
-Response:
+**Response**
 {
   "visitorId": "uuid"
 }
+
+---

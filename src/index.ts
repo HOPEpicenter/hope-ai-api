@@ -3,42 +3,36 @@ import { TableClient } from "@azure/data-tables";
 import { v4 as uuidv4 } from "uuid";
 import sgMail from "@sendgrid/mail";
 
+import { requireApiKey } from "./shared/auth/requireApiKey";
+import { ensureTableExists } from "./shared/storage/ensureTableExists";
+import {
+  getVisitorsTableClient,
+  VISITORS_PARTITION_KEY,
+} from "./storage/visitors/visitorsTable";
+
 /**
  * ============================================================================
  *  CONFIG
  * ============================================================================
  */
-const VISITORS_TABLE = "Visitors";
+
 const ENGAGEMENTS_TABLE = "Engagements";
-const VISITORS_PARTITION_KEY = "VISITOR";
 
 /**
  * ============================================================================
- *  TABLE CLIENTS + STORAGE HELPERS
+ *  TABLE CLIENTS (Engagements only stays here for now)
  * ============================================================================
  */
-
-/** Create a TableClient using STORAGE_CONNECTION_STRING for Visitors table */
-function getVisitorsTableClient(): TableClient {
-  const conn = process.env.STORAGE_CONNECTION_STRING;
-  if (!conn) throw new Error("Missing STORAGE_CONNECTION_STRING in App Settings / local.settings.json");
-  return TableClient.fromConnectionString(conn, VISITORS_TABLE);
-}
 
 /** Create a TableClient using STORAGE_CONNECTION_STRING for Engagements table */
 function getEngagementsTableClient(): TableClient {
   const conn = process.env.STORAGE_CONNECTION_STRING;
-  if (!conn) throw new Error("Missing STORAGE_CONNECTION_STRING in App Settings / local.settings.json");
-  return TableClient.fromConnectionString(conn, ENGAGEMENTS_TABLE);
-}
-
-/** Ensure a table exists (idempotent). 409 = already exists. */
-async function ensureTableExists(client: TableClient): Promise<void> {
-  try {
-    await client.createTable();
-  } catch (err: any) {
-    if (err?.statusCode !== 409) throw err;
+  if (!conn) {
+    throw new Error(
+      "Missing STORAGE_CONNECTION_STRING in App Settings / local.settings.json"
+    );
   }
+  return TableClient.fromConnectionString(conn, ENGAGEMENTS_TABLE);
 }
 
 /**
@@ -67,7 +61,15 @@ function normalizeSource(source: unknown): string {
   if (typeof source !== "string") return "unknown";
   const s = source.trim().toLowerCase();
   if (!s) return "unknown";
-  const allowed = new Set(["website", "qr", "event", "facebook", "instagram", "youtube", "unknown"]);
+  const allowed = new Set([
+    "website",
+    "qr",
+    "event",
+    "facebook",
+    "instagram",
+    "youtube",
+    "unknown",
+  ]);
   return allowed.has(s) ? s : "unknown";
 }
 
@@ -101,29 +103,10 @@ function makeEngagementRowKey(eventType: string): string {
     pad(d.getUTCMilliseconds(), 3);
 
   const rand = Math.random().toString(36).slice(2, 10);
-  const safeType = (eventType || "unknown").toLowerCase().replace(/[^a-z0-9_]/g, "_");
+  const safeType = (eventType || "unknown")
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "_");
   return `${ts}_${safeType}_${rand}`;
-}
-
-/**
- * ============================================================================
- *  SECURITY
- * ============================================================================
- */
-
-/**
- * API key auth (fail closed if API_KEY isn't set)
- * Expected header: x-api-key
- */
-function requireApiKey(req: HttpRequest): HttpResponseInit | null {
-  const expectedKey = process.env.API_KEY;
-  if (!expectedKey) return { status: 500, jsonBody: { error: "Server missing API_KEY configuration." } };
-
-  const providedKey = req.headers.get("x-api-key");
-  if (!providedKey || providedKey !== expectedKey) {
-    return { status: 401, jsonBody: { error: "Unauthorized" } };
-  }
-  return null;
 }
 
 /**
@@ -137,7 +120,7 @@ function getStaffEmails(): string[] {
   const raw = process.env.STAFF_NOTIFY_EMAILS ?? "";
   return raw
     .split(",")
-    .map(s => s.trim())
+    .map((s) => s.trim())
     .filter(Boolean);
 }
 
@@ -163,8 +146,7 @@ async function notifyStaffNewVisitor(params: {
 
   const subject = `New Visitor: ${params.name} (${params.source})`;
 
-  const text =
-`A new visitor was captured.
+  const text = `A new visitor was captured.
 
 Name: ${params.name}
 Email: ${params.email}
@@ -177,9 +159,10 @@ CreatedAt: ${params.createdAt}
     to: staffEmails,
     from: fromEmail,
     subject,
-    text
+    text,
   });
 }
+
 
 /**
  * ============================================================================

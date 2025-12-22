@@ -554,21 +554,16 @@ app.http("getVisitorStatus", {
 
 /**
  * LIST VISITORS NEEDING FOLLOW-UP
- * Route: GET /api/visitors/needs-followup?windowHours=48&maxResults=50
- * Method(s): GET
+ * Route: GET /api/visitors/needs-followup?windowHours=48&maxResults=50&excludeTest=true
  *
- * Purpose:
- * - Provide staff with an action list for follow-up
+ * Rules:
+ * - needs follow-up if NO engagement OR last engagement older than windowHours
+ * - Sort order:
+ *    1) no engagement ever (top)
+ *    2) most overdue first (largest hoursSinceLastEngagement)
  *
- * Auth:
- * - Requires x-api-key
- *
- * Definition:
- * - needs follow-up if last engagement is older than windowHours OR no engagement exists
- *
- * Notes:
- * - This scans Visitors and checks Engagements per visitorId
- * - Suitable for small to moderate volume (Phase 2)
+ * Optional:
+ * - excludeTest=true filters out obvious test emails (example.com, "+" aliases, cors-test)
  */
 app.http("listVisitorsNeedsFollowup", {
   methods: ["GET"],
@@ -580,6 +575,7 @@ app.http("listVisitorsNeedsFollowup", {
 
     const windowHours = parsePositiveInt(req.query.get("windowHours"), 48);
     const maxResults = parsePositiveInt(req.query.get("maxResults"), 50);
+    const excludeTest = (req.query.get("excludeTest") ?? "").toLowerCase() === "true";
 
     const now = Date.now();
     const cutoffMs = now - windowHours * 60 * 60 * 1000;
@@ -595,8 +591,6 @@ app.http("listVisitorsNeedsFollowup", {
     const results: any[] = [];
 
     for await (const v of visitorsTable.listEntities({ queryOptions: { filter: filterVisitors } })) {
-      if (results.length >= maxResults) break;
-
       const visitorId = (v as any).visitorId as string | undefined;
       if (!visitorId) continue;
 
@@ -605,6 +599,15 @@ app.http("listVisitorsNeedsFollowup", {
       const email = (v as any).email as string | undefined;
       const source = (v as any).source as string | undefined;
 
+      const emailLower = (email ?? "").toLowerCase();
+      if (excludeTest) {
+        const isExample = emailLower.endsWith("@example.com");
+        const hasPlus = emailLower.includes("+");
+        const isCorsTest = emailLower.includes("cors-test");
+        if (isExample || hasPlus || isCorsTest) continue;
+      }
+
+      // Find last engagement for this visitorId (PartitionKey = visitorId)
       const filterEng = `PartitionKey eq '${visitorId.replace(/'/g, "''")}'`;
 
       let lastEngagedAt: string | null = null;
@@ -622,47 +625,45 @@ app.http("listVisitorsNeedsFollowup", {
       const needsFollowup = !lastMs || lastMs < cutoffMs;
       if (!needsFollowup) continue;
 
-	const hoursSince = lastMs ? Math.floor((now - lastMs) / (1000 * 60 * 60)) : null;
-	const reason = !lastMs ? "no_engagement" : "stale_engagement";
+      const hoursSince = lastMs ? Math.floor((now - lastMs) / (1000 * 60 * 60)) : null;
+      const reason = !lastMs ? "no_engagement" : "stale_engagement";
 
-	results.push({
- 	 visitorId,
- 	 name: name ?? "",
-	  email: email ?? "",
- 	 source: source ?? "unknown",
- 	 createdAt: createdAt ?? null,
-  	lastEngagedAt,
- 	 hoursSinceLastEngagement: hoursSince,
- 	 engagementCount,
- 	 needsFollowup: true,
- 	 reason
-});
+      results.push({
+        visitorId,
+        name: name ?? "",
+        email: email ?? "",
+        source: source ?? "unknown",
+        createdAt: createdAt ?? null,
+        lastEngagedAt,
+        hoursSinceLastEngagement: hoursSince,
+        engagementCount,
+        needsFollowup: true,
+        reason
+      });
 
-    
+      // Stop once we have enough (after filtering)
+      if (results.length >= maxResults) break;
     }
 
-   // Sort: (1) no engagement first, then (2) most overdue first
-results.sort((a, b) => {
-  const aNever = a.lastEngagedAt ? 0 : 1;
-  const bNever = b.lastEngagedAt ? 0 : 1;
+    // Sort: (1) no engagement first, then (2) most overdue first
+    results.sort((a, b) => {
+      const aNever = a.lastEngagedAt ? 0 : 1;
+      const bNever = b.lastEngagedAt ? 0 : 1;
+      if (aNever !== bNever) return bNever - aNever;
 
-  // Put "never engaged" at the top
-  if (aNever !== bNever) return bNever - aNever;
+      const aHours = typeof a.hoursSinceLastEngagement === "number" ? a.hoursSinceLastEngagement : -1;
+      const bHours = typeof b.hoursSinceLastEngagement === "number" ? b.hoursSinceLastEngagement : -1;
+      return bHours - aHours;
+    });
 
-  // Both have lastEngagedAt: higher hoursSinceLastEngagement first
-  const aHours = typeof a.hoursSinceLastEngagement === "number" ? a.hoursSinceLastEngagement : -1;
-  const bHours = typeof b.hoursSinceLastEngagement === "number" ? b.hoursSinceLastEngagement : -1;
-  return bHours - aHours;
-});
-
-return {
-  status: 200,
-  jsonBody: {
-    windowHours,
-    count: results.length,
-    visitors: results
-  }
-};
-
+    return {
+      status: 200,
+      jsonBody: {
+        windowHours,
+        excludeTest,
+        count: results.length,
+        visitors: results
+      }
+    };
   }
 });

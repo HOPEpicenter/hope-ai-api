@@ -622,25 +622,47 @@ app.http("listVisitorsNeedsFollowup", {
       const needsFollowup = !lastMs || lastMs < cutoffMs;
       if (!needsFollowup) continue;
 
-      results.push({
-        visitorId,
-        name: name ?? "",
-        email: email ?? "",
-        source: source ?? "unknown",
-        createdAt: createdAt ?? null,
-        lastEngagedAt,
-        hoursSinceLastEngagement: lastMs ? Math.floor((now - lastMs) / (1000 * 60 * 60)) : null,
-        engagementCount
-      });
+	const hoursSince = lastMs ? Math.floor((now - lastMs) / (1000 * 60 * 60)) : null;
+	const reason = !lastMs ? "no_engagement" : "stale_engagement";
+
+	results.push({
+ 	 visitorId,
+ 	 name: name ?? "",
+	  email: email ?? "",
+ 	 source: source ?? "unknown",
+ 	 createdAt: createdAt ?? null,
+  	lastEngagedAt,
+ 	 hoursSinceLastEngagement: hoursSince,
+ 	 engagementCount,
+ 	 needsFollowup: true,
+ 	 reason
+});
+
+    
     }
 
-    return {
-      status: 200,
-      jsonBody: {
-        windowHours,
-        count: results.length,
-        visitors: results
-      }
-    };
+   // Sort: (1) no engagement first, then (2) most overdue first
+results.sort((a, b) => {
+  const aNever = a.lastEngagedAt ? 0 : 1;
+  const bNever = b.lastEngagedAt ? 0 : 1;
+
+  // Put "never engaged" at the top
+  if (aNever !== bNever) return bNever - aNever;
+
+  // Both have lastEngagedAt: higher hoursSinceLastEngagement first
+  const aHours = typeof a.hoursSinceLastEngagement === "number" ? a.hoursSinceLastEngagement : -1;
+  const bHours = typeof b.hoursSinceLastEngagement === "number" ? b.hoursSinceLastEngagement : -1;
+  return bHours - aHours;
+});
+
+return {
+  status: 200,
+  jsonBody: {
+    windowHours,
+    count: results.length,
+    visitors: results
+  }
+};
+
   }
 });

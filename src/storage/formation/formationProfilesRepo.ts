@@ -40,3 +40,32 @@ export function createDefaultFormationProfile(visitorId: string): FormationProfi
 }
 
 export type FormationProfileResult = TableEntityResult<FormationProfileEntity>;
+import { TableClient } from "@azure/data-tables";
+
+/** Get profile entity or null */
+export async function getFormationProfile(
+  table: TableClient,
+  visitorId: string
+): Promise<FormationProfileEntity | null> {
+  try {
+    const entity = await table.getEntity<FormationProfileEntity>("VISITOR", visitorId);
+    // normalize azure fields -> our shape
+    return {
+      ...entity,
+      partitionKey: "VISITOR",
+      rowKey: visitorId,
+      visitorId,
+    };
+  } catch (err: any) {
+    if (err?.statusCode === 404) return null;
+    throw err;
+  }
+}
+
+/** Upsert profile entity (merge) */
+export async function upsertFormationProfile(
+  table: TableClient,
+  entity: FormationProfileEntity
+): Promise<void> {
+  await table.upsertEntity(entity, "Merge");
+}

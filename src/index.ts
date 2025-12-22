@@ -3,58 +3,49 @@ import { TableClient } from "@azure/data-tables";
 import { v4 as uuidv4 } from "uuid";
 import sgMail from "@sendgrid/mail";
 
-const TABLE_NAME = "Visitors";
-const PARTITION_KEY = "VISITOR";
+/**
+ * ============================================================================
+ *  CONFIG
+ * ============================================================================
+ */
+const VISITORS_TABLE = "Visitors";
 const ENGAGEMENTS_TABLE = "Engagements";
+const VISITORS_PARTITION_KEY = "VISITOR";
 
-/** Create a TableClient using STORAGE_CONNECTION_STRING */
-function getTableClient(): TableClient {
+/**
+ * ============================================================================
+ *  TABLE CLIENTS + STORAGE HELPERS
+ * ============================================================================
+ */
+
+/** Create a TableClient using STORAGE_CONNECTION_STRING for Visitors table */
+function getVisitorsTableClient(): TableClient {
   const conn = process.env.STORAGE_CONNECTION_STRING;
   if (!conn) throw new Error("Missing STORAGE_CONNECTION_STRING in App Settings / local.settings.json");
-  return TableClient.fromConnectionString(conn, TABLE_NAME);
+  return TableClient.fromConnectionString(conn, VISITORS_TABLE);
 }
 
-/** Ensure the table exists (idempotent) */
+/** Create a TableClient using STORAGE_CONNECTION_STRING for Engagements table */
+function getEngagementsTableClient(): TableClient {
+  const conn = process.env.STORAGE_CONNECTION_STRING;
+  if (!conn) throw new Error("Missing STORAGE_CONNECTION_STRING in App Settings / local.settings.json");
+  return TableClient.fromConnectionString(conn, ENGAGEMENTS_TABLE);
+}
+
+/** Ensure a table exists (idempotent). 409 = already exists. */
 async function ensureTableExists(client: TableClient): Promise<void> {
   try {
     await client.createTable();
   } catch (err: any) {
-    if (err?.statusCode !== 409) throw err; // 409 = already exists
+    if (err?.statusCode !== 409) throw err;
   }
 }
 
-/** Get Engagements Table */
-
-function getEngagementsTableClient(): TableClient {
-  const conn = process.env.STORAGE_CONNECTION_STRING;
-  if (!conn) throw new Error("Missing STORAGE_CONNECTION_STRING");
-  return TableClient.fromConnectionString(conn, ENGAGEMENTS_TABLE);
-}
-
-function makeEngagementRowKey(eventType: string): string {
-  const d = new Date();
-  const pad = (n: number, w = 2) => String(n).padStart(w, "0");
-  const ts =
-    d.getUTCFullYear().toString() +
-    pad(d.getUTCMonth() + 1) +
-    pad(d.getUTCDate()) +
-    pad(d.getUTCHours()) +
-    pad(d.getUTCMinutes()) +
-    pad(d.getUTCSeconds()) +
-    pad(d.getUTCMilliseconds(), 3);
-
-  const rand = Math.random().toString(36).slice(2, 10);
-  const safeType = (eventType || "unknown").toLowerCase().replace(/[^a-z0-9_]/g, "_");
-  return `${ts}_${safeType}_${rand}`;
-}
-
-function normalizeEnum(val: unknown): string | null {
-  if (typeof val !== "string") return null;
-  const s = val.trim().toLowerCase();
-  return s ? s : null;
-}
-
-
+/**
+ * ============================================================================
+ *  GENERAL HELPERS
+ * ============================================================================
+ */
 
 /** Basic 400 helper */
 function badRequest(message: string): HttpResponseInit {
@@ -76,12 +67,54 @@ function normalizeSource(source: unknown): string {
   if (typeof source !== "string") return "unknown";
   const s = source.trim().toLowerCase();
   if (!s) return "unknown";
-  // optional allowlist - you can expand anytime
   const allowed = new Set(["website", "qr", "event", "facebook", "instagram", "youtube", "unknown"]);
   return allowed.has(s) ? s : "unknown";
 }
 
-/** API key auth (fail closed if API_KEY isn't set) */
+function normalizeEnum(val: unknown): string | null {
+  if (typeof val !== "string") return null;
+  const s = val.trim().toLowerCase();
+  return s ? s : null;
+}
+
+function parsePositiveInt(val: string | null, fallback: number): number {
+  if (!val) return fallback;
+  const n = Number(val);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.floor(n);
+}
+
+/**
+ * Generate a sortable RowKey for engagement events:
+ * YYYYMMDDHHmmssSSS_eventType_random
+ */
+function makeEngagementRowKey(eventType: string): string {
+  const d = new Date();
+  const pad = (n: number, w = 2) => String(n).padStart(w, "0");
+  const ts =
+    d.getUTCFullYear().toString() +
+    pad(d.getUTCMonth() + 1) +
+    pad(d.getUTCDate()) +
+    pad(d.getUTCHours()) +
+    pad(d.getUTCMinutes()) +
+    pad(d.getUTCSeconds()) +
+    pad(d.getUTCMilliseconds(), 3);
+
+  const rand = Math.random().toString(36).slice(2, 10);
+  const safeType = (eventType || "unknown").toLowerCase().replace(/[^a-z0-9_]/g, "_");
+  return `${ts}_${safeType}_${rand}`;
+}
+
+/**
+ * ============================================================================
+ *  SECURITY
+ * ============================================================================
+ */
+
+/**
+ * API key auth (fail closed if API_KEY isn't set)
+ * Expected header: x-api-key
+ */
 function requireApiKey(req: HttpRequest): HttpResponseInit | null {
   const expectedKey = process.env.API_KEY;
   if (!expectedKey) return { status: 500, jsonBody: { error: "Server missing API_KEY configuration." } };
@@ -90,9 +123,14 @@ function requireApiKey(req: HttpRequest): HttpResponseInit | null {
   if (!providedKey || providedKey !== expectedKey) {
     return { status: 401, jsonBody: { error: "Unauthorized" } };
   }
-
   return null;
 }
+
+/**
+ * ============================================================================
+ *  STAFF NOTIFICATION (SENDGRID) - OPTIONAL
+ * ============================================================================
+ */
 
 /** Parse staff emails from env var (comma-separated) */
 function getStaffEmails(): string[] {
@@ -103,7 +141,10 @@ function getStaffEmails(): string[] {
     .filter(Boolean);
 }
 
-/** Send staff notification email (SendGrid) */
+/**
+ * Send staff notification email (SendGrid).
+ * Safe behavior: If not configured, do nothing.
+ */
 async function notifyStaffNewVisitor(params: {
   visitorId: string;
   name: string;
@@ -141,14 +182,35 @@ CreatedAt: ${params.createdAt}
 }
 
 /**
- * POST /api/visitors
- * Body: { name, email, source? }
+ * ============================================================================
+ *  PHASE 1 — IDENTITY LAYER
+ * ============================================================================
+ */
+
+/**
+ * CREATE VISITOR
+ * Route: POST /api/visitors
+ * Method(s): POST
  *
+ * Purpose:
+ * - Capture a new visitor identity
+ * - Enforce idempotency via normalized email
+ * - Generate visitorId on first insert
+ *
+ * Auth:
+ * - Requires x-api-key
+ *
+ * Storage:
+ * - Table: Visitors
+ * - PartitionKey = "VISITOR"
+ * - RowKey = normalized email
+ *
+ * Behavior:
  * - New email: 201 { visitorId, alreadyExists:false }
  * - Existing email: 200 { visitorId, alreadyExists:true }
  *
- * Stores entity in Table Storage with:
- * PartitionKey="VISITOR", RowKey=normalizedEmail, plus source
+ * Notes:
+ * - Sends staff email only for brand-new visitors (if SendGrid configured)
  */
 app.http("createVisitor", {
   methods: ["POST"],
@@ -178,11 +240,11 @@ app.http("createVisitor", {
     const visitorId = uuidv4();
     const createdAt = new Date().toISOString();
 
-    const table = getTableClient();
+    const table = getVisitorsTableClient();
     await ensureTableExists(table);
 
     const entity = {
-      partitionKey: PARTITION_KEY,
+      partitionKey: VISITORS_PARTITION_KEY,
       rowKey: email, // enforce uniqueness
       visitorId,
       name,
@@ -205,7 +267,7 @@ app.http("createVisitor", {
     } catch (err: any) {
       // Duplicate email -> idempotent success (no staff email)
       if (err?.statusCode === 409) {
-        const existing = await table.getEntity<any>(PARTITION_KEY, email);
+        const existing = await table.getEntity<any>(VISITORS_PARTITION_KEY, email);
         const existingVisitorId = existing?.visitorId ?? null;
 
         return { status: 200, jsonBody: { visitorId: existingVisitorId, alreadyExists: true } };
@@ -218,8 +280,20 @@ app.http("createVisitor", {
 });
 
 /**
- * GET /api/visitors?email=...
- * Returns 200 with { visitorId, name, email, createdAt, source } or 404
+ * GET VISITOR BY EMAIL
+ * Route: GET /api/visitors?email=...
+ * Method(s): GET
+ *
+ * Purpose:
+ * - Lookup visitor identity by email
+ *
+ * Auth:
+ * - Requires x-api-key
+ *
+ * Storage:
+ * - Table: Visitors
+ * - PartitionKey = "VISITOR"
+ * - RowKey = normalized email
  */
 app.http("getVisitorByEmail", {
   methods: ["GET"],
@@ -235,10 +309,10 @@ app.http("getVisitorByEmail", {
     const email = normalizeEmail(rawEmail);
     if (!looksLikeEmail(email)) return badRequest("Query parameter 'email' must be a valid email address.");
 
-    const table = getTableClient();
+    const table = getVisitorsTableClient();
 
     try {
-      const existing = await table.getEntity<any>(PARTITION_KEY, email);
+      const existing = await table.getEntity<any>(VISITORS_PARTITION_KEY, email);
 
       return {
         status: 200,
@@ -258,7 +332,28 @@ app.http("getVisitorByEmail", {
   }
 });
 
+/**
+ * ============================================================================
+ *  PHASE 2 — ENGAGEMENT LAYER (EVENT LOG)
+ * ============================================================================
+ */
 
+/**
+ * CREATE ENGAGEMENT EVENT
+ * Route: POST /api/engagements
+ * Method(s): POST
+ *
+ * Purpose:
+ * - Record a single engagement action tied to a visitor (append-only event log)
+ *
+ * Auth:
+ * - Requires x-api-key
+ *
+ * Storage:
+ * - Table: Engagements
+ * - PartitionKey = visitorId
+ * - RowKey = sortable timestamp + eventType + random
+ */
 app.http("createEngagement", {
   methods: ["POST"],
   authLevel: "anonymous",
@@ -324,9 +419,19 @@ app.http("createEngagement", {
 });
 
 /**
- * Create Visitors Engagament
+ * LIST ENGAGEMENT EVENTS
+ * Route: GET /api/engagements?visitorId=...
+ * Method(s): GET
+ *
+ * Purpose:
+ * - Return engagement timeline for a visitor
+ *
+ * Auth:
+ * - Requires x-api-key
+ *
+ * Notes:
+ * - Returns newest-first (sorted by engagementId / RowKey)
  */
-
 app.http("listEngagements", {
   methods: ["GET"],
   authLevel: "anonymous",
@@ -339,6 +444,7 @@ app.http("listEngagements", {
     if (!visitorId) return badRequest("Query parameter 'visitorId' is required.");
 
     const table = getEngagementsTableClient();
+    await ensureTableExists(table);
 
     const filter = `PartitionKey eq '${visitorId.replace(/'/g, "''")}'`;
 
@@ -363,16 +469,30 @@ app.http("listEngagements", {
     }
 
     events.sort((a, b) => (a.engagementId < b.engagementId ? 1 : -1));
-
     return { status: 200, jsonBody: { visitorId, events } };
   }
 });
 
-
 /**
- * Create Visitors Engagament Status
+ * ============================================================================
+ *  PHASE 2.1 — ENGAGEMENT STATUS
+ * ============================================================================
  */
 
+/**
+ * GET VISITOR ENGAGEMENT STATUS
+ * Route: GET /api/visitors/status?visitorId=...
+ * Method(s): GET
+ *
+ * Purpose:
+ * - Determine if a visitor is currently "engaged"
+ *
+ * Auth:
+ * - Requires x-api-key
+ *
+ * Definition:
+ * - engaged = at least one engagement event in the last 14 days
+ */
 app.http("getVisitorStatus", {
   methods: ["GET"],
   authLevel: "anonymous",
@@ -392,7 +512,6 @@ app.http("getVisitorStatus", {
     let lastEngagedAt: string | null = null;
     let count = 0;
 
-    // We stored occurredAt when creating events; use that as truth
     for await (const e of engagementsTable.listEntities({ queryOptions: { filter } })) {
       count++;
       const occurredAt = (e as any).occurredAt;
@@ -401,7 +520,6 @@ app.http("getVisitorStatus", {
       }
     }
 
-    // engaged = any engagement within last 14 days
     const windowDays = 14;
     let engaged = false;
     let daysSinceLastEngagement: number | null = null;
@@ -423,6 +541,105 @@ app.http("getVisitorStatus", {
         daysSinceLastEngagement,
         engagementCount: count,
         windowDays
+      }
+    };
+  }
+});
+
+/**
+ * ============================================================================
+ *  PHASE 2.2 — FOLLOW-UP OPERATIONS
+ * ============================================================================
+ */
+
+/**
+ * LIST VISITORS NEEDING FOLLOW-UP
+ * Route: GET /api/visitors/needs-followup?windowHours=48&maxResults=50
+ * Method(s): GET
+ *
+ * Purpose:
+ * - Provide staff with an action list for follow-up
+ *
+ * Auth:
+ * - Requires x-api-key
+ *
+ * Definition:
+ * - needs follow-up if last engagement is older than windowHours OR no engagement exists
+ *
+ * Notes:
+ * - This scans Visitors and checks Engagements per visitorId
+ * - Suitable for small to moderate volume (Phase 2)
+ */
+app.http("listVisitorsNeedsFollowup", {
+  methods: ["GET"],
+  authLevel: "anonymous",
+  route: "visitors/needs-followup",
+  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+    const auth = requireApiKey(req);
+    if (auth) return auth;
+
+    const windowHours = parsePositiveInt(req.query.get("windowHours"), 48);
+    const maxResults = parsePositiveInt(req.query.get("maxResults"), 50);
+
+    const now = Date.now();
+    const cutoffMs = now - windowHours * 60 * 60 * 1000;
+
+    const visitorsTable = getVisitorsTableClient();
+    await ensureTableExists(visitorsTable);
+
+    const engagementsTable = getEngagementsTableClient();
+    await ensureTableExists(engagementsTable);
+
+    const filterVisitors = `PartitionKey eq '${VISITORS_PARTITION_KEY}'`;
+
+    const results: any[] = [];
+
+    for await (const v of visitorsTable.listEntities({ queryOptions: { filter: filterVisitors } })) {
+      if (results.length >= maxResults) break;
+
+      const visitorId = (v as any).visitorId as string | undefined;
+      if (!visitorId) continue;
+
+      const createdAt = (v as any).createdAt as string | undefined;
+      const name = (v as any).name as string | undefined;
+      const email = (v as any).email as string | undefined;
+      const source = (v as any).source as string | undefined;
+
+      const filterEng = `PartitionKey eq '${visitorId.replace(/'/g, "''")}'`;
+
+      let lastEngagedAt: string | null = null;
+      let engagementCount = 0;
+
+      for await (const e of engagementsTable.listEntities({ queryOptions: { filter: filterEng } })) {
+        engagementCount++;
+        const occurredAt = (e as any).occurredAt;
+        if (typeof occurredAt === "string") {
+          if (!lastEngagedAt || occurredAt > lastEngagedAt) lastEngagedAt = occurredAt;
+        }
+      }
+
+      const lastMs = lastEngagedAt ? new Date(lastEngagedAt).getTime() : null;
+      const needsFollowup = !lastMs || lastMs < cutoffMs;
+      if (!needsFollowup) continue;
+
+      results.push({
+        visitorId,
+        name: name ?? "",
+        email: email ?? "",
+        source: source ?? "unknown",
+        createdAt: createdAt ?? null,
+        lastEngagedAt,
+        hoursSinceLastEngagement: lastMs ? Math.floor((now - lastMs) / (1000 * 60 * 60)) : null,
+        engagementCount
+      });
+    }
+
+    return {
+      status: 200,
+      jsonBody: {
+        windowHours,
+        count: results.length,
+        visitors: results
       }
     };
   }

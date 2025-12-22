@@ -369,3 +369,61 @@ app.http("listEngagements", {
 });
 
 
+/**
+ * Create Visitors Engagament Status
+ */
+
+app.http("getVisitorStatus", {
+  methods: ["GET"],
+  authLevel: "anonymous",
+  route: "visitors/status",
+  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+    const auth = requireApiKey(req);
+    if (auth) return auth;
+
+    const visitorId = (req.query.get("visitorId") ?? "").trim();
+    if (!visitorId) return badRequest("Query parameter 'visitorId' is required.");
+
+    const engagementsTable = getEngagementsTableClient();
+    await ensureTableExists(engagementsTable);
+
+    const filter = `PartitionKey eq '${visitorId.replace(/'/g, "''")}'`;
+
+    let lastEngagedAt: string | null = null;
+    let count = 0;
+
+    // We stored occurredAt when creating events; use that as truth
+    for await (const e of engagementsTable.listEntities({ queryOptions: { filter } })) {
+      count++;
+      const occurredAt = (e as any).occurredAt;
+      if (typeof occurredAt === "string") {
+        if (!lastEngagedAt || occurredAt > lastEngagedAt) lastEngagedAt = occurredAt;
+      }
+    }
+
+    // engaged = any engagement within last 14 days
+    const windowDays = 14;
+    let engaged = false;
+    let daysSinceLastEngagement: number | null = null;
+
+    if (lastEngagedAt) {
+      const last = new Date(lastEngagedAt).getTime();
+      const now = Date.now();
+      const diffMs = now - last;
+      daysSinceLastEngagement = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      engaged = diffMs <= windowDays * 24 * 60 * 60 * 1000;
+    }
+
+    return {
+      status: 200,
+      jsonBody: {
+        visitorId,
+        engaged,
+        lastEngagedAt,
+        daysSinceLastEngagement,
+        engagementCount: count,
+        windowDays
+      }
+    };
+  }
+});

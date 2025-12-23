@@ -127,9 +127,22 @@ const items: any[] = [];
 
     const trimmed = items.slice(0, maxResults);
 
-    return {
-      status: 200,
-      jsonBody: {
+    const itemsPreview = items.map((it: any) => ({
+  visitorId: it.visitorId,
+  name: it.visitor?.name ?? "",
+  email: it.visitor?.email ?? "",
+  source: it.visitor?.source ?? "unknown",
+  stage: it.formation?.stage ?? null,
+  lastEventType: it.formation?.lastEventType ?? null,
+  lastEventAt: it.formation?.lastEventAt ?? null,
+  reasonCode: it.followup?.reasonCode ?? null,
+  priority: it.followup?.priority ?? "normal",
+  suggestedAction: it.followup?.suggestedAction ?? ""
+}));
+
+return {
+  status: 200,
+  jsonBody: {
         generatedAt: new Date().toISOString(),
         windowHours,
         maxResults,
@@ -146,6 +159,8 @@ function parsePositiveInt(val: string | null, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 import { getFormationEventsTableClient, getFormationProfilesTableClient } from "../../storage/formation/formationTables";
+
+
 
 
 

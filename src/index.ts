@@ -13,6 +13,9 @@ import {
   VISITORS_PARTITION_KEY,
 } from "./storage/visitors/visitorsTable";
 
+import { getFormationEvents } from "./functions/formation/getFormationEvents";
+
+
 /**
  * ============================================================================
  *  CONFIG
@@ -673,4 +676,11 @@ app.http("getFormationProfile", {
   authLevel: "anonymous",
   route: "formation/profile",
   handler: getFormationProfile,
+});
+
+app.http("getFormationEvents", {
+  methods: ["GET"],
+  authLevel: "anonymous",
+  route: "formation/events",
+  handler: getFormationEvents,
 });

@@ -1,4 +1,4 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+﻿import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { getVisitorsTableClient, VISITORS_PARTITION_KEY } from "../../storage/visitors/visitorsTable";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
@@ -89,6 +89,11 @@ const items: any[] = [];
 
       if (!explicitFollowup && !isStale) continue;
 
+      // ✅ Auto-clear: once outcome is recorded, remove from follow-up queue
+      if (((lastEvent as any)?.eventType ?? (lastEvent as any)?.type) === "FOLLOWUP_OUTCOME_RECORDED") {
+        continue;
+      }
+
       items.push({
         visitorId,
         visitor: visitorMap.get(visitorId) ?? null,
@@ -171,6 +176,8 @@ function parsePositiveInt(val: string | null, fallback: number): number {
   const n = Number(val);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
+
+
 
 
 

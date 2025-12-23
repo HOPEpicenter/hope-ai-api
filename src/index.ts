@@ -3,6 +3,8 @@ import { TableClient } from "@azure/data-tables";
 import { v4 as uuidv4 } from "uuid";
 import sgMail from "@sendgrid/mail";
 
+import { postFormationEvent } from "./functions/formation/postFormationEvent";
+
 import { requireApiKey } from "./shared/auth/requireApiKey";
 import { ensureTableExists } from "./shared/storage/ensureTableExists";
 import {
@@ -628,6 +630,7 @@ app.http("listVisitorsNeedsFollowup", {
       if (results.length >= maxResults) break;
     }
 
+
     // Sort: (1) no engagement first, then (2) most overdue first
     results.sort((a, b) => {
       const aNever = a.lastEngagedAt ? 0 : 1;
@@ -649,4 +652,17 @@ app.http("listVisitorsNeedsFollowup", {
       }
     };
   }
+});
+
+/**
+ * ============================================================================
+ *  PHASE 3.1 — FORMATION (Discover HOPE Pilot)
+ * ============================================================================
+ */
+
+app.http("postFormationEvent", {
+  methods: ["POST"],
+  authLevel: "anonymous",
+  route: "formation/events",
+  handler: postFormationEvent,
 });

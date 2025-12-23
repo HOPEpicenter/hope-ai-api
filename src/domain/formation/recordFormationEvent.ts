@@ -15,6 +15,7 @@ import {
   upsertFormationProfile,
 } from "../../storage/formation/formationProfilesRepo";
 import { insertFormationEvent } from "../../storage/formation/formationEventsRepo";
+import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 
 /**
  * NOTE: This service assumes you already have a Visitors table and a helper to verify visitor exists.
@@ -100,6 +101,8 @@ export async function recordFormationEvent(
 
   const eventsTable = getFormationEventsTableClient(deps.storageConnectionString);
   const profilesTable = getFormationProfilesTableClient(deps.storageConnectionString);
+  await ensureTableExists(eventsTable);
+  await ensureTableExists(profilesTable);
 
   // Get or create profile
   let profile = await getFormationProfile(profilesTable, input.visitorId);

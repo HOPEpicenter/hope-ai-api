@@ -1,4 +1,4 @@
-ï»¿import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { TableClient } from "@azure/data-tables";
 import { v4 as uuidv4 } from "uuid";
 import sgMail from "@sendgrid/mail";
@@ -15,6 +15,8 @@ import {
 
 import { getFormationEvents } from "./functions/formation/getFormationEvents";
 
+import "./functions/formation/getFormationFollowupQueue";
+import "./functions/formation/postFormationFollowupAction";
 
 /**
  * ============================================================================
@@ -172,7 +174,7 @@ CreatedAt: ${params.createdAt}
 
 /**
  * ============================================================================
- *  PHASE 1 â€” IDENTITY LAYER
+ *  PHASE 1 — IDENTITY LAYER
  * ============================================================================
  */
 
@@ -323,7 +325,7 @@ app.http("getVisitorByEmail", {
 
 /**
  * ============================================================================
- *  PHASE 2 â€” ENGAGEMENT LAYER (EVENT LOG)
+ *  PHASE 2 — ENGAGEMENT LAYER (EVENT LOG)
  * ============================================================================
  */
 
@@ -464,7 +466,7 @@ app.http("listEngagements", {
 
 /**
  * ============================================================================
- *  PHASE 2.1 â€” ENGAGEMENT STATUS
+ *  PHASE 2.1 — ENGAGEMENT STATUS
  * ============================================================================
  */
 
@@ -537,7 +539,7 @@ app.http("getVisitorStatus", {
 
 /**
  * ============================================================================
- *  PHASE 2.2 â€” FOLLOW-UP OPERATIONS
+ *  PHASE 2.2 — FOLLOW-UP OPERATIONS
  * ============================================================================
  */
 
@@ -660,7 +662,7 @@ app.http("listVisitorsNeedsFollowup", {
 
 /**
  * ============================================================================
- *  PHASE 3.1 â€” FORMATION (Discover HOPE Pilot)
+ *  PHASE 3.1 — FORMATION (Discover HOPE Pilot)
  * ============================================================================
  */
 
@@ -684,3 +686,5 @@ app.http("getFormationEvents", {
   route: "formation/events",
   handler: getFormationEvents,
 });
+
+

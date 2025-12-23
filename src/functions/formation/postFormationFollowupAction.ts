@@ -1,0 +1,124 @@
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+
+import { requireApiKey } from "../../shared/auth/requireApiKey";
+import { ensureVisitorExists } from "../../storage/visitors/visitorsTable";
+import { validateFormationEvent, FormationEventType } from "../../domain/formation/phase3_1_scope";
+import { recordFormationEvent } from "../../domain/formation/recordFormationEvent";
+
+type FollowupAction =
+  | "assign"
+  | "assigned"
+  | "contact"
+  | "contacted"
+  | "outcome"
+  | "outcome_recorded"
+  | "record_outcome";
+
+function badRequest(message: string): HttpResponseInit {
+  return { status: 400, jsonBody: { error: message } };
+}
+
+function normalizeAction(val: unknown): FollowupAction | null {
+  if (typeof val !== "string") return null;
+  const s = val.trim().toLowerCase();
+  if (!s) return null;
+
+  const allowed = new Set<FollowupAction>([
+    "assign",
+    "assigned",
+    "contact",
+    "contacted",
+    "outcome",
+    "outcome_recorded",
+    "record_outcome"
+  ]);
+
+  return allowed.has(s as FollowupAction) ? (s as FollowupAction) : null;
+}
+
+function mapActionToType(action: FollowupAction): FormationEventType {
+  switch (action) {
+    case "assign":
+    case "assigned":
+      return FormationEventType.FOLLOWUP_ASSIGNED;
+
+    case "contact":
+    case "contacted":
+      return FormationEventType.FOLLOWUP_CONTACTED;
+
+    case "outcome":
+    case "outcome_recorded":
+    case "record_outcome":
+      return FormationEventType.FOLLOWUP_OUTCOME_RECORDED;
+  }
+}
+
+app.http("postFormationFollowupAction", {
+  methods: ["POST"],
+  authLevel: "anonymous",
+  route: "formation/followup/action",
+  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+    const auth = requireApiKey(req);
+    if (auth) return auth;
+
+    const connectionString = process.env.STORAGE_CONNECTION_STRING;
+    if (!connectionString) {
+      throw new Error("Missing STORAGE_CONNECTION_STRING");
+    }
+
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return badRequest("Invalid JSON body.");
+    }
+
+    const visitorId = typeof body?.visitorId === "string" ? body.visitorId.trim() : "";
+    if (!visitorId) return badRequest("visitorId required");
+
+    const action = normalizeAction(body?.action);
+    if (!action) return badRequest("action required (assign|contacted|outcome_recorded)");
+
+    const type = mapActionToType(action);
+
+    // Allow either:
+    //  - metadata: { ... } (preferred)
+    //  - convenience fields that are folded into metadata (assigneeId/channel/notes/outcome)
+    const md: any = (body?.metadata && typeof body.metadata === "object") ? body.metadata : {};
+
+    if (typeof body?.assigneeId === "string" && body.assigneeId.trim()) md.assigneeId = body.assigneeId.trim();
+    if (typeof body?.channel === "string" && body.channel.trim()) md.channel = body.channel.trim();
+    if (typeof body?.notes === "string" && body.notes.trim()) md.notes = body.notes.trim();
+    if (typeof body?.outcome === "string" && body.outcome.trim()) md.outcome = body.outcome.trim();
+
+    const input = {
+      visitorId,
+      type,
+      metadata: md
+    };
+
+    // Scope-locked validation (Phase 3.1)
+    const v = validateFormationEvent(input as any);
+    if (!v.ok) return badRequest(v.error);
+
+    try {
+            const result = await recordFormationEvent(input as any, {
+        storageConnectionString: connectionString,
+        ensureVisitorExists: async (visitorId: string) => {
+          await ensureVisitorExists(visitorId);
+        }
+      });return {
+        status: 201,
+        jsonBody: result
+      };
+    } catch (err: any) {
+      context.error("postFormationFollowupAction failed", err);
+      throw err;
+    }
+  }
+});
+
+
+
+
+

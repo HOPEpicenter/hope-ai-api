@@ -43,6 +43,7 @@ app.http("getVisitorsDashboard", {
 
     const limit = parsePositiveInt(req.query.get("limit"), 50, 500);
     const followupWindowHours = parsePositiveInt(req.query.get("followupWindowHours"), 168, 24 * 30); // default 7d
+    const onlyWithFormation = String(req.query.get("onlyWithFormation") ?? "").toLowerCase() === "true";
     const cutoffMs = Date.now() - followupWindowHours * 60 * 60 * 1000;
 
     // Phase 2 window is fixed at 14 days (do NOT change behavior)
@@ -112,6 +113,7 @@ app.http("getVisitorsDashboard", {
       } catch {
         // profile may not exist yet
       }
+      if (onlyWithFormation && formationStage === "Unknown") { continue; }
 
       // -------------------------
       // Phase 3: last formation event + followup flags
@@ -213,4 +215,5 @@ app.http("getVisitorsDashboard", {
     };
   }
 });
+
 

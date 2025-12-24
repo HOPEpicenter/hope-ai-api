@@ -640,3 +640,6 @@ import "./functions/getVisitorStatus";
 
 import "./functions/formation/postFormationNextStep";
 
+
+import "./functions/formation/getFormationSummary";
+

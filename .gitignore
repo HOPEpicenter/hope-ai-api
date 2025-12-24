@@ -4,3 +4,16 @@ local.settings.json
 .env
 .DS_Store
 .vscode/
+# ---- Local build / debug artifacts ----
+build.log
+*.log
+
+# ---- Temporary test payloads ----
+tmp*.json
+toDelete_*.csv
+toDelete_*.json
+toDelete_ids.txt
+
+# ---- Backup files created during debugging ----
+*.bak
+*.bak*

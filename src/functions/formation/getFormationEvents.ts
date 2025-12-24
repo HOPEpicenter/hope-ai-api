@@ -1,10 +1,12 @@
-// src/functions/formation/getFormationEvents.ts
+﻿// src/functions/formation/getFormationEvents.ts
 
 import { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import { ensureVisitorExists } from "../../storage/visitors/visitorsTable";
 import { getFormationEventsTableClient } from "../../storage/formation/formationTables";
+import { cleanTableEntity } from "../../shared/storage/cleanTableEntity";
+import { toFormationEventDto } from "../../domain/formation/formationDtos";
 
 function badRequest(message: string): HttpResponseInit {
   return { status: 400, jsonBody: { error: message } };
@@ -110,3 +112,8 @@ export async function getFormationEvents(
     return { status, jsonBody: { error: err?.message ?? "Server error" } };
   }
 }
+
+
+
+
+

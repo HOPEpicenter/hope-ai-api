@@ -108,7 +108,7 @@ app.http("postFormationFollowupAction", {
         }
       });return {
         status: 201,
-        jsonBody: { eventId: String((result as any)?.eventRowKey ?? (result as any)?.eventId ?? ""), profile: toFormationProfileDto((result as any)?.profile ?? null) }
+        jsonBody: { ...result, profile: toFormationProfileDto((result as any)?.profile ?? null) }
       };
     } catch (err: any) {
       context.error("postFormationFollowupAction failed", err);
@@ -116,7 +116,6 @@ app.http("postFormationFollowupAction", {
     }
   }
 });
-
 
 
 

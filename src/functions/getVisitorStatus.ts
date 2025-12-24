@@ -3,6 +3,7 @@ import { TableClient } from "@azure/data-tables";
 import { requireApiKey } from "../shared/auth/requireApiKey";
 import { ensureTableExists } from "../shared/storage/ensureTableExists";
 import { getFormationProfilesTableClient, getFormationEventsTableClient } from "../storage/formation/formationTables";
+import { tableName } from "../storage/tableName";
 
 function badRequest(message: string): HttpResponseInit {
   return { status: 400, jsonBody: { error: message } };
@@ -15,7 +16,7 @@ function escapeOdataString(s: string): string {
 function getEngagementsTableClient(): TableClient {
   const conn = process.env.STORAGE_CONNECTION_STRING;
   if (!conn) throw new Error("Missing STORAGE_CONNECTION_STRING");
-  return TableClient.fromConnectionString(conn, "Engagements");
+  return TableClient.fromConnectionString(conn, tableName("Engagements"));
 }
 
 app.http("getVisitorStatus", {
@@ -124,3 +125,4 @@ app.http("getVisitorStatus", {
     };
   }
 });
+

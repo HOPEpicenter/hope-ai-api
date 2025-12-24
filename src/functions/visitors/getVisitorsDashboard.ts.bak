@@ -4,7 +4,6 @@ import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import { getVisitorsTableClient, VISITORS_PARTITION_KEY } from "../../storage/visitors/visitorsTable";
 import { getFormationProfilesTableClient, getFormationEventsTableClient } from "../../storage/formation/formationTables";
-import { tableName } from "../../storage/tableName";
 
 function parsePositiveInt(val: string | null, fallback: number, max: number): number {
   if (!val) return fallback;
@@ -22,7 +21,7 @@ function escapeOdataString(s: string): string {
 function getEngagementsTableClient(): TableClient {
   const conn = process.env.STORAGE_CONNECTION_STRING;
   if (!conn) throw new Error("Missing STORAGE_CONNECTION_STRING");
-  return TableClient.fromConnectionString(conn, tableName("Engagements"));
+  return TableClient.fromConnectionString(conn, "Engagements");
 }
 
 const EXPLICIT_FOLLOWUP_EVENT_TYPES = new Set([
@@ -44,7 +43,6 @@ app.http("getVisitorsDashboard", {
 
     const limit = parsePositiveInt(req.query.get("limit"), 50, 500);
     const followupWindowHours = parsePositiveInt(req.query.get("followupWindowHours"), 168, 24 * 30); // default 7d
-    const onlyWithFormation = String(req.query.get("onlyWithFormation") ?? "").toLowerCase() === "true";
     const cutoffMs = Date.now() - followupWindowHours * 60 * 60 * 1000;
 
     // Phase 2 window is fixed at 14 days (do NOT change behavior)
@@ -114,7 +112,6 @@ app.http("getVisitorsDashboard", {
       } catch {
         // profile may not exist yet
       }
-      if (onlyWithFormation && formationStage === "Unknown") { continue; }
 
       // -------------------------
       // Phase 3: last formation event + followup flags
@@ -124,9 +121,7 @@ app.http("getVisitorsDashboard", {
 
       let lastEventAt: string | null = null;
       let lastEventType: string | null = null;
-
-      let lastOutcomeAt: string | null = null;
-      const explicitSinceOutcome: string[] = [];
+      let explicitFollowup = false;
 
       for await (const ev of eventsTable.listEntities({ queryOptions: { filter: eventsFilter } })) {
         const occurredAt = String((ev as any)?.occurredAt ?? "");
@@ -138,20 +133,8 @@ app.http("getVisitorsDashboard", {
           lastEventType = t || null;
         }
 
-        if (t === "FOLLOWUP_OUTCOME_RECORDED") {
-          if (!lastOutcomeAt || occurredAt > lastOutcomeAt) {
-            lastOutcomeAt = occurredAt;
-          }
-        }
-
-        if (EXPLICIT_FOLLOWUP_EVENT_TYPES.has(t)) {
-          explicitSinceOutcome.push(occurredAt);
-        }
+        if (EXPLICIT_FOLLOWUP_EVENT_TYPES.has(t)) explicitFollowup = true;
       }
-
-      const explicitFollowup =
-        explicitSinceOutcome.length > 0 &&
-        (!lastOutcomeAt || explicitSinceOutcome.some(t => t > lastOutcomeAt));
 
       // followup priority mirrors queue logic:
       // - cleared if last event is FOLLOWUP_OUTCOME_RECORDED
@@ -216,6 +199,3 @@ app.http("getVisitorsDashboard", {
     };
   }
 });
-
-
-

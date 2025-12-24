@@ -1,0 +1,141 @@
+﻿import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { requireApiKey } from "../../shared/auth/requireApiKey";
+import { parsePositiveInt } from "../../shared/util/parsePositiveInt";
+
+// Adjust these imports to match your repo exports if names differ
+import { getFormationProfilesTableClient, ensureTableExists } from "../../storage/formation/formationTables";
+
+type Urgency = "OVERDUE" | "DUE_SOON" | "WATCH";
+
+function toDate(value: any): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function daysBetween(now: Date, then: Date): number {
+  const ms = now.getTime() - then.getTime();
+  return Math.floor(ms / (24 * 60 * 60 * 1000));
+}
+
+function computeUrgency(profile: any, daysSinceLastEvent: number): { urgency: Urgency; recommendedAction: string; reason: string } | null {
+  // We’ll treat these as “open follow-up” indicators if present in your profile schema.
+  // If your schema differs, we’ll map it in Step 4G.2B after you paste your profile entity shape.
+  const stage = (profile.stage ?? "Unknown") as string;
+  const lastEventType = (profile.lastEventType ?? "") as string;
+
+  // Conservative rule-based signals:
+  const indicatesFollowup =
+    lastEventType.toUpperCase().includes("FOLLOWUP") ||
+    lastEventType.toUpperCase().includes("NEXT_STEP") ||
+    (profile.followupNeeded === true);
+
+  // Bucket logic:
+  if (indicatesFollowup) {
+    if (daysSinceLastEvent >= 3) {
+      return {
+        urgency: "OVERDUE",
+        recommendedAction: "Contact within 24h",
+        reason: "Open follow-up signal + 3+ days since last event"
+      };
+    }
+    return {
+      urgency: "DUE_SOON",
+      recommendedAction: "Contact within 48h",
+      reason: "Open follow-up signal + 0–2 days since last event"
+    };
+  }
+
+  // “Watch” list for early-stage staleness (no follow-up flag)
+  const earlyStage = ["Unknown", "New", "Exploring", "DiscoverHOPE", "DISCOVER_HOPE"].includes(stage);
+  if (earlyStage && daysSinceLastEvent >= 7) {
+    return {
+      urgency: "WATCH",
+      recommendedAction: "Check-in / invite to next step",
+      reason: "Early stage + 7+ days since last event"
+    };
+  }
+
+  return null;
+}
+
+export async function getFormationFollowupQueue(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+  const auth = requireApiKey(req);
+  if (auth) return auth;
+
+  const windowHours = parsePositiveInt(req.query.get("windowHours"), 168); // default 7 days
+  const maxResults = parsePositiveInt(req.query.get("maxResults"), 50);
+
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - windowHours * 60 * 60 * 1000);
+
+  const profilesTable = getFormationProfilesTableClient();
+  await ensureTableExists(profilesTable);
+
+  const items: any[] = [];
+
+  // Assumption: FormationProfiles partition is "FORMATION_PROFILE" or similar.
+  // If your table uses a different PartitionKey, we’ll swap in the correct constant.
+  // For now, we scan all and filter in-memory (safe for dev; can optimize to PK filter once confirmed).
+  for await (const p of profilesTable.listEntities<any>()) {
+    const lastEventAt = toDate(p.lastEventAt);
+    if (!lastEventAt) continue;
+
+    // only consider within window
+    if (lastEventAt < cutoff) continue;
+
+    const visitorId = (p.visitorId ?? p.RowKey ?? "") as string;
+    if (!visitorId) continue;
+
+    const daysSinceLastEvent = daysBetween(now, lastEventAt);
+
+    const computed = computeUrgency(p, daysSinceLastEvent);
+    if (!computed) continue;
+
+    items.push({
+      visitorId,
+      stage: p.stage ?? "Unknown",
+      urgency: computed.urgency,
+      daysSinceLastEvent,
+      lastEventAt: lastEventAt.toISOString(),
+      lastEventType: p.lastEventType ?? null,
+      recommendedAction: computed.recommendedAction,
+      reason: computed.reason
+    });
+  }
+
+  const urgencyRank: Record<Urgency, number> = { OVERDUE: 0, DUE_SOON: 1, WATCH: 2 };
+
+  items.sort((a, b) => {
+    const ur = urgencyRank[a.urgency as Urgency] - urgencyRank[b.urgency as Urgency];
+    if (ur !== 0) return ur;
+
+    // more stale first
+    const ds = (b.daysSinceLastEvent ?? 0) - (a.daysSinceLastEvent ?? 0);
+    if (ds !== 0) return ds;
+
+    // older lastEventAt first
+    return String(a.lastEventAt).localeCompare(String(b.lastEventAt));
+  });
+
+  const trimmed = items.slice(0, maxResults);
+
+  return {
+    status: 200,
+    jsonBody: {
+      generatedAt: now.toISOString(),
+      windowHours,
+      maxResults,
+      count: trimmed.length,
+      items: trimmed,
+      itemsPreview: trimmed.slice(0, Math.min(10, trimmed.length))
+    }
+  };
+}
+
+app.http("getFormationFollowupQueue", {
+  methods: ["GET"],
+  authLevel: "anonymous",
+  route: "formation/followup-queue",
+  handler: getFormationFollowupQueue
+});

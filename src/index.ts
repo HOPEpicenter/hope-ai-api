@@ -1,24 +1,21 @@
-﻿import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+﻿import { tableName } from "./storage/tableName";
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { TableClient } from "@azure/data-tables";
 import { v4 as uuidv4 } from "uuid";
 import sgMail from "@sendgrid/mail";
-
 import { postFormationEvent } from "./functions/formation/postFormationEvent";
 import { getFormationProfile } from "./functions/formation/getFormationProfile";
-
 import { requireApiKey } from "./shared/auth/requireApiKey";
 import { ensureTableExists } from "./shared/storage/ensureTableExists";
 import {
   getVisitorsTableClient,
   VISITORS_PARTITION_KEY,
 } from "./storage/visitors/visitorsTable";
-
 import { getFormationEvents } from "./functions/formation/getFormationEvents";
-
+import "./functions/formation/getFormationProfile";
 import "./functions/formation/getFormationFollowupQueue";
 import "./functions/formation/postFormationFollowupAction";
 import "./functions/getVisitorStatus";
-
 /**
  * ============================================================================
  *  CONFIG
@@ -41,7 +38,7 @@ function getEngagementsTableClient(): TableClient {
       "Missing STORAGE_CONNECTION_STRING in App Settings / local.settings.json"
     );
   }
-  return TableClient.fromConnectionString(conn, ENGAGEMENTS_TABLE);
+  return TableClient.fromConnectionString(conn, tableName(ENGAGEMENTS_TABLE));
 }
 
 /**
@@ -622,13 +619,6 @@ app.http("postFormationEvent", {
   handler: postFormationEvent,
 });
 
-app.http("getFormationProfile", {
-  methods: ["GET"],
-  authLevel: "anonymous",
-  route: "formation/profile",
-  handler: getFormationProfile,
-});
-
 app.http("getFormationEvents", {
   methods: ["GET"],
   authLevel: "anonymous",
@@ -636,16 +626,12 @@ app.http("getFormationEvents", {
   handler: getFormationEvents,
 });
 import "./functions/getVisitorStatus";
-
-
 import "./functions/formation/postFormationNextStep";
-
-
 import "./functions/formation/getFormationSummary";
-
-
 import "./functions/formation/getFormationFollowupMetrics";
-
-
 import "./functions/formation/getFormationStageTimeseries";
+import "./functions/visitors/getVisitorsDashboard";
+import "./functions/visitors/getVisitorsDashboard";
+
+
 

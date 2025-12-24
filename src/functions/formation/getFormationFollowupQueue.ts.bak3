@@ -50,10 +50,7 @@ function computeFromProfile(p: any, now: Date) {
     stageUpdatedAt
   ]);
 
-  const stageReason = String(p.stageReason ?? ""); 
-  const outcomeRecorded = stageReason === "event:FOLLOWUP_OUTCOME_RECORDED";
-  const stageIsClosed = stage === "Connected";
-  const openFollowup = !!lastFollowupAssignedAt && !lastFollowupOutcomeAt && !outcomeRecorded && !stageIsClosed;
+  const openFollowup = !!lastFollowupAssignedAt && !lastFollowupOutcomeAt;
   const daysSinceLastActivity = lastActivityAt ? daysBetween(now, lastActivityAt) : null;
 
   let urgency: Urgency | null = null;
@@ -106,10 +103,7 @@ export async function getFormationFollowupQueue(req: HttpRequest, context: Invoc
   const auth = requireApiKey(req);
   if (auth) return auth;
 
-  const windowDays = parsePositiveInt(req.query.get("windowDays"), 0);
-  const windowHours = windowDays > 0
-    ? windowDays * 24
-    : parsePositiveInt(req.query.get("windowHours"), 168); // default 7 days
+  const windowHours = parsePositiveInt(req.query.get("windowHours"), 168); // default 7 days
   const maxResults = parsePositiveInt(req.query.get("maxResults"), 50);
 
   const now = new Date();
@@ -168,7 +162,6 @@ export async function getFormationFollowupQueue(req: HttpRequest, context: Invoc
     status: 200,
     jsonBody: {
       generatedAt: now.toISOString(),
-      windowDays: windowDays > 0 ? windowDays : null,
       windowHours,
       maxResults,
       count: trimmed.length,
@@ -184,5 +177,3 @@ app.http("getFormationFollowupQueue", {
   route: "formation/followup-queue",
   handler: getFormationFollowupQueue
 });
-
-

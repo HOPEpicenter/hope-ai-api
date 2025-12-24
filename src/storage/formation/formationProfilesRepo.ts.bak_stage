@@ -1,4 +1,4 @@
-﻿// src/storage/formation/formationProfilesRepo.ts
+// src/storage/formation/formationProfilesRepo.ts
 import { TableEntityResult } from "@azure/data-tables";
 import { FormationStage, PHASE3_1 } from "../../domain/formation/phase3_1_scope";
 
@@ -69,4 +69,3 @@ export async function upsertFormationProfile(
 ): Promise<void> {
   await table.upsertEntity(entity, "Merge");
 }
-

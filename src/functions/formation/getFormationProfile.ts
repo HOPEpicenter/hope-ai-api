@@ -1,14 +1,11 @@
-// src/functions/formation/getFormationProfile.ts
-
-import { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+﻿import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
-import { ensureVisitorExists } from "../../storage/visitors/visitorsTable";
+import { cleanTableEntity } from "../../shared/storage/cleanTableEntity";
 import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
+import { ensureVisitorExists } from "../../storage/visitors/visitorsTable";
+import { toFormationProfileDto } from "../../domain/formation/formationDtos";
 
-/**
- * Basic 400 helper
- */
 function badRequest(message: string): HttpResponseInit {
   return { status: 400, jsonBody: { error: message } };
 }
@@ -19,24 +16,15 @@ function badRequest(message: string): HttpResponseInit {
  * Purpose:
  * - Return the current formation profile for a visitor
  * - If no profile exists yet, return profile: null (not an error)
- *
- * Guardrails:
- * - Requires API key
- * - Visitor must exist
  */
-export async function getFormationProfile(
-  req: HttpRequest,
-  context: InvocationContext
-): Promise<HttpResponseInit> {
+export async function getFormationProfile(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const auth = requireApiKey(req);
   if (auth) return auth;
 
-  const visitorId = (req.query.get("visitorId") ?? "").trim();
-  if (!visitorId) {
-    return badRequest("Query parameter 'visitorId' is required.");
-  }
+  const visitorId = String(req.query.get("visitorId") ?? "").trim();
+  if (!visitorId) return badRequest("Query param 'visitorId' is required.");
 
-  const connectionString = process.env.STORAGE_CONNECTION_STRING;
+  const connectionString = process.env.STORAGE_CONNECTION_STRING || process.env.AzureWebJobsStorage;
   if (!connectionString) {
     return {
       status: 500,
@@ -49,22 +37,20 @@ export async function getFormationProfile(
     await ensureVisitorExists(visitorId);
 
     const table = getFormationProfilesTableClient(connectionString);
-    await ensureTableExists(table);
+    await ensureTableExists(table as any);
 
-    // Profiles are keyed by:
-    // PartitionKey = "VISITOR"
-    // RowKey       = visitorId
+    // PartitionKey for profiles is VISITOR; RowKey is visitorId
     const profile = await table.getEntity<any>("VISITOR", visitorId);
 
     return {
       status: 200,
       jsonBody: {
         visitorId,
-        profile,
+        profile: cleanTableEntity(profile as any),
       },
     };
   } catch (err: any) {
-    // Profile not created yet → return clean null
+    // Profile not created yet -> return clean null
     if (err?.statusCode === 404) {
       return {
         status: 200,
@@ -77,10 +63,18 @@ export async function getFormationProfile(
 
     const status = err?.statusCode ?? 500;
     context.error("getFormationProfile failed", err);
-
     return {
       status,
       jsonBody: { error: err?.message ?? "Server error" },
     };
   }
 }
+
+app.http("getFormationProfile", {
+  methods: ["GET"],
+  authLevel: "anonymous",
+  route: "formation/profile",
+  handler: getFormationProfile,
+});
+
+

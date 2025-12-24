@@ -1,0 +1,45 @@
+﻿// src/domain/formation/updateFormationProfileFromEvent.ts
+import { TableClient } from "@azure/data-tables";
+import { applyFormationEventToProfile, FormationEventLike, FormationProfileEntity } from "./formationRules";
+import { ensureTableExists } from "../../shared/storage/ensureTableExists";
+import { getFormationProfilesTableClient } from "../../storage/formation/formationTables"; // adjust if names differ
+
+export async function updateFormationProfileFromEvent(
+  visitorId: string,
+  evt: FormationEventLike,
+  updatedBy: string = "system"
+) {
+  const connectionString = process.env.STORAGE_CONNECTION_STRING; if (!connectionString) throw new Error("STORAGE_CONNECTION_STRING missing"); const profiles = getFormationProfilesTableClient(connectionString);
+  await ensureTableExists(profiles);
+
+  const pk = FORMATION_PROFILE_PARTITION_KEY;
+  const rk = visitorId;
+
+  let existing: any = null;
+  try {
+    existing = await profiles.getEntity(pk, rk);
+  } catch {
+    // not found is fine
+  }
+
+  const base: FormationProfileEntity = {
+    visitorId,
+    ...(existing ? existing : { stage: "Guest", stageReason: "initial creation" }),
+  };
+
+  const updated = applyFormationEventToProfile(base, evt, updatedBy);
+
+  // Upsert back to table
+  await profiles.upsertEntity(
+    {
+      partitionKey: pk,
+      rowKey: rk,
+      ...updated,
+    },
+    "Merge"
+  );
+
+  return updated;
+}
+
+

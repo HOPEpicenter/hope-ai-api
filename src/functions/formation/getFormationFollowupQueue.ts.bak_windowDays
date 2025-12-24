@@ -106,10 +106,7 @@ export async function getFormationFollowupQueue(req: HttpRequest, context: Invoc
   const auth = requireApiKey(req);
   if (auth) return auth;
 
-  const windowDays = parsePositiveInt(req.query.get("windowDays"), 0);
-  const windowHours = windowDays > 0
-    ? windowDays * 24
-    : parsePositiveInt(req.query.get("windowHours"), 168); // default 7 days
+  const windowHours = parsePositiveInt(req.query.get("windowHours"), 168); // default 7 days
   const maxResults = parsePositiveInt(req.query.get("maxResults"), 50);
 
   const now = new Date();
@@ -168,7 +165,6 @@ export async function getFormationFollowupQueue(req: HttpRequest, context: Invoc
     status: 200,
     jsonBody: {
       generatedAt: now.toISOString(),
-      windowDays: windowDays > 0 ? windowDays : null,
       windowHours,
       maxResults,
       count: trimmed.length,
@@ -184,5 +180,4 @@ app.http("getFormationFollowupQueue", {
   route: "formation/followup-queue",
   handler: getFormationFollowupQueue
 });
-
 

@@ -15,6 +15,9 @@ import {
   upsertFormationProfile,
 } from "../../storage/formation/formationProfilesRepo";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
+import { updateFormationProfileFromEvent } from "./updateFormationProfileFromEvent";
+
+
 /**
  * Formation event recorder (Phase 3)
  * - Append-only events
@@ -204,7 +207,6 @@ export async function recordFormationEvent(
 
   return { eventRowKey: rowKey, profile };
 }
-
 
 
 

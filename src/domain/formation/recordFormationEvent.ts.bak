@@ -15,6 +15,9 @@ import {
   upsertFormationProfile,
 } from "../../storage/formation/formationProfilesRepo";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
+import { updateFormationProfileFromEvent } from "./updateFormationProfileFromEvent";
+
+
 /**
  * Formation event recorder (Phase 3)
  * - Append-only events
@@ -79,9 +82,6 @@ function computeNextStage(
   const current = normalizeStage(currentStage);
 
   switch (eventType) {
-    case FormationEventType.FOLLOWUP_ASSIGNED:
-      // When staff takes ownership, treat as an active Guest (no downgrade)
-      return maxStage(current, "Guest");
     case FormationEventType.NEXT_STEP_SELECTED:
       return maxStage(current, "Connected");
 
@@ -205,7 +205,11 @@ export async function recordFormationEvent(
   return { eventRowKey: rowKey, profile };
 }
 
-
-
-
+await updateFormationProfileFromEvent(visitorId, {
+  visitorId,
+  type,
+  occurredAt,
+  recordedAt: new Date().toISOString(),
+  metadata
+}, "system");
 

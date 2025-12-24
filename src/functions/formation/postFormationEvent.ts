@@ -1,9 +1,10 @@
-// src/functions/formation/postFormationEvent.ts
+﻿// src/functions/formation/postFormationEvent.ts
 import { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { ensureVisitorExists } from "../../storage/visitors/visitorsTable";
 import { recordFormationEvent } from "../../domain/formation/recordFormationEvent";
 import { FormationEventInput } from "../../domain/formation/phase3_1_scope";
+import { toFormationProfileDto } from "../../domain/formation/formationDtos";
 
 function badRequest(message: string): HttpResponseInit {
   return { status: 400, jsonBody: { error: message } };
@@ -47,7 +48,7 @@ export async function postFormationEvent(
         ok: true,
         visitorId: input.visitorId,
         eventId: result.eventRowKey,
-        profile: result.profile,
+        profile: toFormationProfileDto((result as any).profile ?? null),
       },
     };
   } catch (err: any) {
@@ -59,3 +60,12 @@ export async function postFormationEvent(
     return { status, jsonBody: { error: message } };
   }
 }
+
+
+
+
+
+
+
+
+

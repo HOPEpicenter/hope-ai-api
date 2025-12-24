@@ -1,32 +1,30 @@
-// src/domain/formation/recordFormationEvent.ts
-import crypto from "crypto";
+﻿import crypto from "crypto";
 import {
   FormationEventInput,
   FormationEventType,
+  FormationStage,
   applyFormationDefaults,
   validateFormationEvent,
 } from "./phase3_1_scope";
 import { getFormationEventsTableClient, getFormationProfilesTableClient } from "../../storage/formation/formationTables";
-import { FormationEventEntity } from "../../storage/formation/formationEventsRepo";
+import { FormationEventEntity, insertFormationEvent } from "../../storage/formation/formationEventsRepo";
 import {
   FormationProfileEntity,
   createDefaultFormationProfile,
   getFormationProfile,
   upsertFormationProfile,
 } from "../../storage/formation/formationProfilesRepo";
-import { insertFormationEvent } from "../../storage/formation/formationEventsRepo";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 
 /**
- * NOTE: This service assumes you already have a Visitors table and a helper to verify visitor exists.
- * We'll wire that in Step 4 when we build the endpoint handlers (so we can reuse your Phase 1 code).
- *
- * For now, this function focuses on Formation data writes only.
+ * Formation event recorder (Phase 3)
+ * - Append-only events
+ * - Snapshot updates on FormationProfile
+ * - Deterministic, non-downgrading stage progression
  */
 
 export type RecordFormationEventDeps = {
   storageConnectionString: string;
-  // Optional hook to enforce "visitor must exist" using your Phase 1 storage
   ensureVisitorExists?: (visitorId: string) => Promise<void>;
 };
 
@@ -40,7 +38,6 @@ function nowIso() {
 }
 
 function makeRowKey(occurredAtIso: string) {
-  // Sortable + unique: time + random suffix
   const suffix = crypto.randomBytes(6).toString("hex");
   return `${occurredAtIso}__${suffix}`;
 }
@@ -50,7 +47,70 @@ function stringifyMetadata(metadata: unknown): string | undefined {
   return JSON.stringify(metadata);
 }
 
-function applyProfileTouchpoint(profile: FormationProfileEntity, type: string, occurredAt: string, metadata: any) {
+/**
+ * Stage progression rules (PILOT)
+ * Valid stages: Visitor | Guest | Connected
+ * - Never downgrade
+ * - FOLLOWUP_CONTACTED does NOT advance stage
+ * - NEXT_STEP_SELECTED advances to Connected
+ * - FOLLOWUP_OUTCOME_RECORDED advances to Connected for positive outcomes
+ */
+const STAGE_RANK: Record<FormationStage, number> = {
+  Visitor: 0,
+  Guest: 1,
+  Connected: 2,
+};
+
+function normalizeStage(value: unknown): FormationStage {
+  const s = String(value ?? "").trim();
+  return s === "Visitor" || s === "Guest" || s === "Connected"
+    ? (s as FormationStage)
+    : "Visitor";
+}
+
+function maxStage(a: FormationStage, b: FormationStage): FormationStage {
+  return STAGE_RANK[a] >= STAGE_RANK[b] ? a : b;
+}
+
+function computeNextStage(
+  currentStage: unknown,
+  eventType: string,
+  metadata: any
+): FormationStage {
+  const current = normalizeStage(currentStage);
+
+  switch (eventType) {
+    case FormationEventType.NEXT_STEP_SELECTED:
+      return maxStage(current, "Connected");
+
+    case FormationEventType.FOLLOWUP_OUTCOME_RECORDED: {
+      const outcome = String(metadata?.outcome ?? "").toUpperCase().trim();
+      const CONNECTED_OUTCOMES = new Set([
+        "CONNECTED",
+        "WILL_VISIT",
+        "VISITING",
+        "ATTENDING",
+        "NEXT_STEP_TAKEN",
+        "JOINED_GROUP",
+        "MEMBER_CLASS",
+        "BAPTISM_CLASS",
+      ]);
+      return CONNECTED_OUTCOMES.has(outcome)
+        ? maxStage(current, "Connected")
+        : current;
+    }
+
+    default:
+      return current;
+  }
+}
+
+function applyProfileTouchpoint(
+  profile: FormationProfileEntity,
+  type: string,
+  occurredAt: string,
+  metadata: any
+) {
   switch (type) {
     case FormationEventType.SERVICE_ATTENDED:
       profile.lastServiceAttendedAt = occurredAt;
@@ -77,6 +137,15 @@ function applyProfileTouchpoint(profile: FormationProfileEntity, type: string, o
     default:
       break;
   }
+
+  // Stage progression (deterministic, no downgrade)
+  const nextStage = computeNextStage(profile.stage, String(type ?? ""), metadata);
+  if (nextStage !== profile.stage) {
+    profile.stage = nextStage;
+    (profile as any).stageUpdatedAt = occurredAt;
+    (profile as any).stageUpdatedBy = "system";
+    (profile as any).stageReason = `event:${String(type ?? "")}`;
+  }
 }
 
 export async function recordFormationEvent(
@@ -90,7 +159,6 @@ export async function recordFormationEvent(
     throw err;
   }
 
-  // Optional: enforce visitor existence through Phase 1
   if (deps.ensureVisitorExists) {
     await deps.ensureVisitorExists(input.visitorId);
   }
@@ -104,13 +172,11 @@ export async function recordFormationEvent(
   await ensureTableExists(eventsTable);
   await ensureTableExists(profilesTable);
 
-  // Get or create profile
   let profile = await getFormationProfile(profilesTable, input.visitorId);
   if (!profile) {
     profile = createDefaultFormationProfile(input.visitorId);
   }
 
-  // Create event entity (append-only)
   const rowKey = makeRowKey(occurredAt);
 
   const eventEntity: FormationEventEntity = {
@@ -118,26 +184,20 @@ export async function recordFormationEvent(
     rowKey,
     visitorId: input.visitorId,
     type: input.type,
-
     occurredAt,
     recordedAt,
-
     channel: input.channel ?? defaults.channel,
     visibility: input.visibility ?? defaults.visibility,
     sensitivity: input.sensitivity ?? defaults.sensitivity,
-
     summary: input.summary,
     metadata: stringifyMetadata(input.metadata),
     idempotencyKey: input.idempotencyKey,
   };
 
-  // Write event
   await insertFormationEvent(eventsTable, eventEntity);
 
-  // Update profile touchpoints (snapshot)
   applyProfileTouchpoint(profile, input.type, occurredAt, input.metadata);
 
-  // Upsert profile (merge)
   await upsertFormationProfile(profilesTable, profile);
 
   return { eventRowKey: rowKey, profile };

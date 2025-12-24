@@ -1,4 +1,4 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+ï»¿import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { TableClient } from "@azure/data-tables";
 import { v4 as uuidv4 } from "uuid";
 import sgMail from "@sendgrid/mail";
@@ -17,6 +17,7 @@ import { getFormationEvents } from "./functions/formation/getFormationEvents";
 
 import "./functions/formation/getFormationFollowupQueue";
 import "./functions/formation/postFormationFollowupAction";
+import "./functions/getVisitorStatus";
 
 /**
  * ============================================================================
@@ -174,7 +175,7 @@ CreatedAt: ${params.createdAt}
 
 /**
  * ============================================================================
- *  PHASE 1 — IDENTITY LAYER
+ *  PHASE 1 â€” IDENTITY LAYER
  * ============================================================================
  */
 
@@ -325,7 +326,7 @@ app.http("getVisitorByEmail", {
 
 /**
  * ============================================================================
- *  PHASE 2 — ENGAGEMENT LAYER (EVENT LOG)
+ *  PHASE 2 â€” ENGAGEMENT LAYER (EVENT LOG)
  * ============================================================================
  */
 
@@ -466,7 +467,7 @@ app.http("listEngagements", {
 
 /**
  * ============================================================================
- *  PHASE 2.1 — ENGAGEMENT STATUS
+ *  PHASE 2.1 â€” ENGAGEMENT STATUS
  * ============================================================================
  */
 
@@ -484,62 +485,10 @@ app.http("listEngagements", {
  * Definition:
  * - engaged = at least one engagement event in the last 14 days
  */
-app.http("getVisitorStatus", {
-  methods: ["GET"],
-  authLevel: "anonymous",
-  route: "visitors/status",
-  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
-    const auth = requireApiKey(req);
-    if (auth) return auth;
-
-    const visitorId = (req.query.get("visitorId") ?? "").trim();
-    if (!visitorId) return badRequest("Query parameter 'visitorId' is required.");
-
-    const engagementsTable = getEngagementsTableClient();
-    await ensureTableExists(engagementsTable);
-
-    const filter = `PartitionKey eq '${visitorId.replace(/'/g, "''")}'`;
-
-    let lastEngagedAt: string | null = null;
-    let count = 0;
-
-    for await (const e of engagementsTable.listEntities({ queryOptions: { filter } })) {
-      count++;
-      const occurredAt = (e as any).occurredAt;
-      if (typeof occurredAt === "string") {
-        if (!lastEngagedAt || occurredAt > lastEngagedAt) lastEngagedAt = occurredAt;
-      }
-    }
-
-    const windowDays = 14;
-    let engaged = false;
-    let daysSinceLastEngagement: number | null = null;
-
-    if (lastEngagedAt) {
-      const last = new Date(lastEngagedAt).getTime();
-      const now = Date.now();
-      const diffMs = now - last;
-      daysSinceLastEngagement = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      engaged = diffMs <= windowDays * 24 * 60 * 60 * 1000;
-    }
-
-    return {
-      status: 200,
-      jsonBody: {
-        visitorId,
-        engaged,
-        lastEngagedAt,
-        daysSinceLastEngagement,
-        engagementCount: count,
-        windowDays
-      }
-    };
-  }
-});
 
 /**
  * ============================================================================
- *  PHASE 2.2 — FOLLOW-UP OPERATIONS
+ *  PHASE 2.2 â€” FOLLOW-UP OPERATIONS
  * ============================================================================
  */
 
@@ -662,7 +611,7 @@ app.http("listVisitorsNeedsFollowup", {
 
 /**
  * ============================================================================
- *  PHASE 3.1 — FORMATION (Discover HOPE Pilot)
+ *  PHASE 3.1 â€” FORMATION (Discover HOPE Pilot)
  * ============================================================================
  */
 
@@ -686,5 +635,8 @@ app.http("getFormationEvents", {
   route: "formation/events",
   handler: getFormationEvents,
 });
+import "./functions/getVisitorStatus";
 
+
+import "./functions/formation/postFormationNextStep";
 

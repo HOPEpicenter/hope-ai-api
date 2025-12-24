@@ -1,14 +1,28 @@
 ﻿import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { TableClient } from "@azure/data-tables";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
+import { computeEngagementSummary } from "../../domain/engagement/computeEngagement";
+import { tableName } from "../../storage/tableName";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
 
 type Urgency = "OVERDUE" | "DUE_SOON" | "WATCH";
 
+const ENGAGEMENTS_TABLE = "Engagements";
+
+function getEngagementsTableClient(connectionString: string): TableClient {
+  return TableClient.fromConnectionString(connectionString, tableName(ENGAGEMENTS_TABLE));
+}
+
 function parsePositiveInt(val: string | null, fallback: number): number {
   const n = Number(val);
   if (!Number.isFinite(n) || n <= 0) return fallback;
   return Math.floor(n);
+}
+
+
+function escapeOdataString(value: string): string {
+  return value.replace(/'/g, "''");
 }
 
 function toDate(value: any): Date | null {
@@ -123,6 +137,9 @@ export async function getFormationFollowupQueue(req: HttpRequest, context: Invoc
   const profilesTable = getFormationProfilesTableClient(conn);
   await ensureTableExists(profilesTable as any);
 
+
+  const engagementsTable = getEngagementsTableClient(conn);
+  await ensureTableExists(engagementsTable as any);
   const items: any[] = [];
 
   for await (const p of profilesTable.listEntities<any>()) {
@@ -131,10 +148,44 @@ export async function getFormationFollowupQueue(req: HttpRequest, context: Invoc
 
     const computed = computeFromProfile(p, now);
 
+
+    // Phase 5: Engagement intelligence (PartitionKey = visitorId)
+    const engagementEvents: any[] = [];
+    const engagementFilter = `PartitionKey eq '${escapeOdataString(visitorId)}'`;
+    for await (const e of engagementsTable.listEntities<any>({ queryOptions: { filter: engagementFilter } })) {
+      engagementEvents.push(e);
+    }
+
+    const engagementSummary = computeEngagementSummary({
+      events: engagementEvents,
+      windowDays: windowDays > 0 ? windowDays : Math.ceil(windowHours / 24),
+      nowMs: now.getTime()
+    });
     // within window: use lastActivityAt if present; otherwise include (dev safe)
     if (computed.lastActivityAt && computed.lastActivityAt < cutoff) continue;
 
     if (!computed.urgency) continue;
+
+    // If they are engaged recently, downgrade urgency (still show in queue)
+    if (engagementSummary?.engaged && computed?.urgency && computed.urgency !== "WATCH") {
+      computed.urgency = "WATCH";
+      computed.recommendedAction = "Light touch / confirm next step";
+      computed.reason = (computed.reason ? computed.reason + " + engaged recently" : "engaged recently");
+    }
+
+        // Cooldown: if engaged within last 24h, hide from queue
+    const lastEngaged = engagementSummary?.lastEngagedAt
+      ? new Date(engagementSummary.lastEngagedAt)
+      : null;
+
+    if (lastEngaged) {
+      const hoursSinceEngaged = Math.floor(
+        (now.getTime() - lastEngaged.getTime()) / (60 * 60 * 1000)
+      );
+      if (hoursSinceEngaged < 24) {
+        continue;
+      }
+    }
 
     items.push({
       visitorId,
@@ -145,6 +196,12 @@ export async function getFormationFollowupQueue(req: HttpRequest, context: Invoc
       daysSinceLastActivity: computed.daysSinceLastActivity,
       lastFollowupAssignedAt: computed.lastFollowupAssignedAt ? computed.lastFollowupAssignedAt.toISOString() : null,
       lastFollowupOutcomeAt: computed.lastFollowupOutcomeAt ? computed.lastFollowupOutcomeAt.toISOString() : null,
+      engaged: engagementSummary.engaged,
+      lastEngagedAt: engagementSummary.lastEngagedAt,
+      daysSinceLastEngagement: engagementSummary.daysSinceLastEngagement,
+      engagementCount: engagementSummary.engagementCount,
+      engagementScore: engagementSummary.score,
+      engagementScoreReasons: engagementSummary.scoreReasons,
       recommendedAction: computed.recommendedAction,
       reason: computed.reason
     });
@@ -156,8 +213,11 @@ export async function getFormationFollowupQueue(req: HttpRequest, context: Invoc
     const ur = urgencyRank[a.urgency as Urgency] - urgencyRank[b.urgency as Urgency];
     if (ur !== 0) return ur;
 
-    const ds = (b.daysSinceLastActivity ?? -1) - (a.daysSinceLastActivity ?? -1);
-    if (ds !== 0) return ds;
+
+    const score = (b.engagementScore ?? -1) - (a.engagementScore ?? -1);
+    if (score !== 0) return score;
+
+
 
     return String(a.lastActivityAt ?? "").localeCompare(String(b.lastActivityAt ?? ""));
   });
@@ -184,5 +244,17 @@ app.http("getFormationFollowupQueue", {
   route: "formation/followup-queue",
   handler: getFormationFollowupQueue
 });
+
+
+
+
+
+
+
+
+
+
+
+
 
 

@@ -16,6 +16,8 @@ import "./functions/formation/getFormationProfile";
 import "./functions/formation/getFormationFollowupQueue";
 import "./functions/formation/postFormationFollowupAction";
 import "./functions/getVisitorStatus";
+import "./functions/formation/postFormationFollowupAutoAssign";
+
 /**
  * ============================================================================
  *  CONFIG

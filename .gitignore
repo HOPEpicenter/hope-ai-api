@@ -17,3 +17,5 @@ toDelete_ids.txt
 # ---- Backup files created during debugging ----
 *.bak
 *.bak*
+.azurite/
+azurite/

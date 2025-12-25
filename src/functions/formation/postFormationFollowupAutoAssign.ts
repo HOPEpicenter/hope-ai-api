@@ -44,7 +44,8 @@ type AutoAssignBody = {
   assigneeId?: string;
   maxResults?: number;
   dryRun?: boolean;
-  cooldownHours?: number;
+    force?: boolean;
+cooldownHours?: number;
   windowHours?: number;
   windowDays?: number;
   channel?: string;
@@ -84,7 +85,9 @@ app.http("autoAssignFollowup", {
     const maxResults = parsePositiveInt(body.maxResults, 25);
     const dryRun = typeof body.dryRun === "boolean" ? body.dryRun : true;
 
-    const cooldownHours = parseNonNegativeInt(body.cooldownHours, 24);
+    
+    const force = typeof body.force === "boolean" ? body.force : false;
+const cooldownHours = parseNonNegativeInt(body.cooldownHours, 24);
     const windowHours = parsePositiveInt(body.windowHours, 168);
 
     const windowDays =
@@ -122,7 +125,10 @@ if (typeof visitorId !== "string" || !visitorId.trim()) continue;
 
       const computed = computeFromProfile(p, now);
 
-      // Same gating as queue
+            // idempotency guard: skip already-assigned profiles unless force=true
+      const alreadyAssignedTo = typeof (computed as any)?.assignedTo === "string" ? String((computed as any).assignedTo).trim() : "";
+      if (!force && alreadyAssignedTo.length > 0) continue;
+// Same gating as queue
       if (computed?.lastActivityAt && computed.lastActivityAt < cutoff) continue;
       if (!computed?.urgency) continue;
 
@@ -254,6 +260,9 @@ if (typeof visitorId !== "string" || !visitorId.trim()) continue;
     };
   }
 });
+
+
+
 
 
 

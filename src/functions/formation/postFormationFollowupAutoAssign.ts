@@ -1,6 +1,7 @@
 ﻿import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { TableClient } from "@azure/data-tables";
-import { requireApiKey } from "../../shared/auth/requireApiKey";
+import { requireApiKey } from "../../shared/auth/requireApiKey";
+import { writeAutomationRun } from "../../storage/formation/automationRunsRepo";
 import { computeEngagementSummary } from "../../domain/engagement/computeEngagement";
 import { tableName } from "../../storage/tableName";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
@@ -64,6 +65,10 @@ app.http("autoAssignFollowup", {
   handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
     const auth = requireApiKey(req);
     if (auth) return auth;
+
+    // AUTO_ASSIGN_RUN_START_TS
+    const __runStartedAtMs = Date.now();
+    const __runStartedAt = new Date(__runStartedAtMs).toISOString();
 
     const connectionString = process.env.STORAGE_CONNECTION_STRING;
     if (!connectionString) throw new Error("Missing STORAGE_CONNECTION_STRING");
@@ -189,7 +194,35 @@ if (typeof visitorId !== "string" || !visitorId.trim()) continue;
     const automationRunId = `${now.toISOString()}_${Math.random().toString(36).slice(2, 10)}`;
 
     if (dryRun) {
+  // WRITE_AUTOMATION_RUN_DRYRUN
+const __runEndedAtMs = Date.now();
+  const __runEndedAt = new Date(__runEndedAtMs).toISOString();
+
+  await writeAutomationRun({
+    automationRunId: String(automationRunId),
+    trigger: "http",
+    ok: true,
+    dryRun: true,
+    startedAt: __runStartedAt,
+    endedAt: __runEndedAt,
+    durationMs: __runEndedAtMs - __runStartedAtMs,
+
+    scannedProfiles: Number(scannedProfiles),
+    eligible: Number((items ?? []).length),
+    selected: Number(selected.length),
+    assignedCount: 0,
+
+    assigneeId: String(assigneeId),
+
+    windowHours: Number(windowHours),
+    windowDays: Number(windowDays),
+    cooldownHours: Number(cooldownHours),
+    maxResults: Number(maxResults),
+    force: Boolean(force),
+  });
+
       return {
+
         status: 200,
         jsonBody: {
           ok: true,
@@ -243,8 +276,40 @@ if (typeof visitorId !== "string" || !visitorId.trim()) continue;
         eventId: String((result as any)?.eventRowKey ?? (result as any)?.eventId ?? "")
       });
     }
+  // WRITE_AUTOMATION_RUN_REALRUN
+const __runEndedAtMs = Date.now();
+  const __runEndedAt = new Date(__runEndedAtMs).toISOString();
+
+  const __assignedCount =
+    typeof (assigned as any) !== "undefined" && Array.isArray(assigned) ? assigned.length : 0;
+
+  await writeAutomationRun({
+    automationRunId: String(automationRunId),
+    trigger: "http",
+    ok: true,
+    dryRun: false,
+    startedAt: __runStartedAt,
+    endedAt: __runEndedAt,
+    durationMs: __runEndedAtMs - __runStartedAtMs,
+
+    scannedProfiles: Number(scannedProfiles),
+    eligible: Number((items ?? []).length),
+    selected: Number(selected.length),
+    assignedCount: Number(__assignedCount),
+
+    assigneeId: String(assigneeId),
+
+    windowHours: Number(windowHours),
+    windowDays: Number(windowDays),
+    cooldownHours: Number(cooldownHours),
+    maxResults: Number(maxResults),
+    force: Boolean(force),
+  });
+
 
     return {
+
+
       status: 201,
       jsonBody: {
         ok: true,
@@ -260,6 +325,11 @@ if (typeof visitorId !== "string" || !visitorId.trim()) continue;
     };
   }
 });
+
+
+
+
+
 
 
 

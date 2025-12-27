@@ -32,3 +32,18 @@ export async function ensureFormationTablesExist(connectionString: string): Prom
   await profiles.createTable().catch(() => {});
   await events.createTable().catch(() => {});
 }
+
+/** Phase 8: Automation run metrics */
+export const AUTOMATION_RUNS_PARTITION_KEY = "AUTO_ASSIGN";
+
+export function getAutomationRunsTableClient(): TableClient {
+  const name = process.env.AUTOMATION_RUNS_TABLE || "AutomationRuns";
+  const cs = process.env.STORAGE_CONNECTION_STRING || process.env.AzureWebJobsStorage;
+  if (!cs) throw new Error("STORAGE_CONNECTION_STRING (or AzureWebJobsStorage) missing");
+  return TableClient.fromConnectionString(cs, tableName(name));
+}
+
+export async function ensureAutomationRunsTableExists(): Promise<void> {
+  const t = getAutomationRunsTableClient();
+  await t.createTable().catch(() => {});
+}

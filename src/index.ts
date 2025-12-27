@@ -1,4 +1,5 @@
 ﻿import "./functions/formation/autoAssignFollowupTimer";
+import "./functions/formation/index";
 import { tableName } from "./storage/tableName";
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { TableClient } from "@azure/data-tables";
@@ -635,6 +636,7 @@ import "./functions/formation/getFormationFollowupMetrics";
 import "./functions/formation/getFormationStageTimeseries";
 import "./functions/visitors/getVisitorsDashboard";
 import "./functions/visitors/getVisitorsDashboard";
+
 
 
 

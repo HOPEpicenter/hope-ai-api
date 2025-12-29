@@ -1,4 +1,4 @@
-﻿import crypto from "crypto";
+import crypto from "crypto";
 import {
   FormationEventInput,
   FormationEventType,
@@ -6,8 +6,14 @@ import {
   applyFormationDefaults,
   validateFormationEvent,
 } from "./phase3_1_scope";
-import { getFormationEventsTableClient, getFormationProfilesTableClient } from "../../storage/formation/formationTables";
-import { FormationEventEntity, insertFormationEvent } from "../../storage/formation/formationEventsRepo";
+import {
+  getFormationEventsTableClient,
+  getFormationProfilesTableClient,
+} from "../../storage/formation/formationTables";
+import {
+  FormationEventEntity,
+  insertFormationEvent,
+} from "../../storage/formation/formationEventsRepo";
 import {
   FormationProfileEntity,
   createDefaultFormationProfile,
@@ -15,6 +21,7 @@ import {
   upsertFormationProfile,
 } from "../../storage/formation/formationProfilesRepo";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
+
 /**
  * Formation event recorder (Phase 3)
  * - Append-only events
@@ -32,11 +39,11 @@ export type RecordFormationEventResult = {
   profile: FormationProfileEntity;
 };
 
-function nowIso() {
+function nowIso(): string {
   return new Date().toISOString();
 }
 
-function makeRowKey(occurredAtIso: string) {
+function makeRowKey(occurredAtIso: string): string {
   const suffix = crypto.randomBytes(6).toString("hex");
   return `${occurredAtIso}__${suffix}`;
 }
@@ -82,6 +89,7 @@ function computeNextStage(
     case FormationEventType.FOLLOWUP_ASSIGNED:
       // When staff takes ownership, treat as an active Guest (no downgrade)
       return maxStage(current, "Guest");
+
     case FormationEventType.NEXT_STEP_SELECTED:
       return maxStage(current, "Connected");
 
@@ -97,9 +105,7 @@ function computeNextStage(
         "MEMBER_CLASS",
         "BAPTISM_CLASS",
       ]);
-      return CONNECTED_OUTCOMES.has(outcome)
-        ? maxStage(current, "Connected")
-        : current;
+      return CONNECTED_OUTCOMES.has(outcome) ? maxStage(current, "Connected") : current;
     }
 
     default:
@@ -112,7 +118,7 @@ function applyProfileTouchpoint(
   type: string,
   occurredAt: string,
   metadata: any
-) {
+): void {
   switch (type) {
     case FormationEventType.SERVICE_ATTENDED:
       profile.lastServiceAttendedAt = occurredAt;
@@ -125,6 +131,11 @@ function applyProfileTouchpoint(
 
     case FormationEventType.FOLLOWUP_CONTACTED:
       profile.lastFollowupContactedAt = occurredAt;
+      break;
+
+    case FormationEventType.FOLLOWUP_OUTCOME_RECORDED:
+      // ✅ NEW: needed so queue can tell an outcome was recorded
+      profile.lastFollowupOutcomeAt = occurredAt;
       break;
 
     case FormationEventType.NEXT_STEP_SELECTED:
@@ -204,8 +215,3 @@ export async function recordFormationEvent(
 
   return { eventRowKey: rowKey, profile };
 }
-
-
-
-
-

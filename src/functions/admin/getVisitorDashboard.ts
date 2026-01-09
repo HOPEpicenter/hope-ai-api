@@ -72,14 +72,23 @@ function truthy01(val: string | null | undefined): boolean {
 function parseKinds(raw: string | null | undefined): Set<TimelineKind> {
   const s = (raw ?? "").trim();
   if (!s) return new Set<TimelineKind>(["formation", "engagement"]);
-  const parts = s.split(",").map(p => p.trim().toLowerCase()).filter(Boolean);
 
+  const parts = s.split(",").map(p => p.trim().toLowerCase()).filter(Boolean);
   const kinds = new Set<TimelineKind>();
   for (const p of parts) {
     if (p === "formation") kinds.add("formation");
     if (p === "engagement") kinds.add("engagement");
   }
   return kinds.size ? kinds : new Set<TimelineKind>(["formation", "engagement"]);
+}
+
+function parseKindsFromQuery(q: any): Set<TimelineKind> {
+  // Supports:
+  //   ?kinds=formation&kinds=engagement
+  //   ?kinds=formation,engagement
+  const all: string[] = (typeof q?.getAll === "function") ? q.getAll("kinds") : [];
+  const raw = (all && all.length > 0) ? all.join(",") : q?.get?.("kinds");
+  return parseKinds(raw);
 }
 
 function safeIso(val: any): string | null {
@@ -103,7 +112,6 @@ function isAzuriteConnectionString(cs: string): boolean {
   return s.includes("devstoreaccount1") || s.includes("127.0.0.1") || s.includes("localhost");
 }
 
-// Minimal connection “fingerprint” for debug (safe-ish; no secrets)
 function connFingerprint(cs: string) {
   const low = cs.toLowerCase();
   const accountName =
@@ -134,7 +142,6 @@ function connFingerprint(cs: string) {
 }
 
 function getTableClientFromEnv(tbl: string): { client: TableClient; conn: string; isAzurite: boolean; fp: any } {
-  // Prefer your canonical var, fallback to AzureWebJobsStorage
   const cs = process.env.STORAGE_CONNECTION_STRING || process.env.AzureWebJobsStorage;
   if (!cs) throw new Error("Storage connection string not set. Expected STORAGE_CONNECTION_STRING or AzureWebJobsStorage.");
 
@@ -144,32 +151,32 @@ function getTableClientFromEnv(tbl: string): { client: TableClient; conn: string
 }
 
 /**
- * IMPORTANT RULE (prevents TS pain):
- * - DO NOT use `top` or `maxPageSize` inside listEntities({ ... }) options (types often reject it).
- * - If you want “first row only”, use: listEntities(...).byPage({ maxPageSize: 1 })
+ * Build listEntities options deterministically
+ */
+function listOpts(filter?: string) {
+  return filter ? { queryOptions: { filter } } : undefined;
+}
+
+/**
+ * Probe using the same async-iterator path as the working timeline endpoint
  */
 async function probeFirstEntity(client: TableClient, filter?: string): Promise<any | null> {
-  const baseOptions = filter ? ({ queryOptions: { filter } } as any) : undefined;
-  const pages = client.listEntities(baseOptions).byPage({ maxPageSize: 1 });
-  for await (const page of pages) {
-    const first = (page as any[])[0];
-    return first ?? null;
+  for await (const e of client.listEntities(listOpts(filter))) {
+    return e as any;
   }
   return null;
 }
 
-/**
- * Normalize FormationEvents entity
- * - PartitionKey = visitorId
- * - RowKey = eventId (e.g. 2026-...Z__hash)
- * - metadata stored as JSON string in `metadata`
- */
 function normalizeFormationEntity(visitorId: string, e: any, includeRaw: boolean): TimelineItem | null {
-  const occurredAt = safeIso(e.occurredAt) ?? safeIso((e as any).OccurredAt) ?? safeIso(e.timestamp) ?? safeIso(e.recordedAt);
+  const occurredAt =
+    safeIso(e.occurredAt) ??
+    safeIso((e as any).OccurredAt) ??
+    safeIso(e.timestamp) ??
+    safeIso(e.recordedAt);
+
   if (!occurredAt) return null;
 
   const recordedAt = safeIso(e.recordedAt) ?? occurredAt;
-
   const type = (e.type ?? (e as any).Type ?? "UNKNOWN").toString();
   const display = (e.display ?? (e as any).Display ?? `${type}`).toString();
 
@@ -199,17 +206,16 @@ function normalizeFormationEntity(visitorId: string, e: any, includeRaw: boolean
   return item;
 }
 
-/**
- * Normalize Engagement entity
- * - PartitionKey = visitorId
- * - RowKey = engagementId
- */
 function normalizeEngagementEntity(visitorId: string, e: any, includeRaw: boolean): TimelineItem | null {
-  const occurredAt = safeIso(e.occurredAt) ?? safeIso((e as any).OccurredAt) ?? safeIso(e.timestamp) ?? safeIso(e.recordedAt);
+  const occurredAt =
+    safeIso(e.occurredAt) ??
+    safeIso((e as any).OccurredAt) ??
+    safeIso(e.timestamp) ??
+    safeIso(e.recordedAt);
+
   if (!occurredAt) return null;
 
   const recordedAt = safeIso(e.recordedAt) ?? occurredAt;
-
   const type = (e.eventType ?? e.type ?? (e as any).Type ?? "ENGAGEMENT").toString();
   const display = (e.display ?? (e as any).Display ?? `${type}`).toString();
 
@@ -246,10 +252,6 @@ const ENGAGEMENTS_TABLE = tableName(process.env.ENGAGEMENTS_TABLE || "Engagement
 const FORMATION_PROFILES_TABLE = tableName(process.env.FORMATION_PROFILES_TABLE || "FormationProfiles");
 
 async function tryGetVisitor(visitorId: string, visitors: TableClient): Promise<any | null> {
-  // common keys:
-  // 1) PK='VISITOR', RK=email (older) — not supported here
-  // 2) PK='VISITOR', RK=visitorId (admin ops sometimes)
-  // 3) PK=visitorId, RK=visitorId (rare)
   const attempts: Array<[string, string]> = [
     ["VISITOR", visitorId],
     [visitorId, visitorId]
@@ -293,9 +295,8 @@ app.http("getVisitorDashboard", {
 
     const debug = truthy01(req.query.get("debug"));
     const timelineLimit = parsePositiveInt(req.query.get("timelineLimit"), 5);
-    const kinds = parseKinds(req.query.get("kinds"));
+    const kinds = parseKindsFromQuery(req.query);
 
-    // --- Clients ---
     const visitorsClient = getTableClientFromEnv(VISITORS_TABLE);
     const profilesClient = getTableClientFromEnv(FORMATION_PROFILES_TABLE);
     const formationClient = getTableClientFromEnv(FORMATION_EVENTS_TABLE);
@@ -306,7 +307,6 @@ app.http("getVisitorDashboard", {
     await ensureTableExists(formationClient.client);
     await ensureTableExists(engagementsClient.client);
 
-    // --- Visitor ---
     const visitorEntity = await tryGetVisitor(visitorId, visitorsClient.client);
     const visitor = {
       visitorId,
@@ -316,7 +316,6 @@ app.http("getVisitorDashboard", {
       createdAt: (safeIso(visitorEntity?.createdAt) ?? safeIso(visitorEntity?.CreatedAt) ?? null) as string | null
     };
 
-    // --- Formation profile snapshot ---
     const profile = await tryGetFormationProfile(visitorId, profilesClient.client);
     const formationSnapshot = {
       stage: (profile?.stage ?? profile?.Stage ?? null) as string | null,
@@ -326,15 +325,13 @@ app.http("getVisitorDashboard", {
       lastEventAt: (safeIso(profile?.lastEventAt) ?? safeIso(profile?.LastEventAt) ?? null) as string | null
     };
 
-    // --- Timeline preview ---
+    // Timeline preview
     const timelineItems: TimelineItem[] = [];
     const pullCap = Math.min(Math.max(timelineLimit * 8, 50), 300);
 
-    const formationFilter = `PartitionKey eq '${String(visitorId).replace(/'/g, "''")}'`;
-    const engagementFilter = `PartitionKey eq '${String(visitorId).replace(/'/g, "''")}'`;
+    const formationFilter = `visitorId eq '${String(visitorId).replace(/'/g, "''")}'`;
+    const engagementFilter = `visitorId eq '${String(visitorId).replace(/'/g, "''")}'`;
 
-    // --- Step 1/2 Probes (debug-only) ---
-    // These prove whether THIS FUNCTION can see any rows at all, and whether it can see rows for this visitor.
     let formationProbeAnyRow: any = null;
     let formationProbeFirstFiltered: any = null;
     let engagementProbeAnyRow: any = null;
@@ -345,11 +342,7 @@ app.http("getVisitorDashboard", {
         const e = await probeFirstEntity(formationClient.client);
         if (e) formationProbeAnyRow = {
           PartitionKey: (e as any).partitionKey ?? (e as any).PartitionKey,
-          RowKey: (e as any).rowKey ?? (e as any).RowKey,
-          visitorId: (e as any).visitorId,
-          type: (e as any).type,
-          occurredAt: (e as any).occurredAt,
-          recordedAt: (e as any).recordedAt
+          RowKey: (e as any).rowKey ?? (e as any).RowKey
         };
       } catch (err: any) {
         formationProbeAnyRow = { error: "probe_any_failed", message: String(err?.message ?? err) };
@@ -375,11 +368,7 @@ app.http("getVisitorDashboard", {
         const e = await probeFirstEntity(engagementsClient.client);
         if (e) engagementProbeAnyRow = {
           PartitionKey: (e as any).partitionKey ?? (e as any).PartitionKey,
-          RowKey: (e as any).rowKey ?? (e as any).RowKey,
-          visitorId: (e as any).visitorId,
-          type: (e as any).eventType ?? (e as any).type,
-          occurredAt: (e as any).occurredAt,
-          recordedAt: (e as any).recordedAt
+          RowKey: (e as any).rowKey ?? (e as any).RowKey
         };
       } catch (err: any) {
         engagementProbeAnyRow = { error: "probe_any_failed", message: String(err?.message ?? err) };
@@ -389,42 +378,33 @@ app.http("getVisitorDashboard", {
         const e = await probeFirstEntity(engagementsClient.client, engagementFilter);
         if (e) engagementProbeFirstFiltered = {
           PartitionKey: (e as any).partitionKey ?? (e as any).PartitionKey,
-          RowKey: (e as any).rowKey ?? (e as any).RowKey,
-          visitorId: (e as any).visitorId,
-          type: (e as any).eventType ?? (e as any).type,
-          occurredAt: (e as any).occurredAt,
-          recordedAt: (e as any).recordedAt
+          RowKey: (e as any).rowKey ?? (e as any).RowKey
         };
       } catch (err: any) {
         engagementProbeFirstFiltered = { error: "probe_filtered_failed", message: String(err?.message ?? err) };
       }
     }
 
-    // --- Pull formation rows for this visitor ---
     if (kinds.has("formation")) {
       let pulled = 0;
-      for await (const e of formationClient.client.listEntities({ queryOptions: { filter: formationFilter } } as any)) {
+      for await (const e of formationClient.client.listEntities(listOpts(formationFilter))) {
         const item = normalizeFormationEntity(visitorId, e, debug);
         if (item) timelineItems.push(item);
-
         pulled++;
         if (pulled >= pullCap) break;
       }
     }
 
-    // --- Pull engagement rows for this visitor ---
     if (kinds.has("engagement")) {
       let pulled = 0;
-      for await (const e of engagementsClient.client.listEntities({ queryOptions: { filter: engagementFilter } } as any)) {
+      for await (const e of engagementsClient.client.listEntities(listOpts(engagementFilter))) {
         const item = normalizeEngagementEntity(visitorId, e, debug);
         if (item) timelineItems.push(item);
-
         pulled++;
         if (pulled >= pullCap) break;
       }
     }
 
-    // Sort newest-first
     timelineItems.sort((a, b) => {
       const ao = Date.parse(a.occurredAt);
       const bo = Date.parse(b.occurredAt);
@@ -437,7 +417,6 @@ app.http("getVisitorDashboard", {
     const hasMore = timelineItems.length > preview.length;
     const nextCursor = preview.length > 0 ? preview[preview.length - 1].id : null;
 
-    // --- Engagement status (preview-based) ---
     const engagementRows = timelineItems.filter(t => t.kind === "engagement");
     const lastEngagedAt = engagementRows.length > 0 ? engagementRows[0].occurredAt : null;
 
@@ -474,7 +453,6 @@ app.http("getVisitorDashboard", {
 
     if (debug) {
       resp.debugStorage = {
-        // short safe preview of conn
         conn: `${visitorsClient.conn.substring(0, 35)}...`,
         isAzurite: visitorsClient.isAzurite,
         tablesRaw: {
@@ -510,7 +488,6 @@ app.http("getVisitorDashboard", {
       };
     }
 
-    // Enforce debug contract: never leak raw entities when debug=0
     if (!debug) {
       for (const it of resp.timelinePreview.timelineItems as any[]) {
         if (it && typeof it === "object" && it.dataRaw !== undefined) delete it.dataRaw;
@@ -520,4 +497,3 @@ app.http("getVisitorDashboard", {
     return { status: 200, jsonBody: resp };
   }
 });
-

@@ -14,9 +14,11 @@
     "@azure/data-tables": "^13.3.0",
     "@azure/functions": "^4.5.0",
     "@sendgrid/mail": "^8.1.6",
+    "luxon": "^3.7.2",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@types/luxon": "^3.7.1",
     "@types/node": "^20.11.30",
     "@types/uuid": "^9.0.8",
     "rimraf": "^6.0.1",

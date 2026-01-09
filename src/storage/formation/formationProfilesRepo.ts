@@ -17,6 +17,7 @@ export type FormationProfileEntity = {
 
   lastServiceAttendedAt?: string;
   lastFollowupAssignedAt?: string;
+  lastFollowupOutcomeAt?: string;
   lastFollowupContactedAt?: string;
   lastNextStepAt?: string;
   lastPrayerRequestedAt?: string;

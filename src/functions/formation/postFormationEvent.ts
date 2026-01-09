@@ -1,4 +1,4 @@
-﻿// src/functions/formation/postFormationEvent.ts
+// src/functions/formation/postFormationEvent.ts
 import { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { ensureVisitorExists } from "../../storage/visitors/visitorsTable";
@@ -32,6 +32,12 @@ export async function postFormationEvent(
     return badRequest("Invalid JSON body.");
   }
 
+  // Compatibility aliases (HTTP-layer only; domain remains strict)
+  if (body && typeof body === "object") {
+    if (!body.type && body.eventType) body.type = body.eventType;
+    if (!body.channel && body.source) body.channel = body.source;
+  }
+
   const input = body as FormationEventInput;
 
   try {
@@ -53,19 +59,9 @@ export async function postFormationEvent(
     };
   } catch (err: any) {
     const status = err?.statusCode ?? 500;
-    const message =
-      status === 500 ? "Server error" : (err?.message ?? "Error");
+    const message = status === 500 ? "Server error" : (err?.message ?? "Error");
 
     context.error("postFormationEvent failed", err);
     return { status, jsonBody: { error: message } };
   }
 }
-
-
-
-
-
-
-
-
-

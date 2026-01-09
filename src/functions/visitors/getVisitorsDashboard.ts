@@ -1,4 +1,5 @@
-﻿import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+﻿import { makeTableClient } from "../../shared/storage/makeTableClient";
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { TableClient } from "@azure/data-tables";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
@@ -22,7 +23,7 @@ function escapeOdataString(s: string): string {
 function getEngagementsTableClient(): TableClient {
   const conn = process.env.STORAGE_CONNECTION_STRING;
   if (!conn) throw new Error("Missing STORAGE_CONNECTION_STRING");
-  return TableClient.fromConnectionString(conn, tableName("Engagements"));
+  return makeTableClient(conn, "Engagements");
 }
 
 const EXPLICIT_FOLLOWUP_EVENT_TYPES = new Set([
@@ -216,6 +217,7 @@ app.http("getVisitorsDashboard", {
     };
   }
 });
+
 
 
 

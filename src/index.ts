@@ -1,24 +1,52 @@
-﻿import "./functions/formation/autoAssignFollowupTimer";
+﻿// src/index.ts
+
+/**
+ * ============================================================================
+ *  IMPORTANT: FUNCTION REGISTRATION
+ * ============================================================================
+ * Azure Functions (Node v4 programming model) only exposes HTTP endpoints that
+ * are registered at startup via side-effect imports (modules that call app.http).
+ *
+ * Keep ALL side-effect imports at the TOP of this file.
+ */
+
+// --- Side-effect imports (register app.http / timer triggers) ---
+import "./functions/formation/autoAssignFollowupTimer";
 import "./functions/formation/index";
+
+import "./functions/getVisitorStatus";
+import "./functions/visitors/getVisitorsDashboard";
+
+import "./functions/formation/getFormationProfile";
+import "./functions/formation/getFormationFollowupQueue";
+import "./functions/formation/postFormationFollowupAction";
+import "./functions/formation/postFormationFollowupAutoAssign";
+import "./functions/formation/postFormationNextStep";
+import "./functions/formation/getFormationSummary";
+import "./functions/formation/getFormationFollowupMetrics";
+import "./functions/formation/getFormationStageTimeseries";
+
+// ✅ Admin / Ops routes (THIS fixes your 404 for /ops/visitors/...)
+import "./functions/admin/getVisitorDashboard";
+import "./functions/admin/getVisitorTimeline";
+
+// --- Regular imports (used by code in THIS file) ---
 import { tableName } from "./storage/tableName";
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { TableClient } from "@azure/data-tables";
 import { v4 as uuidv4 } from "uuid";
 import sgMail from "@sendgrid/mail";
-import { postFormationEvent } from "./functions/formation/postFormationEvent";
-import { getFormationProfile } from "./functions/formation/getFormationProfile";
+
 import { requireApiKey } from "./shared/auth/requireApiKey";
 import { ensureTableExists } from "./shared/storage/ensureTableExists";
+
 import {
   getVisitorsTableClient,
   VISITORS_PARTITION_KEY,
 } from "./storage/visitors/visitorsTable";
+
+import { postFormationEvent } from "./functions/formation/postFormationEvent";
 import { getFormationEvents } from "./functions/formation/getFormationEvents";
-import "./functions/formation/getFormationProfile";
-import "./functions/formation/getFormationFollowupQueue";
-import "./functions/formation/postFormationFollowupAction";
-import "./functions/getVisitorStatus";
-import "./functions/formation/postFormationFollowupAutoAssign";
 
 /**
  * ============================================================================
@@ -173,7 +201,6 @@ CreatedAt: ${params.createdAt}
   });
 }
 
-
 /**
  * ============================================================================
  *  PHASE 1 — IDENTITY LAYER
@@ -183,33 +210,15 @@ CreatedAt: ${params.createdAt}
 /**
  * CREATE VISITOR
  * Route: POST /api/visitors
- * Method(s): POST
- *
- * Purpose:
- * - Capture a new visitor identity
- * - Enforce idempotency via normalized email
- * - Generate visitorId on first insert
- *
- * Auth:
- * - Requires x-api-key
- *
- * Storage:
- * - Table: Visitors
- * - PartitionKey = "VISITOR"
- * - RowKey = normalized email
- *
- * Behavior:
- * - New email: 201 { visitorId, alreadyExists:false }
- * - Existing email: 200 { visitorId, alreadyExists:true }
- *
- * Notes:
- * - Sends staff email only for brand-new visitors (if SendGrid configured)
  */
 app.http("createVisitor", {
   methods: ["POST"],
   authLevel: "anonymous",
   route: "visitors",
-  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+  handler: async (
+    req: HttpRequest,
+    context: InvocationContext
+  ): Promise<HttpResponseInit> => {
     const auth = requireApiKey(req);
     if (auth) return auth;
 
@@ -228,7 +237,8 @@ app.http("createVisitor", {
     if (!rawEmail) return badRequest("Field 'email' is required.");
 
     const email = normalizeEmail(rawEmail);
-    if (!looksLikeEmail(email)) return badRequest("Field 'email' must be a valid email address.");
+    if (!looksLikeEmail(email))
+      return badRequest("Field 'email' must be a valid email address.");
 
     const visitorId = uuidv4();
     const createdAt = new Date().toISOString();
@@ -243,7 +253,7 @@ app.http("createVisitor", {
       name,
       email,
       createdAt,
-      source
+      source,
     };
 
     try {
@@ -269,30 +279,21 @@ app.http("createVisitor", {
       context.error("createVisitor failed", err);
       throw err;
     }
-  }
+  },
 });
 
 /**
  * GET VISITOR BY EMAIL
  * Route: GET /api/visitors?email=...
- * Method(s): GET
- *
- * Purpose:
- * - Lookup visitor identity by email
- *
- * Auth:
- * - Requires x-api-key
- *
- * Storage:
- * - Table: Visitors
- * - PartitionKey = "VISITOR"
- * - RowKey = normalized email
  */
 app.http("getVisitorByEmail", {
   methods: ["GET"],
   authLevel: "anonymous",
   route: "visitors",
-  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+  handler: async (
+    req: HttpRequest,
+    context: InvocationContext
+  ): Promise<HttpResponseInit> => {
     const auth = requireApiKey(req);
     if (auth) return auth;
 
@@ -300,7 +301,8 @@ app.http("getVisitorByEmail", {
     if (!rawEmail) return badRequest("Query parameter 'email' is required.");
 
     const email = normalizeEmail(rawEmail);
-    if (!looksLikeEmail(email)) return badRequest("Query parameter 'email' must be a valid email address.");
+    if (!looksLikeEmail(email))
+      return badRequest("Query parameter 'email' must be a valid email address.");
 
     const table = getVisitorsTableClient();
 
@@ -314,15 +316,16 @@ app.http("getVisitorByEmail", {
           name: existing?.name ?? null,
           email: existing?.email ?? email,
           createdAt: existing?.createdAt ?? null,
-          source: existing?.source ?? "unknown"
-        }
+          source: existing?.source ?? "unknown",
+        },
       };
     } catch (err: any) {
-      if (err?.statusCode === 404) return { status: 404, jsonBody: { error: "Visitor not found." } };
+      if (err?.statusCode === 404)
+        return { status: 404, jsonBody: { error: "Visitor not found." } };
       context.error("getVisitorByEmail failed", err);
       throw err;
     }
-  }
+  },
 });
 
 /**
@@ -334,24 +337,15 @@ app.http("getVisitorByEmail", {
 /**
  * CREATE ENGAGEMENT EVENT
  * Route: POST /api/engagements
- * Method(s): POST
- *
- * Purpose:
- * - Record a single engagement action tied to a visitor (append-only event log)
- *
- * Auth:
- * - Requires x-api-key
- *
- * Storage:
- * - Table: Engagements
- * - PartitionKey = visitorId
- * - RowKey = sortable timestamp + eventType + random
  */
 app.http("createEngagement", {
   methods: ["POST"],
   authLevel: "anonymous",
   route: "engagements",
-  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+  handler: async (
+    req: HttpRequest,
+    context: InvocationContext
+  ): Promise<HttpResponseInit> => {
     const auth = requireApiKey(req);
     if (auth) return auth;
 
@@ -362,8 +356,10 @@ app.http("createEngagement", {
       return badRequest("Invalid JSON body.");
     }
 
-    const visitorId = typeof body?.visitorId === "string" ? body.visitorId.trim() : "";
-    const eventType = typeof body?.eventType === "string" ? body.eventType.trim() : "";
+    const visitorId =
+      typeof body?.visitorId === "string" ? body.visitorId.trim() : "";
+    const eventType =
+      typeof body?.eventType === "string" ? body.eventType.trim() : "";
 
     if (!visitorId) return badRequest("Field 'visitorId' is required.");
     if (!eventType) return badRequest("Field 'eventType' is required.");
@@ -381,7 +377,10 @@ app.http("createEngagement", {
       }
     }
 
-    const occurredAt = typeof body?.occurredAt === "string" ? body.occurredAt : new Date().toISOString();
+    const occurredAt =
+      typeof body?.occurredAt === "string"
+        ? body.occurredAt
+        : new Date().toISOString();
     const recordedAt = new Date().toISOString();
     const recordedBy = normalizeEnum(body?.recordedBy) ?? "staff";
 
@@ -399,7 +398,7 @@ app.http("createEngagement", {
       source,
       occurredAt,
       recordedAt,
-      recordedBy
+      recordedBy,
     };
 
     if (notes) entity.notes = notes;
@@ -408,28 +407,21 @@ app.http("createEngagement", {
     await table.createEntity(entity);
 
     return { status: 201, jsonBody: { ok: true, engagementId: rowKey } };
-  }
+  },
 });
 
 /**
  * LIST ENGAGEMENT EVENTS
  * Route: GET /api/engagements?visitorId=...
- * Method(s): GET
- *
- * Purpose:
- * - Return engagement timeline for a visitor
- *
- * Auth:
- * - Requires x-api-key
- *
- * Notes:
- * - Returns newest-first (sorted by engagementId / RowKey)
  */
 app.http("listEngagements", {
   methods: ["GET"],
   authLevel: "anonymous",
   route: "engagements",
-  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+  handler: async (
+    req: HttpRequest,
+    context: InvocationContext
+  ): Promise<HttpResponseInit> => {
     const auth = requireApiKey(req);
     if (auth) return auth;
 
@@ -444,8 +436,8 @@ app.http("listEngagements", {
     const events: any[] = [];
     for await (const e of table.listEntities({ queryOptions: { filter } })) {
       events.push({
-        engagementId: e.rowKey,
-        visitorId: e.partitionKey,
+        engagementId: (e as any).rowKey,
+        visitorId: (e as any).partitionKey,
         eventType: (e as any).eventType ?? null,
         channel: (e as any).channel ?? "unknown",
         source: (e as any).source ?? "unknown",
@@ -456,36 +448,19 @@ app.http("listEngagements", {
         metadata: (() => {
           const m = (e as any).metadata;
           if (!m || typeof m !== "string") return null;
-          try { return JSON.parse(m); } catch { return m; }
-        })()
+          try {
+            return JSON.parse(m);
+          } catch {
+            return m;
+          }
+        })(),
       });
     }
 
     events.sort((a, b) => (a.engagementId < b.engagementId ? 1 : -1));
     return { status: 200, jsonBody: { visitorId, events } };
-  }
+  },
 });
-
-/**
- * ============================================================================
- *  PHASE 2.1 — ENGAGEMENT STATUS
- * ============================================================================
- */
-
-/**
- * GET VISITOR ENGAGEMENT STATUS
- * Route: GET /api/visitors/status?visitorId=...
- * Method(s): GET
- *
- * Purpose:
- * - Determine if a visitor is currently "engaged"
- *
- * Auth:
- * - Requires x-api-key
- *
- * Definition:
- * - engaged = at least one engagement event in the last 14 days
- */
 
 /**
  * ============================================================================
@@ -496,21 +471,15 @@ app.http("listEngagements", {
 /**
  * LIST VISITORS NEEDING FOLLOW-UP
  * Route: GET /api/visitors/needs-followup?windowHours=48&maxResults=50&excludeTest=true
- *
- * Rules:
- * - needs follow-up if NO engagement OR last engagement older than windowHours
- * - Sort order:
- *    1) no engagement ever (top)
- *    2) most overdue first (largest hoursSinceLastEngagement)
- *
- * Optional:
- * - excludeTest=true filters out obvious test emails (example.com, "+" aliases, cors-test)
  */
 app.http("listVisitorsNeedsFollowup", {
   methods: ["GET"],
   authLevel: "anonymous",
   route: "visitors/needs-followup",
-  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+  handler: async (
+    req: HttpRequest,
+    context: InvocationContext
+  ): Promise<HttpResponseInit> => {
     const auth = requireApiKey(req);
     if (auth) return auth;
 
@@ -579,13 +548,12 @@ app.http("listVisitorsNeedsFollowup", {
         hoursSinceLastEngagement: hoursSince,
         engagementCount,
         needsFollowup: true,
-        reason
+        reason,
       });
 
       // Stop once we have enough (after filtering)
       if (results.length >= maxResults) break;
     }
-
 
     // Sort: (1) no engagement first, then (2) most overdue first
     results.sort((a, b) => {
@@ -604,10 +572,10 @@ app.http("listVisitorsNeedsFollowup", {
         windowHours,
         excludeTest,
         count: results.length,
-        visitors: results
-      }
+        visitors: results,
+      },
     };
-  }
+  },
 });
 
 /**
@@ -629,16 +597,3 @@ app.http("getFormationEvents", {
   route: "formation/events",
   handler: getFormationEvents,
 });
-import "./functions/getVisitorStatus";
-import "./functions/formation/postFormationNextStep";
-import "./functions/formation/getFormationSummary";
-import "./functions/formation/getFormationFollowupMetrics";
-import "./functions/formation/getFormationStageTimeseries";
-import "./functions/visitors/getVisitorsDashboard";
-import "./functions/visitors/getVisitorsDashboard";
-
-
-
-
-
-

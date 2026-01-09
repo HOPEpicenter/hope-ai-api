@@ -1,11 +1,17 @@
-﻿import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+﻿function hoursSince(iso: string, nowMs: number): number {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return Number.POSITIVE_INFINITY;
+  return (nowMs - t) / (60 * 60 * 1000);
+}
+import { makeTableClient } from "../../shared/storage/makeTableClient";
+import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { TableClient } from "@azure/data-tables";
-import { requireApiKey } from "../../shared/auth/requireApiKey";
+import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { writeAutomationRun } from "../../storage/formation/automationRunsRepo";
 import { computeEngagementSummary } from "../../domain/engagement/computeEngagement";
 import { tableName } from "../../storage/tableName";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
-import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
+import { getFormationProfilesTableClient, getFormationEventsTableClient } from "../../storage/formation/formationTables";
 import { computeFromProfile } from "../../domain/formation/computeFromProfile";
 import { validateFormationEvent, FormationEventType } from "../../domain/formation/phase3_1_scope";
 import { recordFormationEvent } from "../../domain/formation/recordFormationEvent";
@@ -14,8 +20,16 @@ type Urgency = "OVERDUE" | "DUE_SOON" | "WATCH";
 
 const ENGAGEMENTS_TABLE = "Engagements";
 
+function isAzurite(cs: string): boolean {
+  return cs.trim().toLowerCase() === "usedevelopmentstorage=true";
+}
+
 function getEngagementsTableClient(connectionString: string): TableClient {
-  return TableClient.fromConnectionString(connectionString, tableName(ENGAGEMENTS_TABLE));
+  const options = isAzurite(connectionString)
+    ? ({ allowInsecureConnection: true } as const)
+    : undefined;
+
+  return makeTableClient(connectionString, ENGAGEMENTS_TABLE);
 }
 
 function parsePositiveInt(val: any, fallback: number): number {
@@ -47,7 +61,9 @@ type AutoAssignBody = {
   dryRun?: boolean;
     force?: boolean;
 cooldownHours?: number;
-  windowHours?: number;
+  
+  reassignAfterHours?: number;
+windowHours?: number;
   windowDays?: number;
   channel?: string;
   notes?: string;
@@ -72,8 +88,7 @@ app.http("autoAssignFollowup", {
 
     const connectionString = process.env.STORAGE_CONNECTION_STRING;
     if (!connectionString) throw new Error("Missing STORAGE_CONNECTION_STRING");
-
-    let body: AutoAssignBody = {};
+let body: AutoAssignBody = {};
     try {
       body = (await req.json()) ?? {};
     } catch {
@@ -93,7 +108,9 @@ app.http("autoAssignFollowup", {
     
     const force = typeof body.force === "boolean" ? body.force : false;
 const cooldownHours = parseNonNegativeInt(body.cooldownHours, 24);
-    const windowHours = parsePositiveInt(body.windowHours, 168);
+    
+    const reassignAfterHours = parseNonNegativeInt(body.reassignAfterHours, 48);
+const windowHours = parsePositiveInt(body.windowHours, 168);
 
     const windowDays =
       typeof body.windowDays === "number" && body.windowDays > 0
@@ -111,12 +128,13 @@ const cooldownHours = parseNonNegativeInt(body.cooldownHours, 24);
     const cutoff = new Date(now.getTime() - windowHours * 60 * 60 * 1000);
 
     const profilesTable = getFormationProfilesTableClient(connectionString);
-    await ensureTableExists(profilesTable);
-
-    const engagementsTable = getEngagementsTableClient(connectionString);
+    await ensureTableExists(profilesTable); const engagementsTable = getEngagementsTableClient(connectionString);
     await ensureTableExists(engagementsTable);
 
-    const items: any[] = [];
+    
+    const formationEventsTable = getFormationEventsTableClient(connectionString);
+    await ensureTableExists(formationEventsTable);
+const items: any[] = [];
     let scannedProfiles = 0;
 
     // Build a queue-equivalent list using the SAME gating logic as getFormationFollowupQueue
@@ -130,10 +148,32 @@ if (typeof visitorId !== "string" || !visitorId.trim()) continue;
 
       const computed = computeFromProfile(p, now);
 
-            // idempotency guard: skip already-assigned profiles unless force=true
-      const alreadyAssignedTo = typeof (computed as any)?.assignedTo === "string" ? String((computed as any).assignedTo).trim() : "";
-      if (!force && alreadyAssignedTo.length > 0) continue;
-// Same gating as queue
+            // idempotency / reassign guard:
+// if already assigned, allow reassignment only if force=true OR last assignment is older than reassignAfterHours
+const alreadyAssignedTo =
+  typeof (computed as any)?.assignedTo === "string" ? String((computed as any).assignedTo).trim() : "";
+
+if (!force && alreadyAssignedTo.length > 0) {
+  if (reassignAfterHours <= 0) continue;
+
+  let lastAssignedMs: number | null = null;
+
+  // Pull only this visitor's FOLLOWUP_ASSIGNED events
+  const feFilter = `PartitionKey eq '${escapeOdataString(visitorId)}' and type eq '${FormationEventType.FOLLOWUP_ASSIGNED}'`;
+  for await (const fe of formationEventsTable.listEntities<any>({ queryOptions: { filter: feFilter } })) {
+    const occurredAt = String((fe as any)?.occurredAt ?? (fe as any)?.OccurredAt ?? "");
+    const ms = Date.parse(occurredAt);
+    if (!Number.isNaN(ms)) {
+      if (lastAssignedMs == null || ms > lastAssignedMs) lastAssignedMs = ms;
+    }
+  }
+
+  // If we can't determine last assignment time, be conservative and skip
+  if (lastAssignedMs == null) continue;
+
+  const hoursSinceAssigned = (now.getTime() - lastAssignedMs) / (1000 * 60 * 60);
+  if (hoursSinceAssigned < reassignAfterHours) continue;
+}// Same gating as queue
       if (computed?.lastActivityAt && computed.lastActivityAt < cutoff) continue;
       if (!computed?.urgency) continue;
 
@@ -325,6 +365,17 @@ const __runEndedAtMs = Date.now();
     };
   }
 });
+
+
+
+
+
+
+
+
+
+
+
 
 
 

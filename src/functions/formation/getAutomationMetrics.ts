@@ -1,19 +1,20 @@
 ﻿import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { ensureTableExists } from "../../shared/storage/ensureTableExists";
-import { AUTOMATION_RUNS_PARTITION_KEY, getAutomationRunsTableClient } from "../../storage/formation/formationTables";
+import { getAutomationRunsTableClient, AUTOMATION_RUNS_PARTITION_KEY } from "../../storage/formation/formationTables";
 
-function getHeader(req: HttpRequest, name: string): string | null {
-  const v = req.headers.get(name);
-  return v ? String(v) : null;
-}
+function requireApiKeyInline(req: HttpRequest): HttpResponseInit | null {
+  const provided =
+    req.headers.get("x-api-key") ??
+    req.headers.get("X-Api-Key") ??
+    req.headers.get("X-API-KEY") ??
+    "";
 
-function requireApiKeyLocal(req: HttpRequest): HttpResponseInit | null {
-  const expected = process.env.HOPE_API_KEY || process.env.API_KEY;
+  const expected = process.env.HOPE_API_KEY ?? "";
+
   if (!expected) {
-    return { status: 500, jsonBody: { ok: false, error: "Server missing HOPE_API_KEY (or API_KEY)" } };
+    // Misconfig: no key configured
+    return { status: 500, jsonBody: { ok: false, error: "HOPE_API_KEY missing in environment" } };
   }
 
-  const provided = getHeader(req, "x-api-key");
   if (!provided || provided !== expected) {
     return { status: 401, jsonBody: { ok: false, error: "Unauthorized" } };
   }
@@ -21,102 +22,125 @@ function requireApiKeyLocal(req: HttpRequest): HttpResponseInit | null {
   return null;
 }
 
-function parsePositiveIntLocal(v: string | null, def: number): number {
-  if (!v) return def;
-  const n = Number(v);
-  if (!Number.isFinite(n)) return def;
-  const i = Math.floor(n);
-  return i > 0 ? i : def;
+function parsePositiveInt(v: string | null | undefined, fallback: number): number {
+  if (v == null) return fallback;
+  const n = Number.parseInt(String(v).trim(), 10);
+  if (!Number.isFinite(n) || Number.isNaN(n) || n <= 0) return fallback;
+  return n;
 }
 
-export async function getAutomationMetrics(
-  req: HttpRequest,
-  context: InvocationContext
-): Promise<HttpResponseInit> {
-  const auth = requireApiKeyLocal(req);
+function escapeOdataString(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+type RunDto = {
+  automationRunId: string;
+
+  trigger?: string;
+  ok?: boolean;
+  dryRun?: boolean;
+
+  startedAt?: string;
+  endedAt?: string;
+  durationMs?: number;
+
+  scannedProfiles?: number;
+  eligible?: number;
+  selected?: number;
+  assignedCount?: number;
+
+  assigneeId?: string;
+  windowHours?: number;
+  windowDays?: number;
+  cooldownHours?: number;
+  maxResults?: number;
+  force?: boolean;
+
+  error?: string;
+};
+
+export async function getAutomationMetrics(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+  const auth = requireApiKeyInline(req);
   if (auth) return auth;
 
-  const limit = Math.min(parsePositiveIntLocal(req.query.get("limit"), 20), 100);
-  const sinceHours = Math.min(parsePositiveIntLocal(req.query.get("sinceHours"), 48), 24 * 90);
+  try {
+    const sinceHours = parsePositiveInt(req.query.get("sinceHours"), 48);
+    const cutoffMs = Date.now() - sinceHours * 60 * 60 * 1000;
+    const cutoffIso = new Date(cutoffMs).toISOString();
 
-  const cutoffIso = new Date(Date.now() - sinceHours * 60 * 60 * 1000).toISOString();
+    const table = getAutomationRunsTableClient();
 
-  const table = getAutomationRunsTableClient();
-  await ensureTableExists(table);
+    const filter = `PartitionKey eq '${escapeOdataString(
+      AUTOMATION_RUNS_PARTITION_KEY
+    )}' and startedAt ge '${escapeOdataString(cutoffIso)}'`;
 
-  // NOTE: We intentionally avoid filtering by startedAt in OData.
-  // startedAt is a custom string property; filtering on it can be unreliable across SDKs/emulators.
-  // Instead: filter by PartitionKey and apply the cutoff in code.
-  const filter = `PartitionKey eq '${AUTOMATION_RUNS_PARTITION_KEY}'`;
+    const rows: RunDto[] = [];
 
-  const runs: any[] = [];
-  let scanned = 0,
-    eligible = 0,
-    selected = 0,
-    assigned = 0,
-    failures = 0;
+    for await (const e of table.listEntities<any>({ queryOptions: { filter } })) {
+      rows.push({
+        automationRunId: String(e.rowKey ?? e.RowKey ?? ""),
 
-  const softCap = Math.max(limit * 5, 100);
+        trigger: e.trigger,
+        ok: e.ok,
+        dryRun: e.dryRun ?? false,
 
-  for await (const e of table.listEntities({ queryOptions: { filter } })) {
-    const startedAt = typeof (e as any).startedAt === "string" ? String((e as any).startedAt) : "";
-    if (startedAt && startedAt < cutoffIso) continue;
+        startedAt: e.startedAt,
+        endedAt: e.endedAt ?? null,
+        durationMs: typeof e.durationMs === "number" ? e.durationMs : null,
 
-    runs.push({
-      automationRunId: (e as any).automationRunId ?? (e as any).rowKey,
-      trigger: (e as any).trigger,
-      ok: (e as any).ok,
-      dryRun: (e as any).dryRun,
-      startedAt: (e as any).startedAt,
-      endedAt: (e as any).endedAt,
-      durationMs: (e as any).durationMs,
-      scannedProfiles: (e as any).scannedProfiles,
-      eligible: (e as any).eligible,
-      selected: (e as any).selected,
-      assignedCount: (e as any).assignedCount,
-      assigneeId: (e as any).assigneeId,
-      windowHours: (e as any).windowHours,
-      windowDays: (e as any).windowDays,
-      cooldownHours: (e as any).cooldownHours,
-      maxResults: (e as any).maxResults,
-      force: (e as any).force,
-      error: (e as any).error,
-    });
+        scannedProfiles: typeof e.scannedProfiles === "number" ? e.scannedProfiles : 0,
+        eligible: typeof e.eligible === "number" ? e.eligible : 0,
+        selected: typeof e.selected === "number" ? e.selected : 0,
+        assignedCount: typeof e.assignedCount === "number" ? e.assignedCount : 0,
 
-    
-    // SOFTCAP_BREAK
-    if (runs.length >= softCap) break;
-scanned += Number((e as any).scannedProfiles ?? 0);
-    eligible += Number((e as any).eligible ?? 0);
-    selected += Number((e as any).selected ?? 0);
-    assigned += Number((e as any).assignedCount ?? 0);
-    if ((e as any).ok === false) failures += 1;
-  }
+        assigneeId: e.assigneeId ?? null,
+        windowHours: typeof e.windowHours === "number" ? e.windowHours : null,
+        windowDays: typeof e.windowDays === "number" ? e.windowDays : null,
+        cooldownHours: typeof e.cooldownHours === "number" ? e.cooldownHours : null,
+        maxResults: typeof e.maxResults === "number" ? e.maxResults : null,
+        force: typeof e.force === "boolean" ? e.force : null,
 
-  // newest-first by startedAt (ISO string)
-  runs.sort((a, b) => String(b.startedAt || "").localeCompare(String(a.startedAt || "")));
+        error: e.error ?? null,
+      });
 
-  const latest = runs[0] ?? null;
+      if (rows.length >= 100) break;
+    }
 
-  return {
-    status: 200,
-    jsonBody: {
-      ok: true,
-      sinceHours,
-      cutoffIso,
-      latest,
-      totals: {
-        runsCount: runs.length,
-        failures,
-        scannedProfiles: scanned,
-        eligible,
-        selected,
-        assignedCount: assigned,
+    // newest first
+    rows.sort((a, b) => String(b.startedAt ?? "").localeCompare(String(a.startedAt ?? "")));
+
+    const newest20 = rows.slice(0, 20);
+    const latest = newest20[0] ?? null;
+
+    const totals = rows.reduce(
+      (acc, r) => {
+        acc.runsCount += 1;
+        if (r.ok === false) acc.failures += 1;
+        acc.scannedProfiles += Number(r.scannedProfiles ?? 0);
+        acc.eligible += Number(r.eligible ?? 0);
+        acc.selected += Number(r.selected ?? 0);
+        acc.assignedCount += Number(r.assignedCount ?? 0);
+        return acc;
       },
-      runs: runs.slice(0, limit),
-      note: runs.length > limit ? `Showing newest ${limit} runs; totals computed from up to ${softCap} runs.` : undefined,
-    },
-  };
+      { runsCount: 0, failures: 0, scannedProfiles: 0, eligible: 0, selected: 0, assignedCount: 0 }
+    );
+
+    return {
+      status: 200,
+      jsonBody: {
+        ok: true,
+        sinceHours,
+        cutoffIso,
+        latest,
+        totals,
+        runs: newest20,
+        note: "Showing newest 20 runs; totals computed from up to 100 runs.",
+      },
+    };
+  } catch (err: any) {
+    context.error("getAutomationMetrics failed", err?.message ?? err);
+    return { status: 500, jsonBody: { ok: false, error: String(err?.message ?? err) } };
+  }
 }
 
 app.http("getAutomationMetrics", {

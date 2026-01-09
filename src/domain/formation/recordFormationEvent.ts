@@ -27,6 +27,13 @@ import { ensureTableExists } from "../../shared/storage/ensureTableExists";
  * - Append-only events
  * - Snapshot updates on FormationProfile
  * - Deterministic, non-downgrading stage progression
+ *
+ * IMPORTANT CONTRACT (Ops Dashboard):
+ * - FormationProfile must be stored at canonical keys:
+ *    PartitionKey = "VISITOR"
+ *    RowKey = visitorId
+ * - FormationProfile must include snapshot fields:
+ *    lastEventType, lastEventAt, updatedAt
  */
 
 export type RecordFormationEventDeps = {
@@ -105,7 +112,9 @@ function computeNextStage(
         "MEMBER_CLASS",
         "BAPTISM_CLASS",
       ]);
-      return CONNECTED_OUTCOMES.has(outcome) ? maxStage(current, "Connected") : current;
+      return CONNECTED_OUTCOMES.has(outcome)
+        ? maxStage(current, "Connected")
+        : current;
     }
 
     default:
@@ -121,30 +130,30 @@ function applyProfileTouchpoint(
 ): void {
   switch (type) {
     case FormationEventType.SERVICE_ATTENDED:
-      profile.lastServiceAttendedAt = occurredAt;
+      (profile as any).lastServiceAttendedAt = occurredAt;
       break;
 
     case FormationEventType.FOLLOWUP_ASSIGNED:
-      profile.lastFollowupAssignedAt = occurredAt;
-      if (metadata?.assigneeId) profile.assignedTo = String(metadata.assigneeId);
+      (profile as any).lastFollowupAssignedAt = occurredAt;
+      if (metadata?.assigneeId) (profile as any).assignedTo = String(metadata.assigneeId);
       break;
 
     case FormationEventType.FOLLOWUP_CONTACTED:
-      profile.lastFollowupContactedAt = occurredAt;
+      (profile as any).lastFollowupContactedAt = occurredAt;
       break;
 
     case FormationEventType.FOLLOWUP_OUTCOME_RECORDED:
-      // ✅ NEW: needed so queue can tell an outcome was recorded
-      profile.lastFollowupOutcomeAt = occurredAt;
+      // needed so queue can tell an outcome was recorded
+      (profile as any).lastFollowupOutcomeAt = occurredAt;
       break;
 
     case FormationEventType.NEXT_STEP_SELECTED:
     case FormationEventType.INFO_REQUESTED:
-      profile.lastNextStepAt = occurredAt;
+      (profile as any).lastNextStepAt = occurredAt;
       break;
 
     case FormationEventType.PRAYER_REQUESTED:
-      profile.lastPrayerRequestedAt = occurredAt;
+      (profile as any).lastPrayerRequestedAt = occurredAt;
       break;
 
     default:
@@ -152,13 +161,27 @@ function applyProfileTouchpoint(
   }
 
   // Stage progression (deterministic, no downgrade)
-  const nextStage = computeNextStage(profile.stage, String(type ?? ""), metadata);
-  if (nextStage !== profile.stage) {
-    profile.stage = nextStage;
+  const nextStage = computeNextStage((profile as any).stage, String(type ?? ""), metadata);
+  if (nextStage !== (profile as any).stage) {
+    (profile as any).stage = nextStage;
     (profile as any).stageUpdatedAt = occurredAt;
     (profile as any).stageUpdatedBy = "system";
     (profile as any).stageReason = `event:${String(type ?? "")}`;
   }
+}
+
+/**
+ * ENFORCE CANONICAL PROFILE KEYS
+ * Ops dashboard expects: PK="VISITOR", RK=visitorId
+ */
+function enforceProfileKeys(profile: FormationProfileEntity, visitorId: string): FormationProfileEntity {
+  (profile as any).visitorId = visitorId;
+
+  // Force canonical keys for storage + dashboard lookups
+  (profile as any).partitionKey = "VISITOR";
+  (profile as any).rowKey = visitorId;
+
+  return profile;
 }
 
 export async function recordFormationEvent(
@@ -190,6 +213,9 @@ export async function recordFormationEvent(
     profile = createDefaultFormationProfile(input.visitorId);
   }
 
+  // 🔒 Guarantee PK/RK alignment with Ops dashboard expectations
+  profile = enforceProfileKeys(profile, input.visitorId);
+
   const rowKey = makeRowKey(occurredAt);
 
   const eventEntity: FormationEventEntity = {
@@ -209,8 +235,15 @@ export async function recordFormationEvent(
 
   await insertFormationEvent(eventsTable, eventEntity);
 
+  // Update snapshot based on the event
   applyProfileTouchpoint(profile, input.type, occurredAt, input.metadata);
 
+  // ✅ Snapshot fields Ops dashboard should rely on (always set)
+  (profile as any).lastEventType = input.type;
+  (profile as any).lastEventAt = occurredAt;
+  (profile as any).updatedAt = recordedAt;
+
+  // Write snapshot (Merge semantics are handled in repo)
   await upsertFormationProfile(profilesTable, profile);
 
   return { eventRowKey: rowKey, profile };

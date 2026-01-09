@@ -1,7 +1,7 @@
 ﻿import { tableName } from "../tableName";
 // src/storage/visitors/visitorsTable.ts
 import { TableClient } from "@azure/data-tables";
-
+import { makeTableClient } from "../../shared/storage/makeTableClient";
 export const VISITORS_TABLE = "Visitors";
 export const VISITORS_PARTITION_KEY = "VISITOR";
 
@@ -15,7 +15,7 @@ export function getVisitorsTableClient(): TableClient {
       "Missing STORAGE_CONNECTION_STRING in App Settings / local.settings.json"
     );
   }
-  return TableClient.fromConnectionString(conn, tableName(VISITORS_TABLE));
+  return makeTableClient(conn, VISITORS_TABLE);
 }
 
 /**
@@ -58,4 +58,6 @@ export async function ensureVisitorExists(visitorId: string): Promise<void> {
 function escapeOData(value: string): string {
   return value.replace(/'/g, "''");
 }
+
+
 

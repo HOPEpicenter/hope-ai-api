@@ -34,16 +34,14 @@ import "./functions/admin/getVisitorTimeline";
 import { tableName } from "./storage/tableName";
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { TableClient } from "@azure/data-tables";
+import { makeTableClient } from "./shared/storage/makeTableClient";
 import { v4 as uuidv4 } from "uuid";
 import sgMail from "@sendgrid/mail";
 
 import { requireApiKey } from "./shared/auth/requireApiKey";
 import { ensureTableExists } from "./shared/storage/ensureTableExists";
 
-import {
-  getVisitorsTableClient,
-  VISITORS_PARTITION_KEY,
-} from "./storage/visitors/visitorsTable";
+import { getVisitorsTableClient, VISITORS_PARTITION_KEY } from "./storage/visitors/visitorsTable";
 
 import { postFormationEvent } from "./functions/formation/postFormationEvent";
 import { getFormationEvents } from "./functions/formation/getFormationEvents";
@@ -70,7 +68,8 @@ function getEngagementsTableClient(): TableClient {
       "Missing STORAGE_CONNECTION_STRING in App Settings / local.settings.json"
     );
   }
-  return TableClient.fromConnectionString(conn, tableName(ENGAGEMENTS_TABLE));
+  // IMPORTANT: makeTableClient handles Azurite + allowInsecureConnection correctly
+  return makeTableClient(conn, tableName(ENGAGEMENTS_TABLE));
 }
 
 /**
@@ -99,15 +98,7 @@ function normalizeSource(source: unknown): string {
   if (typeof source !== "string") return "unknown";
   const s = source.trim().toLowerCase();
   if (!s) return "unknown";
-  const allowed = new Set([
-    "website",
-    "qr",
-    "event",
-    "facebook",
-    "instagram",
-    "youtube",
-    "unknown",
-  ]);
+  const allowed = new Set(["website", "qr", "event", "facebook", "instagram", "youtube", "unknown"]);
   return allowed.has(s) ? s : "unknown";
 }
 
@@ -141,10 +132,24 @@ function makeEngagementRowKey(eventType: string): string {
     pad(d.getUTCMilliseconds(), 3);
 
   const rand = Math.random().toString(36).slice(2, 10);
-  const safeType = (eventType || "unknown")
-    .toLowerCase()
-    .replace(/[^a-z0-9_]/g, "_");
+  const safeType = (eventType || "unknown").toLowerCase().replace(/[^a-z0-9_]/g, "_");
   return `${ts}_${safeType}_${rand}`;
+}
+
+function encodeCursor(payload: { t: string; rk: string }): string {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
+}
+
+function tryDecodeCursor(raw: string | null): { t: string; rk: string } | null {
+  if (!raw) return null;
+  try {
+    const json = Buffer.from(raw, "base64").toString("utf8");
+    const obj = JSON.parse(json);
+    if (obj && typeof obj.t === "string" && typeof obj.rk === "string") return { t: obj.t, rk: obj.rk };
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -215,10 +220,7 @@ app.http("createVisitor", {
   methods: ["POST"],
   authLevel: "anonymous",
   route: "visitors",
-  handler: async (
-    req: HttpRequest,
-    context: InvocationContext
-  ): Promise<HttpResponseInit> => {
+  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
     const auth = requireApiKey(req);
     if (auth) return auth;
 
@@ -237,8 +239,7 @@ app.http("createVisitor", {
     if (!rawEmail) return badRequest("Field 'email' is required.");
 
     const email = normalizeEmail(rawEmail);
-    if (!looksLikeEmail(email))
-      return badRequest("Field 'email' must be a valid email address.");
+    if (!looksLikeEmail(email)) return badRequest("Field 'email' must be a valid email address.");
 
     const visitorId = uuidv4();
     const createdAt = new Date().toISOString();
@@ -290,10 +291,7 @@ app.http("getVisitorByEmail", {
   methods: ["GET"],
   authLevel: "anonymous",
   route: "visitors",
-  handler: async (
-    req: HttpRequest,
-    context: InvocationContext
-  ): Promise<HttpResponseInit> => {
+  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
     const auth = requireApiKey(req);
     if (auth) return auth;
 
@@ -301,8 +299,7 @@ app.http("getVisitorByEmail", {
     if (!rawEmail) return badRequest("Query parameter 'email' is required.");
 
     const email = normalizeEmail(rawEmail);
-    if (!looksLikeEmail(email))
-      return badRequest("Query parameter 'email' must be a valid email address.");
+    if (!looksLikeEmail(email)) return badRequest("Query parameter 'email' must be a valid email address.");
 
     const table = getVisitorsTableClient();
 
@@ -320,8 +317,7 @@ app.http("getVisitorByEmail", {
         },
       };
     } catch (err: any) {
-      if (err?.statusCode === 404)
-        return { status: 404, jsonBody: { error: "Visitor not found." } };
+      if (err?.statusCode === 404) return { status: 404, jsonBody: { error: "Visitor not found." } };
       context.error("getVisitorByEmail failed", err);
       throw err;
     }
@@ -342,10 +338,7 @@ app.http("createEngagement", {
   methods: ["POST"],
   authLevel: "anonymous",
   route: "engagements",
-  handler: async (
-    req: HttpRequest,
-    context: InvocationContext
-  ): Promise<HttpResponseInit> => {
+  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
     const auth = requireApiKey(req);
     if (auth) return auth;
 
@@ -356,10 +349,8 @@ app.http("createEngagement", {
       return badRequest("Invalid JSON body.");
     }
 
-    const visitorId =
-      typeof body?.visitorId === "string" ? body.visitorId.trim() : "";
-    const eventType =
-      typeof body?.eventType === "string" ? body.eventType.trim() : "";
+    const visitorId = typeof body?.visitorId === "string" ? body.visitorId.trim() : "";
+    const eventType = typeof body?.eventType === "string" ? body.eventType.trim() : "";
 
     if (!visitorId) return badRequest("Field 'visitorId' is required.");
     if (!eventType) return badRequest("Field 'eventType' is required.");
@@ -377,10 +368,7 @@ app.http("createEngagement", {
       }
     }
 
-    const occurredAt =
-      typeof body?.occurredAt === "string"
-        ? body.occurredAt
-        : new Date().toISOString();
+    const occurredAt = typeof body?.occurredAt === "string" ? body.occurredAt : new Date().toISOString();
     const recordedAt = new Date().toISOString();
     const recordedBy = normalizeEnum(body?.recordedBy) ?? "staff";
 
@@ -412,36 +400,70 @@ app.http("createEngagement", {
 
 /**
  * LIST ENGAGEMENT EVENTS
- * Route: GET /api/engagements?visitorId=...
+ * Route: GET /api/engagements?visitorId=...&limit=...&cursor=...
+ *
+ * ✅ Fixes:
+ * - visitorId is OPTIONAL (no more 400 for /engagements?limit=10)
+ * - supports limit
+ * - supports cursor paging (by occurredAt/rowKey)
  */
 app.http("listEngagements", {
   methods: ["GET"],
   authLevel: "anonymous",
   route: "engagements",
-  handler: async (
-    req: HttpRequest,
-    context: InvocationContext
-  ): Promise<HttpResponseInit> => {
+  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
     const auth = requireApiKey(req);
     if (auth) return auth;
 
-    const visitorId = (req.query.get("visitorId") ?? "").trim();
-    if (!visitorId) return badRequest("Query parameter 'visitorId' is required.");
+    const visitorIdRaw = (req.query.get("visitorId") ?? "").trim();
+
+    // Accept limit and common aliases (never 400)
+    const rawLimit = req.query.get("limit") ?? req.query.get("maxResults") ?? req.query.get("take");
+    const limit = parsePositiveInt(rawLimit, 50);
+
+    const cursorRaw = req.query.get("cursor");
+    const cursor = tryDecodeCursor(cursorRaw);
+    const debugOn = req.query.get("debug") === "1" || req.query.get("debug") === "true";
 
     const table = getEngagementsTableClient();
     await ensureTableExists(table);
 
-    const filter = `PartitionKey eq '${visitorId.replace(/'/g, "''")}'`;
+    const escape = (s: string) => String(s).replace(/'/g, "''");
+
+    // Filter by *property* visitorId (works even if PartitionKey differs)
+    let filter: string | null = null;
+    if (visitorIdRaw) {
+      filter = `visitorId eq '${escape(visitorIdRaw)}'`;
+    }
+
+    // Cursor: older than cursor.t, tie-breaker by rowKey
+    if (cursor?.t && cursor?.rk) {
+      const ct = escape(cursor.t);
+      const crk = escape(cursor.rk);
+      const c = `(occurredAt lt '${ct}' or (occurredAt eq '${ct}' and rowKey lt '${crk}'))`;
+      filter = filter ? `${filter} and ${c}` : c;
+    }
+
+    // Over-fetch by 1 to determine nextCursor
+    const fetchMax = Math.min(Math.max(limit + 1, 1), 500);
 
     const events: any[] = [];
-    for await (const e of table.listEntities({ queryOptions: { filter } })) {
+    let lastOcc: string | null = null;
+    let lastRk: string | null = null;
+
+    const iter = table.listEntities<any>(filter ? { queryOptions: { filter } } : undefined);
+
+    for await (const e of iter) {
+      const rowKey = (e as any).rowKey ?? null;
+      const occurredAt = (e as any).occurredAt ?? null;
+
       events.push({
-        engagementId: (e as any).rowKey,
-        visitorId: (e as any).partitionKey,
+        engagementId: rowKey,
+        visitorId: (e as any).visitorId ?? (e as any).partitionKey ?? null,
         eventType: (e as any).eventType ?? null,
         channel: (e as any).channel ?? "unknown",
         source: (e as any).source ?? "unknown",
-        occurredAt: (e as any).occurredAt ?? null,
+        occurredAt,
         recordedAt: (e as any).recordedAt ?? null,
         recordedBy: (e as any).recordedBy ?? null,
         notes: (e as any).notes ?? "",
@@ -455,10 +477,43 @@ app.http("listEngagements", {
           }
         })(),
       });
+
+      if (typeof occurredAt === "string" && typeof rowKey === "string") {
+        lastOcc = occurredAt;
+        lastRk = rowKey;
+      }
+
+      if (events.length >= fetchMax) break;
     }
 
+    // Sort newest first by engagementId (your rowKey is sortable)
     events.sort((a, b) => (a.engagementId < b.engagementId ? 1 : -1));
-    return { status: 200, jsonBody: { visitorId, events } };
+
+    const hasMore = events.length > limit;
+    const page = events.slice(0, limit);
+
+    const nextCursor = hasMore && lastOcc && lastRk ? encodeCursor({ t: lastOcc, rk: lastRk }) : null;
+
+    return {
+      status: 200,
+      jsonBody: {
+        ok: true,
+        visitorId: visitorIdRaw || null,
+        limit,
+        cursor: cursorRaw ?? null,
+        nextCursor,
+        count: page.length,
+        events: page,
+        debug: debugOn
+          ? {
+              table: (table as any).tableName ?? "Engagements",
+              filter,
+              fetched: events.length,
+              returned: page.length,
+            }
+          : undefined,
+      },
+    };
   },
 });
 
@@ -476,10 +531,7 @@ app.http("listVisitorsNeedsFollowup", {
   methods: ["GET"],
   authLevel: "anonymous",
   route: "visitors/needs-followup",
-  handler: async (
-    req: HttpRequest,
-    context: InvocationContext
-  ): Promise<HttpResponseInit> => {
+  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
     const auth = requireApiKey(req);
     if (auth) return auth;
 
@@ -561,8 +613,10 @@ app.http("listVisitorsNeedsFollowup", {
       const bNever = b.lastEngagedAt ? 0 : 1;
       if (aNever !== bNever) return bNever - aNever;
 
-      const aHours = typeof a.hoursSinceLastEngagement === "number" ? a.hoursSinceLastEngagement : -1;
-      const bHours = typeof b.hoursSinceLastEngagement === "number" ? b.hoursSinceLastEngagement : -1;
+      const aHours =
+        typeof a.hoursSinceLastEngagement === "number" ? a.hoursSinceLastEngagement : -1;
+      const bHours =
+        typeof b.hoursSinceLastEngagement === "number" ? b.hoursSinceLastEngagement : -1;
       return bHours - aHours;
     });
 

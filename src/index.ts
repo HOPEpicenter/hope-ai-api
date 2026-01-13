@@ -397,73 +397,109 @@ app.http("createEngagement", {
     return { status: 201, jsonBody: { ok: true, engagementId: rowKey } };
   },
 });
-
 /**
- * LIST ENGAGEMENT EVENTS
- * Route: GET /api/engagements?visitorId=...&limit=...&cursor=...
+ * LIST ENGAGEMENT EVENTS (paged)
+ * Route: GET /api/engagements?visitorId=...&limit=10&cursor=...&debug=1
  *
- * ✅ Fixes:
- * - visitorId is OPTIONAL (no more 400 for /engagements?limit=10)
- * - supports limit
- * - supports cursor paging (by occurredAt/rowKey)
+ * Cursor is RowKey-only (within a visitorId partition):
+ *   cursor = base64url(JSON.stringify({ rk: "<RowKey>" }))
+ *
+ * Semantics:
+ * - First page: newest-first up to limit.
+ * - Next page: older items (RowKey < cursor.rk)
  */
 app.http("listEngagements", {
   methods: ["GET"],
   authLevel: "anonymous",
   route: "engagements",
-  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
+  handler: async (
+    req: HttpRequest,
+    context: InvocationContext
+  ): Promise<HttpResponseInit> => {
     const auth = requireApiKey(req);
     if (auth) return auth;
 
-    const visitorIdRaw = (req.query.get("visitorId") ?? "").trim();
+    const debugOn =
+      req.query.get("debug") === "1" || req.query.get("debug") === "true";
 
-    // Accept limit and common aliases (never 400)
-    const rawLimit = req.query.get("limit") ?? req.query.get("maxResults") ?? req.query.get("take");
-    const limit = parsePositiveInt(rawLimit, 50);
+    const limit = parsePositiveInt(req.query.get("limit"), 50);
 
-    const cursorRaw = req.query.get("cursor");
-    const cursor = tryDecodeCursor(cursorRaw);
-    const debugOn = req.query.get("debug") === "1" || req.query.get("debug") === "true";
+    const visitorId = (req.query.get("visitorId") ?? "").trim();
+
+    const cursorRaw = (req.query.get("cursor") ?? "").trim();
+
+    const escapeOData = (s: string) => String(s).replace(/'/g, "''");
+
+    const b64urlDecode = (s: string): string => {
+      const pad = s.length % 4 === 0 ? "" : "=".repeat(4 - (s.length % 4));
+      const b64 = (s + pad).replace(/-/g, "+").replace(/_/g, "/");
+      return Buffer.from(b64, "base64").toString("utf8");
+    };
+
+    const b64urlEncode = (s: string): string => {
+      return Buffer.from(s, "utf8")
+        .toString("base64")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/g, "");
+    };
+
+    let cursorDecoded: any = null;
+    let cursorRowKey: string | null = null;
+    if (cursorRaw) {
+      try {
+        cursorDecoded = JSON.parse(b64urlDecode(cursorRaw));
+        cursorRowKey =
+          typeof cursorDecoded?.rk === "string" ? cursorDecoded.rk : null;
+      } catch {
+        return badRequest("Invalid cursor.");
+      }
+    }
+
+    // Cursor paging is only supported when visitorId is present (single partition).
+    // Without visitorId, Azure Tables ordering is PartitionKey+RowKey, and row-only cursor is ambiguous.
+    if (cursorRaw && !visitorId) {
+      return badRequest("Cursor paging requires query parameter 'visitorId'.");
+    }
 
     const table = getEngagementsTableClient();
     await ensureTableExists(table);
 
-    const escape = (s: string) => String(s).replace(/'/g, "''");
-
-    // Filter by *property* visitorId (works even if PartitionKey differs)
-    let filter: string | null = null;
-    if (visitorIdRaw) {
-      filter = `visitorId eq '${escape(visitorIdRaw)}'`;
+    const filters: string[] = [];
+    if (visitorId) {
+      // Engagement rows are stored with partitionKey = visitorId
+      filters.push(`PartitionKey eq '${escapeOData(visitorId)}'`);
+    }
+    if (cursorRowKey) {
+      // "older than" cursor (RowKey is sortable)
+      filters.push(`RowKey lt '${escapeOData(cursorRowKey)}'`);
     }
 
-    // Cursor: older than cursor.t, tie-breaker by rowKey
-    if (cursor?.t && cursor?.rk) {
-      const ct = escape(cursor.t);
-      const crk = escape(cursor.rk);
-      const c = `(occurredAt lt '${ct}' or (occurredAt eq '${ct}' and rowKey lt '${crk}'))`;
-      filter = filter ? `${filter} and ${c}` : c;
-    }
+    const filter = filters.length ? filters.join(" and ") : undefined;
 
-    // Over-fetch by 1 to determine nextCursor
-    const fetchMax = Math.min(Math.max(limit + 1, 1), 500);
+    // We must return newest-first, but listEntities yields ascending by (PartitionKey, RowKey).
+    // Strategy: iterate and keep a rolling window of the last (limit + 1) rows (newest in that partition).
+    const window: any[] = [];
+    let fetched = 0;
 
-    const events: any[] = [];
-    let lastOcc: string | null = null;
-    let lastRk: string | null = null;
-
-    const iter = table.listEntities<any>(filter ? { queryOptions: { filter } } : undefined);
+    const iter = table.listEntities<any>(
+      filter ? { queryOptions: { filter } } : undefined
+    );
 
     for await (const e of iter) {
-      const rowKey = (e as any).rowKey ?? null;
-      const occurredAt = (e as any).occurredAt ?? null;
+      fetched++;
 
-      events.push({
+      // normalize entity
+      const rowKey = (e as any).rowKey ?? (e as any).RowKey ?? null;
+      const pk = (e as any).partitionKey ?? (e as any).PartitionKey ?? null;
+
+      window.push({
         engagementId: rowKey,
-        visitorId: (e as any).visitorId ?? (e as any).partitionKey ?? null,
+        visitorId: (e as any).visitorId ?? pk,
         eventType: (e as any).eventType ?? null,
         channel: (e as any).channel ?? "unknown",
         source: (e as any).source ?? "unknown",
-        occurredAt,
+        occurredAt: (e as any).occurredAt ?? null,
         recordedAt: (e as any).recordedAt ?? null,
         recordedBy: (e as any).recordedBy ?? null,
         notes: (e as any).notes ?? "",
@@ -478,155 +514,49 @@ app.http("listEngagements", {
         })(),
       });
 
-      if (typeof occurredAt === "string" && typeof rowKey === "string") {
-        lastOcc = occurredAt;
-        lastRk = rowKey;
+      // Keep only last limit+1 (drop oldest)
+      if (window.length > limit + 1) {
+        window.shift();
       }
-
-      if (events.length >= fetchMax) break;
     }
 
-    // Sort newest first by engagementId (your rowKey is sortable)
-    events.sort((a, b) => (a.engagementId < b.engagementId ? 1 : -1));
+    // window now contains the newest (limit+1) rows within filter scope, but still in ascending order.
+    // Convert to newest-first and trim to limit.
+    const newestFirst = window.slice().reverse();
+    const page = newestFirst.slice(0, limit);
 
-    const hasMore = events.length > limit;
-    const page = events.slice(0, limit);
-
-    const nextCursor = hasMore && lastOcc && lastRk ? encodeCursor({ t: lastOcc, rk: lastRk }) : null;
+    // Compute nextCursor:
+    // If we have more than limit in the window, it indicates there are older rows beyond this page.
+    // Use the oldest RowKey in the returned page as the boundary for the next request.
+    let nextCursor: string | null = null;
+    if (window.length > limit && page.length > 0) {
+      const oldestReturned = page[page.length - 1]; // because page is newest-first
+      if (oldestReturned?.engagementId) {
+        nextCursor = b64urlEncode(JSON.stringify({ rk: oldestReturned.engagementId }));
+      }
+    }
 
     return {
       status: 200,
       jsonBody: {
         ok: true,
-        visitorId: visitorIdRaw || null,
+        visitorId: visitorId || null,
         limit,
-        cursor: cursorRaw ?? null,
+        cursor: cursorRaw || null,
         nextCursor,
         count: page.length,
         events: page,
         debug: debugOn
           ? {
               table: (table as any).tableName ?? "Engagements",
-              filter,
-              fetched: events.length,
+              filter: filter ?? null,
+              cursorRaw: cursorRaw || null,
+              cursorDecoded,
+              fetched,
+              windowSize: window.length,
               returned: page.length,
             }
           : undefined,
-      },
-    };
-  },
-});
-
-/**
- * ============================================================================
- *  PHASE 2.2 — FOLLOW-UP OPERATIONS
- * ============================================================================
- */
-
-/**
- * LIST VISITORS NEEDING FOLLOW-UP
- * Route: GET /api/visitors/needs-followup?windowHours=48&maxResults=50&excludeTest=true
- */
-app.http("listVisitorsNeedsFollowup", {
-  methods: ["GET"],
-  authLevel: "anonymous",
-  route: "visitors/needs-followup",
-  handler: async (req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> => {
-    const auth = requireApiKey(req);
-    if (auth) return auth;
-
-    const windowHours = parsePositiveInt(req.query.get("windowHours"), 48);
-    const maxResults = parsePositiveInt(req.query.get("maxResults"), 50);
-    const excludeTest = (req.query.get("excludeTest") ?? "").toLowerCase() === "true";
-
-    const now = Date.now();
-    const cutoffMs = now - windowHours * 60 * 60 * 1000;
-
-    const visitorsTable = getVisitorsTableClient();
-    await ensureTableExists(visitorsTable);
-
-    const engagementsTable = getEngagementsTableClient();
-    await ensureTableExists(engagementsTable);
-
-    const filterVisitors = `PartitionKey eq '${VISITORS_PARTITION_KEY}'`;
-
-    const results: any[] = [];
-
-    for await (const v of visitorsTable.listEntities({ queryOptions: { filter: filterVisitors } })) {
-      const visitorId = (v as any).visitorId as string | undefined;
-      if (!visitorId) continue;
-
-      const createdAt = (v as any).createdAt as string | undefined;
-      const name = (v as any).name as string | undefined;
-      const email = (v as any).email as string | undefined;
-      const source = (v as any).source as string | undefined;
-
-      const emailLower = (email ?? "").toLowerCase();
-      if (excludeTest) {
-        const isExample = emailLower.endsWith("@example.com");
-        const hasPlus = emailLower.includes("+");
-        const isCorsTest = emailLower.includes("cors-test");
-        if (isExample || hasPlus || isCorsTest) continue;
-      }
-
-      // Find last engagement for this visitorId (PartitionKey = visitorId)
-      const filterEng = `PartitionKey eq '${visitorId.replace(/'/g, "''")}'`;
-
-      let lastEngagedAt: string | null = null;
-      let engagementCount = 0;
-
-      for await (const e of engagementsTable.listEntities({ queryOptions: { filter: filterEng } })) {
-        engagementCount++;
-        const occurredAt = (e as any).occurredAt;
-        if (typeof occurredAt === "string") {
-          if (!lastEngagedAt || occurredAt > lastEngagedAt) lastEngagedAt = occurredAt;
-        }
-      }
-
-      const lastMs = lastEngagedAt ? new Date(lastEngagedAt).getTime() : null;
-      const needsFollowup = !lastMs || lastMs < cutoffMs;
-      if (!needsFollowup) continue;
-
-      const hoursSince = lastMs ? Math.floor((now - lastMs) / (1000 * 60 * 60)) : null;
-      const reason = !lastMs ? "no_engagement" : "stale_engagement";
-
-      results.push({
-        visitorId,
-        name: name ?? "",
-        email: email ?? "",
-        source: source ?? "unknown",
-        createdAt: createdAt ?? null,
-        lastEngagedAt,
-        hoursSinceLastEngagement: hoursSince,
-        engagementCount,
-        needsFollowup: true,
-        reason,
-      });
-
-      // Stop once we have enough (after filtering)
-      if (results.length >= maxResults) break;
-    }
-
-    // Sort: (1) no engagement first, then (2) most overdue first
-    results.sort((a, b) => {
-      const aNever = a.lastEngagedAt ? 0 : 1;
-      const bNever = b.lastEngagedAt ? 0 : 1;
-      if (aNever !== bNever) return bNever - aNever;
-
-      const aHours =
-        typeof a.hoursSinceLastEngagement === "number" ? a.hoursSinceLastEngagement : -1;
-      const bHours =
-        typeof b.hoursSinceLastEngagement === "number" ? b.hoursSinceLastEngagement : -1;
-      return bHours - aHours;
-    });
-
-    return {
-      status: 200,
-      jsonBody: {
-        windowHours,
-        excludeTest,
-        count: results.length,
-        visitors: results,
       },
     };
   },

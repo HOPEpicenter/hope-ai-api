@@ -39,11 +39,15 @@ jobs:
           New-Item -ItemType Directory -Force -Path $azDir | Out-Null
           $azLog = Join-Path $azDir "azurite.log"
 
+          # Bind explicitly to 127.0.0.1
           $args = @(
             "-y","azurite",
             "--silent",
             "--location",$azDir,
-            "--debug",$azLog
+            "--debug",$azLog,
+            "--blobHost","127.0.0.1",
+            "--queueHost","127.0.0.1",
+            "--tableHost","127.0.0.1"
           )
 
           Start-Process -FilePath "npx" -ArgumentList $args -WindowStyle Hidden
@@ -54,8 +58,6 @@ jobs:
         shell: powershell
         run: |
           npm i -g azure-functions-core-tools@4 --unsafe-perm true
-
-          # Ensure npm global bin is on PATH for later steps
           $npmBin = npm bin -g
           "NPM_GLOBAL_BIN=$npmBin" | Out-File -FilePath $env:GITHUB_ENV -Append
           $npmBin | Out-File -FilePath $env:GITHUB_PATH -Append
@@ -70,8 +72,11 @@ jobs:
         env:
           HOPE_API_KEY: ci-key
           FUNCTIONS_WORKER_RUNTIME: node
-          STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFeqCnf2q==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-          AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFeqCnf2q==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+
+          # OFFICIAL Azurite dev connection string (key must match Azurite)
+          STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+          AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+
           NODE_ENV: "development"
         run: |
           $logDir = Join-Path $env:RUNNER_TEMP "func"
@@ -83,11 +88,9 @@ jobs:
           Write-Host "Starting Functions host using: $funcExe"
 
           if ($funcExe.ToLower().EndsWith(".ps1")) {
-            # func is a PowerShell shim; run it via powershell.exe
             $args = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$funcExe,"start","--port","7071")
             $p = Start-Process -FilePath "powershell" -ArgumentList $args -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
           } else {
-            # func is an exe/cmd
             $p = Start-Process -FilePath $funcExe -ArgumentList "start","--port","7071" -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
           }
 

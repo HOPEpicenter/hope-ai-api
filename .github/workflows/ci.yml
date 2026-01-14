@@ -54,7 +54,6 @@ jobs:
         shell: powershell
         run: |
           npm i -g azure-functions-core-tools@4 --unsafe-perm true
-          # Ensure npm global bin is on PATH for later steps
           $npmBin = npm bin -g
           "NPM_GLOBAL_BIN=$npmBin" | Out-File -FilePath $env:GITHUB_ENV -Append
           $npmBin | Out-File -FilePath $env:GITHUB_PATH -Append
@@ -71,9 +70,11 @@ jobs:
         run: |
           $logDir = Join-Path $env:RUNNER_TEMP "func"
           New-Item -ItemType Directory -Force -Path $logDir | Out-Null
-          $funcLog = Join-Path $logDir "func.log"
+          $funcOut = Join-Path $logDir "func.out.log"
+          $funcErr = Join-Path $logDir "func.err.log"
 
-          $p = Start-Process -FilePath "func" -ArgumentList "start","--port","7071" -WindowStyle Hidden -RedirectStandardOutput $funcLog -RedirectStandardError $funcLog -PassThru
+          # Start host and capture stdout/stderr to separate files (PowerShell requirement)
+          $p = Start-Process -FilePath "func" -ArgumentList "start","--port","7071" -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
 
           $base = "http://127.0.0.1:7071/api"
           $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
@@ -89,15 +90,19 @@ jobs:
             }
 
             if ($p.HasExited) {
-              Write-Host "Functions host exited early. Last 200 lines of func.log:" -ForegroundColor Yellow
-              Get-Content $funcLog -Tail 200 | ForEach-Object { Write-Host $_ }
+              Write-Host "Functions host exited early. Last 120 lines of func.out.log:" -ForegroundColor Yellow
+              if (Test-Path $funcOut) { Get-Content $funcOut -Tail 120 | ForEach-Object { Write-Host $_ } }
+              Write-Host "Last 120 lines of func.err.log:" -ForegroundColor Yellow
+              if (Test-Path $funcErr) { Get-Content $funcErr -Tail 120 | ForEach-Object { Write-Host $_ } }
               throw "Functions host exited before becoming ready."
             }
           } while ((Get-Date) -lt $deadline)
 
           if ((Get-Date) -ge $deadline) {
-            Write-Host "Functions host did not become ready. Last 200 lines of func.log:" -ForegroundColor Yellow
-            Get-Content $funcLog -Tail 200 | ForEach-Object { Write-Host $_ }
+            Write-Host "Functions host did not become ready. Last 120 lines of func.out.log:" -ForegroundColor Yellow
+            if (Test-Path $funcOut) { Get-Content $funcOut -Tail 120 | ForEach-Object { Write-Host $_ } }
+            Write-Host "Last 120 lines of func.err.log:" -ForegroundColor Yellow
+            if (Test-Path $funcErr) { Get-Content $funcErr -Tail 120 | ForEach-Object { Write-Host $_ } }
             throw "Functions host did not become ready in time."
           }
 
@@ -122,4 +127,5 @@ jobs:
           name: ci-logs
           path: |
             ${{ runner.temp }}\azurite\azurite.log
-            ${{ runner.temp }}\func\func.log
+            ${{ runner.temp }}\func\func.out.log
+            ${{ runner.temp }}\func\func.err.log

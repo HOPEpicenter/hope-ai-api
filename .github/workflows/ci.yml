@@ -1,0 +1,91 @@
+name: CI - Build + Regression + Smoke
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        shell: powershell
+        run: |
+          npm ci
+
+      - name: Build (tsc)
+        shell: powershell
+        run: |
+          npm run build
+
+      - name: Start Azurite
+        shell: powershell
+        run: |
+          npm install -g azurite
+          $azDir = Join-Path $env:RUNNER_TEMP "azurite"
+          New-Item -ItemType Directory -Force -Path $azDir | Out-Null
+          Start-Process -FilePath "azurite" -ArgumentList "--silent","--location",$azDir,"--debug",(Join-Path $azDir "azurite.log") -WindowStyle Hidden
+          Start-Sleep -Seconds 2
+          Write-Host "Azurite started. Log at $azDir\azurite.log"
+
+      - name: Install Azure Functions Core Tools v4
+        shell: powershell
+        run: |
+          choco install azure-functions-core-tools-4 --no-progress -y
+          func --version
+
+      - name: Start Functions Host
+        shell: powershell
+        env:
+          HOPE_API_KEY: ci-key
+          STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFeqCnf2q==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+          AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFeqCnf2q==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+          NODE_ENV: "development"
+        run: |
+          Start-Process -FilePath "func" -ArgumentList "start","--port","7071" -WindowStyle Hidden
+
+          $base = "http://127.0.0.1:7071/api"
+          $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
+
+          $deadline = (Get-Date).AddSeconds(75)
+          do {
+            try {
+              Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body '{"name":"ci","email":"ci@example.com","source":"ci"}' -TimeoutSec 5 | Out-Null
+              Write-Host "Functions host is up via /visitors"
+              break
+            } catch {
+              Start-Sleep -Milliseconds 900
+            }
+          } while ((Get-Date) -lt $deadline)
+
+          if ((Get-Date) -ge $deadline) {
+            throw "Functions host did not become ready in time."
+          }
+
+      - name: Run Regression
+        shell: powershell
+        env:
+          HOPE_API_KEY: ci-key
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\scripts\regression.ps1 -BaseUrl "http://127.0.0.1:7071/api"
+
+      - name: Run Smoke
+        shell: powershell
+        env:
+          HOPE_API_KEY: ci-key
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\scripts\smoke.ps1 -BaseUrl "http://127.0.0.1:7071/api"

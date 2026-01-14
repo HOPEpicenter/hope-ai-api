@@ -10,7 +10,7 @@ on:
 jobs:
   test:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -32,36 +32,53 @@ jobs:
         run: |
           npm run build
 
-      - name: Start Azurite
+      - name: Start Azurite (npx)
         shell: powershell
         run: |
-          npm install -g azurite
           $azDir = Join-Path $env:RUNNER_TEMP "azurite"
           New-Item -ItemType Directory -Force -Path $azDir | Out-Null
-          Start-Process -FilePath "azurite" -ArgumentList "--silent","--location",$azDir,"--debug",(Join-Path $azDir "azurite.log") -WindowStyle Hidden
-          Start-Sleep -Seconds 2
-          Write-Host "Azurite started. Log at $azDir\azurite.log"
+          $azLog = Join-Path $azDir "azurite.log"
 
-      - name: Install Azure Functions Core Tools v4
+          $args = @(
+            "-y","azurite",
+            "--silent",
+            "--location",$azDir,
+            "--debug",$azLog
+          )
+
+          Start-Process -FilePath "npx" -ArgumentList $args -WindowStyle Hidden
+          Start-Sleep -Seconds 2
+          Write-Host "Azurite started. Log at $azLog"
+
+      - name: Install Azure Functions Core Tools v4 (npm)
         shell: powershell
         run: |
-          choco install azure-functions-core-tools-4 --no-progress -y
+          npm i -g azure-functions-core-tools@4 --unsafe-perm true
+          # Ensure npm global bin is on PATH for later steps
+          $npmBin = npm bin -g
+          "NPM_GLOBAL_BIN=$npmBin" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $npmBin | Out-File -FilePath $env:GITHUB_PATH -Append
           func --version
 
-      - name: Start Functions Host
+      - name: Start Functions Host (capture logs)
         shell: powershell
         env:
           HOPE_API_KEY: ci-key
+          FUNCTIONS_WORKER_RUNTIME: node
           STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFeqCnf2q==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
           AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFeqCnf2q==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
           NODE_ENV: "development"
         run: |
-          Start-Process -FilePath "func" -ArgumentList "start","--port","7071" -WindowStyle Hidden
+          $logDir = Join-Path $env:RUNNER_TEMP "func"
+          New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+          $funcLog = Join-Path $logDir "func.log"
+
+          $p = Start-Process -FilePath "func" -ArgumentList "start","--port","7071" -WindowStyle Hidden -RedirectStandardOutput $funcLog -RedirectStandardError $funcLog -PassThru
 
           $base = "http://127.0.0.1:7071/api"
           $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
 
-          $deadline = (Get-Date).AddSeconds(75)
+          $deadline = (Get-Date).AddSeconds(120)
           do {
             try {
               Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body '{"name":"ci","email":"ci@example.com","source":"ci"}' -TimeoutSec 5 | Out-Null
@@ -70,9 +87,17 @@ jobs:
             } catch {
               Start-Sleep -Milliseconds 900
             }
+
+            if ($p.HasExited) {
+              Write-Host "Functions host exited early. Last 200 lines of func.log:" -ForegroundColor Yellow
+              Get-Content $funcLog -Tail 200 | ForEach-Object { Write-Host $_ }
+              throw "Functions host exited before becoming ready."
+            }
           } while ((Get-Date) -lt $deadline)
 
           if ((Get-Date) -ge $deadline) {
+            Write-Host "Functions host did not become ready. Last 200 lines of func.log:" -ForegroundColor Yellow
+            Get-Content $funcLog -Tail 200 | ForEach-Object { Write-Host $_ }
             throw "Functions host did not become ready in time."
           }
 
@@ -89,3 +114,12 @@ jobs:
           HOPE_API_KEY: ci-key
         run: |
           powershell -ExecutionPolicy Bypass -File .\scripts\smoke.ps1 -BaseUrl "http://127.0.0.1:7071/api"
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs
+          path: |
+            ${{ runner.temp }}\azurite\azurite.log
+            ${{ runner.temp }}\func\func.log

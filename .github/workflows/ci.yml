@@ -54,9 +54,17 @@ jobs:
         shell: powershell
         run: |
           npm i -g azure-functions-core-tools@4 --unsafe-perm true
+
+          # Ensure npm global bin is on PATH for later steps
           $npmBin = npm bin -g
           "NPM_GLOBAL_BIN=$npmBin" | Out-File -FilePath $env:GITHUB_ENV -Append
           $npmBin | Out-File -FilePath $env:GITHUB_PATH -Append
+
+          # Prove what "func" resolves to on this runner
+          $cmd = Get-Command func -ErrorAction Stop
+          Write-Host "func command type: $($cmd.CommandType)"
+          Write-Host "func source:       $($cmd.Source)"
+
           func --version
 
       - name: Start Functions Host (capture logs)
@@ -73,8 +81,11 @@ jobs:
           $funcOut = Join-Path $logDir "func.out.log"
           $funcErr = Join-Path $logDir "func.err.log"
 
-          # Start host and capture stdout/stderr to separate files (PowerShell requirement)
-          $p = Start-Process -FilePath "func" -ArgumentList "start","--port","7071" -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
+          # Resolve the actual Windows-launchable command (usually func.cmd)
+          $funcExe = (Get-Command func -ErrorAction Stop).Source
+          Write-Host "Starting Functions host using: $funcExe"
+
+          $p = Start-Process -FilePath $funcExe -ArgumentList "start","--port","7071" -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
 
           $base = "http://127.0.0.1:7071/api"
           $headers = @{ "x-api-key" = $env:HOPE_API_KEY }

@@ -60,11 +60,9 @@ jobs:
           "NPM_GLOBAL_BIN=$npmBin" | Out-File -FilePath $env:GITHUB_ENV -Append
           $npmBin | Out-File -FilePath $env:GITHUB_PATH -Append
 
-          # Prove what "func" resolves to on this runner
           $cmd = Get-Command func -ErrorAction Stop
           Write-Host "func command type: $($cmd.CommandType)"
           Write-Host "func source:       $($cmd.Source)"
-
           func --version
 
       - name: Start Functions Host (capture logs)
@@ -81,16 +79,22 @@ jobs:
           $funcOut = Join-Path $logDir "func.out.log"
           $funcErr = Join-Path $logDir "func.err.log"
 
-          # Resolve the actual Windows-launchable command (usually func.cmd)
           $funcExe = (Get-Command func -ErrorAction Stop).Source
           Write-Host "Starting Functions host using: $funcExe"
 
-          $p = Start-Process -FilePath $funcExe -ArgumentList "start","--port","7071" -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
+          if ($funcExe.ToLower().EndsWith(".ps1")) {
+            # func is a PowerShell shim; run it via powershell.exe
+            $args = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$funcExe,"start","--port","7071")
+            $p = Start-Process -FilePath "powershell" -ArgumentList $args -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
+          } else {
+            # func is an exe/cmd
+            $p = Start-Process -FilePath $funcExe -ArgumentList "start","--port","7071" -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
+          }
 
           $base = "http://127.0.0.1:7071/api"
           $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
 
-          $deadline = (Get-Date).AddSeconds(120)
+          $deadline = (Get-Date).AddSeconds(150)
           do {
             try {
               Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body '{"name":"ci","email":"ci@example.com","source":"ci"}' -TimeoutSec 5 | Out-Null

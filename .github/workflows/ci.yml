@@ -39,7 +39,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path $azDir | Out-Null
           $azLog = Join-Path $azDir "azurite.log"
 
-          # Bind explicitly to 127.0.0.1
           $args = @(
             "-y","azurite",
             "--silent",
@@ -59,15 +58,13 @@ jobs:
         run: |
           npm i -g azure-functions-core-tools@4 --unsafe-perm true
           $npmBin = npm bin -g
-          "NPM_GLOBAL_BIN=$npmBin" | Out-File -FilePath $env:GITHUB_ENV -Append
           $npmBin | Out-File -FilePath $env:GITHUB_PATH -Append
 
           $cmd = Get-Command func -ErrorAction Stop
-          Write-Host "func command type: $($cmd.CommandType)"
-          Write-Host "func source:       $($cmd.Source)"
+          Write-Host "func source: $($cmd.Source)"
           func --version
 
-      - name: Start Functions Host (capture logs)
+      - name: Start Host + Run Regression + Run Smoke (single step)
         shell: powershell
         env:
           HOPE_API_KEY: ci-key
@@ -79,6 +76,8 @@ jobs:
 
           NODE_ENV: "development"
         run: |
+          $ErrorActionPreference = "Stop"
+
           $logDir = Join-Path $env:RUNNER_TEMP "func"
           New-Item -ItemType Directory -Force -Path $logDir | Out-Null
           $funcOut = Join-Path $logDir "func.out.log"
@@ -87,56 +86,55 @@ jobs:
           $funcExe = (Get-Command func -ErrorAction Stop).Source
           Write-Host "Starting Functions host using: $funcExe"
 
-          if ($funcExe.ToLower().EndsWith(".ps1")) {
-            $args = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$funcExe,"start","--port","7071")
-            $p = Start-Process -FilePath "powershell" -ArgumentList $args -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
-          } else {
-            $p = Start-Process -FilePath $funcExe -ArgumentList "start","--port","7071" -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
-          }
-
-          $base = "http://127.0.0.1:7071/api"
-          $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
-
-          $deadline = (Get-Date).AddSeconds(150)
-          do {
-            try {
-              Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body '{"name":"ci","email":"ci@example.com","source":"ci"}' -TimeoutSec 5 | Out-Null
-              Write-Host "Functions host is up via /visitors"
-              break
-            } catch {
-              Start-Sleep -Milliseconds 900
+          try {
+            if ($funcExe.ToLower().EndsWith(".ps1")) {
+              $args = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$funcExe,"start","--port","7071")
+              $p = Start-Process -FilePath "powershell" -ArgumentList $args -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
+            } else {
+              $p = Start-Process -FilePath $funcExe -ArgumentList "start","--port","7071" -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
             }
 
-            if ($p.HasExited) {
-              Write-Host "Functions host exited early. Last 120 lines of func.out.log:" -ForegroundColor Yellow
+            $base = "http://127.0.0.1:7071/api"
+            $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
+
+            # Wait until /visitors works (host + storage ok)
+            $deadline = (Get-Date).AddSeconds(180)
+            do {
+              try {
+                Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body '{"name":"ci","email":"ci@example.com","source":"ci"}' -TimeoutSec 5 | Out-Null
+                Write-Host "Host ready via POST /visitors"
+                break
+              } catch {
+                Start-Sleep -Milliseconds 900
+              }
+
+              if ($p.HasExited) {
+                Write-Host "Host exited early. Last 120 lines of func.out.log:" -ForegroundColor Yellow
+                if (Test-Path $funcOut) { Get-Content $funcOut -Tail 120 | ForEach-Object { Write-Host $_ } }
+                Write-Host "Last 120 lines of func.err.log:" -ForegroundColor Yellow
+                if (Test-Path $funcErr) { Get-Content $funcErr -Tail 120 | ForEach-Object { Write-Host $_ } }
+                throw "Functions host exited before becoming ready."
+              }
+            } while ((Get-Date) -lt $deadline)
+
+            if ((Get-Date) -ge $deadline) {
+              Write-Host "Host not ready in time. Last 120 lines of func.out.log:" -ForegroundColor Yellow
               if (Test-Path $funcOut) { Get-Content $funcOut -Tail 120 | ForEach-Object { Write-Host $_ } }
               Write-Host "Last 120 lines of func.err.log:" -ForegroundColor Yellow
               if (Test-Path $funcErr) { Get-Content $funcErr -Tail 120 | ForEach-Object { Write-Host $_ } }
-              throw "Functions host exited before becoming ready."
+              throw "Functions host did not become ready in time."
             }
-          } while ((Get-Date) -lt $deadline)
 
-          if ((Get-Date) -ge $deadline) {
-            Write-Host "Functions host did not become ready. Last 120 lines of func.out.log:" -ForegroundColor Yellow
-            if (Test-Path $funcOut) { Get-Content $funcOut -Tail 120 | ForEach-Object { Write-Host $_ } }
-            Write-Host "Last 120 lines of func.err.log:" -ForegroundColor Yellow
-            if (Test-Path $funcErr) { Get-Content $funcErr -Tail 120 | ForEach-Object { Write-Host $_ } }
-            throw "Functions host did not become ready in time."
+            # Run regression + smoke WHILE host is alive
+            powershell -ExecutionPolicy Bypass -File .\scripts\regression.ps1 -BaseUrl $base
+            powershell -ExecutionPolicy Bypass -File .\scripts\smoke.ps1 -BaseUrl $base
+
+          } finally {
+            if ($p -and -not $p.HasExited) {
+              Write-Host "Stopping Functions host (pid=$($p.Id))"
+              Stop-Process -Id $p.Id -Force
+            }
           }
-
-      - name: Run Regression
-        shell: powershell
-        env:
-          HOPE_API_KEY: ci-key
-        run: |
-          powershell -ExecutionPolicy Bypass -File .\scripts\regression.ps1 -BaseUrl "http://127.0.0.1:7071/api"
-
-      - name: Run Smoke
-        shell: powershell
-        env:
-          HOPE_API_KEY: ci-key
-        run: |
-          powershell -ExecutionPolicy Bypass -File .\scripts\smoke.ps1 -BaseUrl "http://127.0.0.1:7071/api"
 
       - name: Upload logs on failure
         if: failure()

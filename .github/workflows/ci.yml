@@ -32,15 +32,37 @@ jobs:
         run: |
           npm run build
 
-      - name: Start Azurite (npx)
+      - name: Ensure Azurite is available (dev dependency)
         shell: powershell
         run: |
+          # If azurite isn't already in package-lock, install it now (no-save to avoid lock churn)
+          # This is only for CI reliability.
+          $has = Test-Path ".\node_modules\azurite\package.json"
+          if (-not $has) {
+            Write-Host "Azurite not found in node_modules; installing (no-save)..."
+            npm i azurite@latest --no-save
+          } else {
+            Write-Host "Azurite found in node_modules."
+          }
+
+      - name: Start Azurite (capture logs + pid)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+
           $azDir = Join-Path $env:RUNNER_TEMP "azurite"
           New-Item -ItemType Directory -Force -Path $azDir | Out-Null
           $azLog = Join-Path $azDir "azurite.log"
+          $azPidFile = Join-Path $azDir "azurite.pid"
 
+          $azExe = Join-Path $PWD "node_modules\azurite\dist\src\azurite.js"
+          if (-not (Test-Path $azExe)) {
+            throw "Azurite entry not found at $azExe"
+          }
+
+          # Run azurite via node to avoid npx quirks
           $args = @(
-            "-y","azurite",
+            $azExe,
             "--silent",
             "--location",$azDir,
             "--debug",$azLog,
@@ -49,13 +71,25 @@ jobs:
             "--tableHost","127.0.0.1"
           )
 
-          Start-Process -FilePath "npx" -ArgumentList $args -WindowStyle Hidden
-          Write-Host "Azurite starting. Log at $azLog"
+          $p = Start-Process -FilePath "node" -ArgumentList $args -WindowStyle Hidden -PassThru
+          $p.Id | Out-File -FilePath $azPidFile -Encoding ascii
+
+          Write-Host "Azurite started with pid=$($p.Id)"
+          Write-Host "Azurite log: $azLog"
+          Start-Sleep -Seconds 2
+
+          if ($p.HasExited) {
+            Write-Host "Azurite exited immediately. Last 200 lines of azurite.log:" -ForegroundColor Yellow
+            if (Test-Path $azLog) { Get-Content $azLog -Tail 200 | ForEach-Object { Write-Host $_ } }
+            throw "Azurite process exited early."
+          }
 
       - name: Wait for Azurite ports
         shell: powershell
         run: |
           $ErrorActionPreference = "Stop"
+          $azLog = Join-Path $env:RUNNER_TEMP "azurite\azurite.log"
+          $azPidFile = Join-Path $env:RUNNER_TEMP "azurite\azurite.pid"
 
           function Wait-Port([string]$hostname,[int]$port,[int]$timeoutSeconds) {
             $deadline = (Get-Date).AddSeconds($timeoutSeconds)
@@ -74,12 +108,28 @@ jobs:
               Start-Sleep -Milliseconds 800
             } while ((Get-Date) -lt $deadline)
 
+            Write-Host "Azurite failed to bind in time. Last 200 lines of azurite.log:" -ForegroundColor Yellow
+            if (Test-Path $azLog) { Get-Content $azLog -Tail 200 | ForEach-Object { Write-Host $_ } }
+
+            if (Test-Path $azPidFile) {
+              $pid = (Get-Content $azPidFile -ErrorAction SilentlyContinue | Select-Object -First 1)
+              if ($pid) {
+                $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+                if ($proc) {
+                  Write-Host "Azurite process is still running (pid=$pid)" -ForegroundColor Yellow
+                } else {
+                  Write-Host "Azurite process is NOT running (pid=$pid)" -ForegroundColor Yellow
+                }
+              }
+            }
+
             throw ("Timed out waiting for {0}:{1}" -f $hostname, $port)
           }
 
-          Wait-Port "127.0.0.1" 10000 60
-          Wait-Port "127.0.0.1" 10001 60
-          Wait-Port "127.0.0.1" 10002 60
+          # Give it more time on CI runners
+          Wait-Port "127.0.0.1" 10000 120
+          Wait-Port "127.0.0.1" 10001 120
+          Wait-Port "127.0.0.1" 10002 120
 
       - name: Install Azure Functions Core Tools v4 (npm)
         shell: powershell
@@ -97,10 +147,8 @@ jobs:
         env:
           HOPE_API_KEY: ci-key
           FUNCTIONS_WORKER_RUNTIME: node
-
           STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
           AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-
           NODE_ENV: "development"
         run: |
           $ErrorActionPreference = "Stop"

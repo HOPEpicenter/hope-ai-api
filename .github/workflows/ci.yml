@@ -57,27 +57,26 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
-          function Wait-Port([string]$host,[int]$port,[int]$timeoutSeconds) {
+          function Wait-Port([string]$hostname,[int]$port,[int]$timeoutSeconds) {
             $deadline = (Get-Date).AddSeconds($timeoutSeconds)
             do {
               $ok = $false
               try {
-                $r = Test-NetConnection -ComputerName $host -Port $port -WarningAction SilentlyContinue
+                $r = Test-NetConnection -ComputerName $hostname -Port $port -WarningAction SilentlyContinue
                 $ok = [bool]$r.TcpTestSucceeded
               } catch { $ok = $false }
 
               if ($ok) {
-                Write-Host "OK: $host:$port is listening"
+                Write-Host ("OK: {0}:{1} is listening" -f $hostname, $port)
                 return
               }
 
               Start-Sleep -Milliseconds 800
             } while ((Get-Date) -lt $deadline)
 
-            throw "Timed out waiting for $host:$port"
+            throw ("Timed out waiting for {0}:{1}" -f $hostname, $port)
           }
 
-          # Azurite defaults
           Wait-Port "127.0.0.1" 10000 60
           Wait-Port "127.0.0.1" 10001 60
           Wait-Port "127.0.0.1" 10002 60
@@ -126,7 +125,6 @@ jobs:
             $base = "http://127.0.0.1:7071/api"
             $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
 
-            # Readiness: allow longer on CI
             $deadline = (Get-Date).AddSeconds(240)
             do {
               try {

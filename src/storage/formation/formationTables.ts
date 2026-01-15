@@ -1,50 +1,44 @@
-﻿import { TableClient } from "@azure/data-tables";
-import { tableName } from "../tableName";
-import { ensureTableExists } from "../../shared/storage/ensureTableExists";
+import { TableClient } from "@azure/data-tables";
+import { makeTableClient } from "../../shared/storage/makeTableClient";
 
-export const FORMATION_PROFILES_TABLE = "FormationProfiles";
-export const FORMATION_EVENTS_TABLE = "FormationEvents";
-export const AUTOMATION_RUNS_TABLE_DEFAULT = "AutomationRuns";
+// ---- Table names (dev defaults) ----
+// Keep these stable; they show up in debug output and scripts.
+export const FORMATION_EVENTS_TABLE = process.env.FORMATION_EVENTS_TABLE || "devFormationEvents";
+export const FORMATION_PROFILES_TABLE = process.env.FORMATION_PROFILES_TABLE || "devFormationProfiles";
+export const AUTOMATION_RUNS_TABLE = process.env.AUTOMATION_RUNS_TABLE || "devAutomationRuns";
 
-export const FORMATION_PROFILES_PARTITION_KEY = "VISITOR";
-export const FORMATION_EVENTS_PARTITION_KEY = "VISITOR";
+// ---- Partition Keys ----
+// These must match what your code writes/queries.
+export const FORMATION_PARTITION_KEY = "VISITOR";
 export const AUTOMATION_RUNS_PARTITION_KEY = "RUN";
 
-function isAzuriteConnectionString(cs: string): boolean {
-  const s = String(cs ?? "").trim().toLowerCase();
-  // Common dev patterns:
-  // - UseDevelopmentStorage=true (shortcut)
-  // - devstoreaccount1 (full Azurite connection string)
-  return s.includes("usedevelopmentstorage=true") || s.includes("accountname=devstoreaccount1");
+function resolveStorageConnectionString(explicit?: string): string {
+  const cs =
+    explicit ||
+    process.env.STORAGE_CONNECTION_STRING ||
+    process.env.AzureWebJobsStorage ||
+    "";
+
+  if (!cs) {
+    throw new Error(
+      "Storage connection string missing. Set STORAGE_CONNECTION_STRING (preferred) or AzureWebJobsStorage."
+    );
+  }
+  return cs;
 }
 
-function makeClient(connectionString: string, logicalTable: string): TableClient {
-  const options = isAzuriteConnectionString(connectionString)
-    ? ({ allowInsecureConnection: true } as any)
-    : undefined;
-
-  return TableClient.fromConnectionString(connectionString, tableName(logicalTable), options as any);
+// NOTE: These accept an optional connection string so older call sites compiling with cs args keep working.
+export function getFormationEventsTableClient(connectionString?: string): TableClient {
+  const cs = resolveStorageConnectionString(connectionString);
+  return makeTableClient(cs, FORMATION_EVENTS_TABLE);
 }
 
-export function getFormationProfilesTableClient(connectionString: string): TableClient {
-  return makeClient(connectionString, FORMATION_PROFILES_TABLE);
+export function getFormationProfilesTableClient(connectionString?: string): TableClient {
+  const cs = resolveStorageConnectionString(connectionString);
+  return makeTableClient(cs, FORMATION_PROFILES_TABLE);
 }
 
-export function getFormationEventsTableClient(connectionString: string): TableClient {
-  return makeClient(connectionString, FORMATION_EVENTS_TABLE);
-}
-
-export function getAutomationRunsTableClient(): TableClient {
-  const cs = process.env.STORAGE_CONNECTION_STRING;
-  if (!cs) throw new Error("Missing STORAGE_CONNECTION_STRING");
-
-  const logical =
-    (process.env.AUTOMATION_RUNS_TABLE ?? "").trim() || AUTOMATION_RUNS_TABLE_DEFAULT;
-
-  return makeClient(cs, logical);
-}
-
-export async function ensureAutomationRunsTableExists(): Promise<void> {
-  const t = getAutomationRunsTableClient();
-  await ensureTableExists(t);
+export function getAutomationRunsTableClient(connectionString?: string): TableClient {
+  const cs = resolveStorageConnectionString(connectionString);
+  return makeTableClient(cs, AUTOMATION_RUNS_TABLE);
 }

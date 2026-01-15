@@ -1,4 +1,5 @@
 ﻿// src/functions/admin/getVisitorDashboard.ts
+
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { TableClient } from "@azure/data-tables";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
@@ -6,7 +7,13 @@ import { makeTableClient } from "../../shared/storage/makeTableClient";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import { tableName } from "../../storage/tableName";
 
-type TimelineKind = "formation" | "engagement";
+import {
+  TimelineKind,
+  TimelineItemCore,
+  mapFormationRow,
+  mapEngagementRow,
+  sortTimelineDesc,
+} from "../../shared/timeline/timelineMapping";
 
 type TimelineItem = {
   id: string;
@@ -98,15 +105,6 @@ function safeIso(val: any): string | null {
   return String(val);
 }
 
-function parseMaybeJson(val: any): any {
-  if (val == null) return undefined;
-  if (typeof val === "object") return val;
-  if (typeof val !== "string") return val;
-  const s = val.trim();
-  if (!s) return undefined;
-  try { return JSON.parse(s); } catch { return val; }
-}
-
 function isAzuriteConnectionString(cs: string): boolean {
   const s = cs.toLowerCase();
   return s.includes("devstoreaccount1") || s.includes("127.0.0.1") || s.includes("localhost");
@@ -150,16 +148,10 @@ function getTableClientFromEnv(tbl: string): { client: TableClient; conn: string
   return { client, conn: cs, isAzurite, fp: connFingerprint(cs) };
 }
 
-/**
- * Build listEntities options deterministically
- */
 function listOpts(filter?: string) {
   return filter ? { queryOptions: { filter } } : undefined;
 }
 
-/**
- * Probe using the same async-iterator path as the working timeline endpoint
- */
 async function probeFirstEntity(client: TableClient, filter?: string): Promise<any | null> {
   for await (const e of client.listEntities(listOpts(filter))) {
     return e as any;
@@ -167,83 +159,13 @@ async function probeFirstEntity(client: TableClient, filter?: string): Promise<a
   return null;
 }
 
-function normalizeFormationEntity(visitorId: string, e: any, includeRaw: boolean): TimelineItem | null {
-  const occurredAt =
-    safeIso(e.occurredAt) ??
-    safeIso((e as any).OccurredAt) ??
-    safeIso(e.timestamp) ??
-    safeIso(e.recordedAt);
-
-  if (!occurredAt) return null;
-
-  const recordedAt = safeIso(e.recordedAt) ?? occurredAt;
-  const type = (e.type ?? (e as any).Type ?? "UNKNOWN").toString();
-  const display = (e.display ?? (e as any).Display ?? `${type}`).toString();
-
-  const metadata =
-    parseMaybeJson(e.metadata) ??
-    parseMaybeJson((e as any).Metadata) ??
-    parseMaybeJson((e as any).metadataJson) ??
-    undefined;
-
-  const eventId = (e.eventId ?? (e as any).EventId ?? (e as any).rowKey ?? (e as any).RowKey ?? "").toString();
-  const id = eventId || ((e as any).rowKey ?? (e as any).RowKey ?? "").toString() || `${occurredAt}__${type}`;
-
-  const data = { eventId: id, visitorId, type, occurredAt, recordedAt, display, metadata };
-
-  const item: TimelineItem = {
-    id,
-    kind: "formation",
-    occurredAt,
-    recordedAt,
-    type,
-    display,
-    metadata,
-    data
-  };
-
-  if (includeRaw) item.dataRaw = e;
-  return item;
+function escapeODataString(val: string): string {
+  return String(val).replace(/'/g, "''");
 }
 
-function normalizeEngagementEntity(visitorId: string, e: any, includeRaw: boolean): TimelineItem | null {
-  const occurredAt =
-    safeIso(e.occurredAt) ??
-    safeIso((e as any).OccurredAt) ??
-    safeIso(e.timestamp) ??
-    safeIso(e.recordedAt);
-
-  if (!occurredAt) return null;
-
-  const recordedAt = safeIso(e.recordedAt) ?? occurredAt;
-  const type = (e.eventType ?? e.type ?? (e as any).Type ?? "ENGAGEMENT").toString();
-  const display = (e.display ?? (e as any).Display ?? `${type}`).toString();
-
-  const metadata = {
-    eventType: e.eventType ?? undefined,
-    channel: e.channel ?? undefined,
-    source: e.source ?? undefined,
-    recordedBy: e.recordedBy ?? undefined
-  };
-
-  const engagementId = ((e as any).engagementId ?? (e as any).EngagementId ?? (e as any).rowKey ?? (e as any).RowKey ?? "").toString();
-  const id = engagementId || ((e as any).rowKey ?? (e as any).RowKey ?? "").toString() || `${occurredAt}__${type}`;
-
-  const data = { engagementId: id, visitorId, type, occurredAt, recordedAt, display, metadata };
-
-  const item: TimelineItem = {
-    id,
-    kind: "engagement",
-    occurredAt,
-    recordedAt,
-    type,
-    display,
-    metadata,
-    data
-  };
-
-  if (includeRaw) item.dataRaw = e;
-  return item;
+function buildVisitorFilter(visitorId: string): string {
+  const esc = escapeODataString(visitorId);
+  return `(visitorId eq '${esc}' or PartitionKey eq '${esc}')`;
 }
 
 const VISITORS_TABLE = tableName(process.env.VISITORS_TABLE || "Visitors");
@@ -280,6 +202,42 @@ async function tryGetFormationProfile(visitorId: string, profiles: TableClient):
     } catch { /* ignore */ }
   }
   return null;
+}
+
+function toDashboardItem(visitorId: string, core: TimelineItemCore, raw: any, includeRaw: boolean): TimelineItem | null {
+  const occurredAt = core.occurredAt;
+  if (!occurredAt) return null;
+
+  const recordedAt = core.recordedAt ?? occurredAt;
+  const type = core.type ?? "UNKNOWN";
+  const display = core.display || type;
+
+  const id = core.rk || `${occurredAt}__${core.kind}`;
+
+  const data = {
+    id,
+    visitorId,
+    kind: core.kind,
+    type,
+    occurredAt,
+    recordedAt,
+    display,
+    metadata: core.metadata || {},
+  };
+
+  const item: TimelineItem = {
+    id,
+    kind: core.kind,
+    occurredAt,
+    recordedAt,
+    type,
+    display,
+    metadata: core.metadata || {},
+    data
+  };
+
+  if (includeRaw) item.dataRaw = raw;
+  return item;
 }
 
 app.http("getVisitorDashboard", {
@@ -329,8 +287,10 @@ app.http("getVisitorDashboard", {
     const timelineItems: TimelineItem[] = [];
     const pullCap = Math.min(Math.max(timelineLimit * 8, 50), 300);
 
-    const formationFilter = `visitorId eq '${String(visitorId).replace(/'/g, "''")}'`;
-    const engagementFilter = `visitorId eq '${String(visitorId).replace(/'/g, "''")}'`;
+    const baseFilter = buildVisitorFilter(String(visitorId));
+
+    const formationFilter = baseFilter;
+    const engagementFilter = baseFilter;
 
     let formationProbeAnyRow: any = null;
     let formationProbeFirstFiltered: any = null;
@@ -388,7 +348,8 @@ app.http("getVisitorDashboard", {
     if (kinds.has("formation")) {
       let pulled = 0;
       for await (const e of formationClient.client.listEntities(listOpts(formationFilter))) {
-        const item = normalizeFormationEntity(visitorId, e, debug);
+        const core = mapFormationRow(e);
+        const item = toDashboardItem(visitorId, core, e, debug);
         if (item) timelineItems.push(item);
         pulled++;
         if (pulled >= pullCap) break;
@@ -398,19 +359,19 @@ app.http("getVisitorDashboard", {
     if (kinds.has("engagement")) {
       let pulled = 0;
       for await (const e of engagementsClient.client.listEntities(listOpts(engagementFilter))) {
-        const item = normalizeEngagementEntity(visitorId, e, debug);
+        const core = mapEngagementRow(e);
+        const item = toDashboardItem(visitorId, core, e, debug);
         if (item) timelineItems.push(item);
         pulled++;
         if (pulled >= pullCap) break;
       }
     }
 
+    // Sort with shared logic via core-sort comparator
     timelineItems.sort((a, b) => {
-      const ao = Date.parse(a.occurredAt);
-      const bo = Date.parse(b.occurredAt);
-      if (bo !== ao) return bo - ao;
-      if (b.id !== a.id) return b.id.localeCompare(a.id);
-      return 0;
+      const ac: TimelineItemCore = { rk: a.id, kind: a.kind, occurredAt: a.occurredAt, recordedAt: a.recordedAt, type: a.type, display: a.display, metadata: a.metadata || {} };
+      const bc: TimelineItemCore = { rk: b.id, kind: b.kind, occurredAt: b.occurredAt, recordedAt: b.recordedAt, type: b.type, display: b.display, metadata: b.metadata || {} };
+      return sortTimelineDesc(ac, bc);
     });
 
     const preview = timelineItems.slice(0, timelineLimit);

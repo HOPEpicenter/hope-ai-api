@@ -50,8 +50,37 @@ jobs:
           )
 
           Start-Process -FilePath "npx" -ArgumentList $args -WindowStyle Hidden
-          Start-Sleep -Seconds 2
-          Write-Host "Azurite started. Log at $azLog"
+          Write-Host "Azurite starting. Log at $azLog"
+
+      - name: Wait for Azurite ports
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          function Wait-Port([string]$host,[int]$port,[int]$timeoutSeconds) {
+            $deadline = (Get-Date).AddSeconds($timeoutSeconds)
+            do {
+              $ok = $false
+              try {
+                $r = Test-NetConnection -ComputerName $host -Port $port -WarningAction SilentlyContinue
+                $ok = [bool]$r.TcpTestSucceeded
+              } catch { $ok = $false }
+
+              if ($ok) {
+                Write-Host "OK: $host:$port is listening"
+                return
+              }
+
+              Start-Sleep -Milliseconds 800
+            } while ((Get-Date) -lt $deadline)
+
+            throw "Timed out waiting for $host:$port"
+          }
+
+          # Azurite defaults
+          Wait-Port "127.0.0.1" 10000 60
+          Wait-Port "127.0.0.1" 10001 60
+          Wait-Port "127.0.0.1" 10002 60
 
       - name: Install Azure Functions Core Tools v4 (npm)
         shell: powershell
@@ -70,7 +99,6 @@ jobs:
           HOPE_API_KEY: ci-key
           FUNCTIONS_WORKER_RUNTIME: node
 
-          # OFFICIAL Azurite dev connection string (key must match Azurite)
           STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
           AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
 
@@ -86,6 +114,7 @@ jobs:
           $funcExe = (Get-Command func -ErrorAction Stop).Source
           Write-Host "Starting Functions host using: $funcExe"
 
+          $p = $null
           try {
             if ($funcExe.ToLower().EndsWith(".ps1")) {
               $args = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$funcExe,"start","--port","7071")
@@ -97,11 +126,11 @@ jobs:
             $base = "http://127.0.0.1:7071/api"
             $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
 
-            # Wait until /visitors works (host + storage ok)
-            $deadline = (Get-Date).AddSeconds(180)
+            # Readiness: allow longer on CI
+            $deadline = (Get-Date).AddSeconds(240)
             do {
               try {
-                Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body '{"name":"ci","email":"ci@example.com","source":"ci"}' -TimeoutSec 5 | Out-Null
+                Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body '{"name":"ci","email":"ci@example.com","source":"ci"}' -TimeoutSec 10 | Out-Null
                 Write-Host "Host ready via POST /visitors"
                 break
               } catch {
@@ -109,23 +138,22 @@ jobs:
               }
 
               if ($p.HasExited) {
-                Write-Host "Host exited early. Last 120 lines of func.out.log:" -ForegroundColor Yellow
-                if (Test-Path $funcOut) { Get-Content $funcOut -Tail 120 | ForEach-Object { Write-Host $_ } }
-                Write-Host "Last 120 lines of func.err.log:" -ForegroundColor Yellow
-                if (Test-Path $funcErr) { Get-Content $funcErr -Tail 120 | ForEach-Object { Write-Host $_ } }
+                Write-Host "Host exited early. Last 200 lines of func.out.log:" -ForegroundColor Yellow
+                if (Test-Path $funcOut) { Get-Content $funcOut -Tail 200 | ForEach-Object { Write-Host $_ } }
+                Write-Host "Last 200 lines of func.err.log:" -ForegroundColor Yellow
+                if (Test-Path $funcErr) { Get-Content $funcErr -Tail 200 | ForEach-Object { Write-Host $_ } }
                 throw "Functions host exited before becoming ready."
               }
             } while ((Get-Date) -lt $deadline)
 
             if ((Get-Date) -ge $deadline) {
-              Write-Host "Host not ready in time. Last 120 lines of func.out.log:" -ForegroundColor Yellow
-              if (Test-Path $funcOut) { Get-Content $funcOut -Tail 120 | ForEach-Object { Write-Host $_ } }
-              Write-Host "Last 120 lines of func.err.log:" -ForegroundColor Yellow
-              if (Test-Path $funcErr) { Get-Content $funcErr -Tail 120 | ForEach-Object { Write-Host $_ } }
+              Write-Host "Host not ready in time. Last 200 lines of func.out.log:" -ForegroundColor Yellow
+              if (Test-Path $funcOut) { Get-Content $funcOut -Tail 200 | ForEach-Object { Write-Host $_ } }
+              Write-Host "Last 200 lines of func.err.log:" -ForegroundColor Yellow
+              if (Test-Path $funcErr) { Get-Content $funcErr -Tail 200 | ForEach-Object { Write-Host $_ } }
               throw "Functions host did not become ready in time."
             }
 
-            # Run regression + smoke WHILE host is alive
             powershell -ExecutionPolicy Bypass -File .\scripts\regression.ps1 -BaseUrl $base
             powershell -ExecutionPolicy Bypass -File .\scripts\smoke.ps1 -BaseUrl $base
 

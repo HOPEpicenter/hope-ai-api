@@ -39,17 +39,6 @@ jobs:
           $ErrorActionPreference = "Stop"
           npm run build
 
-      - name: Install Azure Functions Core Tools v4
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-
-          # Install via Chocolatey (most reliable on windows-latest)
-          choco install azure-functions-core-tools-4 -y --no-progress
-
-          # Verify
-          func --version
-
       - name: Install Azurite
         shell: pwsh
         run: |

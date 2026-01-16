@@ -64,6 +64,43 @@ jobs:
           ) -NoNewWindow
 
           Start-Sleep -Seconds 2
+      - name: Install Azure Functions Core Tools v4 (npm)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npm i -g azure-functions-core-tools@4 --unsafe-perm true
+          func --version
+
+      - name: Start Functions Host (background)
+        shell: pwsh
+        env:
+          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
+          STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          # Start the Functions host in the background and write logs to a file
+          $log = Join-Path $PWD "func-host.log"
+          if (Test-Path $log) { Remove-Item $log -Force }
+
+          Start-Process -FilePath "func" -ArgumentList @("start","--port","7071","--verbose") -NoNewWindow -RedirectStandardOutput $log -RedirectStandardError $log
+
+          # Wait until the host is ready (or fail with logs)
+          $deadline = (Get-Date).AddSeconds(60)
+          while ((Get-Date) -lt $deadline) {
+            if (Test-Path $log) {
+              $txt = Get-Content $log -Raw
+              if ($txt -match "Host started" -or $txt -match "Host initialized" -or $txt -match "Job host started") {
+                Write-Host "Functions host is up."
+                exit 0
+              }
+            }
+            Start-Sleep -Seconds 2
+          }
+
+          Write-Host "Functions host did not become ready in time. Last 200 lines:"
+          if (Test-Path $log) { Get-Content $log -Tail 200 }
+          exit 1
 
       - name: Regression
         shell: pwsh

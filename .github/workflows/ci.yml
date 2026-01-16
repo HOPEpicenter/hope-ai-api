@@ -11,7 +11,6 @@ jobs:
   test:
     name: test
     runs-on: windows-latest
-    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -26,13 +25,18 @@ jobs:
       - name: Install dependencies
         shell: powershell
         run: |
-          $ErrorActionPreference = "Stop"
           npm ci
 
-      - name: Start Azurite (bind 127.0.0.1)
+      - name: Install Azure Functions Core Tools
         shell: powershell
         run: |
-          $ErrorActionPreference = "Stop"
+          npm i -g azure-functions-core-tools@4 --unsafe-perm true
+          $npmBin = npm bin -g
+          "NPM_GLOBAL_BIN=$npmBin" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Start Azurite (blob/queue/table)
+        shell: powershell
+        run: |
           $azDir = Join-Path $env:RUNNER_TEMP "azurite"
           New-Item -ItemType Directory -Force -Path $azDir | Out-Null
           $azLog = Join-Path $azDir "azurite.log"
@@ -48,9 +52,8 @@ jobs:
           )
 
           Start-Process -FilePath "npx" -ArgumentList $args -WindowStyle Hidden | Out-Null
-          Start-Sleep -Seconds 2
 
-      - name: Wait for Azurite ports (10000/10001/10002)
+      - name: Wait for Azurite ports
         shell: powershell
         run: |
           $ErrorActionPreference = "Stop"
@@ -61,14 +64,15 @@ jobs:
               try {
                 $client = New-Object System.Net.Sockets.TcpClient
                 $iar = $client.BeginConnect($hostname, $port, $null, $null)
-                if ($iar.AsyncWaitHandle.WaitOne(700, $false) -and $client.Connected) {
+                if ($iar.AsyncWaitHandle.WaitOne(500)) {
+                  $client.EndConnect($iar)
                   $client.Close()
                   Write-Host ("OK: {0}:{1} is listening" -f $hostname, $port)
                   return
                 }
                 $client.Close()
               } catch { }
-              Start-Sleep -Milliseconds 350
+              Start-Sleep -Milliseconds 500
             } while ((Get-Date) -lt $deadline)
 
             throw ("Timed out waiting for {0}:{1}" -f $hostname, $port)
@@ -78,43 +82,28 @@ jobs:
           Wait-Port "127.0.0.1" 10001 90
           Wait-Port "127.0.0.1" 10002 90
 
-      - name: Install Azure Functions Core Tools v4 (npm)
+      - name: Build
         shell: powershell
         run: |
-          $ErrorActionPreference = "Stop"
-          npm i -g azure-functions-core-tools@4 --unsafe-perm true
-
-          # Ensure npm global bin is on PATH for later steps
-          $npmBin = npm bin -g
-          "NPM_GLOBAL_BIN=$npmBin" | Out-File -FilePath $env:GITHUB_ENV -Append
-          $env:PATH = "$npmBin;$env:PATH"
-
-          func --version
-
-      - name: Build (TypeScript)
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
           npm run build
 
-      - name: Start Functions host + run regression + smoke (no rebuild)
+      - name: Start Functions host + warmup + regression + smoke
         shell: powershell
         env:
           HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
           FUNCTIONS_WORKER_RUNTIME: node
           NODE_ENV: development
 
-          # Azurite "official" connection string (safe: this is the public Azurite default key, not your real Azure key)
           STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
           AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
 
-          # Disable timer trigger during CI to avoid storage-trigger timing noise
-          AzureWebJobs.autoAssignFollowupTimer.Disabled: "true"
-
-          # Tell regression script to skip build (build already done above)
           HOPE_CI_SKIP_BUILD: "1"
+
         run: |
           $ErrorActionPreference = "Stop"
+
+          # Disable timer trigger during CI (set in-process to avoid YAML/env key dot issues)
+          $env:AzureWebJobs_autoAssignFollowupTimer_Disabled = "true"
 
           # Make sure func is on PATH
           if ($env:NPM_GLOBAL_BIN) { $env:PATH = "$env:NPM_GLOBAL_BIN;$env:PATH" }
@@ -130,58 +119,58 @@ jobs:
           $p = $null
           try {
             if ($funcExe.ToLower().EndsWith(".ps1")) {
-              $args = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$funcExe,"start","--port","7071","--no-build")
+              $args = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$funcExe,"start","--port","7071")
               $p = Start-Process -FilePath "powershell" -ArgumentList $args -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
             } else {
-              $p = Start-Process -FilePath $funcExe -ArgumentList "start","--port","7071","--no-build" -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
+              $p = Start-Process -FilePath $funcExe -ArgumentList "start","--port","7071" -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
             }
 
             $base = "http://127.0.0.1:7071/api"
             $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
 
-            # Wait until host is responding successfully
             $deadline = (Get-Date).AddSeconds(240)
-            $ready = $false
             do {
               try {
                 Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body '{"name":"ci","email":"ci@example.com","source":"ci"}' -TimeoutSec 10 | Out-Null
                 Write-Host "Host ready via POST /visitors"
-                $ready = $true
                 break
               } catch {
                 Start-Sleep -Milliseconds 900
               }
 
               if ($p.HasExited) {
-                Write-Host "Host exited early. func.out.log (tail 200):" -ForegroundColor Yellow
+                Write-Host "Host exited early. ==== func.out.log (tail 200) ====" -ForegroundColor Yellow
                 if (Test-Path $funcOut) { Get-Content $funcOut -Tail 200 | ForEach-Object { Write-Host $_ } }
-                Write-Host "func.err.log (tail 200):" -ForegroundColor Yellow
+                Write-Host "==== func.err.log (tail 200) ====" -ForegroundColor Yellow
                 if (Test-Path $funcErr) { Get-Content $funcErr -Tail 200 | ForEach-Object { Write-Host $_ } }
                 throw "Functions host exited before becoming ready."
               }
             } while ((Get-Date) -lt $deadline)
 
-            if (-not $ready) {
-              Write-Host "Host not ready in time. func.out.log (tail 200):" -ForegroundColor Yellow
+            if ((Get-Date) -ge $deadline) {
+              Write-Host "Host not ready in time. ==== func.out.log (tail 200) ====" -ForegroundColor Yellow
               if (Test-Path $funcOut) { Get-Content $funcOut -Tail 200 | ForEach-Object { Write-Host $_ } }
-              Write-Host "func.err.log (tail 200):" -ForegroundColor Yellow
+              Write-Host "==== func.err.log (tail 200) ====" -ForegroundColor Yellow
               if (Test-Path $funcErr) { Get-Content $funcErr -Tail 200 | ForEach-Object { Write-Host $_ } }
               throw "Functions host did not become ready in time."
             }
 
-            # Run regression + smoke without rebuilding
+            Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body '{"name":"warmup","email":"warmup@example.com","source":"ci"}' -TimeoutSec 10 | Out-Null
+            Write-Host "Storage warmup OK via POST /visitors"
+
             powershell -ExecutionPolicy Bypass -File .\scripts\regression.ps1 -BaseUrl $base
             powershell -ExecutionPolicy Bypass -File .\scripts\smoke.ps1 -BaseUrl $base
 
+          } catch {
+            Write-Host "CI step failed: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "==== func.out.log (tail 200) ====" -ForegroundColor Yellow
+            if (Test-Path $funcOut) { Get-Content $funcOut -Tail 200 | ForEach-Object { Write-Host $_ } }
+            Write-Host "==== func.err.log (tail 200) ====" -ForegroundColor Yellow
+            if (Test-Path $funcErr) { Get-Content $funcErr -Tail 200 | ForEach-Object { Write-Host $_ } }
+            throw
           } finally {
             if ($p -and -not $p.HasExited) {
-              Write-Host ("Stopping Functions host (pid={0})" -f $p.Id)
+              Write-Host "Stopping Functions host (pid=$($p.Id))"
               Stop-Process -Id $p.Id -Force
             }
-
-            Write-Host "==== func.out.log (tail 200) ===="
-            if (Test-Path $funcOut) { Get-Content $funcOut -Tail 200 | ForEach-Object { Write-Host $_ } }
-
-            Write-Host "==== func.err.log (tail 200) ===="
-            if (Test-Path $funcErr) { Get-Content $funcErr -Tail 200 | ForEach-Object { Write-Host $_ } }
           }

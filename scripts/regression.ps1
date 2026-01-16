@@ -100,10 +100,13 @@ Write-Host ""
 Write-Host "[2] Build sanity: npm run build"
 
 if ($env:HOPE_CI_SKIP_BUILD -eq "1") {
-  Write-Host "[OK]   Skipped build (HOPE_CI_SKIP_BUILD=1)."
+  Ok "Skipped build (HOPE_CI_SKIP_BUILD=1)."
 } else {
   npm run build
-  Write-Host "[OK]   npm run build succeeded."
+  if ($LASTEXITCODE -ne 0) {
+    Fail "npm run build failed."
+  }
+  Ok "npm run build succeeded."
 }
 
 # -----------------------------

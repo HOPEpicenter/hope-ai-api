@@ -39,17 +39,41 @@ jobs:
           $ErrorActionPreference = "Stop"
           npm run build
 
+      - name: Install Azure Functions Core Tools v4
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          # Install via Chocolatey (most reliable on windows-latest)
+          choco install azure-functions-core-tools-4 -y --no-progress
+
+          # Verify
+          func --version
+
       - name: Install Azurite
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           npm i -g azurite
+          azurite --version
 
       - name: Start Azurite
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          Start-Process -FilePath azurite -ArgumentList "--silent","--location",".azurite","--debug",".azurite\debug.log" -NoNewWindow
+
+          New-Item -ItemType Directory -Force .azurite | Out-Null
+
+          # On Windows, azurite is a Node CLI. Start via the .cmd shim.
+          $az = (Get-Command azurite.cmd -ErrorAction SilentlyContinue)
+          if (-not $az) { throw "azurite.cmd not found on PATH" }
+
+          Start-Process -FilePath $az.Source -ArgumentList @(
+            "--silent",
+            "--location",".azurite",
+            "--debug",".azurite\debug.log"
+          ) -NoNewWindow
+
           Start-Sleep -Seconds 2
 
       - name: Regression

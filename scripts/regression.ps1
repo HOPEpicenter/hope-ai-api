@@ -99,13 +99,14 @@ if ($hits.Count -gt 0) {
 Write-Host ""
 Write-Host "[2] Build sanity: npm run build"
 
-Push-Location $RepoRoot
-try {
-  npm run build | ForEach-Object { $_ }
+if ($env:HOPE_CI_SKIP_BUILD -eq "1") {
+  Ok "Skipped build (HOPE_CI_SKIP_BUILD=1)."
+} else {
+  npm run build
+  if ($LASTEXITCODE -ne 0) {
+    Fail "npm run build failed."
+  }
   Ok "npm run build succeeded."
-}
-finally {
-  Pop-Location
 }
 
 # -----------------------------

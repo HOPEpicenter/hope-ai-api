@@ -139,11 +139,12 @@ jobs:
       - name: Start Host + Run Regression + Run Smoke
         shell: powershell
         env:
-          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
+	  HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
           FUNCTIONS_WORKER_RUNTIME: node
           STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
           AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-          NODE_ENV: "development"
+        AzureWebJobs.autoAssignFollowupTimer.Disabled: "true"  
+	NODE_ENV: "development"
         run: |
           $ErrorActionPreference = "Stop"
 

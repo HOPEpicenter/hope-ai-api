@@ -34,16 +34,28 @@ jobs:
         run: |
           npm run build
 =======
-      - name: Install Azure Functions Core Tools (v4)
-        shell: powershell
+        name: Install Azure Functions Core Tools v4 (robust)
         run: |
-          $ErrorActionPreference = "Stop"
+          set -e
 
-          # GitHub-hosted runners usually have choco available
-          choco install azure-functions-core-tools-4 -y --no-progress
+          # Try npm first (fast path)
+          sudo npm i -g azure-functions-core-tools@4 --unsafe-perm true || true
 
-          $funcExe = (Get-Command func -ErrorAction Stop).Source
-          Write-Host "func installed at: $funcExe"
+          # Fallback to Microsoft apt repo if func is still missing
+          if ! command -v func >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y wget apt-transport-https ca-certificates
+
+            UBUNTU_VER="$(lsb_release -rs)"
+            wget -q "https://packages.microsoft.com/config/ubuntu/${UBUNTU_VER}/packages-microsoft-prod.deb" -O packages-microsoft-prod.deb
+            sudo dpkg -i packages-microsoft-prod.deb
+
+            sudo apt-get update
+            sudo apt-get install -y azure-functions-core-tools-4
+          fi
+
+          func --version
+
 >>>>>>> Stashed changes
 
       - name: Ensure Azurite is available

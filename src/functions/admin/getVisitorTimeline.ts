@@ -9,35 +9,27 @@ import { makeTableClient } from "../../shared/storage/makeTableClient";
 import { tableName } from "../../storage/tableName";
 
 import {
-  TimelineItemCore,
-  mapFormationRow,
-  mapEngagementRow,
-  sortTimelineDesc,
-} from "../../shared/timeline/timelineMapping";
+  decodeCursor,
+  encodeCursor,
+  listByVisitorWithFallback,
+  cursorFromLast,
+  getRowKey,
+  TimelineCursor
+} from "../../shared/timeline/timelineQuery";
 
-/**
- * =====================================================================================
- * Timeline endpoint (ops)
- *   GET /api/ops/visitors/{visitorId}/timeline?limit=10&kinds=formation,engagement&cursor=...
- * =====================================================================================
- *
- * Goals:
- * - Merge formation + engagement events into one reverse-chronological timeline.
- * - Always produce a non-null `display` string for each item.
- * - Support cursor pagination (older items).
- * - Include debug fields when debug=1.
- *
- * Cursor format: base64url(JSON) where JSON is { rk: "RowKey-ish" } (preferred)
- * Back-compat: if cursor contains { t: "occurredAtIso" }, we will best-effort filter by occurredAt.
- */
-
-// ---------- config ----------
-const FORMATION_EVENTS_TABLE = "FormationEvents"; // tableName() resolves dev/prod name
+const FORMATION_EVENTS_TABLE = "FormationEvents";
 const ENGAGEMENTS_TABLE = "Engagements";
 
-// ---------- helpers ----------
 function badRequest(message: string): HttpResponseInit {
   return { status: 400, jsonBody: { error: message } };
+}
+
+function safeStr(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
+function cleanSpaces(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
 }
 
 function parsePositiveInt(val: string | null, fallback: number): number {
@@ -63,21 +55,30 @@ function getEngagementsTableClient(cs?: string): TableClient {
   return makeTableClient(conn, tableName(ENGAGEMENTS_TABLE));
 }
 
-// Cursor is base64url(JSON)
-function b64urlEncode(obj: any): string {
-  const json = JSON.stringify(obj);
-  const b64 = Buffer.from(json, "utf8").toString("base64");
-  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+function buildEngagementDisplay(eventType: unknown, notes: unknown): string {
+  const n = cleanSpaces(safeStr(notes));
+  if (n) return n;
+  const t = cleanSpaces(safeStr(eventType));
+  return t ? `${t} (engagement)` : "engagement";
 }
 
-function b64urlDecode(cursor: string): any | null {
-  try {
-    const b64 = cursor.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((cursor.length + 3) % 4);
-    const json = Buffer.from(b64, "base64").toString("utf8");
-    return JSON.parse(json);
-  } catch {
-    return null;
+function buildFormationDisplay(type: unknown, metadata: any): string {
+  const t = cleanSpaces(safeStr(type)) || "formation";
+
+  const assigneeId = cleanSpaces(safeStr(metadata?.assigneeId));
+  const channel = cleanSpaces(safeStr(metadata?.channel));
+  const notes = cleanSpaces(safeStr(metadata?.notes));
+
+  if (t === "FOLLOWUP_ASSIGNED") {
+    const who = assigneeId ? ` -> ${assigneeId}` : "";
+    const ch = channel ? ` (${channel})` : "";
+    const tail = notes ? ` - ${notes}` : "";
+    return `${t}${who}${ch}${tail}`;
   }
+
+  const ch = channel ? ` (${channel})` : "";
+  const tail = notes ? ` - ${notes}` : "";
+  return `${t}${ch}${tail}`;
 }
 
 function parseKinds(raw: string | null): Array<"formation" | "engagement"> {
@@ -92,14 +93,67 @@ function parseKinds(raw: string | null): Array<"formation" | "engagement"> {
   return out.length ? out : ["formation", "engagement"];
 }
 
-function escapeODataString(val: string): string {
-  return String(val).replace(/'/g, "''");
+function pickOccurredAt(row: any): string | null {
+  const o = row?.occurredAt;
+  if (typeof o === "string" && o) return o;
+  const r = row?.recordedAt;
+  if (typeof r === "string" && r) return r;
+  const u = row?.updatedAt;
+  if (typeof u === "string" && u) return u;
+  return null;
 }
 
-function buildVisitorFilter(visitorId: string): string {
-  const esc = escapeODataString(visitorId);
-  // robust across schemas: either visitorId property OR PartitionKey
-  return `(visitorId eq '${esc}' or PartitionKey eq '${esc}')`;
+function pickRecordedAt(row: any): string | null {
+  const r = row?.recordedAt;
+  if (typeof r === "string" && r) return r;
+  const u = row?.updatedAt;
+  if (typeof u === "string" && u) return u;
+  return null;
+}
+
+function normalizeMetadata(meta: any): Record<string, any> {
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) return meta;
+  return {};
+}
+
+function parseMetadataFromRow(row: any): Record<string, any> {
+  const metaRaw = row?.metadata ?? row?.meta ?? null;
+
+  if (metaRaw && typeof metaRaw === "object") return normalizeMetadata(metaRaw);
+
+  if (typeof metaRaw === "string" && metaRaw.trim()) {
+    try {
+      return normalizeMetadata(JSON.parse(metaRaw));
+    } catch {
+      return { raw: metaRaw };
+    }
+  }
+
+  return {};
+}
+
+type TimelineItemInternal = {
+  kind: "formation" | "engagement";
+  rk: string;
+  occurredAt: string | null;
+  recordedAt: string | null;
+  type: string | null;
+  display: string;
+  metadata: Record<string, any>;
+};
+
+function sortDesc(a: TimelineItemInternal, b: TimelineItemInternal): number {
+  const at = a.occurredAt ?? "";
+  const bt = b.occurredAt ?? "";
+  if (at !== bt) return at < bt ? 1 : -1;
+
+  const ar = a.recordedAt ?? "";
+  const br = b.recordedAt ?? "";
+  if (ar !== br) return ar < br ? 1 : -1;
+
+  if (a.rk !== b.rk) return a.rk < b.rk ? 1 : -1;
+  if (a.kind !== b.kind) return a.kind < b.kind ? 1 : -1;
+  return 0;
 }
 
 app.http("getVisitorTimeline", {
@@ -119,93 +173,76 @@ app.http("getVisitorTimeline", {
     const debugEnabled = (req.query.get("debug") ?? "") === "1";
 
     const cursorRaw = req.query.get("cursor");
-    const cursorDecoded = cursorRaw ? b64urlDecode(cursorRaw) : null;
+    const cursorDecoded = cursorRaw ? decodeCursor(cursorRaw) : null;
+    const cursor: TimelineCursor | null = cursorDecoded;
 
-    const cursorRk = typeof cursorDecoded?.rk === "string" && cursorDecoded.rk ? String(cursorDecoded.rk) : null;
-    const cursorT = typeof cursorDecoded?.t === "string" && cursorDecoded.t ? String(cursorDecoded.t) : null;
-
-    // We pull more than limit from each table and then merge/sort.
     const perTableMax = Math.max(50, limit * 5);
 
-    const baseFilter = buildVisitorFilter(visitorId);
+    const items: TimelineItemInternal[] = [];
 
-    const items: TimelineItemCore[] = [];
-
-    // ---------- Formation ----------
-    let formationFetched = 0;
-    let formationFilterUsed: string | null = null;
+    let formationDebug: any = null;
+    let engagementDebug: any = null;
 
     if (kinds.includes("formation")) {
       const table = getFormationEventsTableClient();
       await ensureTableExists(table);
 
-      let filter = baseFilter;
+      const res = await listByVisitorWithFallback<any>(table, visitorId, cursor, perTableMax);
+      formationDebug = { usedStrategy: res.usedStrategy, usedFilter: res.usedFilter, fetched: res.rows.length };
 
-      if (cursorRk) {
-        const escRk = escapeODataString(cursorRk);
-        filter = `${filter} and RowKey lt '${escRk}'`;
-      } else if (cursorT) {
-        // back-compat best-effort (older cursor format)
-        const escT = escapeODataString(cursorT);
-        filter = `${filter} and occurredAt lt '${escT}'`;
-      }
+      for (const row of res.rows) {
+        const metaObj = parseMetadataFromRow(row);
+        const type = (row as any).type ?? (row as any).eventType ?? null;
+        const rk = getRowKey(row);
 
-      formationFilterUsed = filter;
-
-      const formationRows: any[] = [];
-      for await (const row of table.listEntities<any>({ queryOptions: { filter } })) {
-        formationRows.push(row);
-        if (formationRows.length >= perTableMax) break;
-      }
-      formationFetched = formationRows.length;
-
-      for (const row of formationRows) {
-        items.push(mapFormationRow(row));
+        items.push({
+          kind: "formation",
+          rk,
+          occurredAt: pickOccurredAt(row),
+          recordedAt: pickRecordedAt(row),
+          type: typeof type === "string" ? type : null,
+          display: buildFormationDisplay(type, metaObj),
+          metadata: metaObj
+        });
       }
     }
-
-    // ---------- Engagement ----------
-    let engagementFetched = 0;
-    let engagementFilterUsed: string | null = null;
 
     if (kinds.includes("engagement")) {
       const table = getEngagementsTableClient();
       await ensureTableExists(table);
 
-      let filter = baseFilter;
+      const res = await listByVisitorWithFallback<any>(table, visitorId, cursor, perTableMax);
+      engagementDebug = { usedStrategy: res.usedStrategy, usedFilter: res.usedFilter, fetched: res.rows.length };
 
-      if (cursorRk) {
-        const escRk = escapeODataString(cursorRk);
-        filter = `${filter} and RowKey lt '${escRk}'`;
-      } else if (cursorT) {
-        const escT = escapeODataString(cursorT);
-        filter = `${filter} and occurredAt lt '${escT}'`;
-      }
+      for (const row of res.rows) {
+        const type = (row as any).eventType ?? (row as any).type ?? null;
+        const notes = (row as any).notes ?? "";
+        const rk = getRowKey(row);
 
-      engagementFilterUsed = filter;
-
-      const engagementRows: any[] = [];
-      for await (const row of table.listEntities<any>({ queryOptions: { filter } })) {
-        engagementRows.push(row);
-        if (engagementRows.length >= perTableMax) break;
-      }
-      engagementFetched = engagementRows.length;
-
-      for (const row of engagementRows) {
-        items.push(mapEngagementRow(row));
+        items.push({
+          kind: "engagement",
+          rk,
+          occurredAt: pickOccurredAt(row),
+          recordedAt: pickRecordedAt(row),
+          type: typeof type === "string" ? type : null,
+          display: buildEngagementDisplay(type, notes),
+          metadata: {}
+        });
       }
     }
 
-    // ---------- Merge / sort / limit ----------
-    items.sort(sortTimelineDesc);
+    items.sort(sortDesc);
 
     const returned = items.slice(0, limit);
 
-    // nextCursor uses the last returned item's rk
+    // Cursor for page2+: encode time anchor + rk tie-breaker from the LAST returned item
     let nextCursor: string | null = null;
     if (returned.length === limit) {
       const last = returned[returned.length - 1];
-      if (last && last.rk) nextCursor = b64urlEncode({ rk: last.rk });
+
+      // We need occurredAt + rk in cursor.
+      const c = { t: last.occurredAt ?? undefined, rk: last.rk || undefined };
+      if (c.t || c.rk) nextCursor = encodeCursor(c);
     }
 
     const response: any = {
@@ -214,38 +251,31 @@ app.http("getVisitorTimeline", {
       kinds,
       limit,
       cursor: cursorRaw ?? null,
+      cursorValid: cursorRaw ? !!cursorDecoded : null,
       nextCursor,
-      items: returned,
+      items: returned.map(i => {
+        const { rk, ...rest } = i as any;
+        return rest;
+      })
     };
 
     if (debugEnabled) {
       response.debug = {
-        visitorId,
-        kinds,
-        limit,
         cursorRaw: cursorRaw ?? null,
         cursorDecoded,
-        cursorRk,
-        cursorT,
         perTableMax,
-        counts: {
-          formationFetched,
-          engagementFetched,
-          merged: items.length,
-          returned: returned.length,
-        },
-        filters: {
-          baseFilter,
-          formation: formationFilterUsed,
-          engagement: engagementFilterUsed,
+        returnedRks: returned.map(x => x.rk).filter(Boolean),
+        queries: {
+          formation: formationDebug,
+          engagement: engagementDebug
         },
         tables: {
           formation: tableName(FORMATION_EVENTS_TABLE),
-          engagement: tableName(ENGAGEMENTS_TABLE),
-        },
+          engagement: tableName(ENGAGEMENTS_TABLE)
+        }
       };
     }
 
     return { status: 200, jsonBody: response };
-  },
+  }
 });

@@ -48,7 +48,7 @@ jobs:
           func --version
           (Get-Command func* | Select-Object Name,Source,CommandType | Format-Table -AutoSize | Out-String) | Write-Host
 
-      - name: Start Azurite (npx, pinned)
+            - name: Start Azurite (npx, pinned) + wait for ports
         timeout-minutes: 6
         shell: pwsh
         run: |
@@ -62,77 +62,42 @@ jobs:
           if (Test-Path $azOut) { Remove-Item $azOut -Force }
           if (Test-Path $azErr) { Remove-Item $azErr -Force }
 
-          # Start Azurite without global install (pinned for determinism)
-          $cmd = 'npx --yes azurite@3.33.0 --silent --location .azurite --debug .azurite\debug.log'
+          # Start Azurite with explicit ports (blob/queue/table) on localhost
+          $cmd = @(
+            "npx --yes azurite@3.33.0",
+            "--silent",
+            "--location .azurite",
+            "--debug .azurite\debug.log",
+            "--blobPort 10000",
+            "--queuePort 10001",
+            "--tablePort 10002",
+            "--blobHost 127.0.0.1",
+            "--queueHost 127.0.0.1",
+            "--tableHost 127.0.0.1"
+          ) -join " "
+
           Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", $cmd) -NoNewWindow -RedirectStandardOutput $azOut -RedirectStandardError $azErr
 
-          Start-Sleep -Seconds 2
-          if (Test-Path $azOut) { Get-Content $azOut -Tail 30 | Write-Host }
-          if (Test-Path $azErr) { Get-Content $azErr -Tail 30 | Write-Host }
-
-      - name: Start Functions Host (background)
-        timeout-minutes: 10
-        shell: pwsh
-        env:
-          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
-          AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-          STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-          FUNCTIONS_WORKER_RUNTIME: "node"
-        run: |
-          $ErrorActionPreference = "Stop"
-          $ProgressPreference = "SilentlyContinue"
-
-          $logOut = Join-Path $PWD "func-host.out.log"
-          $logErr = Join-Path $PWD "func-host.err.log"
-          if (Test-Path $logOut) { Remove-Item $logOut -Force }
-          if (Test-Path $logErr) { Remove-Item $logErr -Force }
-
-          $funcCmd = (Get-Command func.cmd -ErrorAction Stop)
-
-          $p = Start-Process -FilePath $funcCmd.Source `
-            -ArgumentList @("start","--port","7071","--verbose") `
-            -NoNewWindow `
-            -RedirectStandardOutput $logOut `
-            -RedirectStandardError  $logErr `
-            -PassThru
-
-          Write-Host "Started func host PID=$($p.Id)"
-
-          $base = "http://127.0.0.1:7071/api"
-          $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
-
-          $deadline = (Get-Date).AddSeconds(180)
+          # Wait until ports are actually listening (especially 10002)
+          $deadline = (Get-Date).AddSeconds(60)
           while ((Get-Date) -lt $deadline) {
-            if ($p.HasExited) {
-              Write-Host "func host exited early. ExitCode=$($p.ExitCode)"
-              Write-Host "=== func-host.out.log (tail 200) ==="
-              if (Test-Path $logOut) { Get-Content $logOut -Tail 200 }
-              Write-Host "=== func-host.err.log (tail 200) ==="
-              if (Test-Path $logErr) { Get-Content $logErr -Tail 200 }
-              exit 1
-            }
-
-            try {
-              $body = @{
-                name   = "CI Warmup"
-                email  = ("ciwarmup+" + (Get-Date -Format "yyyyMMddHHmmss") + "@example.com")
-                source = "ci"
-              } | ConvertTo-Json
-
-              $r = Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body $body -TimeoutSec 10
-              Write-Host "Functions host is up. visitorId=$($r.visitorId)"
+            $p0 = Get-NetTCPConnection -LocalPort 10000 -State Listen -ErrorAction SilentlyContinue
+            $p1 = Get-NetTCPConnection -LocalPort 10001 -State Listen -ErrorAction SilentlyContinue
+            $p2 = Get-NetTCPConnection -LocalPort 10002 -State Listen -ErrorAction SilentlyContinue
+            if ($p0 -and $p1 -and $p2) {
+              Write-Host "Azurite is listening on 10000/10001/10002"
               exit 0
-            } catch {
-              Start-Sleep -Seconds 2
             }
+            Start-Sleep -Seconds 2
           }
 
-          Write-Host "Functions host did not become ready in time."
-          Write-Host "=== func-host.out.log (tail 200) ==="
-          if (Test-Path $logOut) { Get-Content $logOut -Tail 200 }
-          Write-Host "=== func-host.err.log (tail 200) ==="
-          if (Test-Path $logErr) { Get-Content $logErr -Tail 200 }
+          Write-Host "Azurite did not start listening in time."
+          Write-Host "=== azurite.out.log (tail 200) ==="
+          if (Test-Path $azOut) { Get-Content $azOut -Tail 200 }
+          Write-Host "=== azurite.err.log (tail 200) ==="
+          if (Test-Path $azErr) { Get-Content $azErr -Tail 200 }
           exit 1
+
 
       - name: Regression
         timeout-minutes: 12

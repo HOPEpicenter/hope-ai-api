@@ -18,9 +18,15 @@ jobs:
     timeout-minutes: 35
 
     env:
+      # Prevent Core Tools interactive prompt ("Select a number for worker runtime")
+      FUNCTIONS_WORKER_RUNTIME: "node"
+
       HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
+
+      # Azurite (required by Functions runtime + your app)
       AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
       STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+
       BASE_URL: "http://127.0.0.1:7071/api"
 
     steps:
@@ -45,7 +51,7 @@ jobs:
           set -euo pipefail
           npm run build
 
-      - name: Install Functions Core Tools v4
+      - name: Install Azure Functions Core Tools v4
         shell: bash
         run: |
           set -euo pipefail
@@ -57,6 +63,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .azurite
+          rm -f azurite.out.log azurite.err.log || true
+
           nohup npx --yes azurite@3.33.0 \
             --silent \
             --location .azurite \
@@ -67,12 +75,17 @@ jobs:
             > azurite.out.log 2> azurite.err.log &
 
           for i in {1..60}; do
-            (nc -z 127.0.0.1 10000 && nc -z 127.0.0.1 10001 && nc -z 127.0.0.1 10002) && echo "Azurite up" && exit 0
+            if nc -z 127.0.0.1 10000 && nc -z 127.0.0.1 10001 && nc -z 127.0.0.1 10002; then
+              echo "Azurite up"
+              exit 0
+            fi
             sleep 1
           done
 
           echo "Azurite did not start listening in time"
+          echo "=== azurite.out.log (tail 200) ==="
           tail -n 200 azurite.out.log || true
+          echo "=== azurite.err.log (tail 200) ==="
           tail -n 200 azurite.err.log || true
           exit 1
 
@@ -81,6 +94,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f func-host.out.log func-host.err.log func-host.pid || true
+
           nohup func start --port 7071 --verbose > func-host.out.log 2> func-host.err.log &
           echo $! > func-host.pid
           echo "FUNC_HOST_PID=$(cat func-host.pid)"
@@ -116,32 +130,24 @@ jobs:
           tail -n 200 func-host.err.log || true
           exit 1
 
-      - name: Wait for Functions Host (HTTP warmup)
+      - name: Warmup (POST /visitors)
         shell: bash
         run: |
           set -euo pipefail
-          pid="$(cat func-host.pid || true)"
-
           for i in {1..120}; do
-            if [ -n "${pid}" ] && ! ps -p "$pid" >/dev/null 2>&1; then
-              echo "Functions host PID $pid exited."
-              tail -n 200 func-host.out.log || true
-              tail -n 200 func-host.err.log || true
-              exit 1
-            fi
-
             if curl -sS -m 10 -H "x-api-key: ${HOPE_API_KEY}" -H "Content-Type: application/json" \
               -d "{\"name\":\"CI Warmup\",\"email\":\"ciwarmup+${i}@example.com\",\"source\":\"ci\"}" \
               "${BASE_URL}/visitors" >/dev/null; then
-              echo "Functions host is up."
+              echo "Warmup OK"
               exit 0
             fi
-
             sleep 1
           done
 
           echo "Warmup never succeeded."
+          echo "=== func-host.out.log (tail 200) ==="
           tail -n 200 func-host.out.log || true
+          echo "=== func-host.err.log (tail 200) ==="
           tail -n 200 func-host.err.log || true
           exit 1
 
@@ -157,7 +163,7 @@ jobs:
           set -euo pipefail
           pwsh -NoLogo -NoProfile -Command '$ErrorActionPreference="Stop"; ./scripts/smoke.ps1'
 
-      - name: Always dump logs + cleanup
+      - name: Always dump logs
         if: ${{ always() }}
         shell: bash
         run: |

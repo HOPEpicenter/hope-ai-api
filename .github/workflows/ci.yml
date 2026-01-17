@@ -179,10 +179,33 @@ jobs:
           exit 1
 
       - name: Regression
+        timeout-minutes: 12
         shell: bash
         run: |
           set -euo pipefail
+
+          echo "[CI] Regression start $(date -Iseconds)"
+          set +e
           pwsh -NoLogo -NoProfile -Command '$ErrorActionPreference="Stop"; ./scripts/regression.ps1'
+          code=$?
+          set -e
+
+          if [ "$code" -ne 0 ]; then
+            echo ""
+            echo "=== Regression failed. Dumping Functions + Azurite logs ==="
+            echo "=== TAIL func-host.out.log ==="
+            tail -n 250 func-host.out.log || true
+            echo "=== TAIL func-host.err.log ==="
+            tail -n 250 func-host.err.log || true
+            echo "=== TAIL azurite.out.log ==="
+            tail -n 250 azurite.out.log || true
+            echo "=== TAIL azurite.err.log ==="
+            tail -n 250 azurite.err.log || true
+            exit "$code"
+          fi
+
+          echo "[CI] Regression end $(date -Iseconds)"
+
 
       - name: Smoke
         shell: bash

@@ -48,10 +48,12 @@ jobs:
           func --version
           (Get-Command func* | Select-Object Name,Source,CommandType | Format-Table -AutoSize | Out-String) | Write-Host
 
-            - name: Start Azurite (npx, pinned) + wait for ports
+      - name: Start Azurite (npx, pinned) + wait for ports
         timeout-minutes: 6
         shell: pwsh
         run: |
+
+
           $ErrorActionPreference = "Stop"
           $ProgressPreference = "SilentlyContinue"
 

@@ -21,6 +21,7 @@
     "@types/luxon": "^3.7.1",
     "@types/node": "^20.11.30",
     "@types/uuid": "^9.0.8",
+    "azurite": "^3.33.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.5.4"
   }

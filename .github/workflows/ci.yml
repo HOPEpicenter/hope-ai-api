@@ -55,29 +55,31 @@ jobs:
           $ErrorActionPreference = "Stop"
           npm i -g azurite
           azurite --version
-
-      - name: Start Azurite
-        timeout-minutes: 3
+      - name: Start Azurite (npx, pinned)
+        timeout-minutes: 6
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $ProgressPreference = "SilentlyContinue"
 
           New-Item -ItemType Directory -Force .azurite | Out-Null
-          $az = (Get-Command azurite.cmd -ErrorAction Stop)
 
           $azOut = Join-Path $PWD "azurite.out.log"
           $azErr = Join-Path $PWD "azurite.err.log"
           if (Test-Path $azOut) { Remove-Item $azOut -Force }
           if (Test-Path $azErr) { Remove-Item $azErr -Force }
 
-          Start-Process -FilePath $az.Source `
-            -ArgumentList @("--silent","--location",".azurite","--debug",".azurite\debug.log") `
-            -NoNewWindow `
-            -RedirectStandardOutput $azOut `
-            -RedirectStandardError  $azErr
+          # Start Azurite without global install (pinned version for determinism)
+          $cmd = 'npx --yes azurite@3.33.0 --silent --location .azurite --debug .azurite\debug.log'
+          Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", $cmd) -NoNewWindow -RedirectStandardOutput $azOut -RedirectStandardError $azErr
 
           Start-Sleep -Seconds 2
+
+          # Quick sanity: show last few lines so we know it started
+          if (Test-Path $azOut) { Get-Content $azOut -Tail 20 | Write-Host }
+          if (Test-Path $azErr) { Get-Content $azErr -Tail 20 | Write-Host }
+
+
 
       - name: Start Functions Host (background)
         timeout-minutes: 8

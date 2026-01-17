@@ -95,18 +95,34 @@ jobs:
           set -euo pipefail
           rm -f func-host.out.log func-host.err.log func-host.pid || true
 
+          echo "Starting Functions host..."
           nohup func start --port 7071 --verbose > func-host.out.log 2> func-host.err.log &
           echo $! > func-host.pid
+
           echo "FUNC_HOST_PID=$(cat func-host.pid)"
+          sleep 2
+
+          echo "=== func-host.out.log (tail 50) ==="
+          tail -n 50 func-host.out.log || true
+          echo "=== func-host.err.log (tail 50) ==="
+          tail -n 50 func-host.err.log || true
 
       - name: Wait for port 7071 (host bind)
         shell: bash
         run: |
           set -euo pipefail
-          pid="$(cat func-host.pid || true)"
 
-          for i in {1..90}; do
-            if [ -n "${pid}" ] && ! ps -p "$pid" >/dev/null 2>&1; then
+          pid="$(cat func-host.pid || true)"
+          if [ -z "${pid}" ]; then
+            echo "func-host.pid missing/empty"
+            exit 1
+          fi
+
+          echo "Waiting for port 7071 to open (PID=$pid)..."
+
+          for i in {1..120}; do
+            # If process died, dump logs and fail immediately
+            if ! ps -p "$pid" >/dev/null 2>&1; then
               echo "Functions host PID $pid exited before binding 7071."
               echo "=== func-host.out.log (tail 200) ==="
               tail -n 200 func-host.out.log || true
@@ -115,21 +131,32 @@ jobs:
               exit 1
             fi
 
+            # Port open?
             if nc -z 127.0.0.1 7071; then
               echo "Port 7071 is listening."
               exit 0
             fi
 
+            # Every 10s, show recent logs so we can see what it's doing
+            if [ $((i % 10)) -eq 0 ]; then
+              echo "Still waiting... (t=${i}s)"
+              echo "=== func-host.out.log (tail 40) ==="
+              tail -n 40 func-host.out.log || true
+              echo "=== func-host.err.log (tail 40) ==="
+              tail -n 40 func-host.err.log || true
+            fi
+
             sleep 1
           done
 
-          echo "Port 7071 never opened."
+          echo "Port 7071 never opened after 120s."
           echo "=== func-host.out.log (tail 200) ==="
           tail -n 200 func-host.out.log || true
           echo "=== func-host.err.log (tail 200) ==="
           tail -n 200 func-host.err.log || true
           exit 1
 
+      
       - name: Warmup (POST /visitors)
         shell: bash
         run: |

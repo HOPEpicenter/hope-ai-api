@@ -121,6 +121,24 @@ jobs:
           Write-Host "=== func-host.err.log (tail 200) ==="
           if (Test-Path $logErr) { Get-Content $logErr -Tail 200 }
           exit 1
+      - name: Warmup probe (POST /visitors)
+        timeout-minutes: 3
+        shell: pwsh
+        env:
+          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $base = "http://127.0.0.1:7071/api"
+          $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
+
+          $body = @{
+            name   = "CI Warmup"
+            email  = ("ciwarmup+" + (Get-Date -Format "yyyyMMddHHmmss") + "@example.com")
+            source = "ci"
+          } | ConvertTo-Json
+
+          $r = Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body $body
+          "Warmup OK visitorId=$($r.visitorId)"
 
         - name: Regression
         timeout-minutes: 12

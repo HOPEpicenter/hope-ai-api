@@ -22,6 +22,12 @@ jobs:
           node-version: "20"
           cache: "npm"
 
+      - name: Install Azure Functions Core Tools v4
+        shell: powershell
+        run: |
+          npm i -g azure-functions-core-tools@4 --unsafe-perm true
+          func --version
+
       - name: Versions
         shell: powershell
         run: |
@@ -48,7 +54,6 @@ jobs:
           $f = Get-Item .\dist\index.js
           Write-Host ("dist/index.js OK: {0} bytes, {1}" -f $f.Length, $f.LastWriteTime)
 
-      # Start Azurite tables on 10002 (CI only; local uses whatever you run)
       - name: Install Azurite (pinned)
         shell: powershell
         run: npm i -g azurite@3.32.0
@@ -60,7 +65,6 @@ jobs:
           $azLog = Join-Path $PWD ".azurite\table-debug.log"
           "AZURITE_TABLE_LOG=$azLog" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-          # Start azurite-table in background
           Start-Process -FilePath "azurite-table" `
             -ArgumentList @("--location", ".azurite", "--debug", $azLog, "--tableHost", "127.0.0.1", "--tablePort", "10002") `
             -NoNewWindow
@@ -86,10 +90,9 @@ jobs:
           STORAGE_CONNECTION_STRING: UseDevelopmentStorage=true
           HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
         run: |
-          $funcLog = Join-Path $PWD (".azurite\func-host.log")
+          $funcLog = Join-Path $PWD ".azurite\func-host.log"
           "FUNC_HOST_LOG=$funcLog" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-          # Start func host in background and capture logs
           Start-Process -FilePath "func" `
             -ArgumentList @("start", "--port", "7071") `
             -NoNewWindow `

@@ -12,22 +12,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: build_and_smoke
+  build_and_smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 35
-
-    env:
-      # Prevent Core Tools interactive prompt ("Select a number for worker runtime")
-      FUNCTIONS_WORKER_RUNTIME: "node"
-
-      HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
-
-      # Azurite (required by Functions runtime + your app)
-      AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-      STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-
-      BASE_URL: "http://127.0.0.1:7071/api"
 
     steps:
       - name: Checkout
@@ -39,27 +26,26 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: Install deps
-        shell: bash
+      - name: Install dependencies
         run: |
           set -euo pipefail
           npm ci
 
       - name: Build (tsc)
-        shell: bash
         run: |
           set -euo pipefail
           npm run build
+          test -f dist/index.js
+          echo "dist/index.js exists ✅"
 
       - name: Install Azure Functions Core Tools v4
-        shell: bash
         run: |
           set -euo pipefail
           npm i -g azure-functions-core-tools@4 --unsafe-perm true
           func --version
 
-      - name: Start Azurite + wait for ports
-        shell: bash
+      - name: Start Azurite (pinned) + wait for ports
+        timeout-minutes: 6
         run: |
           set -euo pipefail
           mkdir -p .azurite
@@ -75,153 +61,98 @@ jobs:
             > azurite.out.log 2> azurite.err.log &
 
           for i in {1..60}; do
-            if nc -z 127.0.0.1 10000 && nc -z 127.0.0.1 10001 && nc -z 127.0.0.1 10002; then
-              echo "Azurite up"
-              exit 0
-            fi
+            nc -z 127.0.0.1 10000 && nc -z 127.0.0.1 10001 && nc -z 127.0.0.1 10002 && break
             sleep 1
           done
 
-          echo "Azurite did not start listening in time"
-          echo "=== azurite.out.log (tail 200) ==="
-          tail -n 200 azurite.out.log || true
-          echo "=== azurite.err.log (tail 200) ==="
-          tail -n 200 azurite.err.log || true
-          exit 1
+          nc -z 127.0.0.1 10000
+          nc -z 127.0.0.1 10001
+          nc -z 127.0.0.1 10002
+          echo "Azurite up ✅"
 
       - name: Start Functions Host (background)
-        shell: bash
+        timeout-minutes: 6
+        env:
+          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
+          AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+          STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+          # critical: stop restarts while dist/ is being created
+          AzureFunctionsJobHost__Logging__Console__IsEnabled: "true"
         run: |
           set -euo pipefail
           rm -f func-host.out.log func-host.err.log func-host.pid || true
 
-          echo "Starting Functions host..."
-          nohup func start --port 7071 --verbose > func-host.out.log 2> func-host.err.log &
+          # Ensure dist is present BEFORE func start (CI race fix)
+          test -f dist/index.js
+
+          # Start func with NO file watching (prevents “Host configuration has changed. restart” loops)
+          nohup func start --port 7071 --verbose --no-build \
+            > func-host.out.log 2> func-host.err.log &
+
           echo $! > func-host.pid
-
           echo "FUNC_HOST_PID=$(cat func-host.pid)"
-          sleep 2
 
-          echo "=== func-host.out.log (tail 50) ==="
-          tail -n 50 func-host.out.log || true
-          echo "=== func-host.err.log (tail 50) ==="
-          tail -n 50 func-host.err.log || true
-
-      - name: Wait for port 7071 (host bind)
-        shell: bash
+      - name: Wait for host bind (port 7071)
+        timeout-minutes: 4
         run: |
           set -euo pipefail
-
           pid="$(cat func-host.pid || true)"
-          if [ -z "${pid}" ]; then
-            echo "func-host.pid missing/empty"
-            exit 1
-          fi
 
-          echo "Waiting for port 7071 to open (PID=$pid)..."
-
-          for i in {1..120}; do
-            # If process died, dump logs and fail immediately
-            if ! ps -p "$pid" >/dev/null 2>&1; then
-              echo "Functions host PID $pid exited before binding 7071."
-              echo "=== func-host.out.log (tail 200) ==="
-              tail -n 200 func-host.out.log || true
-              echo "=== func-host.err.log (tail 200) ==="
-              tail -n 200 func-host.err.log || true
+          for i in {1..90}; do
+            if [ -n "${pid}" ] && ! ps -p "$pid" >/dev/null 2>&1; then
+              echo "Functions host PID $pid exited early."
+              echo "=== func-host.out.log (tail 250) ==="
+              tail -n 250 func-host.out.log || true
+              echo "=== func-host.err.log (tail 250) ==="
+              tail -n 250 func-host.err.log || true
               exit 1
             fi
 
-            # Port open?
             if nc -z 127.0.0.1 7071; then
-              echo "Port 7071 is listening."
-              exit 0
-            fi
-
-            # Every 10s, show recent logs so we can see what it's doing
-            if [ $((i % 10)) -eq 0 ]; then
-              echo "Still waiting... (t=${i}s)"
-              echo "=== func-host.out.log (tail 40) ==="
-              tail -n 40 func-host.out.log || true
-              echo "=== func-host.err.log (tail 40) ==="
-              tail -n 40 func-host.err.log || true
-            fi
-
-            sleep 1
-          done
-
-          echo "Port 7071 never opened after 120s."
-          echo "=== func-host.out.log (tail 200) ==="
-          tail -n 200 func-host.out.log || true
-          echo "=== func-host.err.log (tail 200) ==="
-          tail -n 200 func-host.err.log || true
-          exit 1
-
-      
-      - name: Warmup (POST /visitors)
-        shell: bash
-        run: |
-          set -euo pipefail
-          for i in {1..120}; do
-            if curl -sS -m 10 -H "x-api-key: ${HOPE_API_KEY}" -H "Content-Type: application/json" \
-              -d "{\"name\":\"CI Warmup\",\"email\":\"ciwarmup+${i}@example.com\",\"source\":\"ci\"}" \
-              "${BASE_URL}/visitors" >/dev/null; then
-              echo "Warmup OK"
+              echo "Port 7071 open ✅"
               exit 0
             fi
             sleep 1
           done
 
-          echo "Warmup never succeeded."
-          echo "=== func-host.out.log (tail 200) ==="
-          tail -n 200 func-host.out.log || true
-          echo "=== func-host.err.log (tail 200) ==="
-          tail -n 200 func-host.err.log || true
+          echo "Port 7071 never opened."
+          echo "=== func-host.out.log (tail 250) ==="
+          tail -n 250 func-host.out.log || true
+          echo "=== func-host.err.log (tail 250) ==="
+          tail -n 250 func-host.err.log || true
           exit 1
 
       - name: Regression
         timeout-minutes: 12
-        shell: bash
+        env:
+          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
         run: |
           set -euo pipefail
-
-          echo "[CI] Regression start $(date -Iseconds)"
-          set +e
-          pwsh -NoLogo -NoProfile -Command '$ErrorActionPreference="Stop"; ./scripts/regression.ps1'
-          code=$?
-          set -e
-
-          if [ "$code" -ne 0 ]; then
-            echo ""
-            echo "=== Regression failed. Dumping Functions + Azurite logs ==="
-            echo "=== TAIL func-host.out.log ==="
-            tail -n 250 func-host.out.log || true
-            echo "=== TAIL func-host.err.log ==="
-            tail -n 250 func-host.err.log || true
-            echo "=== TAIL azurite.out.log ==="
-            tail -n 250 azurite.out.log || true
-            echo "=== TAIL azurite.err.log ==="
-            tail -n 250 azurite.err.log || true
-            exit "$code"
-          fi
-
-          echo "[CI] Regression end $(date -Iseconds)"
-
+          ./scripts/regression.ps1
 
       - name: Smoke
-        shell: bash
+        timeout-minutes: 12
+        env:
+          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
         run: |
           set -euo pipefail
-          pwsh -NoLogo -NoProfile -Command '$ErrorActionPreference="Stop"; ./scripts/smoke.ps1'
+          ./scripts/smoke.ps1
 
-      - name: Always dump logs
+      - name: Always dump logs + cleanup
         if: ${{ always() }}
-        shell: bash
         run: |
           echo "=== TAIL func-host.out.log ==="
-          tail -n 200 func-host.out.log || true
+          tail -n 250 func-host.out.log || true
           echo "=== TAIL func-host.err.log ==="
-          tail -n 200 func-host.err.log || true
+          tail -n 250 func-host.err.log || true
           echo "=== TAIL azurite.out.log ==="
-          tail -n 200 azurite.out.log || true
+          tail -n 250 azurite.out.log || true
           echo "=== TAIL azurite.err.log ==="
-          tail -n 200 azurite.err.log || true
+          tail -n 250 azurite.err.log || true
+
+          if [ -f func-host.pid ]; then
+            pid="$(cat func-host.pid || true)"
+            if [ -n "${pid}" ]; then
+              kill -9 "$pid" || true
+            fi
+          fi

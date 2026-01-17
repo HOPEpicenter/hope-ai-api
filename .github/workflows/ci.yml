@@ -48,12 +48,10 @@ jobs:
           func --version
           (Get-Command func* | Select-Object Name,Source,CommandType | Format-Table -AutoSize | Out-String) | Write-Host
 
-      - name: Start Azurite (npx, pinned) + wait for ports
+      - name: Start Azurite (local devDependency) + wait for ports
         timeout-minutes: 6
         shell: pwsh
         run: |
-
-
           $ErrorActionPreference = "Stop"
           $ProgressPreference = "SilentlyContinue"
 
@@ -64,23 +62,25 @@ jobs:
           if (Test-Path $azOut) { Remove-Item $azOut -Force }
           if (Test-Path $azErr) { Remove-Item $azErr -Force }
 
-          # Start Azurite with explicit ports (blob/queue/table) on localhost
-          $cmd = @(
-            "npx --yes azurite@3.33.0",
+          $azJs = Join-Path $PWD "node_modules\azurite\dist\src\azurite.js"
+          if (-not (Test-Path $azJs)) {
+            throw "Azurite devDependency missing. Did npm ci run? Expected: $azJs"
+          }
+
+          # Start Azurite directly with node (no npx, no global install)
+          $args = @(
+            $azJs,
             "--silent",
-            "--location .azurite",
-            "--debug .azurite\debug.log",
-            "--blobPort 10000",
-            "--queuePort 10001",
-            "--tablePort 10002",
-            "--blobHost 127.0.0.1",
-            "--queueHost 127.0.0.1",
-            "--tableHost 127.0.0.1"
-          ) -join " "
+            "--location", ".azurite",
+            "--debug", ".azurite\debug.log",
+            "--blobHost", "127.0.0.1", "--blobPort", "10000",
+            "--queueHost","127.0.0.1", "--queuePort","10001",
+            "--tableHost","127.0.0.1", "--tablePort","10002"
+          )
 
-          Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", $cmd) -NoNewWindow -RedirectStandardOutput $azOut -RedirectStandardError $azErr
+          Start-Process -FilePath "node" -ArgumentList $args -NoNewWindow -RedirectStandardOutput $azOut -RedirectStandardError $azErr
 
-          # Wait until ports are actually listening (especially 10002)
+          # Wait for ports
           $deadline = (Get-Date).AddSeconds(60)
           while ((Get-Date) -lt $deadline) {
             $p0 = Get-NetTCPConnection -LocalPort 10000 -State Listen -ErrorAction SilentlyContinue
@@ -99,6 +99,7 @@ jobs:
           Write-Host "=== azurite.err.log (tail 200) ==="
           if (Test-Path $azErr) { Get-Content $azErr -Tail 200 }
           exit 1
+
 
 
       - name: Regression

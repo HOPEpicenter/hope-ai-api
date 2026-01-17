@@ -1,7 +1,12 @@
 name: CI - Build + Regression + Smoke
 
 on:
-  push:
+  concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+
+push:
     branches: ["main"]
   pull_request:
     branches: ["main"]
@@ -61,8 +66,9 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          New-Item -ItemType Directory -Force .azurite | Out-Null
+          $ProgressPreference = "SilentlyContinue"
 
+          New-Item -ItemType Directory -Force .azurite | Out-Null
           $az = (Get-Command azurite.cmd -ErrorAction Stop)
 
           $azOut = Join-Path $PWD "azurite.out.log"
@@ -79,13 +85,21 @@ jobs:
           Start-Sleep -Seconds 2
 
       - name: Start Functions Host (background)
-        timeout-minutes: 5
+        timeout-minutes: 8
         shell: pwsh
         env:
           HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
+
+          # Azure Functions runtime expects AzureWebJobsStorage; local.settings.json is not present in CI
+          AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+
+          # Your app expects STORAGE_CONNECTION_STRING
           STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+
+          FUNCTIONS_WORKER_RUNTIME: "node"
         run: |
           $ErrorActionPreference = "Stop"
+          $ProgressPreference = "SilentlyContinue"
 
           $logOut = Join-Path $PWD "func-host.out.log"
           $logErr = Join-Path $PWD "func-host.err.log"
@@ -94,25 +108,44 @@ jobs:
 
           $funcCmd = (Get-Command func.cmd -ErrorAction Stop)
 
-          Start-Process -FilePath $funcCmd.Source `
+          # Start host and keep process handle (so we can detect early exit)
+          $p = Start-Process -FilePath $funcCmd.Source `
             -ArgumentList @("start","--port","7071","--verbose") `
             -NoNewWindow `
             -RedirectStandardOutput $logOut `
-            -RedirectStandardError  $logErr
+            -RedirectStandardError  $logErr `
+            -PassThru
 
-          $deadline = (Get-Date).AddSeconds(90)
+          Write-Host "Started func host PID=$($p.Id)"
+
+          # Wait for HTTP readiness by probing POST /visitors (more reliable than log-matching)
+          $base = "http://127.0.0.1:7071/api"
+          $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
+
+          $deadline = (Get-Date).AddSeconds(120)
           while ((Get-Date) -lt $deadline) {
-            if (Test-Path $logOut) {
-              $txt = Get-Content $logOut -Raw
-              if ($txt -match "Host started" -or
-                  $txt -match "Job host started" -or
-                  $txt -match "Host initialized" -or
-                  $txt -match "Loaded entry point file ""dist/index.js""") {
-                Write-Host "Functions host is up."
-                exit 0
-              }
+            if ($p.HasExited) {
+              Write-Host "func host process exited early. ExitCode=$($p.ExitCode)"
+              Write-Host "=== func-host.out.log (tail 200) ==="
+              if (Test-Path $logOut) { Get-Content $logOut -Tail 200 }
+              Write-Host "=== func-host.err.log (tail 200) ==="
+              if (Test-Path $logErr) { Get-Content $logErr -Tail 200 }
+              exit 1
             }
-            Start-Sleep -Seconds 2
+
+            try {
+              $body = @{
+                name   = "CI Warmup"
+                email  = ("ciwarmup+" + (Get-Date -Format "yyyyMMddHHmmss") + "@example.com")
+                source = "ci"
+              } | ConvertTo-Json
+
+              $r = Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body $body -TimeoutSec 10
+              Write-Host "Functions host is up. visitorId=$($r.visitorId)"
+              exit 0
+            } catch {
+              Start-Sleep -Seconds 2
+            }
           }
 
           Write-Host "Functions host did not become ready in time."
@@ -122,30 +155,12 @@ jobs:
           if (Test-Path $logErr) { Get-Content $logErr -Tail 200 }
           exit 1
 
-      - name: Warmup probe (POST /visitors)
-        timeout-minutes: 3
-        shell: pwsh
-        env:
-          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
-        run: |
-          $ErrorActionPreference = "Stop"
-          $base = "http://127.0.0.1:7071/api"
-          $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
-
-          $body = @{
-            name   = "CI Warmup"
-            email  = ("ciwarmup+" + (Get-Date -Format "yyyyMMddHHmmss") + "@example.com")
-            source = "ci"
-          } | ConvertTo-Json
-
-          $r = Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body $body
-          "Warmup OK visitorId=$($r.visitorId)"
-
       - name: Regression
         timeout-minutes: 12
         shell: pwsh
         env:
           HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
+          AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
           STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
         run: |
           $ErrorActionPreference = "Stop"
@@ -158,6 +173,7 @@ jobs:
         shell: pwsh
         env:
           HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
+          AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
           STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
         run: |
           $ErrorActionPreference = "Stop"

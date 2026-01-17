@@ -22,6 +22,13 @@ jobs:
           node-version: "20"
           cache: "npm"
 
+      - name: Versions
+        shell: powershell
+        run: |
+          node --version
+          npm --version
+          func --version
+
       - name: Install dependencies
         shell: powershell
         run: npm ci
@@ -30,11 +37,33 @@ jobs:
         shell: powershell
         run: npm run build
 
+      - name: Assert dist/index.js exists
+        shell: powershell
+        run: |
+          if (-not (Test-Path ".\dist\index.js")) {
+            Write-Error "dist/index.js missing after build"
+            Get-ChildItem .\dist -ErrorAction SilentlyContinue | Format-Table -AutoSize
+            exit 1
+          }
+          $f = Get-Item .\dist\index.js
+          Write-Host ("dist/index.js OK: {0} bytes, {1}" -f $f.Length, $f.LastWriteTime)
+
+      # Start Azurite tables on 10002 (CI only; local uses whatever you run)
+      - name: Install Azurite (pinned)
+        shell: powershell
+        run: npm i -g azurite@3.32.0
+
       - name: Start Azurite (Tables)
         shell: powershell
         run: |
-          npm run azurite:tables --silent -- --location .azurite --debug .azurite\debug.log
-        timeout-minutes: 2
+          New-Item -ItemType Directory -Force -Path ".azurite" | Out-Null
+          $azLog = Join-Path $PWD ".azurite\table-debug.log"
+          "AZURITE_TABLE_LOG=$azLog" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          # Start azurite-table in background
+          Start-Process -FilePath "azurite-table" `
+            -ArgumentList @("--location", ".azurite", "--debug", $azLog, "--tableHost", "127.0.0.1", "--tablePort", "10002") `
+            -NoNewWindow
 
       - name: Wait for Azurite Table port 10002
         shell: powershell
@@ -57,24 +86,30 @@ jobs:
           STORAGE_CONNECTION_STRING: UseDevelopmentStorage=true
           HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
         run: |
-          $global:funcLog = Join-Path $PWD ("_func_" + (Get-Date -Format "yyyyMMdd_HHmmss") + ".log")
-          Write-Host "funcLog=$global:funcLog"
-          Start-Process -FilePath "func" -ArgumentList @("start","--port","7071") -NoNewWindow -RedirectStandardOutput $global:funcLog -RedirectStandardError $global:funcLog
-        timeout-minutes: 2
+          $funcLog = Join-Path $PWD (".azurite\func-host.log")
+          "FUNC_HOST_LOG=$funcLog" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          # Start func host in background and capture logs
+          Start-Process -FilePath "func" `
+            -ArgumentList @("start", "--port", "7071") `
+            -NoNewWindow `
+            -RedirectStandardOutput $funcLog `
+            -RedirectStandardError $funcLog
 
       - name: Wait for Functions host port 7071
         shell: powershell
         run: |
-          $max = 60
+          $max = 75
           for ($i = 1; $i -le $max; $i++) {
             $conn = Get-NetTCPConnection -LocalPort 7071 -State Listen -ErrorAction SilentlyContinue
             if ($conn) { Write-Host "Functions host listening on 7071"; exit 0 }
             Start-Sleep -Seconds 1
           }
+
           Write-Error "Functions host port 7071 did not open in time"
-          if ($global:funcLog -and (Test-Path $global:funcLog)) {
-            Write-Host "==== func log tail ===="
-            Get-Content $global:funcLog -Tail 200
+          if ($env:FUNC_HOST_LOG -and (Test-Path $env:FUNC_HOST_LOG)) {
+            Write-Host "==== func host log tail ===="
+            Get-Content $env:FUNC_HOST_LOG -Tail 250
           }
           exit 1
         timeout-minutes: 3
@@ -97,11 +132,16 @@ jobs:
         if: failure()
         shell: powershell
         run: |
-          if (Test-Path .azurite\debug.log) {
-            Write-Host "==== azurite debug.log tail ===="
-            Get-Content .azurite\debug.log -Tail 200
+          if ($env:AZURITE_TABLE_LOG -and (Test-Path $env:AZURITE_TABLE_LOG)) {
+            Write-Host "==== azurite table debug.log tail ===="
+            Get-Content $env:AZURITE_TABLE_LOG -Tail 250
+          } else {
+            Write-Host "No azurite table log found."
           }
-          if ($global:funcLog -and (Test-Path $global:funcLog)) {
-            Write-Host "==== func log tail ===="
-            Get-Content $global:funcLog -Tail 200
+
+          if ($env:FUNC_HOST_LOG -and (Test-Path $env:FUNC_HOST_LOG)) {
+            Write-Host "==== func host log tail ===="
+            Get-Content $env:FUNC_HOST_LOG -Tail 250
+          } else {
+            Write-Host "No func host log found."
           }

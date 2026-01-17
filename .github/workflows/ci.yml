@@ -153,20 +153,20 @@ jobs:
           }
 
           # Parse PID from file like: FUNC_HOST_PID=2228
-          $pid = $null
+          $funcPid = $null
           if (Test-Path $pidFile) {
             $raw = (Get-Content $pidFile -Raw).Trim()
-            if ($raw -match "FUNC_HOST_PID=(\d+)") { $pid = [int]$Matches[1] }
+            if ($raw -match "FUNC_HOST_PID=(\d+)") { $funcPid = [int]$Matches[1] }
           }
 
           $deadline = (Get-Date).AddSeconds(240)
           while ((Get-Date) -lt $deadline) {
 
             # If PID exists and process is gone, fail immediately with logs
-            if ($pid) {
-              $p = Get-Process -Id $pid -ErrorAction SilentlyContinue
+            if ($funcPid) {
+              $p = Get-Process -Id $funcPid -ErrorAction SilentlyContinue
               if (-not $p) {
-                Write-Host "Functions host process PID=$pid is not running (it exited)."
+                Write-Host "Functions host process PID=$funcPid is not running (it exited)."
                 Dump-HostLogs
                 exit 1
               }
@@ -199,6 +199,7 @@ jobs:
           Write-Host "Functions host did not become ready in time."
           Dump-HostLogs
           exit 1
+
 
 
       - name: Regression

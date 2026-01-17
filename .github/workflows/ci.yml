@@ -2,7 +2,7 @@ name: CI - Build + Regression + Smoke
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "restore/**" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
@@ -24,223 +24,84 @@ jobs:
 
       - name: Install dependencies
         shell: powershell
-        run: |
-          npm ci
+        run: npm ci
 
-      - name: Build (tsc)
+      - name: Build
+        shell: powershell
+        run: npm run build
+
+      - name: Start Azurite (Tables)
         shell: powershell
         run: |
-          npm run build
+          npm run azurite:tables --silent -- --location .azurite --debug .azurite\debug.log
+        timeout-minutes: 2
 
-      - name: Ensure Azurite is available
+      - name: Wait for Azurite Table port 10002
         shell: powershell
         run: |
-          $has = Test-Path ".\node_modules\azurite\package.json"
-          if (-not $has) {
-            Write-Host "Azurite not found in node_modules; installing (no-save)..."
-            npm i azurite@latest --no-save
-          } else {
-            Write-Host "Azurite found in node_modules."
+          $max = 60
+          for ($i = 1; $i -le $max; $i++) {
+            $conn = Get-NetTCPConnection -LocalPort 10002 -State Listen -ErrorAction SilentlyContinue
+            if ($conn) { Write-Host "Azurite tables listening on 10002"; exit 0 }
+            Start-Sleep -Seconds 1
           }
+          Write-Error "Azurite tables port 10002 did not open in time"
+          exit 1
+        timeout-minutes: 2
 
-      - name: Start Azurite
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
-
-          $azDir = Join-Path $env:RUNNER_TEMP "azurite"
-          New-Item -ItemType Directory -Force -Path $azDir | Out-Null
-          $azLog = Join-Path $azDir "azurite.log"
-          $azPidFile = Join-Path $azDir "azurite.pid"
-
-          $azExe = Join-Path $PWD "node_modules\azurite\dist\src\azurite.js"
-          if (-not (Test-Path $azExe)) {
-            throw "Azurite entry not found at $azExe"
-          }
-
-          $args = @(
-            $azExe,
-            "--silent",
-            "--location",$azDir,
-            "--debug",$azLog,
-            "--blobHost","127.0.0.1",
-            "--queueHost","127.0.0.1",
-            "--tableHost","127.0.0.1"
-          )
-
-          $p = Start-Process -FilePath "node" -ArgumentList $args -WindowStyle Hidden -PassThru
-          $p.Id | Out-File -FilePath $azPidFile -Encoding ascii
-
-          Write-Host "Azurite started with pid=$($p.Id)"
-          Start-Sleep -Seconds 2
-
-          if ($p.HasExited) {
-            Write-Host "Azurite exited immediately. Last 200 lines of azurite.log:" -ForegroundColor Yellow
-            if (Test-Path $azLog) { Get-Content $azLog -Tail 200 | ForEach-Object { Write-Host $_ } }
-            throw "Azurite process exited early."
-          }
-
-      - name: Wait for Azurite ports
-        shell: powershell
-        run: |
-          $ErrorActionPreference = "Stop"
-          $azLog = Join-Path $env:RUNNER_TEMP "azurite\azurite.log"
-          $azPidFile = Join-Path $env:RUNNER_TEMP "azurite\azurite.pid"
-
-          function Wait-Port([string]$hostname,[int]$port,[int]$timeoutSeconds) {
-            $deadline = (Get-Date).AddSeconds($timeoutSeconds)
-            do {
-              $ok = $false
-              try {
-                $r = Test-NetConnection -ComputerName $hostname -Port $port -WarningAction SilentlyContinue
-                $ok = [bool]$r.TcpTestSucceeded
-              } catch { $ok = $false }
-
-              if ($ok) {
-                Write-Host ("OK: {0}:{1} is listening" -f $hostname, $port)
-                return
-              }
-
-              Start-Sleep -Milliseconds 800
-            } while ((Get-Date) -lt $deadline)
-
-            Write-Host "Azurite failed to bind in time. Last 200 lines of azurite.log:" -ForegroundColor Yellow
-            if (Test-Path $azLog) { Get-Content $azLog -Tail 200 | ForEach-Object { Write-Host $_ } }
-
-            if (Test-Path $azPidFile) {
-              $pid = (Get-Content $azPidFile -ErrorAction SilentlyContinue | Select-Object -First 1)
-              if ($pid) {
-                $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
-                if ($proc) {
-                  Write-Host "Azurite process is still running (pid=$pid)" -ForegroundColor Yellow
-                } else {
-                  Write-Host "Azurite process is NOT running (pid=$pid)" -ForegroundColor Yellow
-                }
-              }
-            }
-
-            throw ("Timed out waiting for {0}:{1}" -f $hostname, $port)
-          }
-
-          Wait-Port "127.0.0.1" 10000 120
-          Wait-Port "127.0.0.1" 10001 120
-          Wait-Port "127.0.0.1" 10002 120
-
-      - name: Install Azure Functions Core Tools v4 (npm)
-        shell: powershell
-        run: |
-          npm i -g azure-functions-core-tools@4 --unsafe-perm true
-          $npmBin = npm bin -g
-          $npmBin | Out-File -FilePath $env:GITHUB_PATH -Append
-          $cmd = Get-Command func -ErrorAction Stop
-          Write-Host "func source: $($cmd.Source)"
-          func --version
-
-      - name: Start Host + Run Regression + Run Smoke
+      - name: Start Functions host
         shell: powershell
         env:
-          HOPE_API_KEY: ci-key
           FUNCTIONS_WORKER_RUNTIME: node
-          STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-          AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-          NODE_ENV: "development"
+          AzureWebJobsStorage: UseDevelopmentStorage=true
+          STORAGE_CONNECTION_STRING: UseDevelopmentStorage=true
+          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
         run: |
-          $ErrorActionPreference = "Stop"
+          $global:funcLog = Join-Path $PWD ("_func_" + (Get-Date -Format "yyyyMMdd_HHmmss") + ".log")
+          Write-Host "funcLog=$global:funcLog"
+          Start-Process -FilePath "func" -ArgumentList @("start","--port","7071") -NoNewWindow -RedirectStandardOutput $global:funcLog -RedirectStandardError $global:funcLog
+        timeout-minutes: 2
 
-          $logDir = Join-Path $env:RUNNER_TEMP "func"
-          New-Item -ItemType Directory -Force -Path $logDir | Out-Null
-          $funcOut = Join-Path $logDir "func.out.log"
-          $funcErr = Join-Path $logDir "func.err.log"
-          $azLog = Join-Path $env:RUNNER_TEMP "azurite\azurite.log"
-
-          function Dump-Logs {
-            Write-Host "==== FUNC OUT (tail 200) ====" -ForegroundColor Yellow
-            if (Test-Path $funcOut) { Get-Content $funcOut -Tail 200 | ForEach-Object { Write-Host $_ } } else { Write-Host "(missing $funcOut)" }
-            Write-Host "==== FUNC ERR (tail 200) ====" -ForegroundColor Yellow
-            if (Test-Path $funcErr) { Get-Content $funcErr -Tail 200 | ForEach-Object { Write-Host $_ } } else { Write-Host "(missing $funcErr)" }
-            Write-Host "==== AZURITE LOG (tail 200) ====" -ForegroundColor Yellow
-            if (Test-Path $azLog) { Get-Content $azLog -Tail 200 | ForEach-Object { Write-Host $_ } } else { Write-Host "(missing $azLog)" }
+      - name: Wait for Functions host port 7071
+        shell: powershell
+        run: |
+          $max = 60
+          for ($i = 1; $i -le $max; $i++) {
+            $conn = Get-NetTCPConnection -LocalPort 7071 -State Listen -ErrorAction SilentlyContinue
+            if ($conn) { Write-Host "Functions host listening on 7071"; exit 0 }
+            Start-Sleep -Seconds 1
           }
-
-          $funcExe = (Get-Command func -ErrorAction Stop).Source
-          Write-Host "Starting Functions host using: $funcExe"
-
-          $p = $null
-          try {
-            if ($funcExe.ToLower().EndsWith(".ps1")) {
-              $args = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$funcExe,"start","--port","7071")
-              $p = Start-Process -FilePath "powershell" -ArgumentList $args -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
-            } else {
-              $p = Start-Process -FilePath $funcExe -ArgumentList "start","--port","7071" -WindowStyle Hidden -RedirectStandardOutput $funcOut -RedirectStandardError $funcErr -PassThru
-            }
-
-            $base = "http://127.0.0.1:7071/api"
-            $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
-
-            $deadline = (Get-Date).AddSeconds(240)
-            do {
-              try {
-                Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body '{"name":"ci-ready","email":"ci-ready@example.com","source":"ci"}' -TimeoutSec 10 | Out-Null
-                Write-Host "Host ready via POST /visitors"
-                break
-              } catch {
-                Start-Sleep -Milliseconds 900
-              }
-
-              if ($p.HasExited) {
-                Write-Host "Host exited early." -ForegroundColor Yellow
-                Dump-Logs
-                throw "Functions host exited before becoming ready."
-              }
-            } while ((Get-Date) -lt $deadline)
-
-            if ((Get-Date) -ge $deadline) {
-              Write-Host "Host not ready in time." -ForegroundColor Yellow
-              Dump-Logs
-              throw "Functions host did not become ready in time."
-            }
-
-            # Storage warmup
-            $warmDeadline = (Get-Date).AddSeconds(60)
-            $warmOk = $false
-            do {
-              try {
-                Invoke-RestMethod -Method Post -Uri "$base/visitors" -Headers $headers -ContentType "application/json" -Body '{"name":"ci-warm","email":"ci-warm@example.com","source":"ci"}' -TimeoutSec 10 | Out-Null
-                $warmOk = $true
-                Write-Host "Storage warmup OK via POST /visitors"
-              } catch {
-                Start-Sleep -Milliseconds 900
-              }
-            } while (-not $warmOk -and (Get-Date) -lt $warmDeadline)
-
-            if (-not $warmOk) {
-              Write-Host "Storage warmup failed." -ForegroundColor Yellow
-              Dump-Logs
-              throw "Storage warmup failed."
-            }
-
-            try {
-              powershell -ExecutionPolicy Bypass -File .\scripts\regression.ps1 -BaseUrl $base
-              powershell -ExecutionPolicy Bypass -File .\scripts\smoke.ps1 -BaseUrl $base
-            } catch {
-              Write-Host "Regression/Smoke failed. Dumping logs..." -ForegroundColor Yellow
-              Dump-Logs
-              throw
-            }
-
-          } finally {
-            if ($p -and -not $p.HasExited) {
-              Write-Host "Stopping Functions host (pid=$($p.Id))"
-              Stop-Process -Id $p.Id -Force
-            }
+          Write-Error "Functions host port 7071 did not open in time"
+          if ($global:funcLog -and (Test-Path $global:funcLog)) {
+            Write-Host "==== func log tail ===="
+            Get-Content $global:funcLog -Tail 200
           }
+          exit 1
+        timeout-minutes: 3
 
-      - name: Upload logs on failure
+      - name: Regression
+        shell: powershell
+        env:
+          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\regression.ps1
+        timeout-minutes: 10
+
+      - name: Smoke
+        shell: powershell
+        env:
+          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke.ps1
+        timeout-minutes: 10
+
+      - name: Dump logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-logs
-          path: |
-            ${{ runner.temp }}\azurite\azurite.log
-            ${{ runner.temp }}\func\func.out.log
-            ${{ runner.temp }}\func\func.err.log
+        shell: powershell
+        run: |
+          if (Test-Path .azurite\debug.log) {
+            Write-Host "==== azurite debug.log tail ===="
+            Get-Content .azurite\debug.log -Tail 200
+          }
+          if ($global:funcLog -and (Test-Path $global:funcLog)) {
+            Write-Host "==== func log tail ===="
+            Get-Content $global:funcLog -Tail 200
+          }

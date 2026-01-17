@@ -14,8 +14,14 @@ concurrency:
 jobs:
   test:
     name: build_and_smoke
-    runs-on: windows-latest
-    timeout-minutes: 40
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    env:
+      HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
+      AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+      STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+      BASE_URL: "http://127.0.0.1:7071/api"
 
     steps:
       - name: Checkout
@@ -27,228 +33,111 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: Install dependencies
-        shell: pwsh
+      - name: Install deps
+        shell: bash
         run: |
-          $ErrorActionPreference = "Stop"
+          set -euo pipefail
           npm ci
 
       - name: Build (tsc)
-        shell: pwsh
+        shell: bash
         run: |
-          $ErrorActionPreference = "Stop"
+          set -euo pipefail
           npm run build
 
-      - name: Install Azure Functions Core Tools v4 (npm)
-        timeout-minutes: 8
-        shell: pwsh
+      - name: Install Functions Core Tools v4
+        shell: bash
         run: |
-          $ErrorActionPreference = "Stop"
+          set -euo pipefail
           npm i -g azure-functions-core-tools@4 --unsafe-perm true
           func --version
-          (Get-Command func* | Select-Object Name,Source,CommandType | Format-Table -AutoSize | Out-String) | Write-Host
 
-      - name: Start Azurite (local devDependency) + wait for ports
-        timeout-minutes: 8
-        shell: pwsh
+      - name: Start Azurite + wait for ports
+        shell: bash
         run: |
-          $ErrorActionPreference = "Stop"
-          $ProgressPreference = "SilentlyContinue"
+          set -euo pipefail
+          mkdir -p .azurite
+          nohup npx --yes azurite@3.33.0 \
+            --silent \
+            --location .azurite \
+            --debug .azurite/debug.log \
+            --blobHost 127.0.0.1 --blobPort 10000 \
+            --queueHost 127.0.0.1 --queuePort 10001 \
+            --tableHost 127.0.0.1 --tablePort 10002 \
+            > azurite.out.log 2> azurite.err.log &
 
-          New-Item -ItemType Directory -Force .azurite | Out-Null
+          # wait until all 3 ports are listening
+          for i in {1..60}; do
+            (nc -z 127.0.0.1 10000 && nc -z 127.0.0.1 10001 && nc -z 127.0.0.1 10002) && echo "Azurite up" && exit 0
+            sleep 1
+          done
 
-          $azOut = Join-Path $PWD "azurite.out.log"
-          $azErr = Join-Path $PWD "azurite.err.log"
-          if (Test-Path $azOut) { Remove-Item $azOut -Force }
-          if (Test-Path $azErr) { Remove-Item $azErr -Force }
-
-          $azJs = Join-Path $PWD "node_modules\azurite\dist\src\azurite.js"
-          if (-not (Test-Path $azJs)) {
-            throw "Azurite devDependency missing. Did npm ci run? Expected: $azJs"
-          }
-
-          $args = @(
-            $azJs,
-            "--silent",
-            "--location", ".azurite",
-            "--debug", ".azurite\debug.log",
-            "--blobHost", "127.0.0.1", "--blobPort", "10000",
-            "--queueHost","127.0.0.1", "--queuePort","10001",
-            "--tableHost","127.0.0.1", "--tablePort","10002"
-          )
-
-          Start-Process -FilePath "node" -ArgumentList $args -NoNewWindow -RedirectStandardOutput $azOut -RedirectStandardError $azErr
-
-          $deadline = (Get-Date).AddSeconds(90)
-          while ((Get-Date) -lt $deadline) {
-            $p0 = Get-NetTCPConnection -LocalPort 10000 -State Listen -ErrorAction SilentlyContinue
-            $p1 = Get-NetTCPConnection -LocalPort 10001 -State Listen -ErrorAction SilentlyContinue
-            $p2 = Get-NetTCPConnection -LocalPort 10002 -State Listen -ErrorAction SilentlyContinue
-            if ($p0 -and $p1 -and $p2) {
-              Write-Host "Azurite is listening on 10000/10001/10002"
-              exit 0
-            }
-            Start-Sleep -Seconds 2
-          }
-
-          Write-Host "Azurite did not start listening in time."
-          Write-Host "=== azurite.out.log (tail 200) ==="
-          if (Test-Path $azOut) { Get-Content $azOut -Tail 200 }
-          Write-Host "=== azurite.err.log (tail 200) ==="
-          if (Test-Path $azErr) { Get-Content $azErr -Tail 200 }
+          echo "Azurite did not start listening in time"
+          tail -n 200 azurite.out.log || true
+          tail -n 200 azurite.err.log || true
           exit 1
 
       - name: Start Functions Host (background)
-        timeout-minutes: 8
-        shell: pwsh
-        env:
-          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
-          AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-          STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+        shell: bash
         run: |
-          $ErrorActionPreference = "Stop"
-          $ProgressPreference = "SilentlyContinue"
-
-          $logOut = Join-Path $PWD "func-host.out.log"
-          $logErr = Join-Path $PWD "func-host.err.log"
-          if (Test-Path $logOut) { Remove-Item $logOut -Force }
-          if (Test-Path $logErr) { Remove-Item $logErr -Force }
-
-          # Prefer the Windows shim explicitly
-          $funcCmd = (Get-Command func.cmd -ErrorAction Stop)
-
-          # Start host
-          $p = Start-Process -FilePath $funcCmd.Source `
-            -ArgumentList @("start","--port","7071","--verbose") `
-            -NoNewWindow `
-            -RedirectStandardOutput $logOut `
-            -RedirectStandardError  $logErr `
-            -PassThru
-
-          "FUNC_HOST_PID=$($p.Id)" | Out-File -FilePath ".func-host.pid" -Encoding ascii
-          Write-Host "Started func host PID=$($p.Id)"
+          set -euo pipefail
+          nohup func start --port 7071 --verbose > func-host.out.log 2> func-host.err.log &
+          echo $! > func-host.pid
+          echo "FUNC_HOST_PID=$(cat func-host.pid)"
 
       - name: Wait for Functions Host (HTTP warmup)
-        timeout-minutes: 8
-        shell: pwsh
-        env:
-          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
+        shell: bash
         run: |
-          $ErrorActionPreference = "Stop"
-          $ProgressPreference = "SilentlyContinue"
+          set -euo pipefail
 
-          $base = "http://127.0.0.1:7071"
-          $api  = "$base/api"
-          $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
+          # fail fast if host dies
+          pid="$(cat func-host.pid || true)"
 
-          $pidFile = Join-Path $PWD ".func-host.pid"
-          $logOut  = Join-Path $PWD "func-host.out.log"
-          $logErr  = Join-Path $PWD "func-host.err.log"
+          for i in {1..180}; do
+            if [ -n "${pid}" ] && ! ps -p "$pid" >/dev/null 2>&1; then
+              echo "Functions host PID $pid exited."
+              tail -n 200 func-host.out.log || true
+              tail -n 200 func-host.err.log || true
+              exit 1
+            fi
 
-          function Dump-HostLogs {
-            Write-Host "=== func-host.out.log (tail 200) ==="
-            if (Test-Path $logOut) { Get-Content $logOut -Tail 200 }
-            Write-Host "=== func-host.err.log (tail 200) ==="
-            if (Test-Path $logErr) { Get-Content $logErr -Tail 200 }
-          }
-
-          # Parse PID from file like: FUNC_HOST_PID=2228
-          $funcPid = $null
-          if (Test-Path $pidFile) {
-            $raw = (Get-Content $pidFile -Raw).Trim()
-            if ($raw -match "FUNC_HOST_PID=(\d+)") { $funcPid = [int]$Matches[1] }
-          }
-
-          $deadline = (Get-Date).AddSeconds(240)
-          while ((Get-Date) -lt $deadline) {
-
-            # If PID exists and process is gone, fail immediately with logs
-            if ($funcPid) {
-              $p = Get-Process -Id $funcPid -ErrorAction SilentlyContinue
-              if (-not $p) {
-                Write-Host "Functions host process PID=$funcPid is not running (it exited)."
-                Dump-HostLogs
-                exit 1
-              }
-            }
-
-            # First: prove host is listening at all (any HTTP response is fine)
-            try {
-              Invoke-WebRequest -Uri $base -UseBasicParsing -TimeoutSec 3 | Out-Null
-            } catch {
-              Start-Sleep -Seconds 2
-              continue
-            }
-
-            # Second: warmup real endpoint
-            try {
-              $body = @{
-                name   = "CI Warmup"
-                email  = ("ciwarmup+" + (Get-Date -Format "yyyyMMddHHmmss") + "@example.com")
-                source = "ci"
-              } | ConvertTo-Json
-
-              $r = Invoke-RestMethod -Method Post -Uri "$api/visitors" -Headers $headers -ContentType "application/json" -Body $body -TimeoutSec 10
-              Write-Host "Functions host is up. visitorId=$($r.visitorId)"
+            # try warmup POST /visitors
+            if curl -sS -m 10 -H "x-api-key: ${HOPE_API_KEY}" -H "Content-Type: application/json" \
+              -d "{\"name\":\"CI Warmup\",\"email\":\"ciwarmup+${i}@example.com\",\"source\":\"ci\"}" \
+              "${BASE_URL}/visitors" >/dev/null; then
+              echo "Functions host is up."
               exit 0
-            } catch {
-              Start-Sleep -Seconds 2
-            }
-          }
+            fi
 
-          Write-Host "Functions host did not become ready in time."
-          Dump-HostLogs
+            sleep 1
+          done
+
+          echo "Functions host did not become ready in time."
+          tail -n 200 func-host.out.log || true
+          tail -n 200 func-host.err.log || true
           exit 1
 
-
-
       - name: Regression
-        timeout-minutes: 12
-        shell: pwsh
-        env:
-          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
-          AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-          STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+        shell: bash
         run: |
-          $ErrorActionPreference = "Stop"
-          .\scripts\regression.ps1
+          set -euo pipefail
+          pwsh -NoLogo -NoProfile -Command '$ErrorActionPreference="Stop"; ./scripts/regression.ps1'
 
       - name: Smoke
-        timeout-minutes: 12
-        shell: pwsh
-        env:
-          HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
-          AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-          STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+        shell: bash
         run: |
-          $ErrorActionPreference = "Stop"
-          .\scripts\smoke.ps1
+          set -euo pipefail
+          pwsh -NoLogo -NoProfile -Command '$ErrorActionPreference="Stop"; ./scripts/smoke.ps1'
 
       - name: Always dump logs + cleanup
         if: ${{ always() }}
-        shell: pwsh
+        shell: bash
         run: |
-          Write-Host "=== TAIL func-host.out.log ==="
-          if (Test-Path "func-host.out.log") { Get-Content "func-host.out.log" -Tail 200 }
-
-          Write-Host "=== TAIL func-host.err.log ==="
-          if (Test-Path "func-host.err.log") { Get-Content "func-host.err.log" -Tail 200 }
-
-          Write-Host "=== TAIL azurite.out.log ==="
-          if (Test-Path "azurite.out.log") { Get-Content "azurite.out.log" -Tail 200 }
-
-          Write-Host "=== TAIL azurite.err.log ==="
-          if (Test-Path "azurite.err.log") { Get-Content "azurite.err.log" -Tail 200 }
-
-          Write-Host "=== Kill anything still holding port 7071 ==="
-          try {
-            $p = Get-NetTCPConnection -LocalPort 7071 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($p) {
-              Write-Host ("Killing PID: " + $p.OwningProcess)
-              Stop-Process -Id $p.OwningProcess -Force -ErrorAction SilentlyContinue
-            } else {
-              Write-Host "No listener on 7071"
-            }
-          } catch {
-            Write-Host "Get-NetTCPConnection not available or failed."
-          }
+          echo "=== TAIL func-host.out.log ==="
+          tail -n 200 func-host.out.log || true
+          echo "=== TAIL func-host.err.log ==="
+          tail -n 200 func-host.err.log || true
+          echo "=== TAIL azurite.out.log ==="
+          tail -n 200 azurite.out.log || true
+          echo "=== TAIL azurite.err.log ==="
+          tail -n 200 azurite.err.log || true

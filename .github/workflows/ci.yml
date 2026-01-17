@@ -48,13 +48,6 @@ jobs:
           func --version
           (Get-Command func* | Select-Object Name,Source,CommandType | Format-Table -AutoSize | Out-String) | Write-Host
 
-      - name: Install Azurite
-        timeout-minutes: 3
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          npm i -g azurite
-          azurite --version
       - name: Start Azurite (npx, pinned)
         timeout-minutes: 6
         shell: pwsh
@@ -69,30 +62,21 @@ jobs:
           if (Test-Path $azOut) { Remove-Item $azOut -Force }
           if (Test-Path $azErr) { Remove-Item $azErr -Force }
 
-          # Start Azurite without global install (pinned version for determinism)
+          # Start Azurite without global install (pinned for determinism)
           $cmd = 'npx --yes azurite@3.33.0 --silent --location .azurite --debug .azurite\debug.log'
           Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", $cmd) -NoNewWindow -RedirectStandardOutput $azOut -RedirectStandardError $azErr
 
           Start-Sleep -Seconds 2
-
-          # Quick sanity: show last few lines so we know it started
-          if (Test-Path $azOut) { Get-Content $azOut -Tail 20 | Write-Host }
-          if (Test-Path $azErr) { Get-Content $azErr -Tail 20 | Write-Host }
-
-
+          if (Test-Path $azOut) { Get-Content $azOut -Tail 30 | Write-Host }
+          if (Test-Path $azErr) { Get-Content $azErr -Tail 30 | Write-Host }
 
       - name: Start Functions Host (background)
-        timeout-minutes: 8
+        timeout-minutes: 10
         shell: pwsh
         env:
           HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
-
-          # Azure Functions runtime expects AzureWebJobsStorage; local.settings.json is not present in CI
           AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-
-          # Your app expects STORAGE_CONNECTION_STRING
           STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
-
           FUNCTIONS_WORKER_RUNTIME: "node"
         run: |
           $ErrorActionPreference = "Stop"
@@ -105,7 +89,6 @@ jobs:
 
           $funcCmd = (Get-Command func.cmd -ErrorAction Stop)
 
-          # Start host and keep process handle (so we can detect early exit)
           $p = Start-Process -FilePath $funcCmd.Source `
             -ArgumentList @("start","--port","7071","--verbose") `
             -NoNewWindow `
@@ -115,14 +98,13 @@ jobs:
 
           Write-Host "Started func host PID=$($p.Id)"
 
-          # Wait for HTTP readiness by probing POST /visitors (more reliable than log-matching)
           $base = "http://127.0.0.1:7071/api"
           $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
 
-          $deadline = (Get-Date).AddSeconds(120)
+          $deadline = (Get-Date).AddSeconds(180)
           while ((Get-Date) -lt $deadline) {
             if ($p.HasExited) {
-              Write-Host "func host process exited early. ExitCode=$($p.ExitCode)"
+              Write-Host "func host exited early. ExitCode=$($p.ExitCode)"
               Write-Host "=== func-host.out.log (tail 200) ==="
               if (Test-Path $logOut) { Get-Content $logOut -Tail 200 }
               Write-Host "=== func-host.err.log (tail 200) ==="
@@ -157,13 +139,11 @@ jobs:
         shell: pwsh
         env:
           HOPE_API_KEY: ${{ secrets.HOPE_API_KEY }}
-          AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+          AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
           STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
         run: |
           $ErrorActionPreference = "Stop"
-          Write-Host ("[CI] Regression start: " + (Get-Date).ToString("o"))
           .\scripts\regression.ps1
-          Write-Host ("[CI] Regression end: " + (Get-Date).ToString("o"))
 
       - name: Smoke
         timeout-minutes: 12
@@ -174,9 +154,7 @@ jobs:
           STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNo/SuKxkTg==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
         run: |
           $ErrorActionPreference = "Stop"
-          Write-Host ("[CI] Smoke start: " + (Get-Date).ToString("o"))
           .\scripts\smoke.ps1
-          Write-Host ("[CI] Smoke end: " + (Get-Date).ToString("o"))
 
       - name: Always dump logs + cleanup
         if: ${{ always() }}
@@ -193,16 +171,3 @@ jobs:
 
           Write-Host "=== TAIL azurite.err.log ==="
           if (Test-Path "azurite.err.log") { Get-Content "azurite.err.log" -Tail 200 }
-
-          Write-Host "=== Kill anything still holding port 7071 ==="
-          try {
-            $p = Get-NetTCPConnection -LocalPort 7071 -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($p) {
-              Write-Host ("Killing PID: " + $p.OwningProcess)
-              Stop-Process -Id $p.OwningProcess -Force -ErrorAction SilentlyContinue
-            } else {
-              Write-Host "No listener on 7071"
-            }
-          } catch {
-            Write-Host "Get-NetTCPConnection not available or failed."
-          }

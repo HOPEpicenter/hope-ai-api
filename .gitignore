@@ -30,3 +30,6 @@ __azurite_db_*.json
 payload.json
 dump.js
 Get-ChildItem
+
+# legacy scratch
+legacy/scratch/

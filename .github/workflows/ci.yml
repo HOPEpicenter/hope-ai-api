@@ -96,34 +96,43 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
-          # Run compiled JS to match production-ish behavior
-          # Assumes tsc outputs dist/index.js
-          $appLog = Join-Path $env:RUNNER_TEMP "app.log"
+          $logDir = Join-Path $env:RUNNER_TEMP "express"
+          New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
-          Start-Process -FilePath "node" -ArgumentList @("dist/index.js") -RedirectStandardOutput $appLog -RedirectStandardError $appLog -WindowStyle Hidden
+          $outLog = Join-Path $logDir "express.out.log"
+          $errLog = Join-Path $logDir "express.err.log"
 
-          function Wait-Http([string]$url, [int]$seconds = 30) {
+          # Start Express (build output). Adjust if your entrypoint differs.
+          $p = Start-Process -FilePath "node" -ArgumentList @("dist/index.js") `
+            -WindowStyle Hidden `
+            -RedirectStandardOutput $outLog `
+            -RedirectStandardError  $errLog `
+            -PassThru
+
+          function Wait-Port([int]$port, [int]$seconds = 60) {
             $deadline = (Get-Date).AddSeconds($seconds)
             while ((Get-Date) -lt $deadline) {
-              try {
-                $r = Invoke-WebRequest -Uri $url -Method Get -TimeoutSec 2 -UseBasicParsing
-                if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { return $true }
-              } catch {}
-              Start-Sleep -Milliseconds 300
+              $ok = Test-NetConnection -ComputerName 127.0.0.1 -Port $port -WarningAction SilentlyContinue
+              if ($ok.TcpTestSucceeded) { return $true }
+              Start-Sleep -Milliseconds 250
             }
             return $false
           }
 
-          if (-not (Wait-Http "http://127.0.0.1:3000/api/visitors?limit=1" 30)) {
-            Write-Host "==== APP LOG (tail 200) ===="
-            if (Test-Path $appLog) { Get-Content $appLog -Tail 200 }
-            throw "Express server did not become reachable on :3000."
+          if (-not (Wait-Port 3000 60)) {
+            Write-Host "==== EXPRESS OUT (tail 200) ===="
+            if (Test-Path $outLog) { Get-Content $outLog -Tail 200 }
+            Write-Host "==== EXPRESS ERR (tail 200) ===="
+            if (Test-Path $errLog) { Get-Content $errLog -Tail 200 }
+            if ($p -and $p.HasExited) { Write-Host "Express exited early with code $($p.ExitCode)" }
+            throw "Express server did not open port 3000 in time."
           }
 
-          "OK: Express is reachable on http://127.0.0.1:3000" | Write-Host
+          "OK: Express is listening on 127.0.0.1:3000" | Write-Host
 
       - name: Smoke (dev-smoke.ps1)
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           .\scripts\dev-smoke.ps1
+

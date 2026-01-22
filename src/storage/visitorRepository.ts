@@ -1,20 +1,14 @@
 import { TableClient } from "@azure/data-tables";
 
-export type VisitorEntity = {
-  partitionKey: string; // mapped from PartitionKey
-  rowKey: string;       // mapped from RowKey
-  name: string;
-  email?: string;
-  source?: string;
-  createdAtIso: string; // ISO string
-};
-
 export type Visitor = {
   id: string;
   name: string;
   email?: string;
   source?: string;
   createdAtIso: string;
+
+  // keep optional so legacy code (updateVisitor) compiles
+  tags?: string[];
 };
 
 type ListOptions = {
@@ -30,32 +24,26 @@ function getConnectionString(): string {
 }
 
 function getVisitorsTableName(): string {
-  // Keep your current table name convention.
-  // If you already use "devVisitors", leave it.
   return process.env.VISITORS_TABLE || "devVisitors";
 }
 
 const VISITOR_PARTITION_KEY = "visitor";
 
-function toDomain(e: VisitorEntity): Visitor {
-  return {
-    id: e.rowKey,
-    name: e.name,
-    email: e.email,
-    source: e.source,
-    createdAtIso: e.createdAtIso,
-  };
-}
-
-function toEntityProps(v: Omit<VisitorEntity, "partitionKey" | "rowKey">) {
-  return {
-    PartitionKey: VISITOR_PARTITION_KEY,
-    // RowKey is supplied separately for create/upsert calls
-    name: v.name,
-    email: v.email,
-    source: v.source,
-    createdAtIso: v.createdAtIso,
-  };
+function normalizeTags(raw: any): string[] | undefined {
+  if (Array.isArray(raw)) return raw.filter(x => typeof x === "string");
+  if (typeof raw === "string" && raw.trim().length) {
+    // if older data stored tags as JSON or CSV, best-effort parse
+    const s = raw.trim();
+    if (s.startsWith("[") && s.endsWith("]")) {
+      try {
+        const arr = JSON.parse(s);
+        if (Array.isArray(arr)) return arr.filter(x => typeof x === "string");
+      } catch { /* ignore */ }
+    }
+    // CSV fallback
+    return s.split(",").map(t => t.trim()).filter(Boolean);
+  }
+  return undefined;
 }
 
 export class VisitorRepository {
@@ -76,76 +64,81 @@ export class VisitorRepository {
     await this.client.createTable();
   }
 
-  async create(visitor: {
-    id: string;
-    name: string;
-    email?: string;
-    source?: string;
-    createdAtIso: string;
-  }): Promise<void> {
-    await this.client.createEntity({
-      ...toEntityProps({
-        name: visitor.name,
-        email: visitor.email,
-        source: visitor.source,
-        createdAtIso: visitor.createdAtIso,
-      }),
-      RowKey: visitor.id,
-    });
+  /**
+   * Back-compat for existing code: createVisitor/updateVisitor call repo.save(...)
+   * We implement as an UPSERT (replace/merge is fine for dev).
+   */
+  async save(visitor: Visitor): Promise<void> {
+    await this.ensureTable();
+
+    // IMPORTANT: Table SDK entity shape is lower-case keys: partitionKey / rowKey
+    const entity: any = {
+      partitionKey: VISITOR_PARTITION_KEY,
+      rowKey: visitor.id,
+      name: visitor.name,
+      email: visitor.email,
+      source: visitor.source,
+      createdAtIso: visitor.createdAtIso,
+    };
+
+    // Persist tags if present (as JSON string to keep schema simple)
+    if (visitor.tags) {
+      entity.tags = JSON.stringify(visitor.tags);
+    }
+
+    await this.client.upsertEntity(entity, "Merge");
+  }
+
+  async create(visitor: Visitor): Promise<void> {
+    // keep create for new codepaths; use save to minimize duplication
+    await this.save(visitor);
   }
 
   async getById(id: string): Promise<Visitor | null> {
     try {
       const e = await this.client.getEntity<any>(VISITOR_PARTITION_KEY, id);
 
-      const entity: VisitorEntity = {
-        partitionKey: e.partitionKey ?? e.PartitionKey ?? VISITOR_PARTITION_KEY,
-        rowKey: e.rowKey ?? e.RowKey ?? id,
+      return {
+        id: e.rowKey ?? e.RowKey ?? id,
         name: e.name,
         email: e.email,
         source: e.source,
         createdAtIso: e.createdAtIso,
+        tags: normalizeTags(e.tags),
       };
-
-      return toDomain(entity);
     } catch (err: any) {
-      // 404 from Tables SDK often appears as RestError with statusCode 404
       if (err?.statusCode === 404) return null;
       throw err;
     }
   }
 
   async list(options: ListOptions): Promise<{ items: Visitor[]; count: number }> {
+    await this.ensureTable();
+
     const limit = Math.max(1, Math.min(options.limit ?? 25, 200));
 
-    // IMPORTANT:
-    // - OData property name MUST be PartitionKey (capital P, capital K)
-    // - Value must match exactly: "visitor"
+    // IMPORTANT: OData property name MUST be PartitionKey (capital P, K)
     const filter = `PartitionKey eq '${VISITOR_PARTITION_KEY}'`;
 
     const out: Visitor[] = [];
 
-    // Note: Azure Table does not support "ORDER BY" server-side.
-    // We’ll fetch up to "limit" and then sort client-side by createdAtIso desc.
     for await (const e of this.client.listEntities<any>({
       queryOptions: { filter },
     })) {
-      const entity: VisitorEntity = {
-        partitionKey: e.partitionKey ?? e.PartitionKey ?? VISITOR_PARTITION_KEY,
-        rowKey: e.rowKey ?? e.RowKey,
+      out.push({
+        id: e.rowKey ?? e.RowKey,
         name: e.name,
         email: e.email,
         source: e.source,
         createdAtIso: e.createdAtIso,
-      };
-      out.push(toDomain(entity));
+        tags: normalizeTags(e.tags),
+      });
 
-      // We can early-stop once we have "limit" items,
-      // BUT sorting is client-side, so we’ll collect and sort only what we have.
+      // early stop once we have enough
       if (out.length >= limit) break;
     }
 
-    // Newest first (ISO sorts lexicographically if always ISO)
+    // newest first (ISO compares lexicographically)
     out.sort((a, b) => (a.createdAtIso < b.createdAtIso ? 1 : -1));
 
     return { items: out, count: out.length };

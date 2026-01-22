@@ -1,16 +1,35 @@
-﻿{
+{
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
-    "lib": ["ES2020"],
-    "rootDir": "src",
     "outDir": "dist",
+    "rootDir": "src",
+    "baseUrl": "src",
+    "paths": {
+      "@repositories/*": ["repositories/*"],
+      "@shared/*": ["shared/*"],
+      "@storage/*": ["storage/*"],
+      "@domain/*": ["domain/*"],
+      "@visitors/*": ["visitors/*"]
+    },
     "strict": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node",
-    "sourceMap": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "moduleResolution": "node"
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*"]
+}
+
+{
+  "exclude": [
+    "node_modules",
+    "dist",
+
+    "src/**/_disabled*/**",
+    "src/**/*_disabled/**",
+    "src/createVisitor_disabled/**",
+
+    "src/functions/**"
+  ]
 }

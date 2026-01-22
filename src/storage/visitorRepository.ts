@@ -2,18 +2,28 @@ import { TableClient } from "@azure/data-tables";
 
 export type Visitor = {
   id: string;
-  name: string;
+
+  // legacy fields your code currently uses
+  firstName?: string;
+  lastName?: string;
   email?: string;
-  source?: string;
-  createdAtIso: string;
-
-  // keep optional so legacy code (updateVisitor) compiles
+  phone?: string;
+  status?: string;
   tags?: string[];
+  notes?: string;
+  source?: string;
+
+  // legacy timestamps (your errors show createdAt/updatedAt, but some code may use created/updated)
+  createdAt?: string;
+  updatedAt?: string;
+  created?: string;
+  updated?: string;
+
+  // allow any extra fields without breaking compilation during migration
+  [key: string]: any;
 };
 
-type ListOptions = {
-  limit: number;
-};
+type ListOptions = { limit: number };
 
 function getConnectionString(): string {
   return (
@@ -29,21 +39,26 @@ function getVisitorsTableName(): string {
 
 const VISITOR_PARTITION_KEY = "visitor";
 
-function normalizeTags(raw: any): string[] | undefined {
-  if (Array.isArray(raw)) return raw.filter(x => typeof x === "string");
+function toIso(val: any): string {
+  if (typeof val === "string" && val.trim().length) return val;
+  return new Date().toISOString();
+}
+
+function normalizeTags(raw: any): string[] {
+  if (Array.isArray(raw)) return raw.filter((x) => typeof x === "string");
   if (typeof raw === "string" && raw.trim().length) {
-    // if older data stored tags as JSON or CSV, best-effort parse
     const s = raw.trim();
     if (s.startsWith("[") && s.endsWith("]")) {
       try {
         const arr = JSON.parse(s);
-        if (Array.isArray(arr)) return arr.filter(x => typeof x === "string");
-      } catch { /* ignore */ }
+        if (Array.isArray(arr)) return arr.filter((x) => typeof x === "string");
+      } catch {
+        // ignore
+      }
     }
-    // CSV fallback
-    return s.split(",").map(t => t.trim()).filter(Boolean);
+    return s.split(",").map((t) => t.trim()).filter(Boolean);
   }
-  return undefined;
+  return [];
 }
 
 export class VisitorRepository {
@@ -65,33 +80,36 @@ export class VisitorRepository {
   }
 
   /**
-   * Back-compat for existing code: createVisitor/updateVisitor call repo.save(...)
-   * We implement as an UPSERT (replace/merge is fine for dev).
+   * Back-compat: existing code calls repo.save(visitor).
+   * We'll upsert with Merge so partial updates work.
    */
   async save(visitor: Visitor): Promise<void> {
     await this.ensureTable();
 
-    // IMPORTANT: Table SDK entity shape is lower-case keys: partitionKey / rowKey
+    const createdIso = toIso(visitor.createdAt ?? visitor.created);
+    const updatedIso = toIso(visitor.updatedAt ?? visitor.updated ?? createdIso);
+
+    // IMPORTANT: Table SDK entity uses lowercase partitionKey/rowKey fields
     const entity: any = {
       partitionKey: VISITOR_PARTITION_KEY,
       rowKey: visitor.id,
-      name: visitor.name,
+
+      firstName: visitor.firstName ?? "",
+      lastName: visitor.lastName ?? "",
       email: visitor.email,
+      phone: visitor.phone,
+      status: visitor.status,
+      notes: visitor.notes,
       source: visitor.source,
-      createdAtIso: visitor.createdAtIso,
+
+      createdAt: createdIso,
+      updatedAt: updatedIso,
+
+      // store tags as JSON string to keep schema simple
+      tags: JSON.stringify(Array.isArray(visitor.tags) ? visitor.tags : []),
     };
 
-    // Persist tags if present (as JSON string to keep schema simple)
-    if (visitor.tags) {
-      entity.tags = JSON.stringify(visitor.tags);
-    }
-
     await this.client.upsertEntity(entity, "Merge");
-  }
-
-  async create(visitor: Visitor): Promise<void> {
-    // keep create for new codepaths; use save to minimize duplication
-    await this.save(visitor);
   }
 
   async getById(id: string): Promise<Visitor | null> {
@@ -100,10 +118,15 @@ export class VisitorRepository {
 
       return {
         id: e.rowKey ?? e.RowKey ?? id,
-        name: e.name,
+        firstName: e.firstName,
+        lastName: e.lastName,
         email: e.email,
+        phone: e.phone,
+        status: e.status,
+        notes: e.notes,
         source: e.source,
-        createdAtIso: e.createdAtIso,
+        createdAt: e.createdAt ?? e.created,
+        updatedAt: e.updatedAt ?? e.updated,
         tags: normalizeTags(e.tags),
       };
     } catch (err: any) {
@@ -117,7 +140,7 @@ export class VisitorRepository {
 
     const limit = Math.max(1, Math.min(options.limit ?? 25, 200));
 
-    // IMPORTANT: OData property name MUST be PartitionKey (capital P, K)
+    // IMPORTANT: correct OData property casing
     const filter = `PartitionKey eq '${VISITOR_PARTITION_KEY}'`;
 
     const out: Visitor[] = [];
@@ -127,19 +150,27 @@ export class VisitorRepository {
     })) {
       out.push({
         id: e.rowKey ?? e.RowKey,
-        name: e.name,
+        firstName: e.firstName,
+        lastName: e.lastName,
         email: e.email,
+        phone: e.phone,
+        status: e.status,
+        notes: e.notes,
         source: e.source,
-        createdAtIso: e.createdAtIso,
+        createdAt: e.createdAt ?? e.created,
+        updatedAt: e.updatedAt ?? e.updated,
         tags: normalizeTags(e.tags),
       });
 
-      // early stop once we have enough
       if (out.length >= limit) break;
     }
 
-    // newest first (ISO compares lexicographically)
-    out.sort((a, b) => (a.createdAtIso < b.createdAtIso ? 1 : -1));
+    // sort newest first if we have createdAt values
+    out.sort((a, b) => {
+      const aa = a.createdAt ?? "";
+      const bb = b.createdAt ?? "";
+      return aa < bb ? 1 : -1;
+    });
 
     return { items: out, count: out.length };
   }

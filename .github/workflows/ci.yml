@@ -134,5 +134,6 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          .\scripts\dev-smoke.ps1
+          .\scripts/ci-smoke-express.ps1
+
 

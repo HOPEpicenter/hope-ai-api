@@ -19,3 +19,14 @@ toDelete_ids.txt
 *.bak*
 .azurite/
 azurite/
+# --- local backups ---
+.patch-backups/
+
+# --- azurite artifacts ---
+AzuriteConfig
+__azurite_db_*.json
+
+# --- misc local scratch ---
+payload.json
+dump.js
+Get-ChildItem

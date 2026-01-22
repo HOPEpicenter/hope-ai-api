@@ -49,21 +49,30 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
-          # Use npx to avoid Windows shim issues
+          # Install Azurite (avoid npx flakiness on Windows runners)
+          npm i -g azurite
+
+          # Find Azurite JS entrypoint in global node_modules
+          $globalRoot = (npm root -g).Trim()
+          $azJs = Join-Path $globalRoot "azurite\dist\src\azurite.js"
+          if (-not (Test-Path $azJs)) { throw "Azurite entrypoint not found at $azJs" }
+
+          $azDir = Join-Path $env:RUNNER_TEMP "azurite"
+          New-Item -ItemType Directory -Force -Path $azDir | Out-Null
           $azLog = Join-Path $env:RUNNER_TEMP "azurite.log"
 
-          # Start all services (includes Table on 10002)
-          Start-Process -FilePath "npx" -ArgumentList @(
-            "--yes","azurite",
+          # Start Azurite (blob/queue/table)
+          $p = Start-Process -FilePath "node" -ArgumentList @(
+            $azJs,
             "--silent",
-            "--location", (Join-Path $env:RUNNER_TEMP "azurite"),
+            "--location", $azDir,
             "--debug", $azLog,
             "--blobHost","127.0.0.1","--blobPort","10000",
             "--queueHost","127.0.0.1","--queuePort","10001",
             "--tableHost","127.0.0.1","--tablePort","10002"
-          ) -WindowStyle Hidden
+          ) -WindowStyle Hidden -PassThru
 
-          function Wait-Port([int]$port, [int]$seconds = 30) {
+          function Wait-Port([int]$port, [int]$seconds = 180) {
             $deadline = (Get-Date).AddSeconds($seconds)
             while ((Get-Date) -lt $deadline) {
               $ok = Test-NetConnection -ComputerName 127.0.0.1 -Port $port -WarningAction SilentlyContinue
@@ -73,9 +82,10 @@ jobs:
             return $false
           }
 
-          if (-not (Wait-Port 10002 30)) {
+          if (-not (Wait-Port 10002 180)) {
             Write-Host "==== AZURITE LOG (tail 200) ===="
             if (Test-Path $azLog) { Get-Content $azLog -Tail 200 }
+            if ($p -and $p.HasExited) { Write-Host "Azurite exited early with code $($p.ExitCode)" }
             throw "Azurite Table port 10002 did not open."
           }
 

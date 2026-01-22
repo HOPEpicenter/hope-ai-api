@@ -5,7 +5,7 @@
     "private":  true,
     "description":  "Azure Functions v4 (Node.js + TypeScript) backend for HOPE",
     "scripts":  {
-                    "build":  "tsc \u0026\u0026 node scripts/copy-function-json.js",
+                    "build":  "tsc",
                     "clean":  "rimraf dist",
                     "copy":  "copyfiles -u 1 src/**/function.json dist/",
                     "dev":  "ts-node src/index.ts"

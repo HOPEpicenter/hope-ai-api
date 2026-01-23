@@ -9,8 +9,7 @@ app.use(express.json());
 app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
 app.get("/api/health", (_req, res) => res.status(200).json({ ok: true }));
 app.use("/api/visitors", visitorsRouter);
-
-const port = 3000;
+const port = parseInt(process.env.PORT || "3000", 10);
 app.listen(port, () => {
   console.log(`HOPE API listening on port ${port}`);
 });

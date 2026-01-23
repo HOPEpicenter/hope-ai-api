@@ -55,7 +55,12 @@ function Get-Headers() {
   $k = $env:HOPE_API_KEY
   if (-not $k) { $k = "" }
   $k = $k.Trim()
-  if ($k) { $h["x-api-key"] = $k }
+
+  if (-not $k) {
+    throw "HOPE_API_KEY is not set in the environment. Set `$env:HOPE_API_KEY='dev-local-key-123' then re-run."
+  }
+
+  $h["x-api-key"] = $k
   return $h
 }
 
@@ -106,3 +111,38 @@ Write-Host ""
 Write-Host ("LIST {0}/api/visitors?limit=5" -f $base)
 $list = Invoke-Json "GET" ("{0}/api/visitors?limit=5" -f $base)
 $list | ConvertTo-Json -Depth 20
+# --------------------------
+# Phase 2: Engagements smoke
+# --------------------------
+$engObj = @{
+  visitorId = $id
+  type      = "SERVICE_ATTENDED"
+  channel   = "in-person"
+  notes     = "Phase 2 smoke"
+}
+$engJson = $engObj | ConvertTo-Json -Depth 10
+
+Write-Host ""
+Write-Host ("POST {0}/api/engagements" -f $base)
+$engCreated = Invoke-Json "POST" ("{0}/api/engagements" -f $base) $engJson
+$engCreated | ConvertTo-Json -Depth 20
+
+Write-Host ""
+Write-Host ("GET {0}/api/visitors/{1}/engagements?limit=10" -f $base, $id)
+$engList = Invoke-Json "GET" ("{0}/api/visitors/{1}/engagements?limit=10" -f $base, $id)
+$engList | ConvertTo-Json -Depth 20
+
+Write-Host ""
+Write-Host "[OK] Smoke passed: Visitors + Engagements"
+
+# Output summary object (so callers can capture it)
+[pscustomobject]@{
+  ok            = $true
+  baseUrl       = $base
+  visitorId     = $id
+  visitor       = $created
+  engagementId  = $engCreated.id
+  engagement    = $engCreated
+  engagements   = $engList
+}
+

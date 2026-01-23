@@ -1,4 +1,4 @@
-name: CI - Build + Regression + Smoke
+﻿name: CI - Build + Regression + Smoke
 
 on:
   pull_request:
@@ -49,22 +49,12 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
-          # Install Azurite (avoid npx flakiness on Windows runners)
-          npm i -g azurite
-
-          # Find Azurite JS entrypoint in global node_modules
-          $globalRoot = (npm root -g).Trim()
-          $azJs = Join-Path $globalRoot "azurite\dist\src\azurite.js"
-          if (-not (Test-Path $azJs)) { throw "Azurite entrypoint not found at $azJs" }
-
           $azDir = Join-Path $env:RUNNER_TEMP "azurite"
           New-Item -ItemType Directory -Force -Path $azDir | Out-Null
           $azLog = Join-Path $env:RUNNER_TEMP "azurite.log"
-
-          # Start Azurite (blob/queue/table)
-          $p = Start-Process -FilePath "node" -ArgumentList @(
-            $azJs,
-            "--silent",
+          # Start Azurite (blob/queue/table) using local devDependency (installed via npm ci)
+          $p = Start-Process -FilePath "npx" -ArgumentList @(
+            "--yes","azurite",            "--silent",
             "--location", $azDir,
             "--debug", $azLog,
             "--blobHost","127.0.0.1","--blobPort","10000",
@@ -104,4 +94,6 @@ jobs:
           if ($env:EXPRESS_OUT_LOG -and (Test-Path $env:EXPRESS_OUT_LOG)) { Get-Content $env:EXPRESS_OUT_LOG -Tail 200 }
           Write-Host "==== EXPRESS ERR (tail 200) ====" -ForegroundColor Yellow
           if ($env:EXPRESS_ERR_LOG -and (Test-Path $env:EXPRESS_ERR_LOG)) { Get-Content $env:EXPRESS_ERR_LOG -Tail 200 }
+
+
 

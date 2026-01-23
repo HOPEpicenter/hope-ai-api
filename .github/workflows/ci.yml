@@ -1,4 +1,4 @@
-﻿name: CI - Build + Regression + Smoke
+name: CI - Build + Regression + Smoke
 
 on:
   pull_request:
@@ -37,6 +37,12 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           npm ci
+
+      - name: Guard (no @azure/functions under src)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npm run guard
 
       - name: Build (tsc)
         shell: pwsh
@@ -94,6 +100,3 @@ jobs:
           if ($env:EXPRESS_OUT_LOG -and (Test-Path $env:EXPRESS_OUT_LOG)) { Get-Content $env:EXPRESS_OUT_LOG -Tail 200 }
           Write-Host "==== EXPRESS ERR (tail 200) ====" -ForegroundColor Yellow
           if ($env:EXPRESS_ERR_LOG -and (Test-Path $env:EXPRESS_ERR_LOG)) { Get-Content $env:EXPRESS_ERR_LOG -Tail 200 }
-
-
-

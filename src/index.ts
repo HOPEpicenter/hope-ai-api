@@ -1,5 +1,7 @@
 import express from "express";
+import { engagementsRouter } from "./routes/engagements";
 import visitorsRouter from "./routes/visitors/visitorsRouter";
+
 
 const app = express();
 
@@ -9,7 +11,10 @@ app.use(express.json());
 app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
 app.get("/api/health", (_req, res) => res.status(200).json({ ok: true }));
 app.use("/api/visitors", visitorsRouter);
+
+app.use("/api", engagementsRouter);
 const port = parseInt(process.env.PORT || "3000", 10);
 app.listen(port, () => {
   console.log(`HOPE API listening on port ${port}`);
 });
+

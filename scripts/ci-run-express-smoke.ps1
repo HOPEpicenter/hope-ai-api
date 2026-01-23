@@ -56,7 +56,17 @@ try {
   # Run the smoke script in THE SAME STEP so the process can't disappear between steps
   $baseUrl = "http://127.0.0.1:$Port/api"
   Write-Host "Running smoke against: $baseUrl" -ForegroundColor Cyan
-  pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\ci-smoke-express.ps1 -BaseUrl $baseUrl -RetrySeconds 60
+  $cmd = Get-Command pwsh -ErrorAction SilentlyContinue
+  $ps = if ($cmd) { $cmd.Source } else { $null }
+
+  if (-not $ps) {
+    $cmd = Get-Command powershell -ErrorAction SilentlyContinue
+    $ps = if ($cmd) { $cmd.Source } else { $null }
+  }
+
+  if (-not $ps) { throw "Neither 'pwsh' nor 'powershell' found on PATH." }
+
+  & $ps -NoProfile -ExecutionPolicy Bypass -File .\scripts\ci-smoke-express.ps1 -BaseUrl $baseUrl -RetrySeconds 60
 
 } catch {
   Write-Host "Smoke failed. Dumping Express logs..." -ForegroundColor Yellow

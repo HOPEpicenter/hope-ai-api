@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 
 
 # Guard: ensure Express-only src does not reference Azure Functions
-& "\guard-no-azure-functions.ps1"
+& "$PSScriptRoot\guard-no-azure-functions.ps1"
 $logDir = Join-Path $env:RUNNER_TEMP "express"
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
@@ -84,3 +84,4 @@ try {
     Stop-Process -Id $p.Id -Force
   }
 }
+

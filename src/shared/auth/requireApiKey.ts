@@ -1,28 +1,32 @@
-﻿// src/shared/auth/requireApiKey.ts
-import { HttpRequest, HttpResponseInit } from "@azure/functions";
+﻿import { Request, Response, NextFunction } from "express";
 
 /**
- * Expected header: x-api-key
- * Expected env var: HOPE_API_KEY (fallback: API_KEY)
+ * Express-only API key middleware (no Azure Functions types).
+ *
+ * Expects:
+ * - env: HOPE_API_KEY (preferred)
+ * - header: x-api-key
  */
-export function requireApiKey(req: HttpRequest): HttpResponseInit | null {
-  const expectedKey = process.env.HOPE_API_KEY || process.env.API_KEY;
+export function requireApiKey(req: Request, res: Response, next: NextFunction) {
+  const expected = (process.env.HOPE_API_KEY ?? "").trim();
 
-  if (!expectedKey) {
-    return {
-      status: 500,
-      jsonBody: { error: "Server missing HOPE_API_KEY (or API_KEY) configuration." },
-    };
+  if (!expected) {
+    // Fail closed if not configured (safer than accidentally exposing endpoints).
+    return res.status(500).json({
+      ok: false,
+      error: "HOPE_API_KEY not configured",
+    });
   }
 
-  const providedKey =
-    req.headers.get("x-api-key") ||
-    req.headers.get("x-functions-key") || // optional fallback if you ever want it
-    "";
+  const provided =
+    (req.header("x-api-key") ?? req.header("X-API-KEY") ?? "").trim();
 
-  if (!providedKey || providedKey !== expectedKey) {
-    return { status: 401, jsonBody: { error: "Unauthorized" } };
+  if (!provided || provided !== expected) {
+    return res.status(401).json({
+      ok: false,
+      error: "unauthorized",
+    });
   }
 
-  return null;
+  return next();
 }

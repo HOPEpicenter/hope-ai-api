@@ -1,4 +1,11 @@
 ﻿import { TableClient } from "@azure/data-tables";
+function describeTableEndpoint(cs: string | undefined): string {
+  if (!cs) return "<missing>";
+  const m = cs.match(/TableEndpoint=([^;]+);/i);
+  if (m && m[1]) return m[1];
+  const acct = (cs.match(/AccountName=([^;]+);/i) || [])[1];
+  return acct ? ("<no TableEndpoint; AccountName=" + acct + ">") : "<unknown>";
+}
 
 export type Visitor = {
   id: string;
@@ -27,8 +34,7 @@ type ListOptions = { limit: number };
 
 function getConnectionString(): string {
   return (
-    process.env.STORAGE_CONNECTION_STRING ||
-    process.env.AzureWebJobsStorage ||
+    process.env.STORAGE_CONNECTION_STRING || process.env.AzureWebJobsStorage ||
     ""
   );
 }
@@ -175,4 +181,6 @@ export class VisitorRepository {
     return { items: out, count: out.length };
   }
 }
+
+
 

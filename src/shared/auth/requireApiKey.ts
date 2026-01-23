@@ -1,28 +1,39 @@
-﻿// src/shared/auth/requireApiKey.ts
-import { HttpRequest, HttpResponseInit } from "@azure/functions";
+﻿import type { Request, Response, NextFunction } from "express";
 
 /**
- * Expected header: x-api-key
- * Expected env var: HOPE_API_KEY (fallback: API_KEY)
+ * Express-only API key guard.
+ * - Checks header: x-api-key
+ * - Compares to env: HOPE_API_KEY
+ * - Responds 401 JSON on failure
  */
-export function requireApiKey(req: HttpRequest): HttpResponseInit | null {
-  const expectedKey = process.env.HOPE_API_KEY || process.env.API_KEY;
+export function requireApiKey(req: Request, res: Response, next: NextFunction) {
+  const expected = process.env.HOPE_API_KEY;
 
-  if (!expectedKey) {
-    return {
-      status: 500,
-      jsonBody: { error: "Server missing HOPE_API_KEY (or API_KEY) configuration." },
-    };
+  // If no key configured, fail closed (safer for prod).
+  if (!expected) {
+    return res.status(500).json({
+      ok: false,
+      error: "ServerMisconfigured",
+      message: "HOPE_API_KEY is not set"
+    });
   }
 
-  const providedKey =
-    req.headers.get("x-api-key") ||
-    req.headers.get("x-functions-key") || // optional fallback if you ever want it
-    "";
+  const provided = getHeader(req, "x-api-key");
 
-  if (!providedKey || providedKey !== expectedKey) {
-    return { status: 401, jsonBody: { error: "Unauthorized" } };
+  if (!provided || provided !== expected) {
+    return res.status(401).json({
+      ok: false,
+      error: "Unauthorized",
+      message: "Missing or invalid API key"
+    });
   }
 
-  return null;
+  return next();
+}
+
+function getHeader(req: Request, headerName: string): string | undefined {
+  const raw = req.headers[headerName.toLowerCase()];
+  if (Array.isArray(raw)) return raw[0];
+  if (typeof raw === "string") return raw;
+  return undefined;
 }

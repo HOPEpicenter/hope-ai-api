@@ -1,63 +1,29 @@
-﻿import { tableName } from "../tableName";
-// src/storage/visitors/visitorsTable.ts
-import { TableClient } from "@azure/data-tables";
+﻿import type { TableClient } from "@azure/data-tables";
 import { makeTableClient } from "../../shared/storage/makeTableClient";
-export const VISITORS_TABLE = "Visitors";
-export const VISITORS_PARTITION_KEY = "VISITOR";
+
+const VISITORS_TABLE = process.env.VISITORS_TABLE || "devVisitors";
+
+function describeTableEndpoint(cs: string | undefined): string {
+  if (!cs) return "<missing>";
+  const m = cs.match(/TableEndpoint=([^;]+);/i);
+  if (m && m[1]) return m[1];
+  const acct = (cs.match(/AccountName=([^;]+);/i) || [])[1];
+  return acct ? ("<no TableEndpoint; AccountName=" + acct + ">") : "<unknown>";
+}
 
 /**
- * Create a TableClient using STORAGE_CONNECTION_STRING for Visitors table
+ * Create a TableClient for Visitors table.
+ * Uses STORAGE_CONNECTION_STRING (preferred) or AzureWebJobsStorage (fallback).
  */
 export function getVisitorsTableClient(): TableClient {
-  const conn = process.env.STORAGE_CONNECTION_STRING;
+  const conn = process.env.STORAGE_CONNECTION_STRING || process.env.AzureWebJobsStorage;
+
+  // Safe debug line: prints only endpoint, never keys/signatures
+  console.log("[VisitorsTable] TableEndpoint=" + describeTableEndpoint(conn));
+
   if (!conn) {
-    throw new Error(
-      "Missing STORAGE_CONNECTION_STRING in App Settings / local.settings.json"
-    );
+    throw new Error("Missing STORAGE_CONNECTION_STRING or AzureWebJobsStorage for Table Storage.");
   }
+
   return makeTableClient(conn, VISITORS_TABLE);
 }
-
-/**
- * Lookup a visitor entity by visitorId (property).
- * Assumes Visitors table stores visitorId as a string property.
- */
-export async function getVisitorByVisitorId(
-  table: TableClient,
-  visitorId: string
-): Promise<any | null> {
-  const safeVisitorId = escapeOData(visitorId);
-  const filter = `PartitionKey eq '${VISITORS_PARTITION_KEY}' and visitorId eq '${safeVisitorId}'`;
-
-  for await (const v of table.listEntities({
-    queryOptions: { filter },
-  })) {
-    return v as any;
-  }
-
-  return null;
-}
-
-/**
- * Throws 404-style error if visitor not found
- */
-export async function ensureVisitorExists(visitorId: string): Promise<void> {
-  const table = getVisitorsTableClient();
-  const existing = await getVisitorByVisitorId(table, visitorId);
-
-  if (!existing) {
-    const err = new Error("Visitor not found.");
-    (err as any).statusCode = 404;
-    throw err;
-  }
-}
-
-/**
- * Minimal OData escaping for single quotes
- */
-function escapeOData(value: string): string {
-  return value.replace(/'/g, "''");
-}
-
-
-

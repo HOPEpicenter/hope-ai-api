@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$BaseUrl = "http://127.0.0.1:3000/api",
   [int]$RetrySeconds = 60
 )
@@ -6,7 +6,13 @@ param(
 $ErrorActionPreference = "Stop"
 
 if (-not $env:HOPE_API_KEY) {
-  throw "HOPE_API_KEY env var is missing. CI must set secrets.HOPE_API_KEY"
+  if ($env:GITHUB_ACTIONS -eq "true") {
+    throw "HOPE_API_KEY env var is missing. CI must set secrets.HOPE_API_KEY"
+  }
+
+  # Local/dev fallback so the smoke suite can run without extra setup
+  $env:HOPE_API_KEY = "dev-local-key"
+  Write-Host "Local run: HOPE_API_KEY was missing; using fallback key 'dev-local-key' for smoke."
 }
 
 $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
@@ -95,3 +101,4 @@ try {
   }
 }
 Write-Host "OK: CI Express smoke passed."
+

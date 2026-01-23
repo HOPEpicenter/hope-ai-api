@@ -1,5 +1,6 @@
-﻿import { TableClient } from "@azure/data-tables";
+import { TableClient } from "@azure/data-tables";
 import { resolveStorageConnectionString } from "../shared/storage/resolveStorageConnectionString";
+import { EngagementSummaryRepository } from "./engagementSummaryRepository";
 
 export type EngagementEvent = {
   id: string;
@@ -37,6 +38,7 @@ function makeRowKey(occurredAtIso: string, id: string): string {
 
 export class EngagementRepository {
   private readonly client: TableClient;
+  private readonly summaries: EngagementSummaryRepository;
 
   constructor(client?: TableClient) {
     const cs = getConnectionString();
@@ -51,10 +53,11 @@ export class EngagementRepository {
       TableClient.fromConnectionString(cs, getEngagementsTableName(), {
         allowInsecureConnection: true,
       });
+
+    this.summaries = new EngagementSummaryRepository();
   }
 
   async ensureTable(): Promise<void> {
-    // Create is idempotent in Azurite/SDK; if you see conflicts later we can switch to "create if not exists".
     await this.client.createTable();
   }
 
@@ -75,9 +78,11 @@ export class EngagementRepository {
       input.occurredAt && input.occurredAt.trim() ? input.occurredAt : isoNow();
     const recordedAt = isoNow();
 
+    const rowKey = makeRowKey(occurredAt, id);
+
     const entity: any = {
       partitionKey: input.visitorId,
-      rowKey: makeRowKey(occurredAt, id),
+      rowKey,
 
       id,
       visitorId: input.visitorId,
@@ -90,6 +95,15 @@ export class EngagementRepository {
     };
 
     await this.client.createEntity(entity);
+
+    // Snapshot write-path (additive; does not change endpoint behavior)
+    await this.summaries.applyEvent({
+      visitorId: input.visitorId,
+      rowKey,
+      type: input.type,
+      channel: input.channel ?? "",
+      occurredAt,
+    });
 
     return {
       id,

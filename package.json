@@ -1,34 +1,35 @@
-{
-    "name": "hope-ai-api",
-    "version": "1.0.0",
-    "main": "dist/index.js",
-    "private": true,
-    "description": "Azure Functions v4 (Node.js + TypeScript) backend for HOPE",
-    "scripts": {
-        "build": "tsc",
-        "clean": "rimraf dist",
-        "copy": "copyfiles -u 1 src/**/function.json dist/",
-        "dev": "ts-node src/index.ts"
-    },
-    "dependencies": {
-        "@azure/data-tables": "^13.3.0",
-        "@azure/functions": "^4.5.0",
-        "@sendgrid/mail": "^8.1.6",
-        "dotenv": "^17.2.3",
-        "express": "^5.2.1",
-        "luxon": "^3.7.2",
-        "uuid": "^9.0.1"
-    },
-    "devDependencies": {
-        "@types/express": "^5.0.6",
-        "@types/luxon": "^3.7.1",
-        "@types/node": "^20.11.30",
-        "@types/uuid": "^9.0.8",
-        "azurite": "^3.35.0",
-        "copyfiles": "^2.4.1",
-        "nodemon": "^3.1.11",
-        "rimraf": "^6.0.1",
-        "ts-node": "^10.9.2",
-        "typescript": "^5.9.3"
-    }
+﻿{
+    "name":  "hope-ai-api",
+    "version":  "1.0.0",
+    "main":  "dist/index.js",
+    "private":  true,
+    "description":  "Azure Functions v4 (Node.js + TypeScript) backend for HOPE",
+    "scripts":  {
+                    "build":  "tsc",
+                    "clean":  "rimraf dist",
+                    "copy":  "copyfiles -u 1 src/**/function.json dist/",
+                    "dev":  "ts-node src/index.ts",
+                    "guard":  "powershell -ExecutionPolicy Bypass -File .\\scripts\\guard-no-azure-functions.ps1"
+                },
+    "dependencies":  {
+                         "@azure/data-tables":  "^13.3.0",
+                         "@azure/functions":  "^4.5.0",
+                         "@sendgrid/mail":  "^8.1.6",
+                         "dotenv":  "^17.2.3",
+                         "express":  "^5.2.1",
+                         "luxon":  "^3.7.2",
+                         "uuid":  "^9.0.1"
+                     },
+    "devDependencies":  {
+                            "@types/express":  "^5.0.6",
+                            "@types/luxon":  "^3.7.1",
+                            "@types/node":  "^20.11.30",
+                            "@types/uuid":  "^9.0.8",
+                            "azurite":  "^3.35.0",
+                            "copyfiles":  "^2.4.1",
+                            "nodemon":  "^3.1.11",
+                            "rimraf":  "^6.0.1",
+                            "ts-node":  "^10.9.2",
+                            "typescript":  "^5.9.3"
+                        }
 }

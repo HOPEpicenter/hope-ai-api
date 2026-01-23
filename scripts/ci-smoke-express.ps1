@@ -32,6 +32,11 @@ function Dump-ExpressLogs {
 }
 
 Write-Host "=== CI EXPRESS SMOKE ==="
+
+Write-Host "HEALTH $BaseUrl/health"
+$h = Invoke-RestMethod -Method Get -Uri "$BaseUrl/health" -Headers $headers -TimeoutSec 10
+Assert ($h.ok -eq $true) "GET /health did not return ok=true. Response: $(($h | ConvertTo-Json -Depth 10))"
+
 Write-Host "BaseUrl: $BaseUrl"
 
 # POST /visitors (retry loop)

@@ -1,4 +1,4 @@
-import { TableClient } from "@azure/data-tables";
+﻿import { TableClient } from "@azure/data-tables";
 
 export type Visitor = {
   id: string;
@@ -72,7 +72,7 @@ export class VisitorRepository {
       );
     }
     this.client =
-      client ?? TableClient.fromConnectionString(cs, getVisitorsTableName());
+      client ?? TableClient.fromConnectionString(cs, getVisitorsTableName(), { allowInsecureConnection: true });
   }
 
   async ensureTable(): Promise<void> {
@@ -175,3 +175,4 @@ export class VisitorRepository {
     return { items: out, count: out.length };
   }
 }
+

@@ -30,3 +30,16 @@ __azurite_db_*.json
 payload.json
 dump.js
 Get-ChildItem
+
+# legacy scratch
+legacy/scratch/
+
+# local scripts
+scripts/dev-smoke.ps1
+
+# legacy disabled scratch folders
+src/*_disabled_*
+src/dailyAutoGenerateTasks_disabled_disabled_disabled_disabled/
+src/myTasks_disabled_disabled_disabled_disabled/
+src/teamTasks_disabled_disabled_disabled_disabled/
+src/unassignedTasks_disabled_disabled_disabled_disabled/

@@ -66,7 +66,7 @@ if (-not $created) {
   throw $lastErr
 }
 
-Assert ($created.id) "POST /visitors did not return 'id'. Response: $(($created | ConvertTo-Json -Depth 10))"
+Assert (-not [string]::IsNullOrWhiteSpace($created.id)) "POST /visitors did not return 'id'. Response: $(($created | ConvertTo-Json -Depth 10))"
 $vid = $created.id
 Write-Host "CREATED ID: $vid"
 

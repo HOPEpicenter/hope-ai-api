@@ -1,5 +1,6 @@
 ﻿import { TableClient } from "@azure/data-tables";
 
+import { resolveStorageConnectionString } from "../shared/storage/resolveStorageConnectionString";
 export type Visitor = {
   id: string;
 
@@ -26,10 +27,10 @@ export type Visitor = {
 type ListOptions = { limit: number };
 
 function getConnectionString(): string {
-  return (
+  return resolveStorageConnectionString(
     process.env.STORAGE_CONNECTION_STRING ||
-    process.env.AzureWebJobsStorage ||
-    ""
+      process.env.AzureWebJobsStorage ||
+      ""
   );
 }
 

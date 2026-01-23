@@ -1,32 +1,36 @@
-﻿import { Request, Response, NextFunction } from "express";
+﻿import type { Request, Response, NextFunction } from "express";
 
-/**
- * Express-only API key middleware (no Azure Functions types).
- *
- * Expects:
- * - env: HOPE_API_KEY (preferred)
- * - header: x-api-key
- */
+function pickHeader(req: Request): string {
+  // Express normalizes headers to lower-case keys, but req.get() is safest.
+  const v =
+    req.get("x-api-key") ??
+    req.get("X-API-KEY") ??
+    req.headers["x-api-key"];
+
+  if (typeof v === "string") return v;
+  if (Array.isArray(v) && typeof v[0] === "string") return v[0];
+  return "";
+}
+
 export function requireApiKey(req: Request, res: Response, next: NextFunction) {
-  const expected = (process.env.HOPE_API_KEY ?? "").trim();
+  try {
+    const expected = (process.env.HOPE_API_KEY ?? "").trim();
+    if (!expected) {
+      // Server misconfigured — don’t 401 the client for a server issue
+      return res.status(500).json({ ok: false, error: "Server missing HOPE_API_KEY" });
+    }
 
-  if (!expected) {
-    // Fail closed if not configured (safer than accidentally exposing endpoints).
-    return res.status(500).json({
-      ok: false,
-      error: "HOPE_API_KEY not configured",
-    });
+    const provided = pickHeader(req).trim();
+    if (!provided) {
+      return res.status(401).json({ ok: false, error: "Missing x-api-key" });
+    }
+
+    if (provided !== expected) {
+      return res.status(401).json({ ok: false, error: "Invalid x-api-key" });
+    }
+
+    return next();
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, error: err?.message ?? "auth error" });
   }
-
-  const provided =
-    (req.header("x-api-key") ?? req.header("X-API-KEY") ?? "").trim();
-
-  if (!provided || provided !== expected) {
-    return res.status(401).json({
-      ok: false,
-      error: "unauthorized",
-    });
-  }
-
-  return next();
 }

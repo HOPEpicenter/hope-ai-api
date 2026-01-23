@@ -102,6 +102,10 @@ jobs:
           $outLog = Join-Path $logDir "express.out.log"
           $errLog = Join-Path $logDir "express.err.log"
 
+          # Export log paths so later steps (smoke) can dump them on failure
+          "EXPRESS_OUT_LOG=$outLog" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "EXPRESS_ERR_LOG=$errLog" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
           # Start Express (build output). Adjust if your entrypoint differs.
           $p = Start-Process -FilePath "node" -ArgumentList @("dist/index.js") `
             -WindowStyle Hidden `
@@ -120,20 +124,25 @@ jobs:
           }
 
           if (-not (Wait-Port 3000 60)) {
-            Write-Host "==== EXPRESS OUT (tail 200) ===="
+            Write-Host "==== EXPRESS OUT (tail 200) ====" -ForegroundColor Yellow
             if (Test-Path $outLog) { Get-Content $outLog -Tail 200 }
-            Write-Host "==== EXPRESS ERR (tail 200) ===="
+            Write-Host "==== EXPRESS ERR (tail 200) ====" -ForegroundColor Yellow
             if (Test-Path $errLog) { Get-Content $errLog -Tail 200 }
             if ($p -and $p.HasExited) { Write-Host "Express exited early with code $($p.ExitCode)" }
-            throw "Express server did not open port 3000 in time."
+            throw "Express port 3000 did not open."
           }
 
           "OK: Express is listening on 127.0.0.1:3000" | Write-Host
-
-      - name: Smoke (dev-smoke.ps1)
+      - name: Smoke (ci-smoke-express.ps1)
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          .\scripts/ci-smoke-express.ps1
-
-
+          .\scripts\ci-smoke-express.ps1
+      - name: Dump Express logs (on failure)
+        if: failure()
+        shell: pwsh
+        run: |
+          Write-Host "==== EXPRESS OUT (tail 200) ====" -ForegroundColor Yellow
+          if ($env:EXPRESS_OUT_LOG -and (Test-Path $env:EXPRESS_OUT_LOG)) { Get-Content $env:EXPRESS_OUT_LOG -Tail 200 }
+          Write-Host "==== EXPRESS ERR (tail 200) ====" -ForegroundColor Yellow
+          if ($env:EXPRESS_ERR_LOG -and (Test-Path $env:EXPRESS_ERR_LOG)) { Get-Content $env:EXPRESS_ERR_LOG -Tail 200 }

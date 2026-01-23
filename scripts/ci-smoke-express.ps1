@@ -1,5 +1,6 @@
-﻿param(
-  [string]$BaseUrl = "http://127.0.0.1:3000/api"
+param(
+  [string]$BaseUrl = "http://127.0.0.1:3000/api",
+  [int]$RetrySeconds = 60
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,10 +15,26 @@ function Assert([bool]$cond, [string]$msg) {
   if (-not $cond) { throw $msg }
 }
 
+function Dump-ExpressLogs {
+  Write-Host "==== EXPRESS OUT (tail 200) ====" -ForegroundColor Yellow
+  if ($env:EXPRESS_OUT_LOG -and (Test-Path $env:EXPRESS_OUT_LOG)) {
+    Get-Content $env:EXPRESS_OUT_LOG -Tail 200 | ForEach-Object { Write-Host $_ }
+  } else {
+    Write-Host "(missing EXPRESS_OUT_LOG or file not found: $($env:EXPRESS_OUT_LOG))"
+  }
+
+  Write-Host "==== EXPRESS ERR (tail 200) ====" -ForegroundColor Yellow
+  if ($env:EXPRESS_ERR_LOG -and (Test-Path $env:EXPRESS_ERR_LOG)) {
+    Get-Content $env:EXPRESS_ERR_LOG -Tail 200 | ForEach-Object { Write-Host $_ }
+  } else {
+    Write-Host "(missing EXPRESS_ERR_LOG or file not found: $($env:EXPRESS_ERR_LOG))"
+  }
+}
+
 Write-Host "=== CI EXPRESS SMOKE ==="
 Write-Host "BaseUrl: $BaseUrl"
 
-# POST /visitors
+# POST /visitors (retry loop)
 $stamp = Get-Date -Format "yyyyMMddHHmmss"
 $body = @{
   firstName = "CI"
@@ -28,23 +45,39 @@ $body = @{
 } | ConvertTo-Json
 
 Write-Host "POST $BaseUrl/visitors"
-$created = Invoke-RestMethod -Method Post -Uri "$BaseUrl/visitors" -Headers $headers -ContentType "application/json" -Body $body
 
-# Your API returns { id: "...", ... } in your dev output
+$deadline = (Get-Date).AddSeconds($RetrySeconds)
+$created = $null
+$lastErr = $null
+
+do {
+  try {
+    $created = Invoke-RestMethod -Method Post -Uri "$BaseUrl/visitors" -Headers $headers -ContentType "application/json" -Body $body -TimeoutSec 10
+    break
+  } catch {
+    $lastErr = $_
+    Start-Sleep -Milliseconds 500
+  }
+} while ((Get-Date) -lt $deadline)
+
+if (-not $created) {
+  Write-Host "FAILED: Could not POST /visitors within $RetrySeconds seconds." -ForegroundColor Red
+  Dump-ExpressLogs
+  throw $lastErr
+}
+
 Assert ($created.id) "POST /visitors did not return 'id'. Response: $(($created | ConvertTo-Json -Depth 10))"
 $vid = $created.id
 Write-Host "CREATED ID: $vid"
 
 # GET /visitors/{id}
 Write-Host "GET $BaseUrl/visitors/$vid"
-$got = Invoke-RestMethod -Method Get -Uri "$BaseUrl/visitors/$vid" -Headers $headers
+$got = Invoke-RestMethod -Method Get -Uri "$BaseUrl/visitors/$vid" -Headers $headers -TimeoutSec 10
 Assert ($got.id -eq $vid) "GET /visitors/{id} returned wrong id. Response: $(($got | ConvertTo-Json -Depth 10))"
 
 # LIST /visitors?limit=5
 Write-Host "LIST $BaseUrl/visitors?limit=5"
-$list = Invoke-RestMethod -Method Get -Uri "$BaseUrl/visitors?limit=5" -Headers $headers
-
-# Your API returns { ok:true, count, limit, items:[...] }
+$list = Invoke-RestMethod -Method Get -Uri "$BaseUrl/visitors?limit=5" -Headers $headers -TimeoutSec 10
 Assert ($list.ok -eq $true) "LIST /visitors did not return ok=true. Response: $(($list | ConvertTo-Json -Depth 10))"
 Assert ($list.items.Count -ge 1) "LIST /visitors returned no items. Response: $(($list | ConvertTo-Json -Depth 10))"
 

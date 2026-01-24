@@ -41,10 +41,14 @@ engagementsRouter.get("/visitors/:id/engagements", async (req, res) => {
     const limitRaw = (req.query.limit as any) ?? "50";
     const limit = Math.max(1, Math.min(parseInt(String(limitRaw), 10) || 50, 200));
 
-    const repo = new EngagementRepository();
-    const items = await repo.listByVisitor(visitorId, limit);
+    
+    const cursorRaw = req.query.cursor;
+    const cursor = (typeof cursorRaw === "string" && cursorRaw.trim()) ? cursorRaw.trim() : undefined;
 
-    return res.json({ ok: true, visitorId, items, count: items.length, limit });
+    const repo = new EngagementRepository();
+    const items = await repo.listByVisitor(visitorId, limit, cursor);
+    const nextCursor = items.length ? `${items[items.length - 1].occurredAt}_${items[items.length - 1].id}` : null;
+    return res.json({ ok: true, visitorId, items, count: items.length, limit, nextCursor });
   } catch (err: any) {
     return res.status(500).json({ ok: false, error: err?.message ?? "unknown error" });
   }

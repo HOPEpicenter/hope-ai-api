@@ -85,7 +85,7 @@ export class EngagementRepository {
   }
 
   async create(input: {
-    id?: string;            // Ã¢Å“â€¦ Option A: allow client-supplied id
+    id?: string;            // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Option A: allow client-supplied id
     visitorId: string;
     type: string;
     channel?: string;
@@ -123,7 +123,7 @@ export class EngagementRepository {
     try {
       await this.client.createEntity(entity);
 
-      // Ã¢Å“â€¦ Only apply snapshot if we actually created a new entity
+      // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Only apply snapshot if we actually created a new entity
       await this.summaries.applyEvent({
         visitorId: input.visitorId,
         rowKey,
@@ -134,7 +134,7 @@ export class EngagementRepository {
 
       return this.toEvent(entity);
     } catch (e: any) {
-      // Ã¢Å“â€¦ Idempotency: if same (visitorId + occurredAt + id) already exists,
+      // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Idempotency: if same (visitorId + occurredAt + id) already exists,
       // return it and DO NOT re-apply summary.
       if (!isConflictAlreadyExists(e)) throw e;
 
@@ -143,13 +143,16 @@ export class EngagementRepository {
     }
   }
 
-  async listByVisitor(visitorId: string, limit: number): Promise<EngagementEvent[]> {
+  async listByVisitor(visitorId: string, limit: number, cursor?: string): Promise<EngagementEvent[]> {
     await this.ensureTable();
 
     const items: EngagementEvent[] = [];
     const max = Math.max(1, Math.min(limit || 50, 200));
-    const filter = `PartitionKey eq '${visitorId.replace(/'/g, "''")}'`;
-
+    const safeVid = visitorId.replace(/'/g, "''");
+    const safeCursor = (cursor && String(cursor).trim()) ? String(cursor).trim().replace(/'/g, "''") : "";
+    const filter = safeCursor
+      ? `PartitionKey eq '${safeVid}' and RowKey gt '${safeCursor}'`
+      : `PartitionKey eq '${safeVid}'`;
     for await (const e of this.client.listEntities<any>({ queryOptions: { filter } })) {
       items.push(this.toEvent(e));
       if (items.length >= max) break;

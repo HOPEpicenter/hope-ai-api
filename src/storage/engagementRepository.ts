@@ -39,7 +39,8 @@ function makeRowKey(occurredAtIso: string, id: string): string {
 function isConflictAlreadyExists(err: any): boolean {
   const status = err?.statusCode ?? err?.status;
   const code = err?.code;
-  return status === 409 || code === "EntityAlreadyExists";}
+  return status === 409 || code === "EntityAlreadyExists";
+}
 
 export class EngagementRepository {
   private readonly client: TableClient;
@@ -84,7 +85,7 @@ export class EngagementRepository {
   }
 
   async create(input: {
-    id?: string;            // ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Option A: allow client-supplied id
+    id?: string; // Option A: allow client-supplied id
     visitorId: string;
     type: string;
     channel?: string;
@@ -94,10 +95,10 @@ export class EngagementRepository {
     await this.ensureTable();
 
     const id =
-      (input.id && input.id.trim())
+      input.id && input.id.trim()
         ? input.id.trim()
-        : ((globalThis.crypto as any)?.randomUUID?.() ??
-           require("crypto").randomUUID());
+        : (globalThis.crypto as any)?.randomUUID?.() ??
+          require("crypto").randomUUID();
 
     const occurredAt =
       input.occurredAt && input.occurredAt.trim() ? input.occurredAt : isoNow();
@@ -122,7 +123,7 @@ export class EngagementRepository {
     try {
       await this.client.createEntity(entity);
 
-      // ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Only apply snapshot if we actually created a new entity
+      // Only apply snapshot if we actually created a new entity
       await this.summaries.applyEvent({
         visitorId: input.visitorId,
         rowKey,
@@ -133,7 +134,7 @@ export class EngagementRepository {
 
       return this.toEvent(entity);
     } catch (e: any) {
-      // ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Idempotency: if same (visitorId + occurredAt + id) already exists,
+      // Idempotency: if same (visitorId + occurredAt + id) already exists,
       // return it and DO NOT re-apply summary.
       if (!isConflictAlreadyExists(e)) throw e;
 
@@ -142,7 +143,6 @@ export class EngagementRepository {
     }
   }
 
-  
   /**
    * Read per-visitor engagement summary snapshot (derived).
    * Returns null if no snapshot exists yet.
@@ -151,27 +151,44 @@ export class EngagementRepository {
     return this.summaries.get(visitorId);
   }
 
-
-  async listByVisitor(visitorId: string, limit: number, cursor?: string): Promise<EngagementEvent[]> {
+  // ✅ FIXED: stable cursor paging (exclusive upper bound) + newest-first
+  async listByVisitor(
+    visitorId: string,
+    limit: number,
+    cursor?: string
+  ): Promise<EngagementEvent[]> {
     await this.ensureTable();
 
-    const items: EngagementEvent[] = [];
     const max = Math.max(1, Math.min(limit || 50, 200));
+    // Table queries are ascending; to return newest-first with an exclusive upper-bound cursor,
+    // we overfetch then sort desc then slice.
+    const softCap = Math.min(200, Math.max(max * 4, max));
+
     const safeVid = visitorId.replace(/'/g, "''");
-    const safeCursor = (cursor && String(cursor).trim()) ? String(cursor).trim().replace(/'/g, "''") : "";
+    const safeCursor =
+      cursor && String(cursor).trim()
+        ? String(cursor).trim().replace(/'/g, "''")
+        : "";
+
+    // Cursor is an exclusive UPPER bound for RowKey: RowKey < cursor
     const filter = safeCursor
-      ? `PartitionKey eq '${safeVid}' and RowKey gt '${safeCursor}'`
+      ? `PartitionKey eq '${safeVid}' and RowKey lt '${safeCursor}'`
       : `PartitionKey eq '${safeVid}'`;
-    for await (const e of this.client.listEntities<any>({ queryOptions: { filter } })) {
-      items.push(this.toEvent(e));
-      if (items.length >= max) break;
+
+    const rows: any[] = [];
+    for await (const e of this.client.listEntities<any>({
+      queryOptions: { filter },
+    })) {
+      rows.push(e);
+      if (rows.length >= softCap) break;
     }
 
-    // newest-first
-    items.sort((a, b) =>
-      a.occurredAt < b.occurredAt ? 1 : a.occurredAt > b.occurredAt ? -1 : 0
+    // Newest-first by RowKey (RowKey is our stable paging key)
+    rows.sort((a, b) =>
+      a.rowKey < b.rowKey ? 1 : a.rowKey > b.rowKey ? -1 : 0
     );
 
-    return items;
+    const sliced = rows.slice(0, max);
+    return sliced.map((e) => this.toEvent(e));
   }
 }

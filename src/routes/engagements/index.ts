@@ -53,3 +53,20 @@ engagementsRouter.get("/visitors/:id/engagements", async (req, res) => {
     return res.status(500).json({ ok: false, error: err?.message ?? "unknown error" });
   }
 });
+
+
+// GET /api/visitors/:id/engagements/summary
+// Returns per-visitor engagement summary snapshot.
+// When none exists yet: { ok:true, visitorId, summary:null }
+engagementsRouter.get("/visitors/:id/engagements/summary", async (req, res) => {
+  try {
+    const visitorId = req.params.id;
+
+    const repo = new EngagementRepository();
+    const summary = await repo.getSummary(visitorId);
+
+    return res.json({ ok: true, visitorId, summary: summary ?? null });
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, error: err?.message ?? "unknown error" });
+  }
+});

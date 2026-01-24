@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { EngagementRepository } from "../../storage/engagementRepository";
 
@@ -9,7 +9,7 @@ engagementsRouter.use(requireApiKey);
 // body: { visitorId, type, channel?, notes?, occurredAt? }
 engagementsRouter.post("/engagements", async (req, res) => {
   try {
-    const { visitorId, type, channel, notes, occurredAt } = req.body ?? {};
+    const { id, visitorId, type, channel, notes, occurredAt } = req.body ?? {};
 
     if (!visitorId || typeof visitorId !== "string") {
       return res.status(400).json({ ok: false, error: "visitorId is required" });
@@ -20,6 +20,7 @@ engagementsRouter.post("/engagements", async (req, res) => {
 
     const repo = new EngagementRepository();
     const created = await repo.create({
+      id: (typeof id === "string" && id.trim()) ? id.trim() : undefined,
       visitorId,
       type,
       channel: typeof channel === "string" ? channel : undefined,

@@ -39,8 +39,7 @@ function makeRowKey(occurredAtIso: string, id: string): string {
 function isConflictAlreadyExists(err: any): boolean {
   const status = err?.statusCode ?? err?.status;
   const code = err?.code;
-  return status === 409 || code === "EntityAlreadyExists";
-}
+  return status === 409 || code === "EntityAlreadyExists";}
 
 export class EngagementRepository {
   private readonly client: TableClient;
@@ -85,7 +84,7 @@ export class EngagementRepository {
   }
 
   async create(input: {
-    id?: string;            // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Option A: allow client-supplied id
+    id?: string;            // ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Option A: allow client-supplied id
     visitorId: string;
     type: string;
     channel?: string;
@@ -123,7 +122,7 @@ export class EngagementRepository {
     try {
       await this.client.createEntity(entity);
 
-      // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Only apply snapshot if we actually created a new entity
+      // ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Only apply snapshot if we actually created a new entity
       await this.summaries.applyEvent({
         visitorId: input.visitorId,
         rowKey,
@@ -134,7 +133,7 @@ export class EngagementRepository {
 
       return this.toEvent(entity);
     } catch (e: any) {
-      // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Idempotency: if same (visitorId + occurredAt + id) already exists,
+      // ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Idempotency: if same (visitorId + occurredAt + id) already exists,
       // return it and DO NOT re-apply summary.
       if (!isConflictAlreadyExists(e)) throw e;
 
@@ -142,6 +141,16 @@ export class EngagementRepository {
       return this.toEvent(existing);
     }
   }
+
+  
+  /**
+   * Read per-visitor engagement summary snapshot (derived).
+   * Returns null if no snapshot exists yet.
+   */
+  async getSummary(visitorId: string) {
+    return this.summaries.get(visitorId);
+  }
+
 
   async listByVisitor(visitorId: string, limit: number, cursor?: string): Promise<EngagementEvent[]> {
     await this.ensureTable();

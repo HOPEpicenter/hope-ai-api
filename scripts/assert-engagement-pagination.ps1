@@ -65,17 +65,21 @@ function Get-RowKeyFromItem($it) {
   # Your RowKey is `${occurredAt}_${id}` (stable paging key)
   return "$($it.occurredAt)_$($it.id)"
 }
-
-function Assert-NewestFirst($page, [string]$pageName) {
+function Assert-NewestFirst($page, [string]$label) {
   $items = @($page.items)
-  if ($items.Count -le 1) { return }
+  for ($i = 1; $i -lt $items.Count; $i++) {
+    $prev = $items[$i-1]
+    $cur  = $items[$i]
 
-  for ($i=1; $i -lt $items.Count; $i++) {
-    $prev = Get-RowKeyFromItem $items[$i-1]
-    $cur  = Get-RowKeyFromItem $items[$i]
-    Assert-True ($prev -ge $cur) "$pageName not newest-first at index $i. prev=$prev cur=$cur"
+    $prevRk = Get-RowKeyFromItem $prev
+    $curRk  = Get-RowKeyFromItem $cur
+
+    # Newest-first means RowKey DESC (tie-safe).
+    # If RowKey encodes time first (recommended), this is the correct, stable ordering.
+    Assert-True (
+      ([string]::CompareOrdinal($prevRk, $curRk) -ge 0)
+    ) ("{0} not newest-first at index {1}. prev={2} cur={3}" -f $label, $i, $prevRk, $curRk)
   }
-}
 
 function Assert-NoOverlap($p1, $p2) {
   $ids1 = @($p1.items | ForEach-Object { $_.id })

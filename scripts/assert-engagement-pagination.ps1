@@ -1,28 +1,21 @@
+# .\scripts\assert-engagement-pagination.ps1
 $ErrorActionPreference = "Stop"
 
 function Assert-True([bool]$cond, [string]$msg) {
   if (-not $cond) { throw $msg }
 }
 
-function Compare-CursorDesc([string]$prev, [string]$cur) {
-  # Returns $true if prev should come BEFORE cur in newest-first ordering.
-  # Token format: '<datetime>_<suffix>' (suffix can be RowKey/Guid/etc).
-  $p = $prev -split '_' , 2
-  $c = $cur  -split '_' , 2
-  $pTime = [datetime]::Parse($p[0], [System.Globalization.CultureInfo]::InvariantCulture)
-  $cTime = [datetime]::Parse($c[0], [System.Globalization.CultureInfo]::InvariantCulture)
-  if ($pTime -gt $cTime) { return $true }
-  if ($pTime -lt $cTime) { return $false }
-  # tie-breaker: suffix descending (ordinal)
-  $pTail = if ($p.Count -gt 1) { $p[1] } else { '' }
-  $cTail = if ($c.Count -gt 1) { $c[1] } else { '' }
-  return ([string]::CompareOrdinal($pTail, $cTail) -ge 0)
+function Get-BaseUrl {
+  if ($env:HOPE_BASE_URL -and $env:HOPE_BASE_URL.Trim()) {
+    return $env:HOPE_BASE_URL.Trim().TrimEnd("/")
+  }
+  return "http://localhost:3000"
 }
 
-
-function Get-BaseUrl {
-  if ($env:HOPE_BASE_URL -and $env:HOPE_BASE_URL.Trim()) { return $env:HOPE_BASE_URL.Trim().TrimEnd("/") }
-  return "http://localhost:3000"
+function Get-ApiBase([string]$base) {
+  # Allow HOPE_BASE_URL to be either http://host:port OR http://host:port/api
+  if ($base.ToLower().EndsWith("/api")) { return $base }
+  return ($base.TrimEnd("/") + "/api")
 }
 
 function Get-Headers {
@@ -30,56 +23,69 @@ function Get-Headers {
   return @{ "x-api-key" = $env:HOPE_API_KEY }
 }
 
-function New-TestVisitor([string]$base, [hashtable]$headers) {
-  $stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddHHmmss")
-  $body = @{
-    firstName = "John"
-    lastName  = "Doe"
-    email     = "john+paging-$stamp@example.com"
-    phone     = "555-1234"
-    source    = "paging"
-  } | ConvertTo-Json
+function Invoke-Json([string]$method, [string]$uri, [hashtable]$headers, $body) {
+  if ($null -eq $body) {
+    return Invoke-RestMethod -Method $method -Uri $uri -Headers $headers
+  }
+  $json = $body | ConvertTo-Json -Depth 20
+  return Invoke-RestMethod -Method $method -Uri $uri -Headers $headers -ContentType "application/json" -Body $json
+}
 
-  $v = Invoke-RestMethod -Method Post -Uri "$base/api/visitors" -Headers $headers -ContentType "application/json" -Body $body
-  return $v.id
+function New-TestVisitor([string]$base, [hashtable]$headers) {
+  $api = Get-ApiBase $base
+  $stamp = (Get-Date).ToString("yyyyMMddHHmmssfff")
+  $payload = @{
+    firstName = "Paging"
+    lastName  = "Test"
+    email     = "paging+$stamp@example.com"
+    phone     = "555-0000"
+    notes     = "assert-engagement-pagination"
+    tags      = @("paging-test")
+  }
+  $v = Invoke-Json -method "Post" -uri "$api/visitors" -headers $headers -body $payload
+
+  # Be flexible: some APIs return { id: ... }, others return { visitorId: ... }
+  $id = $null
+  if ($v.PSObject.Properties.Name -contains "id") { $id = $v.id }
+  elseif ($v.PSObject.Properties.Name -contains "visitorId") { $id = $v.visitorId }
+
+  Assert-True ([bool]$id) "Visitor create did not return id. Response: $($v | ConvertTo-Json -Depth 10)"
+  return [string]$id
 }
 
 function Post-Engagement([string]$base, [hashtable]$headers, [string]$visitorId, [string]$note) {
-  $body = @{
-    visitorId = $visitorId
-    type      = "SERVICE_ATTENDED"
-    channel   = "in-person"
-    notes     = $note
-  } | ConvertTo-Json
-
-  return Invoke-RestMethod -Method Post -Uri "$base/api/engagements" -Headers $headers -ContentType "application/json" -Body $body
+  $api = Get-ApiBase $base
+  $payload = @{ note = $note }
+  return Invoke-Json -method "Post" -uri "$api/visitors/$visitorId/engagements" -headers $headers -body $payload
 }
 
 function Get-EngagementsPage([string]$base, [hashtable]$headers, [string]$visitorId, [int]$limit, [string]$cursor) {
-  $u = "$base/api/visitors/$visitorId/engagements?limit=$limit"
-  if ($cursor -and $cursor.Trim()) { $u = "$u&cursor=$cursor" }
+  $api = Get-ApiBase $base
+  $u = "$api/visitors/$visitorId/engagements?limit=$limit"
+  if ($cursor -and $cursor.Trim()) {
+    $u += "&cursor=" + [uri]::EscapeDataString($cursor)
+  }
   return Invoke-RestMethod -Method Get -Uri $u -Headers $headers
 }
 
 function Get-RowKeyFromItem($it) {
-  # Your RowKey is `${occurredAt}_${id}` (stable paging key)
+  # Cursor/order key used by API: occurredAt first, then id (stable)
+  # Example seen in CI failure: "01/25/2026 20:58:16_<guid>"
   return "$($it.occurredAt)_$($it.id)"
 }
+
 function Assert-NewestFirst($page, [string]$label) {
   $items = @($page.items)
   for ($i = 1; $i -lt $items.Count; $i++) {
-    $prev = $items[$i-1]
-    $cur  = $items[$i]
-
-    $prevRk = Get-RowKeyFromItem $prev
-    $curRk  = Get-RowKeyFromItem $cur
+    $prevRk = Get-RowKeyFromItem $items[$i-1]
+    $curRk  = Get-RowKeyFromItem $items[$i]
 
     # Newest-first means RowKey DESC (tie-safe).
-    # If RowKey encodes time first (recommended), this is the correct, stable ordering.
     Assert-True (
       ([string]::CompareOrdinal($prevRk, $curRk) -ge 0)
     ) ("{0} not newest-first at index {1}. prev={2} cur={3}" -f $label, $i, $prevRk, $curRk)
   }
+}
 
 function Assert-NoOverlap($p1, $p2) {
   $ids1 = @($p1.items | ForEach-Object { $_.id })
@@ -105,7 +111,7 @@ Write-Host "BaseUrl=$base"
 $vid = New-TestVisitor -base $base -headers $headers
 Write-Host "VisitorId=$vid"
 
-# Create 6 engagements with a tiny delay so occurredAt differs
+# Create 6 engagements with a tiny delay so occurredAt differs (but ties can still happen in CI -> tie-safe checks)
 1..6 | ForEach-Object {
   Post-Engagement -base $base -headers $headers -visitorId $vid -note "paging-test $_" | Out-Null
   Start-Sleep -Milliseconds 15

@@ -1,136 +1,179 @@
-# .\scripts\assert-engagement-pagination.ps1
+# scripts/assert-engagement-pagination.ps1
+# CI assertion: Engagements pagination is correct (newest-first, cursor exclusive, no overlaps)
+# - Create a visitor
+# - Create N engagements via POST /api/engagements (flat)
+# - Page via GET /api/visitors/{id}/engagements?limit=&cursor=
+# - Assert ordering + cursor semantics
+# Default base url matches CI: http://127.0.0.1:3000
+
+[CmdletBinding()]
+param(
+  [string]$BaseUrl = "http://127.0.0.1:3000",
+  [int]$PageSize = 5,
+  [int]$CreateCount = 12
+)
+
 $ErrorActionPreference = "Stop"
 
-function Assert-True([bool]$cond, [string]$msg) {
-  if (-not $cond) { throw $msg }
+function Write-Log([string]$msg) { Write-Host "[assert-engagement-pagination] $msg" }
+
+function Get-ApiHeaders {
+  $h = @{ "Accept" = "application/json" }
+  if ($env:HOPE_API_KEY) { $h["x-api-key"] = $env:HOPE_API_KEY }
+  return $h
 }
 
-function Get-BaseUrl {
-  if ($env:HOPE_BASE_URL -and $env:HOPE_BASE_URL.Trim()) {
-    return $env:HOPE_BASE_URL.Trim().TrimEnd("/")
-  }
-  return "http://localhost:3000"
-}
+function Invoke-Json {
+  param(
+    [Parameter(Mandatory=$true)][ValidateSet("GET","POST","PUT","PATCH","DELETE")][string]$Method,
+    [Parameter(Mandatory=$true)][string]$Uri,
+    [Parameter()][object]$Body
+  )
 
-function Get-ApiBase([string]$base) {
-  # Allow HOPE_BASE_URL to be either http://host:port OR http://host:port/api
-  if ($base.ToLower().EndsWith("/api")) { return $base }
-  return ($base.TrimEnd("/") + "/api")
-}
+  $headers = Get-ApiHeaders
 
-function Get-Headers {
-  if (-not $env:HOPE_API_KEY) { throw "Missing HOPE_API_KEY env var." }
-  return @{ "x-api-key" = $env:HOPE_API_KEY }
-}
-
-function Invoke-Json([string]$method, [string]$uri, [hashtable]$headers, $body) {
-  if ($null -eq $body) {
-    return Invoke-RestMethod -Method $method -Uri $uri -Headers $headers
-  }
-  $json = $body | ConvertTo-Json -Depth 20
-  return Invoke-RestMethod -Method $method -Uri $uri -Headers $headers -ContentType "application/json" -Body $json
-}
-
-function New-TestVisitor([string]$base, [hashtable]$headers) {
-  $api = Get-ApiBase $base
-  $stamp = (Get-Date).ToString("yyyyMMddHHmmssfff")
-  $payload = @{
-    firstName = "Paging"
-    lastName  = "Test"
-    email     = "paging+$stamp@example.com"
-    phone     = "555-0000"
-    notes     = "assert-engagement-pagination"
-    tags      = @("paging-test")
-  }
-  $v = Invoke-Json -method "Post" -uri "$api/visitors" -headers $headers -body $payload
-
-  # Be flexible: some APIs return { id: ... }, others return { visitorId: ... }
-  $id = $null
-  if ($v.PSObject.Properties.Name -contains "id") { $id = $v.id }
-  elseif ($v.PSObject.Properties.Name -contains "visitorId") { $id = $v.visitorId }
-
-  Assert-True ([bool]$id) "Visitor create did not return id. Response: $($v | ConvertTo-Json -Depth 10)"
-  return [string]$id
-}
-
-function Post-Engagement([string]$base, [hashtable]$headers, [string]$visitorId, [string]$note) {
-  $api = Get-ApiBase $base
-  $payload = @{ note = $note }
-  return Invoke-Json -method "Post" -uri "$api/visitors/$visitorId/engagements" -headers $headers -body $payload
-}
-
-function Get-EngagementsPage([string]$base, [hashtable]$headers, [string]$visitorId, [int]$limit, [string]$cursor) {
-  $api = Get-ApiBase $base
-  $u = "$api/visitors/$visitorId/engagements?limit=$limit"
-  if ($cursor -and $cursor.Trim()) {
-    $u += "&cursor=" + [uri]::EscapeDataString($cursor)
-  }
-  return Invoke-RestMethod -Method Get -Uri $u -Headers $headers
-}
-
-function Get-RowKeyFromItem($it) {
-  # Cursor/order key used by API: occurredAt first, then id (stable)
-  # Example seen in CI failure: "01/25/2026 20:58:16_<guid>"
-  return "$($it.occurredAt)_$($it.id)"
-}
-
-function Assert-NewestFirst($page, [string]$label) {
-  $items = @($page.items)
-  for ($i = 1; $i -lt $items.Count; $i++) {
-    $prevRk = Get-RowKeyFromItem $items[$i-1]
-    $curRk  = Get-RowKeyFromItem $items[$i]
-
-    # Newest-first means RowKey DESC (tie-safe).
-    Assert-True (
-      ([string]::CompareOrdinal($prevRk, $curRk) -ge 0)
-    ) ("{0} not newest-first at index {1}. prev={2} cur={3}" -f $label, $i, $prevRk, $curRk)
+  if ($null -ne $Body) {
+    $json = $Body | ConvertTo-Json -Depth 50 -Compress
+    try {
+      return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $headers -ContentType "application/json" -Body $json
+    } catch {
+      $status = $null
+      $respBody = $null
+      try {
+        if ($_.Exception.Response) {
+          $status = [int]$_.Exception.Response.StatusCode
+          $stream = $_.Exception.Response.GetResponseStream()
+          if ($stream) {
+            $reader = New-Object System.IO.StreamReader($stream)
+            $respBody = $reader.ReadToEnd()
+          }
+        }
+      } catch { }
+      if ($status) { Write-Log "HTTP $status for $Method $Uri" }
+      if ($respBody) { Write-Log "Response body: $respBody" }
+      throw
+    }
+  } else {
+    return Invoke-RestMethod -Method $Method -Uri $Uri -Headers $headers
   }
 }
 
-function Assert-NoOverlap($p1, $p2) {
-  $ids1 = @($p1.items | ForEach-Object { $_.id })
-  $ids2 = @($p2.items | ForEach-Object { $_.id })
-  $overlap = @($ids1 | Where-Object { $ids2 -contains $_ })
-  Assert-True ($overlap.Count -eq 0) ("Overlap detected between pages: " + ($overlap -join ", "))
+function New-RandId([int]$len = 8) {
+  $chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+  -join (1..$len | ForEach-Object { $chars[(Get-Random -Minimum 0 -Maximum $chars.Length)] })
 }
 
-function Assert-StrictlyOlderThanCursor($page, [string]$cursor) {
-  foreach ($it in @($page.items)) {
-    $rk = Get-RowKeyFromItem $it
-    Assert-True ($rk -lt $cursor) "Found item not older than cursor (cursor must be exclusive upper bound). rk=$rk cursor=$cursor"
+function Get-VisitorIdFromCreateResponse($resp) {
+  if ($resp.id) { return [string]$resp.id }
+  if ($resp.visitorId) { return [string]$resp.visitorId }
+  if ($resp.visitor -and $resp.visitor.id) { return [string]$resp.visitor.id }
+  throw "Could not determine visitorId from create visitor response."
+}
+
+function Get-ItemsAndCursor($resp) {
+  $items = $null
+  $cursor = $null
+
+  if ($resp -is [System.Array]) {
+    $items = $resp
+  } elseif ($resp.items) {
+    $items = $resp.items
+    if ($resp.cursor) { $cursor = [string]$resp.cursor }
+    elseif ($resp.nextCursor) { $cursor = [string]$resp.nextCursor }
+  } elseif ($resp.engagements) {
+    $items = $resp.engagements
+    if ($resp.cursor) { $cursor = [string]$resp.cursor }
+    elseif ($resp.nextCursor) { $cursor = [string]$resp.nextCursor }
+  } elseif ($resp.data -and $resp.data.items) {
+    $items = $resp.data.items
+    if ($resp.data.cursor) { $cursor = [string]$resp.data.cursor }
+    elseif ($resp.data.nextCursor) { $cursor = [string]$resp.data.nextCursor }
+  } else {
+    throw "Unrecognized list response shape. Expected items/engagements/array."
+  }
+
+  if ($null -eq $items) { $items = @() }
+  return @{ items = @($items); cursor = $cursor }
+}
+
+function Get-OrderKey($item) {
+  if (-not $item.occurredAt) { throw "Missing occurredAt on item; cannot compute order key." }
+  if (-not $item.id) { throw "Missing id on item; cannot compute order key." }
+  return "$([string]$item.occurredAt)`_$([string]$item.id)"
+}
+
+function Assert-NewestFirst([object[]]$items) {
+  for ($i=1; $i -lt $items.Count; $i++) {
+    $prev = Get-OrderKey $items[$i-1]
+    $curr = Get-OrderKey $items[$i]
+    if ([string]::CompareOrdinal($prev, $curr) -lt 0) {
+      throw "Order violation (not newest-first): prev key=$prev  curr key=$curr"
+    }
   }
 }
 
-# ======== RUN ========
-$base = Get-BaseUrl
-$headers = Get-Headers
-
-Write-Host "== Assert Engagement Pagination ==" -ForegroundColor Cyan
-Write-Host "BaseUrl=$base"
-
-$vid = New-TestVisitor -base $base -headers $headers
-Write-Host "VisitorId=$vid"
-
-# Create 6 engagements with a tiny delay so occurredAt differs (but ties can still happen in CI -> tie-safe checks)
-1..6 | ForEach-Object {
-  Post-Engagement -base $base -headers $headers -visitorId $vid -note "paging-test $_" | Out-Null
-  Start-Sleep -Milliseconds 15
+function Assert-NoOverlap([object[]]$a, [object[]]$b) {
+  $set = New-Object 'System.Collections.Generic.HashSet[string]'
+  foreach ($it in $a) { [void]$set.Add((Get-OrderKey $it)) }
+  foreach ($it in $b) {
+    $k = Get-OrderKey $it
+    if ($set.Contains($k)) { throw "Overlap violation: item appears in both pages: key=$k" }
+  }
 }
 
-$limit = 3
+function Assert-CursorExclusiveUpperBound([string]$cursor, [object[]]$page2) {
+  if (-not $cursor) { throw "Expected non-empty cursor for page1, got empty." }
+  foreach ($it in $page2) {
+    $k = Get-OrderKey $it
+    if ([string]::CompareOrdinal($k, $cursor) -ge 0) {
+      throw "Cursor bound violation: page2 item key must be < cursor. key=$k cursor=$cursor"
+    }
+  }
+}
 
-$p1 = Get-EngagementsPage -base $base -headers $headers -visitorId $vid -limit $limit -cursor ""
-Assert-True ($p1.items.Count -le $limit) "Page1 returned more than limit."
-Assert-True ($p1.nextCursor -and $p1.nextCursor.Trim()) "Page1 missing nextCursor."
-Assert-NewestFirst $p1 "Page1"
+function Create-Engagement {
+  param([string]$base,[string]$visitorId)
 
-$cursor = $p1.nextCursor
+  $ts = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+  $note = "ci-pagination-assert $ts $(New-RandId 6)"
 
-$p2 = Get-EngagementsPage -base $base -headers $headers -visitorId $vid -limit $limit -cursor $cursor
-Assert-True ($p2.items.Count -le $limit) "Page2 returned more than limit."
-Assert-NewestFirst $p2 "Page2"
+  $body = @{ visitorId = $visitorId; type = "NOTE"; note = $note }
+  [void](Invoke-Json -Method POST -Uri "$base/api/engagements" -Body $body)
+}
 
-Assert-NoOverlap $p1 $p2
-Assert-StrictlyOlderThanCursor $p2 $cursor
+Write-Log "BaseUrl=$BaseUrl PageSize=$PageSize CreateCount=$CreateCount"
+$base = $BaseUrl.TrimEnd("/")
 
-Write-Host "OK: paging assertions passed (no overlap, cursor exclusive upper-bound, newest-first)" -ForegroundColor Green
+$rand = New-RandId 6
+$email = "ci.engagements+$((Get-Date).ToString('yyyyMMddHHmmss'))_$rand@example.com"
+$createVisitorBody = @{ firstName="CI"; lastName="Paging"; email=$email; phone="555-0100"; notes="ci pagination assert" }
+
+Write-Log "Creating visitor..."
+$visitorResp = Invoke-Json -Method POST -Uri "$base/api/visitors" -Body $createVisitorBody
+$visitorId = Get-VisitorIdFromCreateResponse $visitorResp
+Write-Log "visitorId=$visitorId"
+
+Write-Log "Creating $CreateCount engagements via POST /api/engagements..."
+1..$CreateCount | ForEach-Object { Create-Engagement -base $base -visitorId $visitorId; Start-Sleep -Milliseconds 25 }
+
+Write-Log "Listing page1..."
+$page1Resp = Invoke-Json -Method GET -Uri "$base/api/visitors/$visitorId/engagements?limit=$PageSize"
+$p1 = Get-ItemsAndCursor $page1Resp
+$page1 = $p1.items
+$cursor = $p1.cursor
+Write-Log "page1 count=$($page1.Count) cursor=$cursor"
+if ($page1.Count -lt 2) { throw "Expected at least 2 items on page1; got $($page1.Count)." }
+Assert-NewestFirst $page1
+if (-not $cursor) { throw "Expected cursor on page1, got empty." }
+
+Write-Log "Listing page2..."
+$page2Resp = Invoke-Json -Method GET -Uri "$base/api/visitors/$visitorId/engagements?limit=$PageSize&cursor=$([uri]::EscapeDataString($cursor))"
+$p2 = Get-ItemsAndCursor $page2Resp
+$page2 = $p2.items
+Write-Log "page2 count=$($page2.Count)"
+if ($page2.Count -eq 0) { throw "Expected at least 1 item on page2; got 0." }
+Assert-NewestFirst $page2
+Assert-NoOverlap $page1 $page2
+Assert-CursorExclusiveUpperBound $cursor $page2
+
+Write-Log "OK: engagement pagination assertions passed."

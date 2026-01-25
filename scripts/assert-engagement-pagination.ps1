@@ -95,11 +95,53 @@ function Get-ItemsAndCursor($resp) {
   if ($null -eq $items) { $items = @() }
   return @{ items = @($items); cursor = $cursor }
 }
+function Normalize-IsoZ($v) {
+  if ($null -eq $v) { return $null }
+
+  # DateTime object (common after JSON conversion)
+  if ($v -is [DateTime]) {
+    return $v.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+  }
+
+  $s = ([string]$v).Trim()
+  if (-not $s) { return $s }
+
+  $dt = New-Object DateTime
+
+  # Prefer ISO-ish formats first (so we don't misinterpret dates like 01/02/2026)
+  $isoFormats = @(
+    "yyyy-MM-ddTHH:mm:ss.fffZ",
+    "yyyy-MM-ddTHH:mm:ssZ",
+    "yyyy-MM-ddTHH:mm:ss.fffK",
+    "yyyy-MM-ddTHH:mm:ssK"
+  )
+
+  if ([DateTime]::TryParseExact(
+      $s,
+      $isoFormats,
+      [Globalization.CultureInfo]::InvariantCulture,
+      [Globalization.DateTimeStyles]::AssumeUniversal -bor [Globalization.DateTimeStyles]::AdjustToUniversal,
+      [ref]$dt
+    )) {
+    return $dt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+  }
+
+  # Fallback: simplest TryParse overload (exists broadly)
+  $dt2 = New-Object DateTime
+  if ([DateTime]::TryParse($s, [ref]$dt2)) {
+    return $dt2.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+  }
+
+  # If parse fails, return original string
+  return $s
+}
 
 function Get-OrderKey($item) {
   if (-not $item.occurredAt) { throw "Missing occurredAt on item; cannot compute order key." }
   if (-not $item.id) { throw "Missing id on item; cannot compute order key." }
-  return "$([string]$item.occurredAt)`_$([string]$item.id)"
+
+  $iso = Normalize-IsoZ $item.occurredAt
+  return "$iso`_$([string]$item.id)"
 }
 
 function Assert-NewestFirst([object[]]$items) {

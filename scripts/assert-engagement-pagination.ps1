@@ -4,6 +4,22 @@ function Assert-True([bool]$cond, [string]$msg) {
   if (-not $cond) { throw $msg }
 }
 
+function Compare-CursorDesc([string]$prev, [string]$cur) {
+  # Returns $true if prev should come BEFORE cur in newest-first ordering.
+  # Token format: '<datetime>_<suffix>' (suffix can be RowKey/Guid/etc).
+  $p = $prev -split '_' , 2
+  $c = $cur  -split '_' , 2
+  $pTime = [datetime]::Parse($p[0], [System.Globalization.CultureInfo]::InvariantCulture)
+  $cTime = [datetime]::Parse($c[0], [System.Globalization.CultureInfo]::InvariantCulture)
+  if ($pTime -gt $cTime) { return $true }
+  if ($pTime -lt $cTime) { return $false }
+  # tie-breaker: suffix descending (ordinal)
+  $pTail = if ($p.Count -gt 1) { $p[1] } else { '' }
+  $cTail = if ($c.Count -gt 1) { $c[1] } else { '' }
+  return ([string]::CompareOrdinal($pTail, $cTail) -ge 0)
+}
+
+
 function Get-BaseUrl {
   if ($env:HOPE_BASE_URL -and $env:HOPE_BASE_URL.Trim()) { return $env:HOPE_BASE_URL.Trim().TrimEnd("/") }
   return "http://localhost:3000"

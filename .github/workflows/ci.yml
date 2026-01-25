@@ -92,7 +92,6 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           .\scripts\ci-run-express-smoke.ps1
-          .\scripts\assert-engagement-pagination.ps1
       - name: Dump Express logs (on failure)
         if: failure()
         shell: pwsh

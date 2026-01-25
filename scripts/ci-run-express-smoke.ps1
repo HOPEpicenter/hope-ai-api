@@ -1,4 +1,4 @@
-﻿param(
+param(
   [int]$Port = 3000,
   [string]$Entry = "dist/index.js",
   [int]$WaitSeconds = 90
@@ -80,6 +80,9 @@ try {
   throw
 } finally {
   if ($p -and -not $p.HasExited) {
+    # --- EXTRA ASSERTIONS (server must still be running) ---
+    .\scripts\assert-engagement-pagination.ps1
+
     Write-Host "Stopping Express (pid=$($p.Id))" -ForegroundColor Yellow
     Stop-Process -Id $p.Id -Force
   }

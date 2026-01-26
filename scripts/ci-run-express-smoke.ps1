@@ -1,4 +1,4 @@
-﻿param(
+param(
   [int]$Port = 3000,
   [string]$Entry = "dist/index.js",
   [int]$WaitSeconds = 90
@@ -9,7 +9,10 @@ $ErrorActionPreference = "Stop"
 
 # Guard: ensure Express-only src does not reference Azure Functions
 & "$PSScriptRoot\guard-no-azure-functions.ps1"
-$logDir = Join-Path $env:RUNNER_TEMP "express"
+$runTemp = $env:RUNNER_TEMP
+if (-not $runTemp) { $runTemp = $env:TEMP }
+if (-not $runTemp) { $runTemp = "." }
+$logDir = Join-Path $runTemp "express"
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
 $outLog = Join-Path $logDir "express.out.log"

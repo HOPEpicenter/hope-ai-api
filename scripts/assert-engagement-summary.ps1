@@ -12,6 +12,18 @@ function To-Json($o) {
   try { return ($o | ConvertTo-Json -Depth 50) } catch { return "<non-serializable>" }
 }
 
+function To-IsoMs([string]$s) {
+  if ($null -eq $s) { return $null }
+  $t = $s.Trim()
+  if (-not $t) { return $t }
+  try {
+    $dt = [DateTimeOffset]::Parse($t)
+    return $dt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+  } catch {
+    return $t
+  }
+}
+
 function Must($cond, [string]$msg) {
   if (-not $cond) { throw $msg }
 }
@@ -133,4 +145,5 @@ if ($s.channels) {
 }
 
 Write-Log "OK: engagement summary assertions passed."
+
 

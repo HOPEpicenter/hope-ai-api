@@ -5,6 +5,7 @@ import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepo
 
 export const engagementsRouter = Router();
 engagementsRouter.use(requireApiKey);
+
 const engagementRepo = new EngagementRepository();
 const engagementSummaryRepo = new EngagementSummaryRepository();
 
@@ -21,10 +22,8 @@ engagementsRouter.post("/engagements", async (req, res) => {
       return res.status(400).json({ ok: false, error: "type is required" });
     }
 
-    // accept "note" as alias for "notes"
     const notesFinal = (((notes ?? (req.body as any)?.note) ?? "") as any).toString();
     const channelFinal = ((channel ?? "") as any).toString();
-
     const occurredAtFinal =
       occurredAt ? new Date(occurredAt).toISOString() : new Date().toISOString();
 
@@ -36,8 +35,7 @@ engagementsRouter.post("/engagements", async (req, res) => {
       notes: notesFinal,
       occurredAt: occurredAtFinal,
     });
-    // Summary snapshot is maintained in storage layer (EngagementRepository.create -> EngagementSummaryRepository.applyEvent).
-    // This route only creates immutable events; summary is read via GET /visitors/:id/engagements/summary.
+
     return res.status(201).json(created);
   } catch (e: any) {
     console.error("[engagements] POST /engagements failed", e);
@@ -53,9 +51,14 @@ engagementsRouter.get("/visitors/:id/engagements", async (req, res) => {
     const cursor = (req.query.cursor as any) ?? undefined;
 
     const limit = Math.max(1, Math.min(parseInt(limitRaw, 10) || 50, 200));
-    const page = await engagementRepo.listByVisitor(visitorId, limit, cursor);
+    const items = await engagementRepo.listByVisitor(visitorId, limit, cursor);
 
-    return res.status(200).json(page);
+    const nextCursor =
+      items.length > 0 && items.length >= limit
+        ? `${items[items.length - 1].occurredAt}_${items[items.length - 1].id}`
+        : "";
+
+    return res.status(200).json({ ok: true, visitorId, items, cursor: nextCursor });
   } catch (e: any) {
     console.error("[engagements] GET /visitors/:id/engagements failed", e);
     return res.status(500).json({ ok: false, error: "internal_error" });
@@ -63,8 +66,6 @@ engagementsRouter.get("/visitors/:id/engagements", async (req, res) => {
 });
 
 // GET /api/visitors/:id/engagements/summary
-// Returns per-visitor engagement summary snapshot.
-// When none exists yet: { ok:true, visitorId, summary:null }
 engagementsRouter.get("/visitors/:id/engagements/summary", async (req, res) => {
   try {
     const visitorId = req.params.id;

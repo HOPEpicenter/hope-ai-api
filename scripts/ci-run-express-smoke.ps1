@@ -7,6 +7,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 
+
+$p = $null
 # Guard: ensure Express-only src does not reference Azure Functions
 & "$PSScriptRoot\guard-no-azure-functions.ps1"
 $runTemp = $env:RUNNER_TEMP
@@ -82,12 +84,41 @@ try {
   Tail $errLog 200
   throw
 } finally {
-  if ($p -and -not $p.HasExited) {
-    # --- EXTRA ASSERTIONS (server must still be running) ---
-    .\scripts\assert-engagement-pagination.ps1
+  # Determine if server is still alive via health endpoint (more reliable than $p.HasExited)
+  $healthOk = $false
+  try {
+    $u = "http://127.0.0.1:$Port/api/health"
+    $r = Invoke-RestMethod -Method Get -Uri $u -TimeoutSec 3
+    if ($r -and $r.ok -eq $true) { $healthOk = $true }
+  } catch { $healthOk = $false }
 
+  if (-not $healthOk) {
+    Write-Host "Express not healthy at assertion time. Dumping logs..." -ForegroundColor Yellow
+    Write-Host "==== EXPRESS OUT (tail 200) ====" -ForegroundColor Yellow
+    Tail $outLog 200
+    Write-Host "==== EXPRESS ERR (tail 200) ====" -ForegroundColor Yellow
+    Tail $errLog 200
+    throw "Express was not running/healthy for extra assertions."
+  }
+
+  Write-Host "Running extra assertions (server still running)..." -ForegroundColor Cyan
+
+  # Prefer pwsh, fallback to powershell
+  $ps = $null
+  $cmd = Get-Command pwsh -ErrorAction SilentlyContinue
+  if ($cmd) { $ps = $cmd.Source }
+  if (-not $ps) {
+    $cmd = Get-Command powershell -ErrorAction SilentlyContinue
+    if ($cmd) { $ps = $cmd.Source }
+  }
+  if (-not $ps) { throw "Neither 'pwsh' nor 'powershell' found on PATH." }
+
+  $rootBase = "http://127.0.0.1:$Port"
+  & $ps -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-engagement-pagination.ps1 -BaseUrl $rootBase
+  & $ps -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-engagement-summary.ps1    -BaseUrl $rootBase
+
+  if ($p) {
     Write-Host "Stopping Express (pid=$($p.Id))" -ForegroundColor Yellow
-    Stop-Process -Id $p.Id -Force
+    Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
   }
 }
-

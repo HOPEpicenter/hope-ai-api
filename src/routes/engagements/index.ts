@@ -36,10 +36,8 @@ engagementsRouter.post("/engagements", async (req, res) => {
       notes: notesFinal,
       occurredAt: occurredAtFinal,
     });
-
-    // NOTE: summary update removed here because repo methods differ (computeSummary/upsert not present).
-    // Summary snapshot can be computed elsewhere (job/endpoint) and read via GET summary.
-
+    // Summary snapshot is maintained in storage layer (EngagementRepository.create -> EngagementSummaryRepository.applyEvent).
+    // This route only creates immutable events; summary is read via GET /visitors/:id/engagements/summary.
     return res.status(201).json(created);
   } catch (e: any) {
     console.error("[engagements] POST /engagements failed", e);

@@ -201,17 +201,15 @@ Write-Log "Creating $CreateCount engagements via POST /api/engagements..."
 Write-Log "Listing page1..."
 $page1Resp = Invoke-Json -Method GET -Uri "$base/api/visitors/$visitorId/engagements?limit=$PageSize"
 $p1 = Get-ItemsAndCursor $page1Resp
+if (-not $p1.cursor) {
+  Write-Host "[assert-engagement-pagination] page1Resp:`n$($page1Resp | ConvertTo-Json -Depth 30)"
+  throw "[assert-engagement-pagination] cursor missing from page1 response"
+}
 $page1 = $p1.items
 $cursor = $p1.cursor
 Write-Log "page1 count=$($page1.Count) cursor=$cursor"
 if ($page1.Count -lt 2) { throw "Expected at least 2 items on page1; got $($page1.Count)." }
 Assert-NewestFirst $page1
-  if (-not $cursor) {
-    # Some server implementations only return a cursor when they feel like it (or return empty string).
-    # We can still test cursor semantics by inferring the cursor from the last item in page1.
-    $cursor = Get-OrderKey $page1[$page1.Count - 1]
-    Write-Log "NOTE: cursor missing from response; inferred cursor from last page1 item: $cursor"
-  }
 Write-Log "Listing page2..."
 $page2Resp = Invoke-Json -Method GET -Uri "$base/api/visitors/$visitorId/engagements?limit=$PageSize&cursor=$([uri]::EscapeDataString($cursor))"
 $p2 = Get-ItemsAndCursor $page2Resp

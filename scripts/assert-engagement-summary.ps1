@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
   [Parameter(Mandatory=$false)][string]$BaseUrl = "http://127.0.0.1:3000",
   [Parameter(Mandatory=$false)][int]$CreateCount = 12
@@ -12,7 +12,7 @@ function To-Json($o) {
   try { return ($o | ConvertTo-Json -Depth 50) } catch { return "<non-serializable>" }
 }
 
-function Must([bool]$cond, [string]$msg) {
+function Must($cond, [string]$msg) {
   if (-not $cond) { throw $msg }
 }
 
@@ -103,8 +103,8 @@ foreach ($e in $created) {
   $expectedByChannel[$e.channel]++
 }
 
-$expectedFirst = ($created | Select-Object -First 1).occurredAt
-$expectedLast  = ($created | Select-Object -Last 1).occurredAt
+$expectedFirst = To-IsoMs (($created | Select-Object -First 1).occurredAt)
+$expectedLast  = To-IsoMs (($created | Select-Object -Last 1).occurredAt)
 
 # --- Fetch summary
 Write-Log "Fetching summary..."
@@ -116,8 +116,8 @@ Must ($resp.summary) ("resp.summary missing. Payload={0}" -f (To-Json $resp))
 $s = $resp.summary
 
 Must ($s.eventCount -eq $CreateCount) ("Expected eventCount={0} but got [{1}]. Payload={2}" -f $CreateCount, $s.eventCount, (To-Json $resp))
-Must ($s.firstEngagedAt -eq $expectedFirst) ("Expected firstEngagedAt={0} but got {1}. Payload={2}" -f $expectedFirst, $s.firstEngagedAt, (To-Json $resp))
-Must ($s.lastEngagedAt -eq $expectedLast) ("Expected lastEngagedAt={0} but got {1}. Payload={2}" -f $expectedLast, $s.lastEngagedAt, (To-Json $resp))
+Must (To-IsoMs $s.firstEngagedAt -eq $expectedFirst) ("Expected firstEngagedAt={0} but got {1}. Payload={2}" -f $expectedFirst, $s.firstEngagedAt, (To-Json $resp))
+Must (To-IsoMs $s.lastEngagedAt -eq $expectedLast) ("Expected lastEngagedAt={0} but got {1}. Payload={2}" -f $expectedLast, $s.lastEngagedAt, (To-Json $resp))
 
 # Validate per-type/per-channel counts (API uses 'types' and 'channels')
 if ($s.types) {
@@ -133,3 +133,4 @@ if ($s.channels) {
 }
 
 Write-Log "OK: engagement summary assertions passed."
+

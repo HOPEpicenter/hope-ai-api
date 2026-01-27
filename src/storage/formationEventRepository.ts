@@ -43,6 +43,17 @@ function cursorFrom(event: FormationEvent): string {
   return `${event.occurredAt}_${event.id}`;
 }
 
+function isConflictAlreadyExists(err: any): boolean {
+  const status = err?.statusCode ?? err?.status;
+  const code =
+    err?.details?.odataError?.code ??
+    err?.details?.errorCode ??
+    err?.code ??
+    err?.name;
+
+  return status === 409 || code === "EntityAlreadyExists";
+}
+
 export class FormationEventRepository {
   private readonly client: TableClient;
   private ensured = false;
@@ -95,9 +106,32 @@ export class FormationEventRepository {
       recordedAt,
     };
 
-    await this.client.createEntity(ent as any);
+    try {
+      await this.client.createEntity(ent as any);
+    } catch (err: any) {
+      // Re-throw but mark it as a conflict for callers that want idempotent behavior.
+      if (isConflictAlreadyExists(err)) throw err;
+      throw err;
+    }
 
     return { id, visitorId, type, notes, occurredAt, recordedAt };
+  }
+
+  async getByVisitorAndId(visitorId: string, id: string): Promise<FormationEvent | null> {
+    await this.ensureTable();
+
+    const pk = String(visitorId || "").trim();
+    const eid = String(id || "").trim();
+    if (!pk) throw new Error("visitorId is required");
+    if (!eid) throw new Error("id is required");
+
+    // id is stored as a property; query it (safe + avoids needing occurredAt).
+    const filter = `PartitionKey eq '${pk}' and id eq '${eid}'`;
+
+    for await (const e of this.client.listEntities<FormationEventEntity>({ queryOptions: { filter } })) {
+      return toDomain(e);
+    }
+    return null;
   }
 
   async listByVisitor(

@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 dist/
 local.settings.json
 .env
@@ -47,3 +47,5 @@ src/unassignedTasks_disabled_disabled_disabled_disabled/
 # Track dev smoke script
 !scripts/dev-smoke.ps1
 
+/scripts/dev-env.ps1
+/scripts/smoke-local.ps1

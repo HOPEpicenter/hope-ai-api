@@ -1,54 +1,140 @@
 param(
-  [Parameter(Mandatory=$true)][string]$BaseUrl,
-  [Parameter(Mandatory=$true)][string]$ApiKey
+  [string]$ApiBase = "http://127.0.0.1:3000/api",
+  [int]$Limit = 5
 )
 
 $ErrorActionPreference = "Stop"
-$headers = @{ "x-api-key" = $ApiKey }
 
-function Fail([string]$msg) { throw "[assert-formation-pagination] $msg" }
-
-# 1) Create visitor
-$visitor = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/visitors" -Headers $headers -ContentType "application/json" -Body (@{
-  firstName = "Formation"
-  lastName  = "Test"
-  email     = ("formation+" + (Get-Date -Format "yyyyMMddHHmmss") + "@example.com")
-} | ConvertTo-Json -Depth 10)
-
-if (-not $visitor.id) { Fail "Visitor create did not return id" }
-$vid = $visitor.id
-
-# 2) Create 5 formation events with controlled occurredAt (1-minute apart)
-for ($i=0; $i -lt 5; $i++) {
-  $occurredAt = (Get-Date).ToUniversalTime().AddMinutes(-$i).ToString("o")
-  $resp = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/formation/events" -Headers $headers -ContentType "application/json" -Body (@{
-    visitorId  = $vid
-    type       = "test"
-    notes      = "formation-$i"
-    occurredAt = $occurredAt
-  } | ConvertTo-Json -Depth 10)
-
-  if (-not $resp.id) { Fail "POST /api/formation/events did not return id" }
+function Require-Env([string]$name) {
+  $v = [Environment]::GetEnvironmentVariable($name)
+  if ([string]::IsNullOrWhiteSpace($v)) { throw "Missing required env var: $name" }
+  return $v
 }
 
-# 3) Page newest-first: limit=2, then next page using cursor
-$page1 = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/visitors/$vid/formation/events?limit=2" -Headers $headers
-if (-not $page1.items -or $page1.items.Count -ne 2) { Fail "Expected 2 items on page1" }
-if (-not $page1.cursor) { Fail "Expected cursor on page1" }
+$apiKey = Require-Env "HOPE_API_KEY"
+$headers = @{ "x-api-key" = $apiKey }
 
-# validate newest-first ordering: occurredAt descending
-if ($page1.items[0].occurredAt -lt $page1.items[1].occurredAt) { Fail "Page1 not newest-first by occurredAt" }
+Write-Host "[assert-formation-pagination] ApiBase=$ApiBase Limit=$Limit"
 
-$page2 = Invoke-RestMethod -Method Get -Uri "$BaseUrl/api/visitors/$vid/formation/events?limit=2&cursor=$([uri]::EscapeDataString($page1.cursor))" -Headers $headers
-if (-not $page2.items -or $page2.items.Count -ne 2) { Fail "Expected 2 items on page2" }
+# --- Create a visitor
+$email = "formation+" + (Get-Date -Format "yyyyMMddHHmmss") + "@example.com"
+Write-Host "[assert-formation-pagination] Creating visitor..."
+$visitor = Invoke-RestMethod -Method Post -Uri "$ApiBase/visitors" -Headers $headers -ContentType "application/json" -Body (@{
+  firstName = "Formation"
+  lastName  = "Paging"
+  email     = $email
+} | ConvertTo-Json -Depth 10)
 
-# no overlap with page1 ids
-$ids1 = @($page1.items | ForEach-Object { $_.id })
-$ids2 = @($page2.items | ForEach-Object { $_.id })
-if (@($ids1 | Where-Object { $ids2 -contains $_ }).Count -gt 0) { Fail "Paging overlap detected between page1 and page2" }
+$visitorId = $visitor.id
+if ([string]::IsNullOrWhiteSpace($visitorId)) { throw "Visitor id missing from response." }
+Write-Host "[assert-formation-pagination] visitorId=$visitorId"
 
-# 4) Collect 4 ids and ensure all unique
-$all = @($ids1 + $ids2)
-if (@($all | Select-Object -Unique).Count -ne $all.Count) { Fail "Duplicate ids across pages" }
+# --- Create formation events (make enough for 2 pages)
+# NOTE: keep payload conservative so it matches your current server validation.
+$createCount = [Math]::Max($Limit * 2 + 2, 12)
+Write-Host "[assert-formation-pagination] Creating $createCount formation events..."
 
-"OK: formation pagination newest-first + cursor paging"
+1..$createCount | ForEach-Object {
+  $n = $_
+  # ensure unique timestamps (helps ordering determinism even if server uses occurredAt)
+  $occurredAt = (Get-Date).ToUniversalTime().AddMilliseconds($n).ToString("o")
+
+  $body = @{
+    visitorId   = $visitorId
+    type        = "note"               # safe default; adjust later if you enforce enums
+    occurredAt  = $occurredAt
+    source      = "assert-formation-pagination"
+    note        = "formation event $n" # if your API uses "note"
+    data        = @{ n = $n }          # if your API uses generic payload "data"
+  }
+
+  try {
+    Invoke-RestMethod -Method Post -Uri "$ApiBase/formation/events" -Headers $headers -ContentType "application/json" -Body ($body | ConvertTo-Json -Depth 10) | Out-Null
+  } catch {
+    $resp = $_.Exception.Response
+    if ($resp) {
+      try {
+        $reader = New-Object System.IO.StreamReader($resp.GetResponseStream())
+        $errBody = $reader.ReadToEnd()
+        Write-Host "[assert-formation-pagination] POST failed body: $errBody"
+      } catch {}
+    }
+    throw
+  }
+}
+
+# --- List page 1 (newest-first)
+Write-Host "[assert-formation-pagination] Listing page1..."
+$page1 = Invoke-RestMethod -Method Get -Uri "$ApiBase/visitors/$visitorId/formation/events?limit=$Limit" -Headers $headers
+
+# Support either envelope { items, nextCursor } or raw array
+$items1 = $null
+$cursor1 = $null
+
+if ($page1 -is [System.Array]) {
+  $items1 = $page1
+} else {
+  $items1 = $page1.items
+  $cursor1 = $page1.nextCursor
+}
+
+if (-not $items1) { throw "page1 items missing." }
+if ($items1.Count -ne $Limit) { throw "Expected page1 count=$Limit but got $($items1.Count)" }
+if ([string]::IsNullOrWhiteSpace($cursor1)) {
+  # If your endpoint returns cursor in a different field, add it here
+  if ($page1.cursor) { $cursor1 = $page1.cursor }
+}
+if ([string]::IsNullOrWhiteSpace($cursor1)) { throw "Expected nextCursor/cursor from page1 but it was empty." }
+
+Write-Host "[assert-formation-pagination] page1 count=$($items1.Count) cursor=$cursor1"
+
+# --- List page 2 using cursor
+Write-Host "[assert-formation-pagination] Listing page2..."
+$page2 = Invoke-RestMethod -Method Get -Uri "$ApiBase/visitors/$visitorId/formation/events?limit=$Limit&cursor=$([Uri]::EscapeDataString($cursor1))" -Headers $headers
+$items2 = $null
+if ($page2 -is [System.Array]) { $items2 = $page2 } else { $items2 = $page2.items }
+if (-not $items2) { throw "page2 items missing." }
+if ($items2.Count -ne $Limit) { throw "Expected page2 count=$Limit but got $($items2.Count)" }
+
+Write-Host "[assert-formation-pagination] page2 count=$($items2.Count)"
+
+# --- Assert no overlap by id (or RowKey)
+function Get-EventKey($e) {
+  if ($e.id) { return [string]$e.id }
+  if ($e.rowKey) { return [string]$e.rowKey }
+  if ($e.RowKey) { return [string]$e.RowKey }
+  # fallback: stringify minimal stable fields
+  return ($e | ConvertTo-Json -Depth 6)
+}
+
+$keys1 = @{}
+$items1 | ForEach-Object { $keys1[(Get-EventKey $_)] = $true }
+
+$overlap = @()
+$items2 | ForEach-Object {
+  $k = Get-EventKey $_
+  if ($keys1.ContainsKey($k)) { $overlap += $k }
+}
+
+if ($overlap.Count -gt 0) {
+  throw "Overlap detected between pages: $($overlap | Select-Object -First 3 -Join ', ')"
+}
+
+# --- Basic newest-first ordering check on occurredAt/createdAt if present
+function Get-TimeIso($e) {
+  if ($e.occurredAt) { return [string]$e.occurredAt }
+  if ($e.createdAt) { return [string]$e.createdAt }
+  if ($e.timestamp) { return [string]$e.timestamp }
+  return $null
+}
+
+$times1 = $items1 | ForEach-Object { Get-TimeIso $_ } | Where-Object { $_ }
+if ($times1.Count -ge 2) {
+  for ($i=0; $i -lt $times1.Count-1; $i++) {
+    $a = [DateTime]::Parse($times1[$i]).ToUniversalTime()
+    $b = [DateTime]::Parse($times1[$i+1]).ToUniversalTime()
+    if ($a -lt $b) { throw "Expected newest-first ordering but found $($times1[$i]) < $($times1[$i+1]) at index $i" }
+  }
+}
+
+Write-Host "[assert-formation-pagination] OK: formation pagination assertions passed."

@@ -4,6 +4,28 @@ param(
   [int]$WaitSeconds = 90
 )
 
+
+# ---------------------------
+# Environment guards (PS5-safe)
+# ---------------------------
+if ([string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+  $env:HOPE_API_KEY = "dev-local-key"
+}
+
+if ([string]::IsNullOrWhiteSpace($env:STORAGE_CONNECTION_STRING) -and [string]::IsNullOrWhiteSpace($env:AzureWebJobsStorage)) {
+  $env:STORAGE_CONNECTION_STRING = "UseDevelopmentStorage=true"
+}
+
+# ---------------------------
+# Stop stale server first (prevents wrong env/api-key)
+# ---------------------------
+(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue).OwningProcess |
+  Sort-Object -Unique |
+  ForEach-Object {
+    try { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } catch {}
+  }
+
+
 $ErrorActionPreference = "Stop"
 
 
@@ -34,8 +56,18 @@ function Tail([string]$path, [int]$n=200) {
 function Wait-Port([int]$port, [int]$seconds) {
   $deadline = (Get-Date).AddSeconds($seconds)
   while ((Get-Date) -lt $deadline) {
-    $ok = Test-NetConnection -ComputerName 127.0.0.1 -Port $port -WarningAction SilentlyContinue
-    if ($ok.TcpTestSucceeded) { return $true }
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+      $iar = $client.BeginConnect("127.0.0.1", $port, $null, $null)
+      if ($iar.AsyncWaitHandle.WaitOne(500)) {
+        $client.EndConnect($iar)
+        if ($client.Connected) { return $true }
+      }
+    } catch {
+      # keep waiting
+    } finally {
+      try { $client.Close() } catch {}
+    }
     Start-Sleep -Milliseconds 250
   }
   return $false
@@ -116,8 +148,8 @@ try {
   $rootBase = "http://127.0.0.1:$Port"
   & $ps -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-engagement-pagination.ps1 -BaseUrl $rootBase
   & $ps -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-formation-pagination.ps1 -BaseUrl $rootBase -ApiKey $env:HOPE_API_KEY
-Write-Host "[CI] Formation idempotency assert"
-& "$PSScriptRoot\assert-formation-idempotency.ps1"
+  Write-Host "[CI] Formation idempotency assert"
+  & "$PSScriptRoot\assert-formation-idempotency.ps1"
   & $ps -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-engagement-summary.ps1    -BaseUrl $rootBase
 
   if ($p) {

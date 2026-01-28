@@ -4,7 +4,7 @@ import { FormationEventRepository } from "../../storage/formationEventRepository
 import { recordFormationEvent } from "../../domain/formation/recordFormationEvent";
 import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
-import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
+import { getFormationProfile, listFormationProfiles } from "../../storage/formation/formationProfilesRepo";
 
 export const formationEventsRouter = Router();
 formationEventsRouter.use(requireApiKey);
@@ -119,6 +119,52 @@ formationEventsRouter.get("/visitors/:id/formation/events", async (req, res) => 
 });
 
 // GET /visitors/:id/formation/profile
+
+/**
+ * GET /formation/profiles?limit=&cursor=&stage=&assignedTo=&q=
+ * Lists FormationProfile snapshots for Ops dashboard (paged).
+ */
+formationEventsRouter.get("/formation/profiles", async (req, res) => {
+  try {
+    const storageConnectionString = process.env.STORAGE_CONNECTION_STRING;
+    if (!storageConnectionString) {
+      return res.status(500).json({ ok: false, error: "Missing STORAGE_CONNECTION_STRING" });
+    }
+
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
+    const cursor = req.query.cursor ? String(req.query.cursor) : undefined;
+
+    const stage = req.query.stage ? String(req.query.stage).trim() : undefined;
+    const assignedTo = req.query.assignedTo ? String(req.query.assignedTo).trim() : undefined;
+    const q = req.query.q ? String(req.query.q).trim() : undefined;
+    const visitorIdQ = req.query.visitorId ? String(req.query.visitorId).trim() : undefined;
+
+    const profilesTable = getFormationProfilesTableClient(storageConnectionString);
+    await ensureTableExists(profilesTable);
+
+    let items: any[] = [];
+let nextCursor: string | null = null;
+
+if (visitorIdQ) {
+  const one = await getFormationProfile(profilesTable as any, visitorIdQ);
+  items = one ? [one] : [];
+} else {
+  const out = await listFormationProfiles(profilesTable as any, {
+    limit,
+    cursor,
+    stage,
+    assignedTo,
+    q,
+  });
+  items = out.items;
+  nextCursor = (out.cursor ?? null) as any;
+}
+
+    return res.status(200).json({ ok: true, items, cursor: nextCursor });
+  } catch (e: any) {
+    return res.status(toHttpStatus(e, 400)).json({ ok: false, error: e?.message || "Bad Request" });
+  }
+});
 formationEventsRouter.get("/visitors/:id/formation/profile", async (req, res) => {
   try {
     const visitorId = String(req.params.id || "").trim();

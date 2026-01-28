@@ -149,6 +149,7 @@ try {
   & $ps -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-engagement-pagination.ps1 -BaseUrl $rootBase
   & $ps -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-formation-pagination.ps1 -BaseUrl $rootBase -ApiKey $env:HOPE_API_KEY
   & $ps -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-formation-profile.ps1 -ApiBase "$rootBase/api"
+  & $ps -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-formation-profiles-list.ps1 -ApiBase "$rootBase/api"
   Write-Host "[CI] Formation idempotency assert"
   & "$PSScriptRoot\assert-formation-idempotency.ps1"
   & $ps -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-engagement-summary.ps1    -BaseUrl $rootBase

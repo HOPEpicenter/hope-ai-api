@@ -1,10 +1,15 @@
+import { FormationStage } from "../../domain/formation/phase3_1_scope";
 import { Router } from "express";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { FormationEventRepository } from "../../storage/formationEventRepository";
 import { recordFormationEvent } from "../../domain/formation/recordFormationEvent";
 import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
-import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
+ 
+          $inside = $args[0].Groups[1].Value
+          if ($inside -match '\blistFormationProfiles\b') { return $args[0].Value }
+          return 'import { ' + ($inside.Trim() + ', listFormationProfiles').Trim().Trim(',') + ' } from "../../storage/formation/formationProfilesRepo";'
+        
 
 export const formationEventsRouter = Router();
 formationEventsRouter.use(requireApiKey);
@@ -136,3 +141,34 @@ formationEventsRouter.get("/visitors/:id/formation/profile", async (req, res) =>
     return res.status(toHttpStatus(e, 400)).json({ ok: false, error: e?.message || "Bad Request" });
   }
 });
+  // GET /formation/profiles?limit=&cursor=&stage=&assignedTo=&q=
+  formationEventsRouter.get("/formation/profiles", async (req, res) => {
+    try {
+      const storageConnectionString = process.env.STORAGE_CONNECTION_STRING;
+      if (!storageConnectionString) {
+        return res.status(500).json({ ok: false, error: "Missing STORAGE_CONNECTION_STRING" });
+      }
+
+      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
+      const cursor = req.query.cursor ? String(req.query.cursor) : undefined;
+
+      const stage = req.query.stage ? String(req.query.stage).trim() : undefined;
+      const assignedTo = req.query.assignedTo ? String(req.query.assignedTo).trim() : undefined;
+      const q = req.query.q ? String(req.query.q).trim() : undefined;
+
+      const profilesTable = getFormationProfilesTableClient(storageConnectionString);
+      await ensureTableExists(profilesTable);
+
+      const out = await listFormationProfiles(profilesTable as any, {
+        limit,
+        cursor,
+        stage: stage as FormationStage | undefined,
+        assignedTo,
+        q,
+      });
+
+      return res.status(200).json({ ok: true, items: out.items, cursor: out.cursor ?? null });
+    } catch (e: any) {
+      return res.status(toHttpStatus(e, 400)).json({ ok: false, error: e?.message || "Bad Request" });
+    }
+  });

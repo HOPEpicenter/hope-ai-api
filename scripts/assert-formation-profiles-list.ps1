@@ -48,8 +48,8 @@ Invoke-PostJson -uri "$ApiBase/formation/events" -headers $headers -body @{
   metadata   = @{ nextStep = "JoinGroup" }
 } | Out-Null
 
-Write-Host "[assert-formation-profiles-list] GET /formation/profiles..."
-$out = Invoke-RestMethod -Method Get -Uri "$ApiBase/formation/profiles?limit=50&stage=Connected" -Headers $headers
+Write-Host "[assert-formation-profiles-list] GET /formation/profiles (visitorId filter)..."
+$out = Invoke-RestMethod -Method Get -Uri "$ApiBase/formation/profiles?limit=10&visitorId=$visitorId" -Headers $headers
 if (-not $out.ok) { throw "Expected ok=true" }
 
 $found = $false

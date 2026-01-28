@@ -41,10 +41,10 @@ Write-Host "[assert-formation-pagination] Creating $createCount formation events
 
   $body = @{
     visitorId   = $visitorId
-    type        = "note"               # safe default; adjust later if you enforce enums
+    type        = "SERVICE_ATTENDED"               # safe default; adjust later if you enforce enums
     occurredAt  = $occurredAt
     source      = "assert-formation-pagination"
-    note        = "formation event $n" # if your API uses "note"
+    note        = "formation event $n" # if your API uses "NOTE"
     data        = @{ n = $n }          # if your API uses generic payload "data"
   }
 
@@ -117,7 +117,7 @@ $items2 | ForEach-Object {
 }
 
 if ($overlap.Count -gt 0) {
-  throw "Overlap detected between pages: $($overlap | Select-Object -First 3 -Join ', ')"
+  throw "Overlap detected between pages: $((( $overlap | Select-Object -First 3 ) -join ', '))"
 }
 
 # --- Basic newest-first ordering check on occurredAt/createdAt if present

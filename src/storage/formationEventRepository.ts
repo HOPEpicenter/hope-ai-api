@@ -1,5 +1,5 @@
 import { TableClient } from "@azure/data-tables";
-import { v4 as uuid } from "uuid";
+import { randomUUID } from "crypto";
 import { ensureTableExists } from "../shared/storage/ensureTableExists";
 import { makeTableClient } from "../shared/storage/makeTableClient";
 import { resolveStorageConnectionString } from "../shared/storage/resolveStorageConnectionString";
@@ -14,33 +14,77 @@ export interface FormationEvent {
 }
 
 type FormationEventEntity = {
+  // NOTE: data-tables typings require lowercase partitionKey/rowKey for writes
+  partitionKey: string;
+  rowKey: string;
+
+  // Keep PascalCase for reads/filters
   PartitionKey: string;
   RowKey: string;
-  id: string;
-  visitorId: string;
-  type: string;
+  id?: string;
+  visitorId?: string;
+  type?: string;
   notes?: string;
-  occurredAt: string;
-  recordedAt: string;
+  occurredAt?: string;
+  recordedAt?: string;
+};
+
+export type FormationEventPage = {
+  items: FormationEvent[];
+  cursor?: string; // RowKey of last item in the returned page (newest-first paging)
 };
 
 function getFormationEventsTableName(): string {
   return process.env.FORMATION_EVENTS_TABLE || "devFormationEvents";
 }
 
-function toDomain(e: any): FormationEvent {
-  return {
-    id: String(e.id),
-    visitorId: String(e.visitorId),
-    type: String(e.type),
-    notes: e.notes !== undefined && e.notes !== null ? String(e.notes) : undefined,
-    occurredAt: String(e.occurredAt),
-    recordedAt: String(e.recordedAt),
-  };
+/**
+ * Preferred RowKey format:
+ *   <occurredAtISO>__<id>
+ * Legacy accepted:
+ *   <occurredAtISO>_<id>
+ */
+function parseRowKey(rk: string): { occurredAt?: string; id?: string } {
+  if (!rk) return {};
+  const delim = rk.includes("__") ? "__" : "_";
+  const parts = rk.split(delim);
+  if (parts.length < 2) return {};
+  const occurredAt = parts[0];
+  const id = parts.slice(1).join(delim);
+  return { occurredAt, id };
 }
 
-function cursorFrom(event: FormationEvent): string {
-  return `${event.occurredAt}_${event.id}`;
+function toDomain(e: any): FormationEvent {
+  const pk = (e.PartitionKey ?? e.partitionKey ?? "") as string;
+  const rk = (e.RowKey ?? e.rowKey ?? "") as string;
+
+  const parsed = parseRowKey(rk);
+
+  const id =
+    (e.id ?? e.eventId ?? e.clientId ?? parsed.id ?? rk ?? "missing-id").toString();
+
+  const occurredAt =
+    (e.occurredAt ?? e.occurred_at ?? parsed.occurredAt ?? "").toString();
+
+  const recordedAt =
+    (e.recordedAt ??
+      e.recorded_at ??
+      e.createdAt ??
+      e.created_at ??
+      e.timestamp ??
+      new Date().toISOString()
+    ).toString();
+
+  const visitorId = (e.visitorId ?? e.visitor_id ?? pk).toString();
+
+  return {
+    id,
+    visitorId,
+    type: (e.type ?? e.eventType ?? e.kind ?? "").toString(),
+    notes: e.notes,
+    occurredAt,
+    recordedAt,
+  };
 }
 
 function isConflictAlreadyExists(err: any): boolean {
@@ -74,6 +118,11 @@ export class FormationEventRepository {
     this.ensured = true;
   }
 
+  /**
+   * Create immutable FormationEvent.
+   * Idempotent when client supplies args.id:
+   *   - if an entity already exists with PartitionKey=visitorId and id=<clientId>, return it.
+   */
   async create(args: {
     visitorId: string;
     type: string;
@@ -83,87 +132,116 @@ export class FormationEventRepository {
   }): Promise<FormationEvent> {
     await this.ensureTable();
 
-    const visitorId = String(args.visitorId || "").trim();
-    const type = String(args.type || "").trim();
-    const occurredAt = String(args.occurredAt || "").trim();
-    const notes = args.notes !== undefined ? String(args.notes) : undefined;
-
+    const visitorId = (args.visitorId ?? "").toString().trim();
     if (!visitorId) throw new Error("visitorId is required");
-    if (!type) throw new Error("type is required");
-    if (!occurredAt) throw new Error("occurredAt is required");
 
-    const id = (args.id ? String(args.id) : uuid()).trim();
+    const clientId = String((args as any).id ?? (args as any).idempotencyKey ?? "").trim();
+    const id = clientId || randomUUID();
+
+    const occurredAt = (args.occurredAt ?? "").toString().trim() || new Date().toISOString();
     const recordedAt = new Date().toISOString();
 
-    const ent: FormationEventEntity = {
-      PartitionKey: visitorId,
-      RowKey: `${occurredAt}_${id}`,
+    const PartitionKey = visitorId;
+    const RowKey = `${occurredAt}__${id}`;
+
+    // Idempotency by client-supplied id (even if occurredAt differs between retries)
+    if (clientId) {
+      const safePk = PartitionKey.replace(/'/g, "''");
+      const safeId = id.replace(/'/g, "''");
+      const filter = `PartitionKey eq '${safePk}' and id eq '${safeId}'`;
+
+      for await (const existing of this.client.listEntities({ queryOptions: { filter } })) {
+        return toDomain(existing);
+      }
+    }
+
+    const entity: FormationEventEntity = {
+      partitionKey: PartitionKey,
+      rowKey: RowKey,
+      PartitionKey,
+      RowKey,
       id,
       visitorId,
-      type,
-      notes,
+      type: args.type,
+      notes: args.notes,
       occurredAt,
       recordedAt,
     };
 
     try {
-      await this.client.createEntity(ent as any);
+      await this.client.createEntity(entity);
     } catch (err: any) {
-      // Re-throw but mark it as a conflict for callers that want idempotent behavior.
-      if (isConflictAlreadyExists(err)) throw err;
+      if (isConflictAlreadyExists(err)) {
+        const got = await this.client.getEntity<FormationEventEntity>(PartitionKey, RowKey);
+        return toDomain(got);
+      }
       throw err;
     }
 
-    return { id, visitorId, type, notes, occurredAt, recordedAt };
+    return toDomain(entity);
   }
 
-  async getByVisitorAndId(visitorId: string, id: string): Promise<FormationEvent | null> {
+  /**
+   * Newest-first paging. Cursor is RowKey of last item in returned page.
+   */
+  /**
+   * Lookup by visitorId + event id (id column). Used by route idempotency retry.
+   */
+  async getByVisitorAndId(visitorId: string, id: string): Promise<FormationEvent | undefined> {
     await this.ensureTable();
 
-    const pk = String(visitorId || "").trim();
-    const eid = String(id || "").trim();
-    if (!pk) throw new Error("visitorId is required");
-    if (!eid) throw new Error("id is required");
+    const pk = String(visitorId ?? "").trim();
+    const eid = String(id ?? "").trim();
+    if (!pk || !eid) return undefined;
 
-    // id is stored as a property; query it (safe + avoids needing occurredAt).
-    const filter = `PartitionKey eq '${pk}' and id eq '${eid}'`;
+    const safePk = pk.replace(/'/g, "''");
+    const safeId = eid.replace(/'/g, "''");
+    const filter = `PartitionKey eq '${safePk}' and id eq '${safeId}'`;
 
-    for await (const e of this.client.listEntities<FormationEventEntity>({ queryOptions: { filter } })) {
+    for await (const e of this.client.listEntities({ queryOptions: { filter } })) {
       return toDomain(e);
     }
-    return null;
+    return undefined;
   }
-
-  async listByVisitor(
-    visitorId: string,
-    limit: number,
-    cursor?: string
-  ): Promise<{ items: FormationEvent[]; cursor: string }> {
+  async listByVisitor(visitorId: string, limit: number, cursor?: string): Promise<FormationEventPage> {
     await this.ensureTable();
 
-    const pk = String(visitorId || "").trim();
-    if (!pk) throw new Error("visitorId is required");
+    const max = Math.max(1, Math.min(Number(limit ?? 50), 200));
+    const pk = (visitorId ?? "").toString().trim();
+    const cur = (cursor ?? "").toString().trim();
 
-    const max = Math.max(1, Math.min(limit || 50, 200));
-    const upperExclusive = cursor ? String(cursor) : undefined;
-
-    const filter = upperExclusive
-      ? `PartitionKey eq '${pk}' and RowKey lt '${upperExclusive}'`
-      : `PartitionKey eq '${pk}'`;
-
-    const rows: FormationEvent[] = [];
-    for await (const e of this.client.listEntities<FormationEventEntity>({ queryOptions: { filter } })) {
-      rows.push(toDomain(e));
+    const safePk = pk.replace(/'/g, "''");
+    let filter = `PartitionKey eq '${safePk}'`;
+    if (cur) {
+      const safeCur = cur.replace(/'/g, "''");
+      filter += ` and RowKey lt '${safeCur}'`;
     }
 
-    // RowKey is occurredAt_id, but we sort by occurredAt then id to be safe.
-    rows.sort((a, b) =>
-      a.occurredAt === b.occurredAt ? (a.id < b.id ? 1 : -1) : a.occurredAt < b.occurredAt ? 1 : -1
-    );
+    // Azure Tables lists ascending by RowKey. We sort DESC in-memory for newest-first.
+    const cap = Math.max(50, Math.min(max * 5, 500));
 
-    const items = rows.slice(0, max);
-    const next = items.length === max ? cursorFrom(items[items.length - 1]) : "";
+    const rows: any[] = [];
+    let n = 0;
+    for await (const e of this.client.listEntities({ queryOptions: { filter } })) {
+      rows.push(e);
+      n++;
+      if (n >= cap) break;
+    }
 
-    return { items, cursor: next };
+    rows.sort((a, b) => {
+      const ar = (a.RowKey ?? a.rowKey ?? "").toString();
+      const br = (b.RowKey ?? b.rowKey ?? "").toString();
+      return br.localeCompare(ar); // DESC
+    });
+
+    const pageEntities = rows.slice(0, max);
+    const items = pageEntities.map(toDomain);
+
+    const nextCursor =
+      pageEntities.length > 0
+        ? (pageEntities[pageEntities.length - 1].RowKey ?? pageEntities[pageEntities.length - 1].rowKey)?.toString()
+        : undefined;
+
+    return { items, cursor: nextCursor };
   }
 }

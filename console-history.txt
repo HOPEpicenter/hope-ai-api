@@ -1,0 +1,403 @@
+﻿cd hope-ai-api
+STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true
+npm test
+@'
+STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true
+'@ | Set-Content -Path .\.env -Encoding UTF8
+@'
+# scripts/run-smoke.ps1
+# Builds, starts server on a random port, waits for /ops/health, runs smoke-tests.ps1, then stops server.
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+function Get-ScriptDir {
+  $d = $PSScriptRoot
+  if (-not $d -or $d.Trim().Length -eq 0) {
+    $cwd = (Get-Location).Path
+    $maybeScripts = Join-Path $cwd "scripts"
+    if (Test-Path $maybeScripts) { return $maybeScripts }
+    return $cwd
+  }
+  return $d
+}
+
+function Find-RepoRoot {
+  param([Parameter(Mandatory=$true)][string]$StartDir)
+
+  $d = $StartDir
+  while ($true) {
+    $pkg = Join-Path $d "package.json"
+    if (Test-Path $pkg) { return $d }
+
+    $parent = Split-Path $d -Parent
+    if (-not $parent -or $parent -eq $d) { break }
+    $d = $parent
+  }
+  throw "Could not find repo root (package.json) starting from: $StartDir"
+}
+
+function Import-DotEnv {
+  param([Parameter(Mandatory=$true)][string]$Path)
+
+  if (-not (Test-Path $Path)) { return }
+
+  $lines = Get-Content -LiteralPath $Path
+  foreach ($line in $lines) {
+    $t = $line.Trim()
+    if ($t.Length -eq 0) { continue }
+    if ($t.StartsWith("#")) { continue }
+
+    $eq = $t.IndexOf("=")
+    if ($eq -lt 1) { continue }
+
+    $key = $t.Substring(0, $eq).Trim()
+    $val = $t.Substring($eq + 1).Trim()
+
+    if (($val.StartsWith('"') -and $val.EndsWith('"')) -or ($val.StartsWith("'") -and $val.EndsWith("'"))) {
+      $val = $val.Substring(1, $val.Length - 2)
+    }
+
+    if ($key.Length -gt 0) {
+      # do not overwrite existing env vars
+      if (-not (Test-Path ("Env:\" + $key))) {
+        Set-Item -Path ("Env:\" + $key) -Value $val
+      }
+    }
+  }
+}
+
+function Require-Env {
+  param([Parameter(Mandatory=$true)][string]$Name)
+
+  $v = [Environment]::GetEnvironmentVariable($Name)
+  if (-not $v -or $v.Trim().Length -eq 0) {
+    throw "$Name is not set. Set it in your shell OR add it to .env in repo root."
+  }
+}
+
+function Wait-ForHealth {
+  param(
+    [Parameter(Mandatory=$true)][string]$BaseUrl,
+    [int]$TimeoutSec = 60
+  )
+
+  $deadline = (Get-Date).AddSeconds($TimeoutSec)
+  $healthUrl = $BaseUrl.TrimEnd("/") + "/ops/health"
+
+  while ((Get-Date) -lt $deadline) {
+    try {
+      $resp = Invoke-WebRequest -Uri $healthUrl -Method GET -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
+      if ([int]$resp.StatusCode -eq 200) {
+        try {
+          $obj = $resp.Content | ConvertFrom-Json
+          if ($obj.ok -eq $true) { return $true }
+        } catch { }
+      }
+    } catch { }
+    Start-Sleep -Milliseconds 300
+  }
+  return $false
+}
+
+$ScriptDir = Get-ScriptDir
+$RepoRoot  = Find-RepoRoot -StartDir $ScriptDir
+
+# Load .env if present (repo root)
+$envPath = Join-Path $RepoRoot ".env"
+Import-DotEnv -Path $envPath
+
+# Required for server boot
+Require-Env -Name "STORAGE_CONNECTION_STRING"
+
+# Logs under repo root
+$LogsDir = Join-Path $RepoRoot "logs"
+if (-not (Test-Path $LogsDir)) { New-Item -ItemType Directory -Path $LogsDir | Out-Null }
+
+$stamp = (Get-Date).ToString("yyyyMMdd-HHmmss")
+$serverOutLog = Join-Path $LogsDir ("smoke-server-{0}.out.log" -f $stamp)
+$serverErrLog = Join-Path $LogsDir ("smoke-server-{0}.err.log" -f $stamp)
+$runLog       = Join-Path $LogsDir ("smoke-run-{0}.log" -f $stamp)
+
+# Pick a random port
+$port = Get-Random -Minimum 20000 -Maximum 45000
+$baseUrl = "http://localhost:{0}" -f $port
+
+# Choose which npm script to run for the server (default: start:dist for CI friendliness)
+$serverScript = $env:OPS_SERVER_SCRIPT
+if (-not $serverScript -or $serverScript.Trim().Length -eq 0) { $serverScript = "start:dist" }
+
+Write-Host ("RepoRoot:      " + $RepoRoot)
+Write-Host ("ScriptDir:     " + $ScriptDir)
+Write-Host ("Port:          " + $port)
+Write-Host ("BaseUrl:       " + $baseUrl)
+Write-Host ("ServerScript:  npm run " + $serverScript)
+Write-Host ("ServerOutLog:  " + $serverOutLog)
+Write-Host ("ServerErrLog:  " + $serverErrLog)
+Write-Host ("RunLog:        " + $runLog)
+
+Push-Location $RepoRoot
+$serverProc = $null
+try {
+  Write-Host "`n== npm run build =="
+  & npm run build 2>&1 | Tee-Object -FilePath $runLog -Append | Out-Host
+  if ($LASTEXITCODE -ne 0) { throw "npm run build failed (exit=$LASTEXITCODE). See $runLog" }
+
+  Write-Host "`n== Start server =="
+  $cmd = "set ""PORT={0}""&& set ""OPS_PORT={0}""&& npm run {1}" -f $port, $serverScript
+  $serverProc = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $cmd `
+    -WorkingDirectory $RepoRoot `
+    -RedirectStandardOutput $serverOutLog `
+    -RedirectStandardError  $serverErrLog `
+    -NoNewWindow `
+    -PassThru
+
+  Write-Host ("Server PID: " + $serverProc.Id)
+
+  Write-Host "`n== Wait for /ops/health =="
+  $ok = Wait-ForHealth -BaseUrl $baseUrl -TimeoutSec 60
+  if (-not $ok) {
+    Write-Host "`n--- Server stdout (tail) ---"
+    if (Test-Path $serverOutLog) { Get-Content $serverOutLog -Tail 120 | ForEach-Object { Write-Host $_ } }
+    Write-Host "`n--- Server stderr (tail) ---"
+    if (Test-Path $serverErrLog) { Get-Content $serverErrLog -Tail 200 | ForEach-Object { Write-Host $_ } }
+    throw "Server did not become healthy within timeout. See $serverOutLog and $serverErrLog"
+  }
+  Write-Host "Health OK"
+
+  Write-Host "`n== Run smoke tests =="
+  $smokePath = Join-Path $ScriptDir "smoke-tests.ps1"
+  if (-not (Test-Path $smokePath)) { throw "Smoke tests file not found: $smokePath" }
+
+  $cmdSmoke = "set ""OPS_BASE_URL={0}""&& powershell -NoProfile -ExecutionPolicy Bypass -File ""{1}"" -BaseUrl ""{0}""" -f $baseUrl, $smokePath
+  $p = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $cmdSmoke `
+    -WorkingDirectory $RepoRoot `
+    -NoNewWindow `
+    -Wait `
+    -PassThru
+
+  if ($p.ExitCode -ne 0) {
+    throw "Smoke tests failed (exit=$($p.ExitCode)). See $serverOutLog, $serverErrLog, and $runLog"
+  }
+
+  Write-Host "`n✅ run-smoke completed successfully" -ForegroundColor Green
+  exit 0
+}
+catch {
+  Write-Host "`n❌ run-smoke failed: $($_.Exception.Message)" -ForegroundColor Red
+  Write-Host ("See logs: " + $serverOutLog + " ; " + $serverErrLog + " ; " + $runLog)
+  exit 1
+}
+finally {
+  Pop-Location
+  if ($serverProc -and -not $serverProc.HasExited) {
+    try {
+      Write-Host "`n== Stop server =="
+      Stop-Process -Id $serverProc.Id -Force -ErrorAction SilentlyContinue
+    } catch { }
+  }
+}
+'@ | Set-Content -Path .\scripts\run-smoke.ps1 -Encoding UTF8
+npm test
+$env:OPS_SERVER_SCRIPT="dev"
+npm test
+$env:STORAGE_CONNECTION_STRING="UseDevelopmentStorage=true"
+# Adds .env to .gitignore if it isn't already there
+if (-not (Test-Path .\.gitignore)) { New-Item -ItemType File -Path .\.gitignore | Out-Null }
+$gi = Get-Content .\.gitignore -Raw
+if ($gi -notmatch '(?m)^\s*\.env\s*$') {
+  "`n.env`n" | Add-Content -Path .\.gitignore -Encoding UTF8
+  Write-Host "Added .env to .gitignore" -ForegroundColor Green
+} else {
+  Write-Host ".env already in .gitignore" -ForegroundColor Yellow
+}
+# scripts/guard-no-bom.ps1
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+$path = Join-Path (Split-Path $PSScriptRoot -Parent) "package.json"
+$bytes = [System.IO.File]::ReadAllBytes($path)
+if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+  throw "package.json has a UTF-8 BOM. Re-save as UTF-8 without BOM."
+}
+Write-Host "No BOM detected in package.json" -ForegroundColor Green
+# scripts/guard-no-bom.ps1
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+$ScriptDir = $PSScriptRoot
+if (-not $ScriptDir -or $ScriptDir.Trim().Length -eq 0) { $ScriptDir = (Get-Location).Path }
+# If run from repo root via paste, ScriptDir is repo root; if run from scripts folder, repo root is parent.
+$maybePkg1 = Join-Path $ScriptDir "package.json"
+$maybePkg2 = Join-Path (Split-Path $ScriptDir -Parent) "package.json"
+if (Test-Path $maybePkg1) { $path = $maybePkg1 }
+elseif (Test-Path $maybePkg2) { $path = $maybePkg2 }
+else { throw "Could not find package.json from: $ScriptDir" }
+$bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $path))
+if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+  throw "package.json has a UTF-8 BOM. Re-save as UTF-8 without BOM."
+}
+Write-Host "No BOM detected in package.json" -ForegroundColor Green
+@'
+# scripts/guard-no-bom.ps1
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+$ScriptDir = $PSScriptRoot
+if (-not $ScriptDir -or $ScriptDir.Trim().Length -eq 0) { $ScriptDir = (Get-Location).Path }
+
+$maybePkg1 = Join-Path $ScriptDir "package.json"
+$maybePkg2 = Join-Path (Split-Path $ScriptDir -Parent) "package.json"
+
+if (Test-Path $maybePkg1) { $path = $maybePkg1 }
+elseif (Test-Path $maybePkg2) { $path = $maybePkg2 }
+else { throw "Could not find package.json from: $ScriptDir" }
+
+$bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $path))
+if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+  throw "package.json has a UTF-8 BOM. Re-save as UTF-8 without BOM."
+}
+
+Write-Host "No BOM detected in package.json" -ForegroundColor Green
+'@ | Set-Content -Path .\scripts\guard-no-bom.ps1 -Encoding UTF8
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\guard-no-bom.ps1
+Split-Path $PSScriptRoot -Parent
+if (...) { ... }
+elseif (...) { ... }
+else { ... }
+Split-Path (Get-Location).Path -Parent
+powershell -File .\scripts\guard-no-bom.ps1
+# -> No BOM detected in package.json
+notepad scripts/guard-no-azure-functions.ps1
+[CmdletBinding()]
+param()
+$ErrorActionPreference = "Stop"
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$srcRoot  = Join-Path $repoRoot "src"
+# Run BOM guard first (fast fail if package.json has UTF-8 BOM)
+$bomGuard = Join-Path $PSScriptRoot "guard-no-bom.ps1"
+if (Test-Path $bomGuard) {
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $bomGuard
+} else {
+  Write-Host ("WARN: BOM guard not found at: {0}" -f $bomGuard) -ForegroundColor Yellow
+}
+if (-not (Test-Path $srcRoot)) {
+  throw "src folder not found at: $srcRoot"
+}
+$files = Get-ChildItem -Path $srcRoot -Recurse -File -Include *.ts,*.tsx -ErrorAction Stop
+$hits = $files | ForEach-Object {
+  Select-String -Path $_.FullName -Pattern "@azure/functions" -SimpleMatch -ErrorAction SilentlyContinue
+} | Where-Object { $_ -ne $null }
+if ($hits) {
+  Write-Host ""
+  Write-Host "ERROR: Found '@azure/functions' imports under src. Express-only build must not reference Azure Functions." -ForegroundColor Red
+  $hits | ForEach-Object {
+    Write-Host (" - {0}:{1} {2}" -f $_.Path, $_.LineNumber, $_.Line.Trim()) -ForegroundColor Red
+  }
+  throw "Guard failed: '@azure/functions' import(s) found in src."
+}
+Write-Host "OK: Guard passed (no '@azure/functions' imports under src)."
+[CmdletBinding()]
+param()
+$ErrorActionPreference = "Stop"
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$srcRoot  = Join-Path $repoRoot "src"
+# Run BOM guard first (fast fail if package.json has UTF-8 BOM)
+$bomGuard = Join-Path $PSScriptRoot "guard-no-bom.ps1"
+if (Test-Path $bomGuard) {
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $bomGuard
+} else {
+  Write-Host ("WARN: BOM guard not found at: {0}" -f $bomGuard) -ForegroundColor Yellow
+}
+if (-not (Test-Path $srcRoot)) {
+  throw "src folder not found at: $srcRoot"
+}
+$files = Get-ChildItem -Path $srcRoot -Recurse -File -Include *.ts,*.tsx -ErrorAction Stop
+$hits = $files | ForEach-Object {
+  Select-String -Path $_.FullName -Pattern "@azure/functions" -SimpleMatch -ErrorAction SilentlyContinue
+} | Where-Object { $_ -ne $null }
+if ($hits) {
+  Write-Host ""
+  Write-Host "ERROR: Found '@azure/functions' imports under src. Express-only build must not reference Azure Functions." -ForegroundColor Red
+  $hits | ForEach-Object {
+    Write-Host (" - {0}:{1} {2}" -f $_.Path, $_.LineNumber, $_.Line.Trim()) -ForegroundColor Red
+  }
+  throw "Guard failed: '@azure/functions' import(s) found in src."
+}
+Write-Host "OK: Guard passed (no '@azure/functions' imports under src)."
+@'
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = "Stop"
+
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$srcRoot  = Join-Path $repoRoot "src"
+
+# Run BOM guard first (fast fail if package.json has UTF-8 BOM)
+$bomGuard = Join-Path $PSScriptRoot "guard-no-bom.ps1"
+if (Test-Path $bomGuard) {
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $bomGuard
+} else {
+  Write-Host ("WARN: BOM guard not found at: {0}" -f $bomGuard) -ForegroundColor Yellow
+}
+
+if (-not (Test-Path $srcRoot)) {
+  throw "src folder not found at: $srcRoot"
+}
+
+$files = Get-ChildItem -Path $srcRoot -Recurse -File -Include *.ts,*.tsx -ErrorAction Stop
+
+$hits = $files | ForEach-Object {
+  Select-String -Path $_.FullName -Pattern "@azure/functions" -SimpleMatch -ErrorAction SilentlyContinue
+} | Where-Object { $_ -ne $null }
+
+if ($hits) {
+  Write-Host ""
+  Write-Host "ERROR: Found '@azure/functions' imports under src. Express-only build must not reference Azure Functions." -ForegroundColor Red
+  $hits | ForEach-Object {
+    Write-Host (" - {0}:{1} {2}" -f $_.Path, $_.LineNumber, $_.Line.Trim()) -ForegroundColor Red
+  }
+  throw "Guard failed: '@azure/functions' import(s) found in src."
+}
+
+Write-Host "OK: Guard passed (no '@azure/functions' imports under src)."
+'@ | Set-Content -Path .\scripts\guard-no-azure-functions.ps1 -Encoding UTF8
+@'
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = "Stop"
+
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$srcRoot  = Join-Path $repoRoot "src"
+
+# Run BOM guard first (fast fail if package.json has UTF-8 BOM)
+$bomGuard = Join-Path $PSScriptRoot "guard-no-bom.ps1"
+if (Test-Path $bomGuard) {
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $bomGuard
+} else {
+  Write-Host ("WARN: BOM guard not found at: {0}" -f $bomGuard) -ForegroundColor Yellow
+}
+
+if (-not (Test-Path $srcRoot)) {
+  throw "src folder not found at: $srcRoot"
+}
+
+$files = Get-ChildItem -Path $srcRoot -Recurse -File -Include *.ts,*.tsx -ErrorAction Stop
+
+$hits = $files | ForEach-Object {
+  Select-String -Path $_.FullName -Pattern "@azure/functions" -SimpleMatch -ErrorAction SilentlyContinue
+} | Where-Object { $_ -ne $null }
+
+if ($hits) {
+  Write-Host ""
+  Write-Host "ERROR: Found '@azure/functions' imports under src. Express-only build must not reference Azure Functions." -ForegroundColor Red
+  $hits | ForEach-Object {
+    Write-Host (" - {0}:{1} {2}" -f $_.Path, $_.LineNumber, $_.Line.Trim()) -ForegroundColor Red
+  }
+  throw "Guard failed: '@azure/functions' import(s) found in src."
+}
+
+Write-Host "OK: Guard passed (no '@azure/functions' imports under src)."
+'@ | Set-Content -Path .\scripts\guard-no-azure-functions.ps1 -Encoding UTF8
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\guard-no-azure-functions.ps1
+Get-History | Select-Object -Last 20

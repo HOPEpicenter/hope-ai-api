@@ -6,6 +6,14 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $srcRoot  = Join-Path $repoRoot "src"
 
+# Run BOM guard first (fast fail if package.json has UTF-8 BOM)
+$bomGuard = Join-Path $PSScriptRoot "guard-no-bom.ps1"
+if (Test-Path $bomGuard) {
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $bomGuard
+} else {
+  Write-Host ("WARN: BOM guard not found at: {0}" -f $bomGuard) -ForegroundColor Yellow
+}
+
 if (-not (Test-Path $srcRoot)) {
   throw "src folder not found at: $srcRoot"
 }

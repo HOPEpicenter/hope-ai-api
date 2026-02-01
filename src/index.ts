@@ -1,24 +1,42 @@
-import express from "express";
-import { engagementsRouter } from "./routes/engagements";
-import { formationEventsRouter } from "./routes/formationEvents";
-import { opsRouter } from "./routes/ops";
-import visitorsRouter from "./routes/visitors/visitorsRouter";
-
+﻿import express from "express";
+import { createOpsRouter } from "./routes/ops/opsRouter";
+import { requestIdMiddleware, errorMiddleware } from "./http/middleware";
+import { requestLogMiddleware } from "./http/requestLog";
+import { AzureTableVisitorsRepository, AzureTableFormationEventsRepository } from "./repositories";
 
 const app = express();
+app.use(express.json({ limit: "256kb" }));
+app.use(requestIdMiddleware);
+app.use(requestLogMiddleware);
+// Real storage-backed repositories
+const visitorsRepository = new AzureTableVisitorsRepository();
+const formationEventsRepository = new AzureTableFormationEventsRepository();
 
-app.use(express.json());
+app.use("/ops", createOpsRouter(visitorsRepository, formationEventsRepository));
 
-// Health endpoints (both forms so smoke can use BaseUrl=/api safely)
-app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
-app.get("/api/health", (_req, res) => res.status(200).json({ ok: true }));
-app.use("/api/visitors", visitorsRouter);
-
-app.use("/api", engagementsRouter);
-app.use("/api", formationEventsRouter);
-app.use("/api/ops", opsRouter);
-const port = parseInt(process.env.PORT || "3000", 10);
-app.listen(port, () => {
-  console.log(`HOPE API listening on port ${port}`);
+/**
+ * Global JSON error handler
+ * Ensures we never leak Express HTML error pages to API clients.
+ */
+app.use((req, res) => {
+  const requestId = (req as any).requestId as string | undefined;
+  res.status(404).json({
+    error: "not_found",
+    message: "Route not found.",
+    requestId,
+  });
 });
+
+app.use(errorMiddleware);
+const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+app.listen(port, () => {
+  // eslint-disable-next-line no-console
+  console.log(`hope-ai-api listening on port ${port}`);
+});
+
+
+
+
+
+
 

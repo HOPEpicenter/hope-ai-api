@@ -5,14 +5,17 @@
     "private":  true,
     "description":  "Azure Functions v4 (Node.js + TypeScript) backend for HOPE",
     "scripts":  {
-                    "build":  "tsc",
-                    "clean":  "rimraf dist",
+                    "test:smoke":  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-smoke.ps1",
+                    "start:dist":  "node dist/index.js",
+                    "build":  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/clean.ps1 \u0026\u0026 tsc",
                     "copy":  "copyfiles -u 1 src/**/function.json dist/",
-                    "dev":  "ts-node src/index.ts",
-                    "guard":  "powershell -ExecutionPolicy Bypass -File .\\scripts\\guard-no-azure-functions.ps1"
+                    "clean":  "rimraf dist",
+                    "test":  "npm run test:smoke",
+                    "guard":  "powershell -ExecutionPolicy Bypass -File .\\scripts\\guard-no-azure-functions.ps1",
+                    "dev":  "ts-node src/index.ts"
                 },
     "dependencies":  {
-                         "@azure/data-tables":  "^13.3.0",
+                         "@azure/data-tables":  "^13.3.2",
                          "@azure/functions":  "^4.5.0",
                          "@sendgrid/mail":  "^8.1.6",
                          "dotenv":  "^17.2.3",
@@ -23,7 +26,7 @@
     "devDependencies":  {
                             "@types/express":  "^5.0.6",
                             "@types/luxon":  "^3.7.1",
-                            "@types/node":  "^20.11.30",
+                            "@types/node":  "^20.19.30",
                             "@types/uuid":  "^9.0.8",
                             "azurite":  "^3.35.0",
                             "copyfiles":  "^2.4.1",

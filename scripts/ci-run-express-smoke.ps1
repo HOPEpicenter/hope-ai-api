@@ -30,6 +30,102 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Get-TempRoot {
+  if (-not [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) { return $env:RUNNER_TEMP }
+  if (-not [string]::IsNullOrWhiteSpace($env:TEMP)) { return $env:TEMP }
+  return [System.IO.Path]::GetTempPath()
+}
+
+function Test-PortOpen {
+  param([string]$HostName = "127.0.0.1", [int]$Port)
+  $client = $null
+  try {
+    $client = New-Object System.Net.Sockets.TcpClient
+    $iar = $client.BeginConnect($HostName, $Port, $null, $null)
+    if ($iar.AsyncWaitHandle.WaitOne(250)) {
+      $client.EndConnect($iar)
+      $client.Close()
+      return $true
+    }
+    $client.Close()
+    return $false
+  } catch {
+    try { if ($client) { $client.Close() } } catch { }
+    return $false
+  }
+}
+
+function Wait-PortOpen {
+  param([string]$HostName = "127.0.0.1", [int]$Port, [int]$Seconds = 120)
+  $deadline = (Get-Date).AddSeconds($Seconds)
+  while ((Get-Date) -lt $deadline) {
+    if (Test-PortOpen -HostName $HostName -Port $Port) { return $true }
+    Start-Sleep -Milliseconds 250
+  }
+  return $false
+}
+
+function Ensure-AzuriteFromNodeModules {
+  param(
+    [string]$HostName = "127.0.0.1",
+    [int]$BlobPort = 10000,
+    [int]$QueuePort = 10001,
+    [int]$TablePort = 10002,
+    [int]$WaitSeconds = 120
+  )
+
+  $blobOpen  = Test-PortOpen -HostName $HostName -Port $BlobPort
+  $queueOpen = Test-PortOpen -HostName $HostName -Port $QueuePort
+  $tableOpen = Test-PortOpen -HostName $HostName -Port $TablePort
+
+  if ($blobOpen -and $queueOpen -and $tableOpen) {
+    Write-Host ("OK: Azurite already running on {0}:{1}/{2}/{3}" -f $HostName,$BlobPort,$QueuePort,$TablePort)
+    return $null
+  }
+
+  $azJs = Join-Path (Get-Location) "node_modules\azurite\dist\src\azurite.js"
+  if (-not (Test-Path -LiteralPath $azJs)) {
+    throw "Azurite not found at $azJs. Ensure it's a devDependency and npm ci has run."
+  }
+
+  $tempRoot = Get-TempRoot
+  $azDir = Join-Path $tempRoot "azurite"
+  New-Item -ItemType Directory -Force -Path $azDir | Out-Null
+
+  $azLog = Join-Path $tempRoot "azurite.log"
+  $azOut = Join-Path $tempRoot "azurite.out.log"
+  $azErr = Join-Path $tempRoot "azurite.err.log"
+
+  Write-Host "Starting Azurite (background) from node_modules..."
+  $p = Start-Process -FilePath "node" -ArgumentList @(
+    $azJs, "--silent",
+    "--location", $azDir,
+    "--debug", $azLog,
+    "--blobHost", $HostName, "--blobPort", "$BlobPort",
+    "--queueHost", $HostName, "--queuePort", "$QueuePort",
+    "--tableHost", $HostName, "--tablePort", "$TablePort"
+  ) -PassThru -NoNewWindow -RedirectStandardOutput $azOut -RedirectStandardError $azErr
+
+  # Wait for all three ports so we don't get a partial start
+  if (-not (Wait-PortOpen -HostName $HostName -Port $BlobPort -Seconds $WaitSeconds)) {
+    Write-Host "==== AZURITE ERR (tail 200) ===="
+    if (Test-Path $azErr) { Get-Content $azErr -Tail 200 }
+    throw "Azurite blob port $BlobPort did not open."
+  }
+  if (-not (Wait-PortOpen -HostName $HostName -Port $QueuePort -Seconds $WaitSeconds)) {
+    Write-Host "==== AZURITE ERR (tail 200) ===="
+    if (Test-Path $azErr) { Get-Content $azErr -Tail 200 }
+    throw "Azurite queue port $QueuePort did not open."
+  }
+  if (-not (Wait-PortOpen -HostName $HostName -Port $TablePort -Seconds $WaitSeconds)) {
+    Write-Host "==== AZURITE ERR (tail 200) ===="
+    if (Test-Path $azErr) { Get-Content $azErr -Tail 200 }
+    throw "Azurite table port $TablePort did not open."
+  }
+
+  Write-Host ("OK: Azurite is listening on {0}:{1}/{2}/{3} (pid={4})" -f $HostName,$BlobPort,$QueuePort,$TablePort,$p.Id)
+  return $p
+}
 function Try-ParseJson {
   param([string]$Text)
   if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
@@ -246,9 +342,7 @@ function Wait-For-Health {
 
 $root = ("http://{0}:{1}" -f $HostName, $Port)
 
-if (-not (Ensure-AzuriteTables -HostName $AzuriteHost -Port $AzuriteTablesPort -WaitSeconds $AzuriteWaitSeconds)) {
-  exit 1
-}
+Ensure-AzuriteFromNodeModules -HostName $AzuriteHost -WaitSeconds $AzuriteWaitSeconds | Out-Null
 
 if (Test-Path -LiteralPath ".\package.json") { Write-Host "No BOM detected in package.json" }
 Write-Host "OK: Guard passed (no '@azure/functions' imports under src)."
@@ -298,4 +392,5 @@ Write-Host ("Stopping Express (pid={0})" -f $proc.Id)
 try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
 
 exit 0
+
 

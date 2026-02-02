@@ -53,56 +53,6 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           npm run build
-
-      - name: Start Azurite (Blob/Queue/Table)
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-
-          $azDir = Join-Path $env:RUNNER_TEMP "azurite"
-          New-Item -ItemType Directory -Force -Path $azDir | Out-Null
-
-          $azLog = Join-Path $env:RUNNER_TEMP "azurite.log"
-
-          # Start Azurite (blob/queue/table) using local devDependency (installed via npm ci)
-          $p = Start-Process -FilePath "npx" -ArgumentList @(
-            "--yes","azurite","--silent",
-            "--location", $azDir,
-            "--debug", $azLog,
-            "--blobHost","127.0.0.1","--blobPort","10000",
-            "--queueHost","127.0.0.1","--queuePort","10001",
-            "--tableHost","127.0.0.1","--tablePort","10002"
-          ) -PassThru
-
-          function Wait-Port([int]$port, [int]$seconds = 180) {
-            $deadline = (Get-Date).AddSeconds($seconds)
-            while ((Get-Date) -lt $deadline) {
-              try {
-                $client = New-Object System.Net.Sockets.TcpClient
-                $iar = $client.BeginConnect("127.0.0.1", $port, $null, $null)
-                if ($iar.AsyncWaitHandle.WaitOne(250)) {
-                  $client.EndConnect($iar)
-                  $client.Close()
-                  return $true
-                }
-                $client.Close()
-              } catch {
-                # keep waiting
-              }
-              Start-Sleep -Milliseconds 250
-            }
-            return $false
-          }
-
-          if (-not (Wait-Port 10002 180)) {
-            Write-Host "==== AZURITE LOG (tail 200) ===="
-            if (Test-Path $azLog) { Get-Content $azLog -Tail 200 }
-            if ($p -and $p.HasExited) { Write-Host "Azurite exited early with code $($p.ExitCode)" }
-            throw "Azurite Table port 10002 did not open."
-          }
-
-          "OK: Azurite tables is listening on 127.0.0.1:10002" | Write-Host
-
       - name: Start Express + Smoke (single step)
         shell: pwsh
         run: |
@@ -117,4 +67,5 @@ jobs:
           if ($env:EXPRESS_OUT_LOG -and (Test-Path $env:EXPRESS_OUT_LOG)) { Get-Content $env:EXPRESS_OUT_LOG -Tail 200 }
           Write-Host "==== EXPRESS ERR (tail 200) ====" -ForegroundColor Yellow
           if ($env:EXPRESS_ERR_LOG -and (Test-Path $env:EXPRESS_ERR_LOG)) { Get-Content $env:EXPRESS_ERR_LOG -Tail 200 }
+
 

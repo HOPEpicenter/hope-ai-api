@@ -97,33 +97,21 @@ function Ensure-AzuriteFromNodeModules {
   $azErr = Join-Path $tempRoot "azurite.err.log"
 
   Write-Host "Starting Azurite (background) from node_modules..."
-  $p = Start-Process -FilePath "node" -ArgumentList @(
+    $p = Start-Process -FilePath "node" -ArgumentList @(
     $azJs, "--silent",
     "--location", $azDir,
     "--debug", $azLog,
-    "--blobHost", $HostName, "--blobPort", "$BlobPort",
-    "--queueHost", $HostName, "--queuePort", "$QueuePort",
     "--tableHost", $HostName, "--tablePort", "$TablePort"
   ) -PassThru -NoNewWindow -RedirectStandardOutput $azOut -RedirectStandardError $azErr
 
-  # Wait for all three ports so we don't get a partial start
-  if (-not (Wait-PortOpen -HostName $HostName -Port $BlobPort -Seconds $WaitSeconds)) {
-    Write-Host "==== AZURITE ERR (tail 200) ===="
-    if (Test-Path $azErr) { Get-Content $azErr -Tail 200 }
-    throw "Azurite blob port $BlobPort did not open."
-  }
-  if (-not (Wait-PortOpen -HostName $HostName -Port $QueuePort -Seconds $WaitSeconds)) {
-    Write-Host "==== AZURITE ERR (tail 200) ===="
-    if (Test-Path $azErr) { Get-Content $azErr -Tail 200 }
-    throw "Azurite queue port $QueuePort did not open."
-  }
+    # Wait for tables only
   if (-not (Wait-PortOpen -HostName $HostName -Port $TablePort -Seconds $WaitSeconds)) {
     Write-Host "==== AZURITE ERR (tail 200) ===="
     if (Test-Path $azErr) { Get-Content $azErr -Tail 200 }
     throw "Azurite table port $TablePort did not open."
   }
 
-  Write-Host ("OK: Azurite is listening on {0}:{1}/{2}/{3} (pid={4})" -f $HostName,$BlobPort,$QueuePort,$TablePort,$p.Id)
+  Write-Host ("OK: Azurite tables is listening on {0}:{1} (pid={2})" -f $HostName,$TablePort,$p.Id)
   return $p
 }
 function Try-ParseJson {
@@ -392,5 +380,6 @@ Write-Host ("Stopping Express (pid={0})" -f $proc.Id)
 try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
 
 exit 0
+
 
 

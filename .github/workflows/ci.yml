@@ -1,14 +1,19 @@
-﻿name: CI - Build + Regression + Smoke
+name: CI - Build + Regression + Smoke
 
 on:
   pull_request:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-smoke:
-    runs-on: windows-2022
+    runs-on: ubuntu-latest
 
     env:
       NODE_ENV: test
@@ -57,22 +62,34 @@ jobs:
 
           $azDir = Join-Path $env:RUNNER_TEMP "azurite"
           New-Item -ItemType Directory -Force -Path $azDir | Out-Null
+
           $azLog = Join-Path $env:RUNNER_TEMP "azurite.log"
+
           # Start Azurite (blob/queue/table) using local devDependency (installed via npm ci)
           $p = Start-Process -FilePath "npx" -ArgumentList @(
-            "--yes","azurite",            "--silent",
+            "--yes","azurite","--silent",
             "--location", $azDir,
             "--debug", $azLog,
             "--blobHost","127.0.0.1","--blobPort","10000",
             "--queueHost","127.0.0.1","--queuePort","10001",
             "--tableHost","127.0.0.1","--tablePort","10002"
-          ) -WindowStyle Hidden -PassThru
+          ) -PassThru
 
           function Wait-Port([int]$port, [int]$seconds = 180) {
             $deadline = (Get-Date).AddSeconds($seconds)
             while ((Get-Date) -lt $deadline) {
-              $ok = Test-NetConnection -ComputerName 127.0.0.1 -Port $port -WarningAction SilentlyContinue
-              if ($ok.TcpTestSucceeded) { return $true }
+              try {
+                $client = New-Object System.Net.Sockets.TcpClient
+                $iar = $client.BeginConnect("127.0.0.1", $port, $null, $null)
+                if ($iar.AsyncWaitHandle.WaitOne(250)) {
+                  $client.EndConnect($iar)
+                  $client.Close()
+                  return $true
+                }
+                $client.Close()
+              } catch {
+                # keep waiting
+              }
               Start-Sleep -Milliseconds 250
             }
             return $false
@@ -91,7 +108,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          .\scripts\ci-run-express-smoke.ps1
+          ./scripts/ci-run-express-smoke.ps1
 
       - name: Dump Express logs (on failure)
         if: failure()

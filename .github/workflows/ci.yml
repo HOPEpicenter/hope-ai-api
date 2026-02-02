@@ -1,4 +1,4 @@
-name: CI - Build + Regression + Smoke
+﻿name: CI - Build + Regression + Smoke
 
 on:
   pull_request:
@@ -14,7 +14,6 @@ concurrency:
 jobs:
   build-and-smoke:
     runs-on: ubuntu-latest
-
     env:
       NODE_ENV: test
       # Express app expects this key for smoke script requests
@@ -118,3 +117,4 @@ jobs:
           if ($env:EXPRESS_OUT_LOG -and (Test-Path $env:EXPRESS_OUT_LOG)) { Get-Content $env:EXPRESS_OUT_LOG -Tail 200 }
           Write-Host "==== EXPRESS ERR (tail 200) ====" -ForegroundColor Yellow
           if ($env:EXPRESS_ERR_LOG -and (Test-Path $env:EXPRESS_ERR_LOG)) { Get-Content $env:EXPRESS_ERR_LOG -Tail 200 }
+

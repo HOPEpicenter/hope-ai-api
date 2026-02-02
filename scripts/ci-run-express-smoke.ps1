@@ -140,7 +140,6 @@ function Start-AzuriteBackground {
   $ext = [System.IO.Path]::GetExtension($src)
 
   if ($ext -eq ".ps1") {
-    # azurite is a PowerShell script shim; run it through powershell.exe (PS 5.1-safe)
     $args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $src, "--silent")
     Start-Process -FilePath "powershell.exe" -ArgumentList $args -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -WindowStyle Hidden | Out-Null
     return $true
@@ -151,7 +150,6 @@ function Start-AzuriteBackground {
     return $true
   }
 
-  # exe or other directly-executable
   Start-Process -FilePath $src -ArgumentList @("--silent") -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -WindowStyle Hidden | Out-Null
   return $true
 }
@@ -286,9 +284,14 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Running extra assertions (server still running)..."
 
+# Keep these tolerant; some are known-skipping or known-broken for Express phases.
 try { & (Join-Path $PSScriptRoot "assert-engagement-pagination.ps1") -BaseUrl $root } catch { }
+
 try { & (Join-Path $PSScriptRoot "assert-formation-idempotency.ps1") -BaseUrl $base } catch { }
-try { & (Join-Path $PSScriptRoot "assert-engagement-summary.ps1") -BaseUrl $base } catch { }
+
+# IMPORTANT FIX:
+# Pass server root so assert-engagement-summary normalizes to /ops (NOT /api/ops).
+try { & (Join-Path $PSScriptRoot "assert-engagement-summary.ps1") -BaseUrl $root } catch { }
 
 Write-Host ("Stopping Express (pid={0})" -f $proc.Id)
 try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }

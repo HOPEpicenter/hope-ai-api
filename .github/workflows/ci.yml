@@ -1,4 +1,4 @@
-name: CI - Build + Regression + Smoke
+﻿name: CI - Build + Regression + Smoke
 
 on:
   pull_request:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-smoke:
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     env:
       NODE_ENV: test
@@ -92,6 +92,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           .\scripts\ci-run-express-smoke.ps1
+
       - name: Dump Express logs (on failure)
         if: failure()
         shell: pwsh

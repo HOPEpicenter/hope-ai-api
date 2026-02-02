@@ -13,6 +13,7 @@ const visitorsRepository = new AzureTableVisitorsRepository();
 const formationEventsRepository = new AzureTableFormationEventsRepository();
 
 app.use("/ops", createOpsRouter(visitorsRepository, formationEventsRepository));
+app.use("/api", createOpsRouter(visitorsRepository, formationEventsRepository));
 
 /**
  * Global JSON error handler

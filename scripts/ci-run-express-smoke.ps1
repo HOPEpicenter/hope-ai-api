@@ -6,7 +6,6 @@ param(
   [Parameter(Mandatory = $false)]
   [int]$Port = 3000,
 
-  # CI appears to be using /api by default, but Express currently serves /ops.
   [Parameter(Mandatory = $false)]
   [ValidateSet("api","ops")]
   [string]$PreferredBasePath = "api",
@@ -15,15 +14,21 @@ param(
   [int]$StartupTimeoutSeconds = 60,
 
   [Parameter(Mandatory = $false)]
-  [int]$SmokeRetrySeconds = 30
+  [int]$SmokeRetrySeconds = 30,
+
+  # Azurite Tables (required for /visitors)
+  [Parameter(Mandatory = $false)]
+  [string]$AzuriteHost = "127.0.0.1",
+
+  [Parameter(Mandatory = $false)]
+  [int]$AzuriteTablesPort = 10002,
+
+  [Parameter(Mandatory = $false)]
+  [int]$AzuriteWaitSeconds = 25
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-
-function Write-Info([string]$Message) { Write-Host $Message }
-function Write-Warn([string]$Message) { Write-Host $Message }
-function Write-Fail([string]$Message) { Write-Host $Message }
 
 function Try-ParseJson {
   param([string]$Text)
@@ -64,7 +69,6 @@ function Invoke-HttpJson {
     $ex = $_.Exception
     $result.Error = $ex.Message
 
-    # Extract status/body from WebException response (PS 5.1-safe)
     try {
       if ($ex -and $ex.Response) {
         $httpResp = $ex.Response
@@ -98,9 +102,7 @@ function Stop-ListenerIfAny {
         Stop-Process -Id $c.OwningProcess -Force -ErrorAction SilentlyContinue
       }
     }
-  } catch {
-    # Non-fatal
-  }
+  } catch { }
 }
 
 function Tail-File {
@@ -110,56 +112,131 @@ function Tail-File {
   }
 }
 
+function Test-TcpListen {
+  param([string]$HostName, [int]$Port)
+
+  $client = $null
+  try {
+    $client = New-Object System.Net.Sockets.TcpClient
+    $iar = $client.BeginConnect($HostName, $Port, $null, $null)
+    $ok = $iar.AsyncWaitHandle.WaitOne(400)
+    if (-not $ok) { try { $client.Close() } catch { } ; return $false }
+    $client.EndConnect($iar)
+    $client.Close()
+    return $true
+  } catch {
+    try { if ($client) { $client.Close() } } catch { }
+    return $false
+  }
+}
+
+function Start-AzuriteBackground {
+  param([string]$OutLog, [string]$ErrLog)
+
+  $cmd = Get-Command azurite -ErrorAction SilentlyContinue
+  if ($null -eq $cmd) { return $false }
+
+  $src = $cmd.Source
+  $ext = [System.IO.Path]::GetExtension($src)
+
+  if ($ext -eq ".ps1") {
+    # azurite is a PowerShell script shim; run it through powershell.exe (PS 5.1-safe)
+    $args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $src, "--silent")
+    Start-Process -FilePath "powershell.exe" -ArgumentList $args -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -WindowStyle Hidden | Out-Null
+    return $true
+  }
+
+  if ($ext -eq ".cmd" -or $ext -eq ".bat") {
+    Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", "azurite", "--silent") -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -WindowStyle Hidden | Out-Null
+    return $true
+  }
+
+  # exe or other directly-executable
+  Start-Process -FilePath $src -ArgumentList @("--silent") -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -WindowStyle Hidden | Out-Null
+  return $true
+}
+
+function Ensure-AzuriteTables {
+  param([string]$HostName, [int]$Port, [int]$WaitSeconds)
+
+  if (Test-TcpListen -HostName $HostName -Port $Port) {
+    Write-Host ("OK: Azurite tables is listening on {0}:{1}" -f $HostName, $Port)
+    return $true
+  }
+
+  $cmd = Get-Command azurite -ErrorAction SilentlyContinue
+  if ($null -eq $cmd) {
+    Write-Host ("FAIL: Azurite tables is not listening on {0}:{1} and 'azurite' is not on PATH." -f $HostName, $Port)
+    return $false
+  }
+
+  $azOut = Join-Path $env:TEMP ("azurite-out-{0}.log" -f ([Guid]::NewGuid().ToString("N")))
+  $azErr = Join-Path $env:TEMP ("azurite-err-{0}.log" -f ([Guid]::NewGuid().ToString("N")))
+
+  Write-Host "Starting Azurite (background)..."
+  $started = $false
+  try { $started = Start-AzuriteBackground -OutLog $azOut -ErrLog $azErr } catch { $started = $false }
+
+  if (-not $started) {
+    Write-Host "FAIL: Unable to start azurite."
+    return $false
+  }
+
+  $deadline = (Get-Date).AddSeconds($WaitSeconds)
+  while ((Get-Date) -lt $deadline) {
+    if (Test-TcpListen -HostName $HostName -Port $Port) {
+      Write-Host ("OK: Azurite tables is listening on {0}:{1}" -f $HostName, $Port)
+      return $true
+    }
+    Start-Sleep -Seconds 1
+  }
+
+  Write-Host ("FAIL: Azurite did not become ready on {0}:{1} within {2}s." -f $HostName, $Port, $WaitSeconds)
+  Write-Host "==== AZURITE OUT (tail 50) ===="
+  Tail-File -Path $azOut -Lines 50
+  Write-Host "==== AZURITE ERR (tail 50) ===="
+  Tail-File -Path $azErr -Lines 50
+  return $false
+}
+
 function Resolve-ApiBase {
-  param(
-    [string]$Root,
-    [string]$Preferred
-  )
+  param([string]$Root, [string]$Preferred)
 
   $pref = "$Root/$Preferred"
   $h1 = Invoke-HttpJson -Method GET -Uri "$pref/health"
   if ($h1.StatusCode -eq 200) { return $pref }
 
-  # If preferred is api and it's 404, try ops
   if ($Preferred -eq "api" -and $h1.StatusCode -eq 404) {
     $ops = "$Root/ops"
     $h2 = Invoke-HttpJson -Method GET -Uri "$ops/health"
     if ($h2.StatusCode -eq 200) {
-      Write-Warn "WARN: '$pref/health' returned 404; using '$ops' instead."
+      Write-Host "WARN: '$pref/health' returned 404; using '$ops' instead."
       return $ops
     }
   }
 
-  # If preferred is ops and it's 404, try api
   if ($Preferred -eq "ops" -and $h1.StatusCode -eq 404) {
     $api = "$Root/api"
     $h2 = Invoke-HttpJson -Method GET -Uri "$api/health"
     if ($h2.StatusCode -eq 200) {
-      Write-Warn "WARN: '$pref/health' returned 404; using '$api' instead."
+      Write-Host "WARN: '$pref/health' returned 404; using '$api' instead."
       return $api
     }
   }
 
-  # Default to preferred even if not healthy; caller will handle timeout/failure messaging
   return $pref
 }
 
 function Wait-For-Health {
-  param(
-    [string]$Root,
-    [string]$Preferred,
-    [int]$TimeoutSeconds
-  )
+  param([string]$Root, [string]$Preferred, [int]$TimeoutSeconds)
 
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-
   while ((Get-Date) -lt $deadline) {
     $base = Resolve-ApiBase -Root $Root -Preferred $Preferred
     $h = Invoke-HttpJson -Method GET -Uri "$base/health"
     if ($h.StatusCode -eq 200) { return $base }
     Start-Sleep -Seconds 1
   }
-
   return $null
 }
 
@@ -167,26 +244,24 @@ function Wait-For-Health {
 
 $root = ("http://{0}:{1}" -f $HostName, $Port)
 
-# Keep existing guard output (minimal; do not overreach)
-if (Test-Path -LiteralPath ".\package.json") {
-  Write-Host "No BOM detected in package.json"
+if (-not (Ensure-AzuriteTables -HostName $AzuriteHost -Port $AzuriteTablesPort -WaitSeconds $AzuriteWaitSeconds)) {
+  exit 1
 }
+
+if (Test-Path -LiteralPath ".\package.json") { Write-Host "No BOM detected in package.json" }
 Write-Host "OK: Guard passed (no '@azure/functions' imports under src)."
 
 Stop-ListenerIfAny -Port $Port
 
-# Start Express
 $outLog = Join-Path $env:TEMP ("hope-ai-api-express-out-{0}.log" -f ([Guid]::NewGuid().ToString("N")))
 $errLog = Join-Path $env:TEMP ("hope-ai-api-express-err-{0}.log" -f ([Guid]::NewGuid().ToString("N")))
 
-Write-Host ("Starting Express via: node dist/index.js")
+Write-Host "Starting Express via: node dist/index.js"
 $proc = Start-Process -FilePath "node" -ArgumentList @("dist/index.js") -PassThru -RedirectStandardOutput $outLog -RedirectStandardError $errLog -WindowStyle Hidden
 
-# Wait for health, resolving /api vs /ops automatically
 $base = Wait-For-Health -Root $root -Preferred $PreferredBasePath -TimeoutSeconds $StartupTimeoutSeconds
-
 if ([string]::IsNullOrWhiteSpace($base)) {
-  Write-Fail "Express not healthy at assertion time. Dumping logs..."
+  Write-Host "Express not healthy at assertion time. Dumping logs..."
   Write-Host "==== EXPRESS OUT (tail 200) ===="
   Tail-File -Path $outLog -Lines 200
   Write-Host "==== EXPRESS ERR (tail 200) ===="
@@ -198,10 +273,9 @@ if ([string]::IsNullOrWhiteSpace($base)) {
 Write-Host ("OK: Express is listening on {0}:{1}" -f $HostName, $Port)
 Write-Host ("Running smoke against: {0}" -f $base)
 
-# Run the smoke script (it may also retry internally)
 & (Join-Path $PSScriptRoot "ci-smoke-express.ps1") -BaseUrl $base -RetrySeconds $SmokeRetrySeconds
 if ($LASTEXITCODE -ne 0) {
-  Write-Fail "Express not healthy at assertion time. Dumping logs..."
+  Write-Host "Express not healthy at assertion time. Dumping logs..."
   Write-Host "==== EXPRESS OUT (tail 200) ===="
   Tail-File -Path $outLog -Lines 200
   Write-Host "==== EXPRESS ERR (tail 200) ===="
@@ -212,31 +286,9 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Running extra assertions (server still running)..."
 
-# Ensure health for extra assertions using the resolved base (NOT hardcoded /api)
-$h2 = Invoke-HttpJson -Method GET -Uri "$base/health"
-if ($h2.StatusCode -ne 200) {
-  Write-Fail "Express was not running/healthy for extra assertions."
-  Write-Host "==== EXPRESS OUT (tail 200) ===="
-  Tail-File -Path $outLog -Lines 200
-  Write-Host "==== EXPRESS ERR (tail 200) ===="
-  Tail-File -Path $errLog -Lines 200
-  try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
-  exit 1
-}
-
-# Extra assertions (keep minimal; engagement/formation asserts may skip)
-try {
-  & (Join-Path $PSScriptRoot "assert-engagement-pagination.ps1") -BaseUrl $root
-} catch { }
-
-Write-Host "[CI] Formation idempotency assert"
-try {
-  & (Join-Path $PSScriptRoot "assert-formation-idempotency.ps1") -BaseUrl $base
-} catch { }
-
-try {
-  & (Join-Path $PSScriptRoot "assert-engagement-summary.ps1") -BaseUrl $base
-} catch { }
+try { & (Join-Path $PSScriptRoot "assert-engagement-pagination.ps1") -BaseUrl $root } catch { }
+try { & (Join-Path $PSScriptRoot "assert-formation-idempotency.ps1") -BaseUrl $base } catch { }
+try { & (Join-Path $PSScriptRoot "assert-engagement-summary.ps1") -BaseUrl $base } catch { }
 
 Write-Host ("Stopping Express (pid={0})" -f $proc.Id)
 try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }

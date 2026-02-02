@@ -94,6 +94,10 @@ function Invoke-HttpJson {
 function Stop-ListenerIfAny {
   param([int]$Port)
 
+  # On Linux/macOS runners this cmdlet may not exist; and on hosted runners we don't need it.
+  $cmd = Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue
+  if ($null -eq $cmd) { return }
+
   try {
     $conns = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
     foreach ($c in $conns) {
@@ -294,3 +298,4 @@ Write-Host ("Stopping Express (pid={0})" -f $proc.Id)
 try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
 
 exit 0
+

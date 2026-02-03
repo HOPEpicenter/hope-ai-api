@@ -237,16 +237,16 @@ function Start-AzuriteBackground {
 
   if ($ext -eq ".ps1") {
     $args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $src, "--silent")
-    Start-Process -FilePath "powershell.exe" -ArgumentList $args -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -WindowStyle Hidden | Out-Null
+    Start-Process -FilePath "powershell.exe" -ArgumentList $args -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog | Out-Null
     return $true
   }
 
   if ($ext -eq ".cmd" -or $ext -eq ".bat") {
-    Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", "azurite", "--silent") -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -WindowStyle Hidden | Out-Null
+    Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", "azurite", "--silent") -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog | Out-Null
     return $true
   }
 
-  Start-Process -FilePath $src -ArgumentList @("--silent") -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -WindowStyle Hidden | Out-Null
+  Start-Process -FilePath $src -ArgumentList @("--silent") -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog | Out-Null
   return $true
 }
 
@@ -349,7 +349,7 @@ $outLog = Join-Path (Get-TempRoot) ("hope-ai-api-express-out-{0}.log" -f ([Guid]
 $errLog = Join-Path (Get-TempRoot) ("hope-ai-api-express-err-{0}.log" -f ([Guid]::NewGuid().ToString("N")))
 
 Write-Host "Starting Express via: node dist/index.js"
-$proc = Start-Process -FilePath "node" -ArgumentList @("dist/index.js") -PassThru -RedirectStandardOutput $outLog -RedirectStandardError $errLog -WindowStyle Hidden
+$proc = Start-Process -FilePath "node" -ArgumentList @("dist/index.js") -PassThru -RedirectStandardOutput $outLog -RedirectStandardError $errLog
 
 $base = Wait-For-Health -Root $root -Preferred $PreferredBasePath -TimeoutSeconds $StartupTimeoutSeconds
 if ([string]::IsNullOrWhiteSpace($base)) {
@@ -388,6 +388,7 @@ Write-Host ("Stopping Express (pid={0})" -f $proc.Id)
 try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
 
 exit 0
+
 
 
 

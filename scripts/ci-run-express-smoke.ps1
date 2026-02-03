@@ -264,8 +264,8 @@ function Ensure-AzuriteTables {
     return $false
   }
 
-  $azOut = Join-Path $env:TEMP ("azurite-out-{0}.log" -f ([Guid]::NewGuid().ToString("N")))
-  $azErr = Join-Path $env:TEMP ("azurite-err-{0}.log" -f ([Guid]::NewGuid().ToString("N")))
+  $azOut = Join-Path (Get-TempRoot) ("azurite-out-{0}.log" -f ([Guid]::NewGuid().ToString("N")))
+  $azErr = Join-Path (Get-TempRoot) ("azurite-err-{0}.log" -f ([Guid]::NewGuid().ToString("N")))
 
   Write-Host "Starting Azurite (background)..."
   $started = $false
@@ -345,8 +345,8 @@ Write-Host "OK: Guard passed (no '@azure/functions' imports under src)."
 
 Stop-ListenerIfAny -Port $Port
 
-$outLog = Join-Path $env:TEMP ("hope-ai-api-express-out-{0}.log" -f ([Guid]::NewGuid().ToString("N")))
-$errLog = Join-Path $env:TEMP ("hope-ai-api-express-err-{0}.log" -f ([Guid]::NewGuid().ToString("N")))
+$outLog = Join-Path (Get-TempRoot) ("hope-ai-api-express-out-{0}.log" -f ([Guid]::NewGuid().ToString("N")))
+$errLog = Join-Path (Get-TempRoot) ("hope-ai-api-express-err-{0}.log" -f ([Guid]::NewGuid().ToString("N")))
 
 Write-Host "Starting Express via: node dist/index.js"
 $proc = Start-Process -FilePath "node" -ArgumentList @("dist/index.js") -PassThru -RedirectStandardOutput $outLog -RedirectStandardError $errLog -WindowStyle Hidden
@@ -388,6 +388,7 @@ Write-Host ("Stopping Express (pid={0})" -f $proc.Id)
 try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
 
 exit 0
+
 
 
 

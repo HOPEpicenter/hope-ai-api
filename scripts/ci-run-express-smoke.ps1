@@ -95,7 +95,7 @@ function Ensure-AzuriteFromNodeModules {
     throw "Azurite not found at $azJs. Ensure it's a devDependency and npm ci has run."
   }
 
-  $tempRoot = Get-TempRoot
+  $tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } elseif ($env:TEMP) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
   $azDir = Join-Path $tempRoot "azurite"
   New-Item -ItemType Directory -Force -Path $azDir | Out-Null
 

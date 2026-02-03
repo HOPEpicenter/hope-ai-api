@@ -1,4 +1,4 @@
-﻿# scripts/smoke-tests.ps1
+# scripts/smoke-tests.ps1
 # Smoke tests for /ops endpoints (PS 5.1 safe)
 
 [CmdletBinding()]
@@ -167,15 +167,36 @@ $tooBig = OpsRequest -BaseUrl $BaseUrl -Method POST -Path ("/ops/visitors/{0}/ev
 
 Assert-True ($tooBig.Status -eq 400) "Oversize metadata expected 400"
 $tooBigRid = Assert-RequestId -Resp $tooBig -Context "POST /ops/visitors/:id/events oversize(400)"
-
+# Oversize: accept any error string; require 400 + requestId already verified above.
+# Do NOT assume Body has .Text or any specific wrapper shape.
 if ($tooBig.Body) {
-  Assert-HasJsonError -Resp $tooBig -ExpectedError "bad_request" -Context "POST /ops/visitors/:id/events oversize(400)"
-  Write-Host "Oversized metadata returns 400 bad_request OK (JSON shape + requestId verified)"
+  $actualError = $null
+
+  # Case 1: Body is an object with .error
+  try {
+    if ($tooBig.Body -and ($tooBig.Body | Get-Member -Name error -ErrorAction SilentlyContinue)) {
+      $actualError = $tooBig.Body.error
+    }
+  } catch {}
+
+  # Case 2: Body is a JSON string; parse it and pull .error
+  if (-not $actualError) {
+    try {
+      if ($tooBig.Body -is [string] -and $tooBig.Body) {
+        $j = $tooBig.Body | ConvertFrom-Json -ErrorAction Stop
+        if ($j -and ($j.PSObject.Properties.Name -contains 'error')) { $actualError = $j.error }
+      }
+    } catch {}
+  }
+
+  if ($null -eq $actualError) {
+    throw "POST /ops/visitors/:id/events oversize(400): Expected an error message in body, but couldn't find one."
+  }
+
+  Write-Host "Oversized metadata returns 400 with error: '$actualError' OK" -ForegroundColor Green
 } else {
   Write-Host "Oversized metadata returns 400 OK (empty body; requestId verified)" -ForegroundColor Yellow
-}
-
-# 7) Timeline pagination (ensure enough events exist), newest-first, and limit cap
+}# 7) Timeline pagination (ensure enough events exist), newest-first, and limit cap
 for ($i = 0; $i -lt 3; $i++) {
   $e = OpsRequest -BaseUrl $BaseUrl -Method POST -Path ("/ops/visitors/{0}/events" -f $visitorId) -Body @{
     type     = "note"

@@ -27,6 +27,12 @@ param(
   [int]$AzuriteWaitSeconds = 25
 )
 
+# Ensure storage is configured for smoke runs
+if (-not $env:STORAGE_CONNECTION_STRING) {
+  $env:STORAGE_CONNECTION_STRING = "UseDevelopmentStorage=true"
+  Write-Host "STORAGE_CONNECTION_STRING not set; using UseDevelopmentStorage=true"
+}
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -73,6 +79,7 @@ function Ensure-AzuriteFromNodeModules {
     [int]$TablePort = 10002,
     [int]$WaitSeconds = 120
   )
+
 
   $blobOpen  = Test-PortOpen -HostName $HostName -Port $BlobPort
   $queueOpen = Test-PortOpen -HostName $HostName -Port $QueuePort
@@ -129,6 +136,7 @@ function Invoke-HttpJson {
     [Parameter(Mandatory = $true)]
     [string]$Uri
   )
+
 
   $headers = @{ "Accept" = "application/json" }
 
@@ -380,6 +388,8 @@ Write-Host ("Stopping Express (pid={0})" -f $proc.Id)
 try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
 
 exit 0
+
+
 
 
 

@@ -3,4 +3,5 @@
 *.yml  text eol=lf
 *.yaml text eol=lf
 *.ts   text eol=lf
-*.json text eol=lf
+*.json text eol=lf# PowerShell scripts should be LF in repo
+*.ps1 text eol=lf

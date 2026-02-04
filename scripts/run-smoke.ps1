@@ -5,6 +5,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 
+
+$script:AzStarted = $false
+$script:AzPid = $null
 # ---- guard: scripts integrity (ops.ps1 etc.) ----
 $guard = Join-Path $PSScriptRoot "guard-scripts.ps1"
 if (-not (Test-Path -LiteralPath $guard)) {
@@ -42,6 +45,118 @@ function Find-RepoRoot {
   }
   throw "Could not find repo root (package.json) starting from: $StartDir"
 }
+
+# Ensure Azurite Tables is available when using UseDevelopmentStorage=true
+function Ensure-AzuriteTables {
+  param([int]$Port = 10002)
+
+  $cs = $env:STORAGE_CONNECTION_STRING
+  if (-not $cs) { return }
+  if ($cs -notmatch '(?i)UseDevelopmentStorage\s*=\s*true') { return }
+  $isOpen = (Test-NetConnection -ComputerName 127.0.0.1 -Port $Port -WarningAction SilentlyContinue).TcpTestSucceeded
+  if ($isOpen) {
+    $listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+
+    if ($env:OPS_AZURITE_KILL_EXISTING -eq "1" -and $listener) {
+      Write-Host ("Stopping existing listener on 127.0.0.1:{0} (pid={1}) because OPS_AZURITE_KILL_EXISTING=1" -f $Port, $listener.OwningProcess) -ForegroundColor Yellow
+      Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+
+      # wait briefly for port to free
+      $deadlineKill = (Get-Date).AddSeconds(5)
+      do {
+        Start-Sleep -Milliseconds 200
+        $isOpen = (Test-NetConnection -ComputerName 127.0.0.1 -Port $Port -WarningAction SilentlyContinue).TcpTestSucceeded
+      } while ($isOpen -and (Get-Date) -lt $deadlineKill)
+
+      if ($isOpen) { throw "Port $Port is still in use after attempting to stop existing listener." }
+    }
+    else {
+      if ($listener) {
+        $proc = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
+        if ($proc) {
+          Write-Host ("Azurite Tables already listening on 127.0.0.1:{0} (pid={1}, name={2})" -f $Port, $proc.Id, $proc.Name)
+        } else {
+          Write-Host ("Azurite Tables already listening on 127.0.0.1:{0} (pid={1})" -f $Port, $listener.OwningProcess)
+        }
+      } else {
+        Write-Host ("Azurite Tables already listening on 127.0.0.1:{0}" -f $Port)
+      }
+      return
+    }
+  }
+
+  if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw "node not found in PATH (required for Azurite)" }
+  if (-not (Get-Command npm  -ErrorAction SilentlyContinue)) { throw "npm not found in PATH (required for Azurite)" }
+
+  $repoRoot  = Find-RepoRoot -StartDir $PSScriptRoot
+  $logsDir   = Join-Path $repoRoot "logs"
+  $azDataDir = Join-Path $repoRoot ".azurite"
+  New-Item -ItemType Directory -Force -Path $logsDir   | Out-Null
+  New-Item -ItemType Directory -Force -Path $azDataDir | Out-Null
+
+  $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+  $azOut = Join-Path $logsDir ("azurite-autostart-{0}.out.log" -f $stamp)
+  $azErr = Join-Path $logsDir ("azurite-autostart-{0}.err.log" -f $stamp)
+
+  $azJs = Join-Path $repoRoot "node_modules\azurite\dist\src\azurite.js"
+
+  $argsCommon = @(
+    "--silent",
+    "--location", $azDataDir,
+    "--blobHost", "127.0.0.1", "--blobPort", "10000",
+    "--queueHost","127.0.0.1", "--queuePort","10001",
+    "--tableHost","127.0.0.1", "--tablePort", "$Port"
+  )
+
+  Write-Host ("Starting Azurite (tables:{0})..." -f $Port)
+
+  $p = $null
+
+  if (Test-Path $azJs) {
+    # Best: use local devDependency (avoids npx/.cmd shim issues)
+    $p = Start-Process -FilePath "node" -ArgumentList (@($azJs) + $argsCommon) `
+      -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
+      -RedirectStandardOutput $azOut -RedirectStandardError $azErr
+  } else {
+    $azCmd = Get-Command azurite -ErrorAction SilentlyContinue
+    if ($azCmd) {
+      # Next best: azurite on PATH
+      $p = Start-Process -FilePath "cmd.exe" -ArgumentList (@("/c","azurite") + $argsCommon) `
+        -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
+        -RedirectStandardOutput $azOut -RedirectStandardError $azErr
+    } else {
+      # Fallback: npx (must run through cmd.exe on Windows)
+      $npx = Get-Command npx -ErrorAction SilentlyContinue
+      if (-not $npx) { throw "Neither local node_modules azurite nor 'azurite' nor 'npx' found. Run: npm ci" }
+
+      $cmdParts = @("npx","--yes","azurite") + $argsCommon
+      $cmdLine  = ($cmdParts | ForEach-Object {
+        $s = [string]$_
+        if ($s -match '\s|"' ) { '"' + ($s -replace '"','\"') + '"' } else { $s }
+      }) -join ' '
+
+      $p = Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", $cmdLine) `
+        -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
+        -RedirectStandardOutput $azOut -RedirectStandardError $azErr
+    }
+  }
+
+  if (-not $p) { throw "Failed to start Azurite (unknown reason)." }
+
+  $deadline = (Get-Date).AddSeconds(45)
+  do {
+    Start-Sleep -Milliseconds 500
+    if ($p.HasExited) { throw ("Azurite exited early (exit={0}). See: {1} ; {2}" -f $p.ExitCode,$azOut,$azErr) }
+    $isOpen = (Test-NetConnection -ComputerName 127.0.0.1 -Port $Port -WarningAction SilentlyContinue).TcpTestSucceeded
+  } while (-not $isOpen -and (Get-Date) -lt $deadline)
+
+  if (-not $isOpen) { throw ("Azurite did not open port {0} in time. See: {1} ; {2}" -f $Port,$azOut,$azErr) }
+
+  Write-Host ("Azurite Tables is listening on 127.0.0.1:{0} (pid={1})" -f $Port,$p.Id)
+  $script:AzStarted = $true
+  $script:AzPid = $p.Id
+}
+
 
 function Import-DotEnv {
   param([Parameter(Mandatory=$true)][string]$Path)
@@ -118,6 +233,8 @@ if (Test-Path $envPath) {
   Write-Host ("No .env found at: " + $envPath + " (ok if env vars are set in shell/CI)") -ForegroundColor DarkGray
 }# Required for server boot
 Require-Env -Name "STORAGE_CONNECTION_STRING"
+Ensure-AzuriteTables
+
 Write-Host "STORAGE_CONNECTION_STRING is set (value not shown)" -ForegroundColor DarkGray
 
 # Run legacy API error-shape guard (fails CI if old patterns reappear)
@@ -208,7 +325,13 @@ catch {
 }
 finally {
   Pop-Location
-  if ($serverProc -and -not $serverProc.HasExited) {
+  if ($script:AzStarted -and $script:AzPid) {
+    try {
+      Write-Host "
+== Stop Azurite ==" -ForegroundColor DarkGray
+      Stop-Process -Id $script:AzPid -Force -ErrorAction SilentlyContinue
+    } catch { }
+  }  if ($serverProc -and -not $serverProc.HasExited) {
     try {
       Write-Host "`n== Stop server =="
       Stop-Process -Id $serverProc.Id -Force -ErrorAction SilentlyContinue

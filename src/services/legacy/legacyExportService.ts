@@ -1,6 +1,6 @@
 ﻿import { AzureTableVisitorsRepository } from "../../repositories/visitorsRepository";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
+import { FormationEventsRepository } from "../../repositories/formationEventsRepository";
 import { mergeTimelines } from "../../domain/integration/mergeTimelines.v1";
 import { makeStableKey } from "../../domain/integration/mergeTimelines.v1";
 import { EngagementEventEnvelopeV1 } from "../../contracts/engagementEvent.v1";
@@ -18,7 +18,7 @@ export class LegacyExportService {
   constructor(
     private visitorsRepo: AzureTableVisitorsRepository,
     private engagementRepo: EngagementEventsRepository,
-    private formationRepo: AzureTableFormationEventsRepository
+    private formationRepo: FormationEventsRepository
   ) {}
 
   /**
@@ -49,3 +49,4 @@ export class LegacyExportService {
     };
   }
 }
+

@@ -1,4 +1,4 @@
-﻿import { getTableClient } from "../storage/tableClient";
+import { getTableClient } from "../storage/tableClient";
 import { randomUUID } from "crypto";
 
 export type VisitorEntity = {
@@ -21,6 +21,7 @@ export type Visitor = {
 export interface VisitorsRepository {
   create(input: { name: string; email?: string }): Promise<Visitor>;
   getById(visitorId: string): Promise<Visitor | null>;
+  list(input: { limit: number }): Promise<{ items: Visitor[]; count: number }>;
   upsert(visitor: Visitor): Promise<Visitor>;
 }
 
@@ -73,6 +74,21 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     }
   }
 
+  async list(input: { limit: number }): Promise<{ items: Visitor[]; count: number }> {
+    const table = await getTableClient(TABLE);
+    const limit = Math.max(1, Math.min(input?.limit ?? 5, 200));
+
+    const items: Visitor[] = [];
+    const filter = "PartitionKey eq 'VISITOR'";
+
+    for await (const e of table.listEntities<VisitorEntity>({ queryOptions: { filter } })) {
+      items.push(toVisitor(e));
+      if (items.length >= limit) break;
+    }
+
+    return { items, count: items.length };
+  }
+
   async upsert(visitor: Visitor): Promise<Visitor> {
     const table = await getTableClient(TABLE);
     const now = nowIso();
@@ -90,3 +106,5 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     return toVisitor(entity);
   }
 }
+
+

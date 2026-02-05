@@ -4,6 +4,8 @@ import { createOpsRouter } from "./routes/ops/opsRouter";
 import { formationRouter } from "./routes/formation";
 
 import { integrationRouter } from "./routes/integration";
+
+import { legacyRouter } from "./routes/legacy";
 import { requestIdMiddleware, errorMiddleware } from "./http/middleware";
 import { requestLogMiddleware } from "./http/requestLog";
 import { AzureTableVisitorsRepository, AzureTableFormationEventsRepository } from "./repositories";
@@ -23,6 +25,8 @@ app.use("/api", createOpsRouter(visitorsRepository, formationEventsRepository));
 app.use("/api", formationRouter);
 
 app.use("/api", integrationRouter);
+
+app.use("/api", legacyRouter);
 /**
  * Global JSON error handler
  * Ensures we never leak Express HTML error pages to API clients.
@@ -42,6 +46,7 @@ app.listen(port, () => {
   // eslint-disable-next-line no-console
   console.log(`hope-ai-api listening on port ${port}`);
 });
+
 
 
 

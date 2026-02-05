@@ -4,7 +4,9 @@ import { formationEventsRouter } from "./events";
 import { formationTimelineRouter } from "./timeline";
 
 export const formationRouter = Router();
-formationRouter.use(requireApiKey);
 
-formationRouter.use(formationEventsRouter);
-formationRouter.use(formationTimelineRouter);
+// Apply API key only to /formation/* (never affect /visitors, /engagements, etc.)
+formationRouter.use("/formation", requireApiKey);
+
+formationRouter.use("/formation", formationEventsRouter);
+formationRouter.use("/formation", formationTimelineRouter);

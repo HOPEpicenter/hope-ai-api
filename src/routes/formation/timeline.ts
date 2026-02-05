@@ -7,7 +7,7 @@ export const formationTimelineRouter = Router();
 
 const service = new FormationService(new AzureTableFormationEventsRepository());
 
-formationTimelineRouter.get("/formation/timeline", async (req, res, next) => {
+formationTimelineRouter.get("/timeline", async (req, res, next) => {
   try {
     const parsed = validateTimelineQueryV1(req.query);
     if (!parsed.ok) {
@@ -37,3 +37,4 @@ formationTimelineRouter.get("/formation/timeline", async (req, res, next) => {
     return next(err);
   }
 });
+

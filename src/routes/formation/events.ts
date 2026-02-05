@@ -7,7 +7,7 @@ export const formationEventsRouter = Router();
 
 const service = new FormationService(new AzureTableFormationEventsRepository());
 
-formationEventsRouter.post("/formation/events", async (req, res, next) => {
+formationEventsRouter.post("/events", async (req, res, next) => {
   try {
     const parsed = validateEngagementEventEnvelopeV1(req.body);
     if (!parsed.ok) {
@@ -31,3 +31,4 @@ formationEventsRouter.post("/formation/events", async (req, res, next) => {
     return next(err);
   }
 });
+

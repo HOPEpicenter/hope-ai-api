@@ -1,5 +1,6 @@
 ﻿import { EngagementEventEnvelopeV1, validateEngagementEventEnvelopeV1 } from "../../contracts/engagementEvent.v1";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
+import { deriveEngagementStatusFromEvents } from "../../domain/engagement/deriveEngagementStatus.v1";
 
 export class EngagementsService {
   constructor(private repo: EngagementEventsRepository) {}
@@ -14,11 +15,23 @@ export class EngagementsService {
     }
 
     const evt = validated.value;
-
     await this.repo.appendEvent(evt as EngagementEventEnvelopeV1);
   }
 
   async readTimeline(visitorId: string, limit: number, cursor?: string) {
     return this.repo.readTimeline(visitorId, limit, cursor);
+  }
+
+  /**
+   * Status v1 is derived from status.transition events (auditable/derivable).
+   * Minimal implementation: read up to 200 events and derive.
+   */
+  async getCurrentStatus(visitorId: string) {
+    const page = await this.repo.readTimeline(visitorId, 200, undefined);
+
+    // Repo returns ascending RowKey order (oldest -> newest).
+    const events = page.items;
+
+    return deriveEngagementStatusFromEvents(visitorId, events);
   }
 }

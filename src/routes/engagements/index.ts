@@ -1,4 +1,6 @@
-import { Router } from "express";
+﻿import { Router } from "express";
+import { engagementsEventsRouter } from "./events";
+import { engagementsTimelineRouter } from "./timeline";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { EngagementRepository } from "../../storage/engagementRepository";
 import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepository";
@@ -76,3 +78,9 @@ engagementsRouter.get("/visitors/:id/engagements/summary", async (req, res) => {
     return res.status(500).json({ ok: false, error: "internal_error" });
   }
 });
+
+
+// Engagement v1 additions (event envelope + timeline contract)
+engagementsRouter.use(engagementsEventsRouter);
+engagementsRouter.use(engagementsTimelineRouter);
+

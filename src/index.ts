@@ -1,5 +1,7 @@
 ﻿import express from "express";
 import { createOpsRouter } from "./routes/ops/opsRouter";
+
+import { formationRouter } from "./routes/formation";
 import { requestIdMiddleware, errorMiddleware } from "./http/middleware";
 import { requestLogMiddleware } from "./http/requestLog";
 import { AzureTableVisitorsRepository, AzureTableFormationEventsRepository } from "./repositories";
@@ -15,6 +17,8 @@ const formationEventsRepository = new AzureTableFormationEventsRepository();
 app.use("/ops", createOpsRouter(visitorsRepository, formationEventsRepository));
 app.use("/api", createOpsRouter(visitorsRepository, formationEventsRepository));
 
+
+app.use("/api", formationRouter);
 /**
  * Global JSON error handler
  * Ensures we never leak Express HTML error pages to API clients.
@@ -34,6 +38,9 @@ app.listen(port, () => {
   // eslint-disable-next-line no-console
   console.log(`hope-ai-api listening on port ${port}`);
 });
+
+
+
 
 
 

@@ -1,5 +1,8 @@
 ﻿import { Router } from "express";
+<<<<<<< HEAD
 import { engagementsStatusRouter } from "./status";
+=======
+>>>>>>> a9b28ba (feat(engagement): envelope v1 + timeline v1 (no deps))
 import { engagementsEventsRouter } from "./events";
 import { engagementsTimelineRouter } from "./timeline";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
@@ -85,7 +88,10 @@ engagementsRouter.get("/visitors/:id/engagements/summary", async (req, res) => {
 engagementsRouter.use(engagementsEventsRouter);
 engagementsRouter.use(engagementsTimelineRouter);
 
+<<<<<<< HEAD
 
 // Engagement status v1 (derived from events)
 engagementsRouter.use(engagementsStatusRouter);
 
+=======
+>>>>>>> a9b28ba (feat(engagement): envelope v1 + timeline v1 (no deps))

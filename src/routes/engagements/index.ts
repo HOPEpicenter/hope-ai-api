@@ -1,4 +1,5 @@
 ﻿import { Router } from "express";
+import { engagementsStatusRouter } from "./status";
 import { engagementsEventsRouter } from "./events";
 import { engagementsTimelineRouter } from "./timeline";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
@@ -83,4 +84,8 @@ engagementsRouter.get("/visitors/:id/engagements/summary", async (req, res) => {
 // Engagement v1 additions (event envelope + timeline contract)
 engagementsRouter.use(engagementsEventsRouter);
 engagementsRouter.use(engagementsTimelineRouter);
+
+
+// Engagement status v1 (derived from events)
+engagementsRouter.use(engagementsStatusRouter);
 

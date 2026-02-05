@@ -366,6 +366,7 @@ Write-Host ("OK: Express is listening on {0}:{1}" -f $HostName, $Port)
 Write-Host ("Running smoke against: {0}" -f $base)
 
 & (Join-Path $PSScriptRoot "ci-smoke-express.ps1") -BaseUrl $base -RetrySeconds $SmokeRetrySeconds
+pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/assert-auth-scoping.ps1 -BaseUrl $base
 if ($LASTEXITCODE -ne 0) {
   Write-Host "Express not healthy at assertion time. Dumping logs..."
   Write-Host "==== EXPRESS OUT (tail 200) ===="
@@ -388,6 +389,11 @@ Write-Host ("Stopping Express (pid={0})" -f $proc.Id)
 try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
 
 exit 0
+
+
+
+
+
 
 
 

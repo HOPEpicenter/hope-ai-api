@@ -1,10 +1,10 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import type { VisitorsRepository } from "../../repositories/visitorsRepository";
 import type {
   FormationEventsRepository,
   FormationEventType,
 } from "../../repositories/formationEventsRepository";
-
+import { createEngagementsRouter } from "./engagements/engagementsRouter";
 import { badRequest, notFound } from "../../http/apiError";
 import {
   parseCreateVisitorBody,
@@ -13,7 +13,6 @@ import {
   parseLimit,
   parseCursor,
 } from "../../http/opsValidation";
-
 const allowedTypes: FormationEventType[] = [
   "note",
   "message",
@@ -23,7 +22,7 @@ const allowedTypes: FormationEventType[] = [
   "follow_up",
   "other",
 ];
-
+import type { EngagementsRepository } from "../../repositories/engagementsRepository";
 function isAllowedType(v: unknown): v is FormationEventType {
   return typeof v === "string" && (allowedTypes as string[]).includes(v);
 }
@@ -38,11 +37,10 @@ function getRequestId(req: any): string | undefined {
   return typeof rid === "string" && rid.length > 0 ? rid : undefined;
 }
 
-export function createOpsRouter(
-  visitorsRepository: VisitorsRepository,
-  formationEventsRepository: FormationEventsRepository
-): Router {
+export function createOpsRouter(visitorsRepository: VisitorsRepository, formationEventsRepository: FormationEventsRepository, engagementsRepository: EngagementsRepository): Router {
   const opsRouter = Router();
+
+  opsRouter.use("/engagements", createEngagementsRouter(engagementsRepository));
 
   opsRouter.get("/health", (req, res) => {
     res.json({ ok: true, requestId: getRequestId(req) });
@@ -218,3 +216,5 @@ export function createOpsRouter(
 
   return opsRouter;
 }
+
+

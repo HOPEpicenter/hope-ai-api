@@ -8,6 +8,7 @@ import { requestIdMiddleware, errorMiddleware } from "./http/middleware";
 import { requestLogMiddleware } from "./http/requestLog";
 import { AzureTableVisitorsRepository, AzureTableFormationEventsRepository } from "./repositories";
 
+import { AzureTableEngagementsRepository } from "./repositories/engagementsRepository";
 process.on("unhandledRejection", (reason) => {
   console.error("UNHANDLED_REJECTION", reason);
 });
@@ -23,13 +24,13 @@ app.get("/api/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 app.use(express.json({ limit: "256kb" }));
-app.use((req, _res, next) => { console.log("REQ_IN", req.method, req.originalUrl); next(); });
 app.use(requestIdMiddleware);
 app.use(requestLogMiddleware);
 // Real storage-backed repositories
 const visitorsRepository = new AzureTableVisitorsRepository();
 const formationEventsRepository = new AzureTableFormationEventsRepository();
-app.use("/ops", createOpsRouter(visitorsRepository, formationEventsRepository));
+const engagementsRepository = new AzureTableEngagementsRepository();
+app.use("/ops", createOpsRouter(visitorsRepository, formationEventsRepository, engagementsRepository));
 // Public API routes
 app.use("/api/visitors", visitorsRouter(visitorsRepository));
 app.use("/api", formationRouter);
@@ -54,6 +55,8 @@ app.listen(port, () => {
   console.log(`hope-ai-api listening on port ${port}`);
 });
 // Public API routes
+
+
 
 
 

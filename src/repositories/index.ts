@@ -1,4 +1,4 @@
-﻿import { AzureTableVisitorsRepository } from "./visitorsRepository";
+import { AzureTableVisitorsRepository } from "./visitorsRepository";
 import { AzureTableFormationEventsRepository } from "./formationEventsRepository";
 
 export { AzureTableVisitorsRepository, AzureTableFormationEventsRepository };
@@ -18,3 +18,5 @@ export function createRepositories() {
     formationEvents: new AzureTableFormationEventsRepository(),
   };
 }
+export * from "./engagementsRepository";
+

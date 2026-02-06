@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
   [Parameter(Mandatory = $false)]
   [string]$HostName = "127.0.0.1",
@@ -33,6 +33,11 @@ if (-not $env:STORAGE_CONNECTION_STRING) {
   Write-Host "STORAGE_CONNECTION_STRING not set; using UseDevelopmentStorage=true"
 }
 
+# Keep AzureWebJobsStorage aligned with STORAGE_CONNECTION_STRING for consistency
+if (-not $env:AzureWebJobsStorage) {
+  $env:AzureWebJobsStorage = $env:STORAGE_CONNECTION_STRING
+  Write-Host "AzureWebJobsStorage not set; using $($env:AzureWebJobsStorage)"
+}
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -349,7 +354,7 @@ $outLog = Join-Path (Get-TempRoot) ("hope-ai-api-express-out-{0}.log" -f ([Guid]
 $errLog = Join-Path (Get-TempRoot) ("hope-ai-api-express-err-{0}.log" -f ([Guid]::NewGuid().ToString("N")))
 
 Write-Host "Starting Express via: node dist/index.js"
-$proc = Start-Process -FilePath "node" -ArgumentList @("dist/index.js") -PassThru -RedirectStandardOutput $outLog -RedirectStandardError $errLog
+$proc = Start-Process -FilePath "node" -ArgumentList @("dist/index.js") -PassThru -NoNewWindow -RedirectStandardOutput $outLog -RedirectStandardError $errLog
 
 $base = Wait-For-Health -Root $root -Preferred $PreferredBasePath -TimeoutSeconds $StartupTimeoutSeconds
 if ([string]::IsNullOrWhiteSpace($base)) {
@@ -391,17 +396,4 @@ Write-Host ("Stopping Express (pid={0})" -f $proc.Id)
 try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
 
 exit 0
-
-
-
-
-
-
-
-
-
-
-
-
-
 

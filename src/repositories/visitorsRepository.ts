@@ -44,7 +44,6 @@ function nowIso(): string {
 
 export class AzureTableVisitorsRepository implements VisitorsRepository {
   async create(input: { name: string; email?: string }): Promise<Visitor> {
-    console.log("VIS_REPO_CREATE_HAS_CONN", !!process.env.STORAGE_CONNECTION_STRING, !!process.env.AzureWebJobsStorage);
     const table = await getTableClient(TABLE);
     const id = randomUUID();
     const now = nowIso();
@@ -109,9 +108,4 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     return toVisitor(entity);
   }
 }
-
-
-
-
-
 

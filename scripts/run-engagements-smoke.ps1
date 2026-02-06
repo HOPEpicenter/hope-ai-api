@@ -34,14 +34,14 @@ $env:PORT = "$Port"
 $server = Start-Process -FilePath "npm" -ArgumentList @("run","start:dist") -PassThru
 
 try {
-  $healthUrl = "$BaseUrl/ops/engagements/summary?visitorId=$VisitorId"
-  Write-Host "==> Waiting for server readiness at $healthUrl"
+  $healthUrl = "$BaseUrl/ops/health"
+Write-Host "==> Waiting for server readiness at $healthUrl"
   Wait-HttpReady -Url $healthUrl -TimeoutSeconds 60
 
   Write-Host "==> Running pagination smoke assertion"
-  pwsh -NoProfile -ExecutionPolicy Bypass -File "./scripts/assert-engagement-pagination.ps1" -BaseUrl $BaseUrl -VisitorId $VisitorId -Limit 1
-
-  Write-Host "? End-to-end build + server + smoke: SUCCESS"
+  npm run test:smoke
+  if ($LASTEXITCODE -ne 0) { throw "Smoke failed (exit=$LASTEXITCODE)" }
+Write-Host "✅ End-to-end build + server + smoke: SUCCESS"
 }
 finally {
   if ($server -and -not $server.HasExited) {

@@ -1,7 +1,30 @@
-﻿# scripts/run-smoke.ps1
+# scripts/run-smoke.ps1
 # Builds, starts server on a random port, waits for /ops/health, runs smoke-tests.ps1, then stops server.
 
 Set-StrictMode -Version Latest
+
+function Test-TcpOpenQuiet {
+  param(
+    [Parameter(Mandatory=$true)][string]$HostName,
+    [Parameter(Mandatory=$true)][int]$Port,
+    [int]$TimeoutMs = 400
+  )
+
+  $client = $null
+  try {
+    $client = [System.Net.Sockets.TcpClient]::new()
+    $iar = $client.BeginConnect($HostName, $Port, $null, $null)
+    $ok = $iar.AsyncWaitHandle.WaitOne($TimeoutMs)
+    if (-not $ok) { return $false }
+    $client.EndConnect($iar)
+    return $true
+  } catch {
+    return $false
+  } finally {
+    if ($client) { try { $client.Close() } catch { } }
+  }
+}
+
 $ErrorActionPreference = "Stop"
 
 
@@ -53,7 +76,7 @@ function Ensure-AzuriteTables {
   $cs = $env:STORAGE_CONNECTION_STRING
   if (-not $cs) { return }
   if ($cs -notmatch '(?i)UseDevelopmentStorage\s*=\s*true') { return }
-  $isOpen = (Test-NetConnection -ComputerName 127.0.0.1 -Port $Port -WarningAction SilentlyContinue).TcpTestSucceeded
+  $isOpen = Test-TcpOpenQuiet -HostName "127.0.0.1" -Port $Port
   if ($isOpen) {
     $listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
 
@@ -65,7 +88,7 @@ function Ensure-AzuriteTables {
       $deadlineKill = (Get-Date).AddSeconds(5)
       do {
         Start-Sleep -Milliseconds 200
-        $isOpen = (Test-NetConnection -ComputerName 127.0.0.1 -Port $Port -WarningAction SilentlyContinue).TcpTestSucceeded
+        $isOpen = Test-TcpOpenQuiet -HostName "127.0.0.1" -Port $Port
       } while ($isOpen -and (Get-Date) -lt $deadlineKill)
 
       if ($isOpen) { throw "Port $Port is still in use after attempting to stop existing listener." }
@@ -147,7 +170,7 @@ function Ensure-AzuriteTables {
   do {
     Start-Sleep -Milliseconds 500
     if ($p.HasExited) { throw ("Azurite exited early (exit={0}). See: {1} ; {2}" -f $p.ExitCode,$azOut,$azErr) }
-    $isOpen = (Test-NetConnection -ComputerName 127.0.0.1 -Port $Port -WarningAction SilentlyContinue).TcpTestSucceeded
+    $isOpen = Test-TcpOpenQuiet -HostName "127.0.0.1" -Port $Port
   } while (-not $isOpen -and (Get-Date) -lt $deadline)
 
   if (-not $isOpen) { throw ("Azurite did not open port {0} in time. See: {1} ; {2}" -f $Port,$azOut,$azErr) }
@@ -304,8 +327,20 @@ try {
   $smokePath = Join-Path $ScriptDir "smoke-tests.ps1"
   if (-not (Test-Path $smokePath)) { throw "Smoke tests file not found: $smokePath" }
 
-  $cmdSmoke = "set ""OPS_BASE_URL={0}""&& powershell -NoProfile -ExecutionPolicy Bypass -File ""{1}"" -BaseUrl ""{0}""" -f $baseUrl, $smokePath
-  $p = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $cmdSmoke `
+    # --- Run smoke tests (quiet progress) ---
+  $argList = @(
+    "-NoProfile",
+    "-ExecutionPolicy","Bypass",
+    "-Command",
+    @"
+`$env:OPS_BASE_URL = '$baseUrl'
+`$ProgressPreference = 'SilentlyContinue'
+& '$smokePath' -BaseUrl '$baseUrl'
+exit `$LASTEXITCODE
+"@
+  )
+
+  $p = Start-Process -FilePath "pwsh" -ArgumentList $argList `
     -WorkingDirectory $RepoRoot `
     -NoNewWindow `
     -Wait `
@@ -313,9 +348,7 @@ try {
 
   if ($p.ExitCode -ne 0) {
     throw "Smoke tests failed (exit=$($p.ExitCode)). See $serverOutLog, $serverErrLog, and $runLog"
-  }
-
-  Write-Host "`n✅ run-smoke completed successfully" -ForegroundColor Green
+  }Write-Host "`n✅ run-smoke completed successfully" -ForegroundColor Green
   exit 0
 }
 catch {

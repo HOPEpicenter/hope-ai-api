@@ -1,4 +1,4 @@
-﻿# scripts/ops.ps1
+# scripts/ops.ps1
 # Ops helpers (PowerShell 5.1 safe). Provides OpsRequest + convenience wrappers.
 
 Set-StrictMode -Version Latest
@@ -70,9 +70,9 @@ function OpsRequest {
 
   try {
     if ($null -ne $json) {
-      $resp = Invoke-WebRequest -Uri $uri -Method $Method -Headers $reqHeaders -Body $json -UseBasicParsing -TimeoutSec $TimeoutSec -ErrorAction Stop
+      $resp = Invoke-WebRequest -SkipHttpErrorCheck -Uri $uri -Method $Method -Headers $reqHeaders -Body $json -UseBasicParsing -TimeoutSec $TimeoutSec -ErrorAction Stop
     } else {
-      $resp = Invoke-WebRequest -Uri $uri -Method $Method -Headers $reqHeaders -UseBasicParsing -TimeoutSec $TimeoutSec -ErrorAction Stop
+      $resp = Invoke-WebRequest -SkipHttpErrorCheck -Uri $uri -Method $Method -Headers $reqHeaders -UseBasicParsing -TimeoutSec $TimeoutSec -ErrorAction Stop
     }
 
     $status = [int]$resp.StatusCode

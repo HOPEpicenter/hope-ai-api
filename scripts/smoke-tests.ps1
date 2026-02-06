@@ -118,7 +118,9 @@ function Assert-HasJsonError {
   }
 }
 
+Write-Host ""
 Write-Host ("Smoke test against " + $BaseUrl)
+Write-Host ""
 
 # 1) Health
 $health = OpsRequest -BaseUrl $BaseUrl -Method GET -Path "/ops/health"

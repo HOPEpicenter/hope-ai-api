@@ -1,4 +1,4 @@
-﻿import { getTableClient } from "../storage/tableClient";
+import { getTableClient } from "../storage/tableClient";
 import { randomUUID } from "crypto";
 
 export type VisitorEntity = {
@@ -21,6 +21,7 @@ export type Visitor = {
 export interface VisitorsRepository {
   create(input: { name: string; email?: string }): Promise<Visitor>;
   getById(visitorId: string): Promise<Visitor | null>;
+  list(input: { limit: number }): Promise<{ items: Visitor[]; count: number }>;
   upsert(visitor: Visitor): Promise<Visitor>;
 }
 
@@ -43,6 +44,7 @@ function nowIso(): string {
 
 export class AzureTableVisitorsRepository implements VisitorsRepository {
   async create(input: { name: string; email?: string }): Promise<Visitor> {
+    console.log("VIS_REPO_CREATE_HAS_CONN", !!process.env.STORAGE_CONNECTION_STRING, !!process.env.AzureWebJobsStorage);
     const table = await getTableClient(TABLE);
     const id = randomUUID();
     const now = nowIso();
@@ -56,8 +58,10 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
       updatedAt: now,
     };
 
-    await table.createEntity(entity);
-    return toVisitor(entity);
+    await Promise.race([
+  table.createEntity(entity),
+  new Promise((_, reject) => setTimeout(() => reject(new Error("TABLE_CREATE_TIMEOUT")), 8000)),
+]);return toVisitor(entity);
   }
 
   async getById(visitorId: string): Promise<Visitor | null> {
@@ -71,6 +75,21 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
       if (code === "ResourceNotFound" || status === 404) return null;
       throw err;
     }
+  }
+
+  async list(input: { limit: number }): Promise<{ items: Visitor[]; count: number }> {
+    const table = await getTableClient(TABLE);
+    const limit = Math.max(1, Math.min(input?.limit ?? 5, 200));
+
+    const items: Visitor[] = [];
+    const filter = "PartitionKey eq 'VISITOR'";
+
+    for await (const e of table.listEntities<VisitorEntity>({ queryOptions: { filter } })) {
+      items.push(toVisitor(e));
+      if (items.length >= limit) break;
+    }
+
+    return { items, count: items.length };
   }
 
   async upsert(visitor: Visitor): Promise<Visitor> {
@@ -90,3 +109,9 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     return toVisitor(entity);
   }
 }
+
+
+
+
+
+

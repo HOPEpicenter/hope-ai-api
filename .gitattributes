@@ -1,7 +1,11 @@
-# Enforce LF line endings across key source/script files
-*.ps1  text eol=lf
+# Normalize line endings across platforms
+* text=auto eol=lf
+
+# Explicitly keep common text formats consistent
+*.ts   text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
 *.yml  text eol=lf
 *.yaml text eol=lf
-*.ts   text eol=lf
-*.json text eol=lf# PowerShell scripts should be LF in repo
-*.ps1 text eol=lf
+*.ps1  text eol=lf

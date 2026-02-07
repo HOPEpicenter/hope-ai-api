@@ -5,6 +5,9 @@
 ### POST /api/visitors
 Creates a visitor.
 
+**Idempotency**
+- If the same email is submitted again, the API returns the existing visitorId.
+
 **Request JSON**
 ~~~json
 { "name": "string", "email": "string" }
@@ -14,7 +17,9 @@ Creates a visitor.
 - name required
 - email required, basic format validation
 
-**Response (201)**
+**Response**
+- 201 Created (new visitor)
+- 200 OK (existing email; idempotent)
 ~~~json
 { "ok": true, "visitorId": "uuid" }
 ~~~
@@ -25,3 +30,4 @@ Creates a visitor.
 
 ### GET /api/visitors/:id
 Fetch a visitor by id.
+

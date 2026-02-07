@@ -15,15 +15,20 @@ export function createCreateVisitorAdapter(visitorsRepository: VisitorsRepositor
 
       if (!name) return res.status(400).json({ ok: false, error: "name is required" });
       if (!emailRaw) return res.status(400).json({ ok: false, error: "email is required" });
-      if (!isValidEmail(emailRaw)) return res.status(400).json({ ok: false, error: "email is invalid" });
+      if (!isValidEmail(emailRaw)) return res.status(400).json({ ok: false, error: "email is invalid" });      const existing = await visitorsRepository.getByEmail(emailRaw);
+
+      if (existing) {
+        // Idempotent: same email -> same visitorId
+        return res.status(200).json({ ok: true, visitorId: existing.visitorId });
+      }
 
       const created = await visitorsRepository.create({ name, email: emailRaw });
 
-      // Keep response stable + minimal for clients
-      return res.status(201).json({ ok: true, visitorId: created.visitorId });
-    } catch (err: any) {
+      // Created
+      return res.status(201).json({ ok: true, visitorId: created.visitorId });} catch (err: any) {
       console.error("CREATE_VISITOR_FAILED", err?.message || err);
       return res.status(500).json({ ok: false, error: "CREATE_VISITOR_FAILED" });
     }
   };
 }
+

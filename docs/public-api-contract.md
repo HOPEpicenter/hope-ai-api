@@ -3,10 +3,11 @@
 ## Visitors
 
 ### POST /api/visitors
-Creates a visitor.
+Creates (or reuses) a visitor by email.
 
 **Idempotency**
-- If the same email is submitted again, the API returns the existing visitorId.
+- The API is **idempotent by normalized email** (trim + lowercase).
+- If the email has been seen before, the API returns the **same** `visitorId` for that email.
 
 **Request JSON**
 ~~~json
@@ -14,19 +15,24 @@ Creates a visitor.
 ~~~
 
 **Validation**
-- name required
-- email required, basic format validation
+- `name` required
+- `email` required, basic format validation
 
-**Response**
-- 201 Created (new visitor)
-- 200 OK (existing email; idempotent)
+**Response (201 Created)**
+Returned when a **new** visitor was created.
+~~~json
+{ "ok": true, "visitorId": "uuid" }
+~~~
+
+**Response (200 OK)**
+Returned when the email already exists (idempotent repeat).
 ~~~json
 { "ok": true, "visitorId": "uuid" }
 ~~~
 
 **Errors**
-- 400: { "ok": false, "error": "name is required" | "email is required" | "email is invalid" }
-- 500: { "ok": false, "error": "CREATE_VISITOR_FAILED" }
+- 400: `{ "ok": false, "error": "name is required" | "email is required" | "email is invalid" }`
+- 500: `{ "ok": false, "error": "CREATE_VISITOR_FAILED" }`
 
 ### GET /api/visitors/:id
 Fetch a visitor by id.

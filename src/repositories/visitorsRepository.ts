@@ -82,7 +82,6 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
       throw err;
     }
   }
-
   async getByEmail(email: string): Promise<Visitor | null> {
     const table = await getTableClient(TABLE);
 
@@ -90,14 +89,21 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     if (!raw) return null;
 
     const emailLower = raw.toLowerCase();
+    // Safe RowKey encoding (avoids illegal chars issues); stable + reversible for debugging
+    const emailKey = encodeURIComponent(emailLower);
 
-    // Escape single quotes for OData
-    const safe = emailLower.replace(/'/g, "''");
-    const filter = `PartitionKey eq 'VISITOR' and emailLower eq '${safe}'`;
-
-    for await (const e of table.listEntities<VisitorEntity>({ queryOptions: { filter } })) {
-      return toVisitor(e);
+    try {
+      const idx = await table.getEntity<{ visitorId: string }>(EMAIL, emailKey);
+      const visitorId = (idx as any).visitorId;
+      if (!visitorId) return null;
+      return await this.getById(visitorId);
+    } catch (err: any) {
+      const status = err?.statusCode ?? err?.status;
+      if (status === 404) return null;
+      throw err;
     }
+  }
+
 
     return null;
   }
@@ -133,6 +139,7 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     return toVisitor(entity);
   }
 }
+
 
 
 

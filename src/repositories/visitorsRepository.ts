@@ -67,37 +67,54 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
 
     // Reserve email FIRST (prevents concurrent duplicates)
     if (emailLower) {
+    // Reserve email FIRST (prevents concurrent duplicates)
+    if (emailLower) {
       const emailKey = encodeURIComponent(emailLower);
-      const indexEntity: EmailIndexEntity = {
-        partitionKey: "EMAIL",
-        rowKey: emailKey,
-        visitorId: id,
-        createdAt: now,
-      };
 
-      try {
-        await table.createEntity(indexEntity as any);
-      } catch (err: any) {
-        const code = String(err?.code ?? "");
-        const status = Number(err?.statusCode ?? err?.status ?? 0);
-        if (status === 409 || code === "EntityAlreadyExists") {
-          // Already reserved -> return existing visitor
+      // One repair attempt for a stale EMAIL index (index exists but visitor row missing)
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const indexEntity: EmailIndexEntity = {
+          partitionKey: "EMAIL",
+          rowKey: emailKey,
+          visitorId: id,
+          createdAt: now,
+        };
+
+        try {
+          await table.createEntity(indexEntity as any);
+          break; // reserved successfully
+        } catch (err: any) {
+          const code = String(err?.code ?? "");
+          const status = Number(err?.statusCode ?? err?.status ?? 0);
+
+          if (!(status === 409 || code === "EntityAlreadyExists")) throw err;
+
+          // Already reserved -> return existing visitor if it exists
           try {
             const idx = await table.getEntity<EmailIndexEntity>("EMAIL", emailKey);
             const existingId = (idx as any).visitorId as string | undefined;
-            if (!existingId) return { visitor: null as any, created: false };
-            const existing = await this.getById(existingId);
-            if (existing) return { visitor: existing, created: false };
-            // If index exists but visitor missing, fall through and attempt create (rare; can happen if prior create failed after reserve)
+            if (existingId) {
+              const existing = await this.getById(existingId);
+              if (existing) return { visitor: existing, created: false };
+
+              // Stale index: points to missing visitor. Repair once by deleting the index then retrying.
+              if (attempt === 0) {
+                try { await table.deleteEntity("EMAIL", emailKey); } catch { }
+                continue;
+              }
+            }
           } catch (e: any) {
             const st = Number(e?.statusCode ?? e?.status ?? 0);
             const cd = String(e?.code ?? "");
             if (!(st === 404 || cd === "ResourceNotFound")) throw e;
           }
-        } else {
-          throw err;
+
+          // If we get here after retry, fail safe (forces visibility instead of silent corruption)
+          throw new Error("EMAIL_INDEX_STALE_OR_UNREADABLE");
         }
       }
+    }
+
     }
 
     const entity: VisitorEntity = {
@@ -199,4 +216,5 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     return toVisitor(entity);
   }
 }
+
 

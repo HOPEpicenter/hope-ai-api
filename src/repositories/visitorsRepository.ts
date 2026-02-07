@@ -6,6 +6,7 @@ export type VisitorEntity = {
   rowKey: string; // visitorId
   name: string;
   email?: string;
+  emailLower?: string; // canonical lowercase for consistency
   createdAt: string; // ISO
   updatedAt: string; // ISO
 };
@@ -21,6 +22,7 @@ export type Visitor = {
   visitorId: string;
   name: string;
   email?: string;
+  emailLower?: string; // canonical lowercase for consistency
   createdAt: string;
   updatedAt: string;
 };
@@ -56,11 +58,14 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     const id = randomUUID();
     const now = nowIso();
 
+    const emailTrim = typeof input.email === "string" ? input.email.trim() : undefined;
+    const emailLower = emailTrim ? emailTrim.toLowerCase() : undefined;
     const entity: VisitorEntity = {
       partitionKey: PK,
       rowKey: id,
       name: input.name,
-      email: input.email,
+      email: emailTrim,
+      emailLower: emailLower,
       createdAt: now,
       updatedAt: now,
     };
@@ -73,10 +78,9 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     ]);
 
     // EMAIL index for idempotency (same email -> same visitorId)
-    if (input.email) {
-      const emailLower = input.email.trim().toLowerCase();
-      const emailKey = encodeURIComponent(emailLower);
-
+    if (emailLower) {
+      // emailLower already computed above
+      const emailKey = encodeURIComponent(emailLower!);
       const indexEntity: EmailIndexEntity = {
         partitionKey: "EMAIL",
         rowKey: emailKey,
@@ -115,8 +119,7 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     if (!raw) return null;
 
     const emailLower = raw.toLowerCase();
-    const emailKey = encodeURIComponent(emailLower);
-
+      const emailKey = encodeURIComponent(emailLower!);
     try {
       const idx = await table.getEntity<EmailIndexEntity>("EMAIL", emailKey);
       const visitorId = (idx as any).visitorId as string | undefined;
@@ -149,11 +152,15 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     const table = await getTableClient(TABLE);
     const now = nowIso();
 
+    
+
+        const emailTrim = typeof visitor.email === "string" ? visitor.email.trim() : undefined;
+    const emailLower = emailTrim ? emailTrim.toLowerCase() : undefined;
     const entity: VisitorEntity = {
       partitionKey: PK,
       rowKey: visitor.visitorId,
       name: visitor.name,
-      email: visitor.email,
+      email: emailTrim,
       createdAt: visitor.createdAt ?? now,
       updatedAt: now,
     };
@@ -162,4 +169,6 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     return toVisitor(entity);
   }
 }
+
+
 

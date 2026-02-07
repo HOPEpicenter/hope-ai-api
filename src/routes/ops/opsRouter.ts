@@ -56,7 +56,7 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
 
     res.status(201).json({
       requestId: getRequestId(req),
-      visitorId: visitor.visitor.visitorId,
+      visitorId: visitor.visitorId,
       visitor,
     });
   });
@@ -198,7 +198,7 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
 
     for (const s of samples) {
       await formationEventsRepository.append({
-        visitorId: visitor.visitor.visitorId,
+        visitorId: visitor.visitorId,
         type: s.type,
         occurredAt: new Date(now - s.minutesAgo * 60_000).toISOString(),
         summary: s.summary,
@@ -208,7 +208,7 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
 
     res.status(201).json({
       requestId: getRequestId(req),
-      visitorId: visitor.visitor.visitorId,
+      visitorId: visitor.visitorId,
       visitor,
       inserted: samples.length,
     });

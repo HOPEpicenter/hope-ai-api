@@ -19,19 +19,15 @@ export function createCreateVisitorAdapter(visitorsRepository: VisitorsRepositor
 
       if (existing) {
         // Idempotent: same email -> same visitorId
-        return res.status(200).json({ ok: true, visitorId: existing.visitor.visitorId });
-      }
+        return res.status(200).json({ ok: true, visitorId: existing.visitorId });
+      }      const result = await visitorsRepository.create({ name, email: emailRaw });
 
-      const result = await visitorsRepository.create({ name, email: emailRaw });
-
-      // Race-safe: repository may return existing visitor if another request reserved first
       const status = result.created ? 201 : 200;
-      return res.status(status).json({ ok: true, visitorId: result.visitor.visitor.visitorId });} catch (err: any) {
+      return res.status(status).json({ ok: true, visitorId: result.visitor.visitorId });} catch (err: any) {
       console.error("CREATE_VISITOR_FAILED", err?.message || err);
       return res.status(500).json({ ok: false, error: "CREATE_VISITOR_FAILED" });
     }
   };
 }
-
 
 

@@ -58,9 +58,13 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     };
 
     await Promise.race([
-  table.createEntity(entity),
-  new Promise((_, reject) => setTimeout(() => reject(new Error("TABLE_CREATE_TIMEOUT")), 8000)),
-]);return toVisitor(entity);
+      table.createEntity(entity),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("TABLE_CREATE_TIMEOUT")), 8000)
+      ),
+    ]);
+
+    return toVisitor(entity);
   }
 
   async getById(visitorId: string): Promise<Visitor | null> {
@@ -108,4 +112,5 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     return toVisitor(entity);
   }
 }
+
 

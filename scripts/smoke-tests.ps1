@@ -162,6 +162,65 @@ $pubVisitorId2 = Get-BodyProp -Resp $pubCreate2 -Name "visitorId"
 Assert-True ($pubVisitorId2 -eq $pubVisitorId) "Expected same visitorId for same email (idempotent)"
 Write-Host "Public create idempotency OK"
 
+# 2c) Stale EMAIL index repair regression
+# Corrupt the EMAIL index row for the public email, then POST /api/visitors again and ensure it repairs back to the original visitorId.
+Write-Host ""
+Write-Host "Public stale EMAIL index repair (regression) ..."
+
+$emailLower = ([string]$pubEmail).Trim().ToLowerInvariant()
+$bogusId = ([Guid]::NewGuid().ToString())
+
+# Corrupt index: EMAIL / encodeURIComponent(emailLower) -> bogus visitorId
+$jsCorrupt = @"
+(async () => {
+  const tableName = process.argv[1];
+  const emailLower = process.argv[2];
+  const bogusId = process.argv[3];
+  const conn = process.env.STORAGE_CONNECTION_STRING;
+  if (!conn) throw new Error("STORAGE_CONNECTION_STRING is not set");
+
+  const { TableClient } = require("@azure/data-tables");
+  const table = TableClient.fromConnectionString(conn, tableName);
+
+  const rowKey = encodeURIComponent(emailLower);
+  const entity = { partitionKey: "EMAIL", rowKey, visitorId: bogusId };
+  await table.upsertEntity(entity, "Replace");
+  console.log("OK: Corrupted EMAIL index:", { pk: "EMAIL", rk: rowKey, visitorId: bogusId });
+})().catch(err => { console.error(err && err.stack || err); process.exit(1); });
+"@
+node -e $jsCorrupt "Visitors" "$emailLower" "$bogusId" | Out-Host
+
+# Now call public create again; should repair and return original visitorId (should be 200)
+$pubCreate3 = OpsRequest -BaseUrl $BaseUrl -Method POST -Path "/api/visitors" -Body @{
+  name  = "Public Smoke Tester Repair $(Get-Date -Format s)"
+  email = $pubEmail
+}
+Assert-True ($pubCreate3.Status -eq 200) "Public create after stale index expected 200 (reused existing visitor)"
+$pubCreate3Rid = Assert-RequestId -Resp $pubCreate3 -Context "POST /api/visitors (stale index repair)"
+$pubVisitorId3 = Get-BodyProp -Resp $pubCreate3 -Name "visitorId"
+Assert-True ($pubVisitorId3 -eq $pubVisitorId) "Expected same visitorId after stale index repair"
+Write-Host "Public stale EMAIL index repair OK"
+
+# Verify EMAIL index repaired in storage
+$jsRead = @"
+(async () => {
+  const tableName = process.argv[1];
+  const emailLower = process.argv[2];
+  const conn = process.env.STORAGE_CONNECTION_STRING;
+  if (!conn) throw new Error("STORAGE_CONNECTION_STRING is not set");
+
+  const { TableClient } = require("@azure/data-tables");
+  const table = TableClient.fromConnectionString(conn, tableName);
+
+  const rowKey = encodeURIComponent(emailLower);
+  const e = await table.getEntity("EMAIL", rowKey);
+  process.stdout.write(String(e.visitorId || ""));
+})().catch(err => { console.error(err && err.stack || err); process.exit(1); });
+"@
+$idxVisitorId = (node -e $jsRead "Visitors" "$emailLower").Trim()
+Assert-True ($idxVisitorId -eq $pubVisitorId) "EMAIL index was not repaired to real visitorId (expected $pubVisitorId, got $idxVisitorId)"
+Write-Host "Public EMAIL index repaired in storage OK"
+
 # Public API: Get visitor (GET /api/visitors/:id)
 $pubGet = OpsRequest -BaseUrl $BaseUrl -Method GET -Path ("/api/visitors/{0}" -f $pubVisitorId)
 Assert-True ($pubGet.Status -eq 200) "Public get visitor expected 200"

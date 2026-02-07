@@ -97,8 +97,38 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
               const existing = await this.getById(existingId);
               if (existing) return { visitor: existing, created: false };
 
-              // Stale index: points to missing visitor. Repair once by deleting the index then retrying.
-              if (attempt === 0) {
+              // Stale index: points to missing visitor.
+              // Prefer recovery: find an existing VISITOR row by emailLower, repair the index to that visitorId, and return it.
+              if (attempt === 0 && emailLower) {
+                try {
+                  const emailLowerEsc = emailLower.replace(/'/g, "''");
+                  const filter = `PartitionKey eq 'VISITOR' and emailLower eq '${emailLowerEsc}'`;
+
+                  let recovered: VisitorEntity | undefined;
+                  for await (const e of table.listEntities<VisitorEntity>({ queryOptions: { filter } })) {
+                    recovered = e;
+                    break;
+                  }
+
+                  if (recovered) {
+                    const recoveredVisitor = toVisitor(recovered);
+
+                    // Repair index to the recovered visitorId
+                    const repaired: EmailIndexEntity = {
+                      partitionKey: "EMAIL",
+                      rowKey: emailKey,
+                      visitorId: recoveredVisitor.visitorId,
+                      createdAt: now,
+                    };
+                    await table.upsertEntity(repaired as any, "Replace");
+
+                    return { visitor: recoveredVisitor, created: false };
+                  }
+                } catch (e: any) {
+                  // If recovery fails for any reason, fall back to delete+retry
+                }
+
+                // Fall back: delete the bad index and retry once
                 try { await table.deleteEntity("EMAIL", emailKey); } catch { }
                 continue;
               }
@@ -216,5 +246,8 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     return toVisitor(entity);
   }
 }
+
+
+
 
 

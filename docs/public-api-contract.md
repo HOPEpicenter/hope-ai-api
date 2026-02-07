@@ -6,21 +6,22 @@
 Creates a visitor.
 
 **Request JSON**
-```json
+~~~json
 { "name": "string", "email": "string" }
-Validation
+~~~
 
-name required
+**Validation**
+- name required
+- email required, basic format validation
 
-email required, basic format validation
+**Response (201)**
+~~~json
+{ "ok": true, "visitorId": "uuid" }
+~~~
 
-Response (201){ "ok": true, "visitorId": "uuid" }
-Errors
+**Errors**
+- 400: { "ok": false, "error": "name is required" | "email is required" | "email is invalid" }
+- 500: { "ok": false, "error": "CREATE_VISITOR_FAILED" }
 
-400: { "ok": false, "error": "name is required" | "email is required" | "email is invalid" }
-
-500: { "ok": false, "error": "CREATE_VISITOR_FAILED" }
-
-GET /api/visitors/:id
-
+### GET /api/visitors/:id
 Fetch a visitor by id.

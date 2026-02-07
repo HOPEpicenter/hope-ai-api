@@ -6,16 +6,21 @@ export type VisitorEntity = {
   rowKey: string; // visitorId
   name: string;
   email?: string;
-  emailLower?: string; // normalized (lowercase) for idempotency lookup
   createdAt: string; // ISO
   updatedAt: string; // ISO
+};
+
+export type EmailIndexEntity = {
+  partitionKey: "EMAIL";
+  rowKey: string; // encodeURIComponent(emailLower)
+  visitorId: string;
+  createdAt: string; // ISO
 };
 
 export type Visitor = {
   visitorId: string;
   name: string;
   email?: string;
-  emailLower?: string; // normalized (lowercase) for idempotency lookup
   createdAt: string;
   updatedAt: string;
 };
@@ -23,8 +28,8 @@ export type Visitor = {
 export interface VisitorsRepository {
   create(input: { name: string; email?: string }): Promise<Visitor>;
   getById(visitorId: string): Promise<Visitor | null>;
-    getByEmail(email: string): Promise<Visitor | null>;
-list(input: { limit: number }): Promise<{ items: Visitor[]; count: number }>;
+  getByEmail(email: string): Promise<Visitor | null>;
+  list(input: { limit: number }): Promise<{ items: Visitor[]; count: number }>;
   upsert(visitor: Visitor): Promise<Visitor>;
 }
 
@@ -67,6 +72,27 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
       ),
     ]);
 
+    // EMAIL index for idempotency (same email -> same visitorId)
+    if (input.email) {
+      const emailLower = input.email.trim().toLowerCase();
+      const emailKey = encodeURIComponent(emailLower);
+
+      const indexEntity: EmailIndexEntity = {
+        partitionKey: "EMAIL",
+        rowKey: emailKey,
+        visitorId: id,
+        createdAt: now,
+      };
+
+      try {
+        await table.createEntity(indexEntity as any);
+      } catch (err: any) {
+        const status = err?.statusCode ?? err?.status;
+        // 409 = already exists (idempotent repeat)
+        if (status !== 409) throw err;
+      }
+    }
+
     return toVisitor(entity);
   }
 
@@ -82,31 +108,28 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
       throw err;
     }
   }
+
   async getByEmail(email: string): Promise<Visitor | null> {
     const table = await getTableClient(TABLE);
-
     const raw = (email ?? "").trim();
     if (!raw) return null;
 
     const emailLower = raw.toLowerCase();
-    // Safe RowKey encoding (avoids illegal chars issues); stable + reversible for debugging
     const emailKey = encodeURIComponent(emailLower);
 
     try {
-      const idx = await table.getEntity<{ visitorId: string }>(EMAIL, emailKey);
-      const visitorId = (idx as any).visitorId;
+      const idx = await table.getEntity<EmailIndexEntity>("EMAIL", emailKey);
+      const visitorId = (idx as any).visitorId as string | undefined;
       if (!visitorId) return null;
       return await this.getById(visitorId);
     } catch (err: any) {
-      const status = err?.statusCode ?? err?.status;
-      if (status === 404) return null;
+      const code = String(err?.code ?? "");
+      const status = Number(err?.statusCode ?? 0);
+      if (code === "ResourceNotFound" || status === 404) return null;
       throw err;
     }
   }
 
-
-    return null;
-  }
   async list(input: { limit: number }): Promise<{ items: Visitor[]; count: number }> {
     const table = await getTableClient(TABLE);
     const limit = Math.max(1, Math.min(input?.limit ?? 5, 200));
@@ -115,7 +138,7 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     const filter = "PartitionKey eq 'VISITOR'";
 
     for await (const e of table.listEntities<VisitorEntity>({ queryOptions: { filter } })) {
-      items.push(toVisitor(e));
+      items.push(toVisitor(e as any));
       if (items.length >= limit) break;
     }
 
@@ -135,13 +158,8 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
       updatedAt: now,
     };
 
-    await table.upsertEntity(entity, "Merge");
+    await table.upsertEntity(entity as any, "Merge");
     return toVisitor(entity);
   }
 }
-
-
-
-
-
 

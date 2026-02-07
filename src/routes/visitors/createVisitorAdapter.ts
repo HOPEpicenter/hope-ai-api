@@ -1,17 +1,26 @@
 import type { Request, Response } from "express";
 import type { VisitorsRepository } from "../../repositories";
 
+function isValidEmail(email: string): boolean {
+  // Intentionally basic: prevents obvious bad inputs without overfitting.
+  // (We don't want a huge regex that rejects valid emails.)
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 export function createCreateVisitorAdapter(visitorsRepository: VisitorsRepository) {
   return async function createVisitorAdapter(req: Request, res: Response) {
     try {
       const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
-      const email = typeof req.body?.email === "string" ? req.body.email.trim() : undefined;
+      const emailRaw = typeof req.body?.email === "string" ? req.body.email.trim() : "";
 
       if (!name) return res.status(400).json({ ok: false, error: "name is required" });
+      if (!emailRaw) return res.status(400).json({ ok: false, error: "email is required" });
+      if (!isValidEmail(emailRaw)) return res.status(400).json({ ok: false, error: "email is invalid" });
 
-      const created = await visitorsRepository.create({ name, email });
+      const created = await visitorsRepository.create({ name, email: emailRaw });
 
-      return res.status(201).json({ ok: true, ...created });
+      // Keep response stable + minimal for clients
+      return res.status(201).json({ ok: true, visitorId: created.visitorId });
     } catch (err: any) {
       console.error("CREATE_VISITOR_FAILED", err?.message || err);
       return res.status(500).json({ ok: false, error: "CREATE_VISITOR_FAILED" });

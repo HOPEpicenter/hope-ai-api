@@ -6,6 +6,7 @@ export type VisitorEntity = {
   rowKey: string; // visitorId
   name: string;
   email?: string;
+  emailLower?: string; // normalized (lowercase) for idempotency lookup
   createdAt: string; // ISO
   updatedAt: string; // ISO
 };
@@ -14,6 +15,7 @@ export type Visitor = {
   visitorId: string;
   name: string;
   email?: string;
+  emailLower?: string; // normalized (lowercase) for idempotency lookup
   createdAt: string;
   updatedAt: string;
 };
@@ -80,6 +82,24 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     }
   }
 
+  async getByEmail(email: string): Promise<Visitor | null> {
+    const table = await getTableClient(TABLE);
+
+    const raw = (email ?? "").trim();
+    if (!raw) return null;
+
+    const emailLower = raw.toLowerCase();
+
+    // Escape single quotes for OData
+    const safe = emailLower.replace(/'/g, "''");
+    const filter = `PartitionKey eq 'VISITOR' and emailLower eq '${safe}'`;
+
+    for await (const e of table.listEntities<VisitorEntity>({ queryOptions: { filter } })) {
+      return toVisitor(e);
+    }
+
+    return null;
+  }
   async list(input: { limit: number }): Promise<{ items: Visitor[]; count: number }> {
     const table = await getTableClient(TABLE);
     const limit = Math.max(1, Math.min(input?.limit ?? 5, 200));
@@ -112,5 +132,6 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     return toVisitor(entity);
   }
 }
+
 
 

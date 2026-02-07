@@ -138,24 +138,36 @@ $createRid = Assert-RequestId -Resp $create -Context "POST /ops/visitors"
 $visitorId = Get-BodyProp -Resp $create -Name "visitorId"
 Assert-True $visitorId "Create visitor expected visitorId"
 Write-Host ("Created visitorId: " + $visitorId)
-# 2b) Public API: Create visitor (POST /api/visitors)
+# 2b) Public API: Create visitor (POST /api/visitors) - idempotent by email
+$pubEmail = ("publicsmoke+{0}@example.com" -f ([Guid]::NewGuid().ToString("N")))
+
 $pubCreate = OpsRequest -BaseUrl $BaseUrl -Method POST -Path "/api/visitors" -Body @{
   name  = "Public Smoke Tester $(Get-Date -Format s)"
-  email = ("publicsmoke+{0}@example.com" -f ([Guid]::NewGuid().ToString("N")))
+  email = $pubEmail
 }
-Assert-True ($pubCreate.Status -eq 201) "Public create visitor expected 201"
+Assert-True ((@(200,201) -contains $pubCreate.Status)) "Public create visitor expected 200 or 201"
 $pubCreateRid = Assert-RequestId -Resp $pubCreate -Context "POST /api/visitors"
 $pubVisitorId = Get-BodyProp -Resp $pubCreate -Name "visitorId"
 Assert-True $pubVisitorId "Public create visitor expected visitorId"
 Write-Host ("Public created visitorId: " + $pubVisitorId)
+
+# Public API: Create again with same email should return same visitorId
+$pubCreate2 = OpsRequest -BaseUrl $BaseUrl -Method POST -Path "/api/visitors" -Body @{
+  name  = "Public Smoke Tester Again $(Get-Date -Format s)"
+  email = $pubEmail
+}
+Assert-True ((@(200,201) -contains $pubCreate2.Status)) "Public create (idempotent) expected 200 or 201"
+$pubCreate2Rid = Assert-RequestId -Resp $pubCreate2 -Context "POST /api/visitors (idempotent repeat)"
+$pubVisitorId2 = Get-BodyProp -Resp $pubCreate2 -Name "visitorId"
+Assert-True ($pubVisitorId2 -eq $pubVisitorId) "Expected same visitorId for same email (idempotent)"
+Write-Host "Public create idempotency OK"
 
 # Public API: Get visitor (GET /api/visitors/:id)
 $pubGet = OpsRequest -BaseUrl $BaseUrl -Method GET -Path ("/api/visitors/{0}" -f $pubVisitorId)
 Assert-True ($pubGet.Status -eq 200) "Public get visitor expected 200"
 $pubGetRid = Assert-RequestId -Resp $pubGet -Context "GET /api/visitors/:id"
 Assert-True ((Get-BodyProp -Resp $pubGet -Name "visitorId") -eq $pubVisitorId) "Public get visitorId mismatch"
-Write-Host "Public visitor get OK"
-# Public API: Create visitor missing email should return 400
+Write-Host "Public visitor get OK"# Public API: Create visitor missing email should return 400
 $pubMissingEmail = OpsRequest -BaseUrl $BaseUrl -Method POST -Path "/api/visitors" -Body @{
   name = "Public Smoke Missing Email"
 } -ExpectStatus 400
@@ -269,6 +281,7 @@ if ($nf.Body -and $nfErr) {
 
 Write-Host "SMOKE TESTS PASSED"
 exit 0
+
 
 
 

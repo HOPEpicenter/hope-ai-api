@@ -155,6 +155,16 @@ Assert-True ($pubGet.Status -eq 200) "Public get visitor expected 200"
 $pubGetRid = Assert-RequestId -Resp $pubGet -Context "GET /api/visitors/:id"
 Assert-True ((Get-BodyProp -Resp $pubGet -Name "visitorId") -eq $pubVisitorId) "Public get visitorId mismatch"
 Write-Host "Public visitor get OK"
+# Public API: Create visitor missing email should return 400
+$pubMissingEmail = OpsRequest -BaseUrl $BaseUrl -Method POST -Path "/api/visitors" -Body @{
+  name = "Public Smoke Missing Email"
+} -ExpectStatus 400
+Assert-True ($pubMissingEmail.Status -eq 400) "Public create missing email expected 400"
+$pubMissingEmailRid = Assert-RequestId -Resp $pubMissingEmail -Context "POST /api/visitors missing email (400)"
+$pubMissingEmailErr = Get-BodyProp -Resp $pubMissingEmail -Name "error"
+Assert-True ($pubMissingEmailErr -eq "email is required") "Expected error: email is required"
+Write-Host "Public create missing email returns 400 OK"
+
 
 
 # 3) Populate dummy
@@ -259,5 +269,6 @@ if ($nf.Body -and $nfErr) {
 
 Write-Host "SMOKE TESTS PASSED"
 exit 0
+
 
 

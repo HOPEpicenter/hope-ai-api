@@ -22,13 +22,17 @@ export type Visitor = {
   visitorId: string;
   name: string;
   email?: string;
-  emailLower?: string; // canonical lowercase for consistency
   createdAt: string;
   updatedAt: string;
 };
 
+export type CreateVisitorResult = {
+  visitor: Visitor;
+  created: boolean;
+};
+
 export interface VisitorsRepository {
-  create(input: { name: string; email?: string }): Promise<Visitor>;
+  create(input: { name: string; email?: string }): Promise<CreateVisitorResult>;
   getById(visitorId: string): Promise<Visitor | null>;
   getByEmail(email: string): Promise<Visitor | null>;
   list(input: { limit: number }): Promise<{ items: Visitor[]; count: number }>;
@@ -53,34 +57,17 @@ function nowIso(): string {
 }
 
 export class AzureTableVisitorsRepository implements VisitorsRepository {
-  async create(input: { name: string; email?: string }): Promise<Visitor> {
+  async create(input: { name: string; email?: string }): Promise<CreateVisitorResult> {
     const table = await getTableClient(TABLE);
     const id = randomUUID();
     const now = nowIso();
 
     const emailTrim = typeof input.email === "string" ? input.email.trim() : undefined;
     const emailLower = emailTrim ? emailTrim.toLowerCase() : undefined;
-    const entity: VisitorEntity = {
-      partitionKey: PK,
-      rowKey: id,
-      name: input.name,
-      email: emailTrim,
-      emailLower: emailLower,
-      createdAt: now,
-      updatedAt: now,
-    };
 
-    await Promise.race([
-      table.createEntity(entity),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("TABLE_CREATE_TIMEOUT")), 8000)
-      ),
-    ]);
-
-    // EMAIL index for idempotency (same email -> same visitorId)
+    // Reserve email FIRST (prevents concurrent duplicates)
     if (emailLower) {
-      // emailLower already computed above
-      const emailKey = encodeURIComponent(emailLower!);
+      const emailKey = encodeURIComponent(emailLower);
       const indexEntity: EmailIndexEntity = {
         partitionKey: "EMAIL",
         rowKey: emailKey,
@@ -91,13 +78,55 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
       try {
         await table.createEntity(indexEntity as any);
       } catch (err: any) {
-        const status = err?.statusCode ?? err?.status;
-        // 409 = already exists (idempotent repeat)
-        if (status !== 409) throw err;
+        const code = String(err?.code ?? "");
+        const status = Number(err?.statusCode ?? err?.status ?? 0);
+        if (status === 409 || code === "EntityAlreadyExists") {
+          // Already reserved -> return existing visitor
+          try {
+            const idx = await table.getEntity<EmailIndexEntity>("EMAIL", emailKey);
+            const existingId = (idx as any).visitorId as string | undefined;
+            if (!existingId) return { visitor: null as any, created: false };
+            const existing = await this.getById(existingId);
+            if (existing) return { visitor: existing, created: false };
+            // If index exists but visitor missing, fall through and attempt create (rare; can happen if prior create failed after reserve)
+          } catch (e: any) {
+            const st = Number(e?.statusCode ?? e?.status ?? 0);
+            const cd = String(e?.code ?? "");
+            if (!(st === 404 || cd === "ResourceNotFound")) throw e;
+          }
+        } else {
+          throw err;
+        }
       }
     }
 
-    return toVisitor(entity);
+    const entity: VisitorEntity = {
+      partitionKey: PK,
+      rowKey: id,
+      name: input.name,
+      email: emailTrim,
+      emailLower: emailLower,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    try {
+      await Promise.race([
+        table.createEntity(entity),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("TABLE_CREATE_TIMEOUT")), 8000)
+        ),
+      ]);
+    } catch (err: any) {
+      // Best-effort cleanup: if we reserved email, remove index so retries work
+      if (emailLower) {
+        const emailKey = encodeURIComponent(emailLower);
+        try { await table.deleteEntity("EMAIL", emailKey); } catch { }
+      }
+      throw err;
+    }
+
+    return { visitor: toVisitor(entity), created: true };
   }
 
   async getById(visitorId: string): Promise<Visitor | null> {
@@ -107,7 +136,7 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
       return toVisitor(e);
     } catch (err: any) {
       const code = String(err?.code ?? "");
-      const status = Number(err?.statusCode ?? 0);
+      const status = Number(err?.statusCode ?? err?.status ?? 0);
       if (code === "ResourceNotFound" || status === 404) return null;
       throw err;
     }
@@ -119,7 +148,8 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     if (!raw) return null;
 
     const emailLower = raw.toLowerCase();
-      const emailKey = encodeURIComponent(emailLower!);
+    const emailKey = encodeURIComponent(emailLower);
+
     try {
       const idx = await table.getEntity<EmailIndexEntity>("EMAIL", emailKey);
       const visitorId = (idx as any).visitorId as string | undefined;
@@ -127,7 +157,7 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
       return await this.getById(visitorId);
     } catch (err: any) {
       const code = String(err?.code ?? "");
-      const status = Number(err?.statusCode ?? 0);
+      const status = Number(err?.statusCode ?? err?.status ?? 0);
       if (code === "ResourceNotFound" || status === 404) return null;
       throw err;
     }
@@ -152,15 +182,15 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     const table = await getTableClient(TABLE);
     const now = nowIso();
 
-    
-
-        const emailTrim = typeof visitor.email === "string" ? visitor.email.trim() : undefined;
+    const emailTrim = typeof visitor.email === "string" ? visitor.email.trim() : undefined;
     const emailLower = emailTrim ? emailTrim.toLowerCase() : undefined;
+
     const entity: VisitorEntity = {
       partitionKey: PK,
       rowKey: visitor.visitorId,
       name: visitor.name,
       email: emailTrim,
+      emailLower: emailLower,
       createdAt: visitor.createdAt ?? now,
       updatedAt: now,
     };
@@ -169,6 +199,4 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     return toVisitor(entity);
   }
 }
-
-
 

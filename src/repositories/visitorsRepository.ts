@@ -27,8 +27,12 @@ export type Visitor = {
   updatedAt: string;
 };
 
+export type CreateVisitorResult = {
+  visitor: Visitor;
+  created: boolean;
+};
 export interface VisitorsRepository {
-  create(input: { name: string; email?: string }): Promise<Visitor>;
+  create(input: { name: string; email?: string }): Promise<CreateVisitorResult>;
   getById(visitorId: string): Promise<Visitor | null>;
   getByEmail(email: string): Promise<Visitor | null>;
   list(input: { limit: number }): Promise<{ items: Visitor[]; count: number }>;
@@ -53,34 +57,19 @@ function nowIso(): string {
 }
 
 export class AzureTableVisitorsRepository implements VisitorsRepository {
-  async create(input: { name: string; email?: string }): Promise<Visitor> {
+  async create(input: { name: string; email?: string }): Promise<CreateVisitorResult> {
+  async create(input: { name: string; email?: string }): Promise<CreateVisitorResult> {
     const table = await getTableClient(TABLE);
     const id = randomUUID();
     const now = nowIso();
 
     const emailTrim = typeof input.email === "string" ? input.email.trim() : undefined;
     const emailLower = emailTrim ? emailTrim.toLowerCase() : undefined;
-    const entity: VisitorEntity = {
-      partitionKey: PK,
-      rowKey: id,
-      name: input.name,
-      email: emailTrim,
-      emailLower: emailLower,
-      createdAt: now,
-      updatedAt: now,
-    };
 
-    await Promise.race([
-      table.createEntity(entity),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("TABLE_CREATE_TIMEOUT")), 8000)
-      ),
-    ]);
-
-    // EMAIL index for idempotency (same email -> same visitorId)
+    // Reserve email FIRST (prevents concurrent duplicates)
     if (emailLower) {
-      // emailLower already computed above
-      const emailKey = encodeURIComponent(emailLower!);
+      const emailKey = encodeURIComponent(emailLower);
+
       const indexEntity: EmailIndexEntity = {
         partitionKey: "EMAIL",
         rowKey: emailKey,
@@ -91,13 +80,62 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
       try {
         await table.createEntity(indexEntity as any);
       } catch (err: any) {
-        const status = err?.statusCode ?? err?.status;
-        // 409 = already exists (idempotent repeat)
-        if (status !== 409) throw err;
+        const code = String(err?.code ?? "");
+        const status = Number(err?.statusCode ?? err?.status ?? 0);
+
+        // 409 = already reserved -> return existing visitor
+        if (status === 409 || code === "EntityAlreadyExists") {
+          try {
+            const idx = await table.getEntity<EmailIndexEntity>("EMAIL", emailKey);
+            const existingId = (idx as any).visitorId as string | undefined;
+            if (!existingId) return { visitor: { visitorId: "", name: "", createdAt: "", updatedAt: "" } as any, created: false };
+
+            const existing = await this.getById(existingId);
+            if (existing) return { visitor: existing, created: false };
+
+            // If index exists but visitor missing, fall through to attempt create with our new id
+          } catch (e: any) {
+            // If index read fails unexpectedly, rethrow
+            const st = Number(e?.statusCode ?? e?.status ?? 0);
+            const cd = String(e?.code ?? "");
+            if (!(st === 404 || cd === "ResourceNotFound")) throw e;
+          }
+        } else {
+          throw err;
+        }
       }
     }
 
-    return toVisitor(entity);
+    // Create visitor entity
+    const entity: VisitorEntity = {
+      partitionKey: PK,
+      rowKey: id,
+      name: input.name,
+      email: emailTrim,
+      emailLower: emailLower,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    try {
+      await Promise.race([
+        table.createEntity(entity),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("TABLE_CREATE_TIMEOUT")), 8000)
+        ),
+      ]);
+    } catch (err: any) {
+      // Best-effort cleanup: if we reserved email, remove index so retries work
+      if (emailLower) {
+        const emailKey = encodeURIComponent(emailLower);
+        try { await table.deleteEntity("EMAIL", emailKey); } catch { }
+      }
+      throw err;
+    }
+
+    return { visitor: toVisitor(entity), created: true };
+  }
+
   }
 
   async getById(visitorId: string): Promise<Visitor | null> {
@@ -169,6 +207,7 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     return toVisitor(entity);
   }
 }
+
 
 
 

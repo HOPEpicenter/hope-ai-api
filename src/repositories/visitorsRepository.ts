@@ -154,9 +154,7 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
 
     
 
-    const emailTrim = typeof visitor.email === "string" ? visitor.email.trim() : undefined;
-    const emailLower = emailTrim ? emailTrim.toLowerCase() : undefined;
-const emailTrim = typeof input.email === "string" ? input.email.trim() : undefined;
+        const emailTrim = typeof visitor.email === "string" ? visitor.email.trim() : undefined;
     const emailLower = emailTrim ? emailTrim.toLowerCase() : undefined;
     const entity: VisitorEntity = {
       partitionKey: PK,
@@ -171,5 +169,6 @@ const emailTrim = typeof input.email === "string" ? input.email.trim() : undefin
     return toVisitor(entity);
   }
 }
+
 
 

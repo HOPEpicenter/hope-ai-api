@@ -23,7 +23,8 @@ export type Visitor = {
 export interface VisitorsRepository {
   create(input: { name: string; email?: string }): Promise<Visitor>;
   getById(visitorId: string): Promise<Visitor | null>;
-  list(input: { limit: number }): Promise<{ items: Visitor[]; count: number }>;
+    getByEmail(email: string): Promise<Visitor | null>;
+list(input: { limit: number }): Promise<{ items: Visitor[]; count: number }>;
   upsert(visitor: Visitor): Promise<Visitor>;
 }
 
@@ -132,6 +133,7 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     return toVisitor(entity);
   }
 }
+
 
 
 

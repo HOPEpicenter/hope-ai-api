@@ -311,6 +311,50 @@ $page1 = OpsRequest -BaseUrl $BaseUrl -Method GET -Path ("/ops/visitors/{0}/time
 Assert-True ($page1.Status -eq 200) "Timeline page1 expected 200"
 $page1Rid = Assert-RequestId -Resp $page1 -Context "GET /ops/visitors/:id/timeline page1"
 Assert-True (Get-BodyProp -Resp $page1 -Name "nextCursor") "Timeline page1 expected nextCursor"
+
+# 7a) Timeline cursor contract regression (limit=1 must not skip or overlap)
+$regV = OpsRequest -BaseUrl $BaseUrl -Method POST -Path "/ops/visitors" -Body @{
+  name  = "Timeline Regression"
+  email = ("timeline+" + (New-Guid) + "@example.com")
+}
+Assert-True ($regV.Status -eq 201) "Timeline regression create visitor expected 201"
+$regVid = Get-BodyProp -Resp $regV -Name "visitorId"
+Assert-True ($regVid) "Timeline regression visitorId missing"
+
+# Append 3 events (seq 0..2). Timeline is newest-first, so page1 should be seq=2, page2 should be seq=1.
+for ($i = 0; $i -lt 3; $i++) {
+  $re = OpsRequest -BaseUrl $BaseUrl -Method POST -Path ("/ops/visitors/{0}/events" -f $regVid) -Body @{
+    type     = "note"
+    metadata = @{ seq = $i; source = "smoke-regression" }
+  }
+  Assert-True ($re.Status -eq 201) "Timeline regression append expected 201"
+  $reRid = Assert-RequestId -Resp $re -Context ("POST /ops/visitors/:id/events regression " + $i)
+}
+
+$rp1 = OpsRequest -BaseUrl $BaseUrl -Method GET -Path ("/ops/visitors/{0}/timeline?limit=1" -f $regVid)
+Assert-True ($rp1.Status -eq 200) "Timeline regression page1 expected 200"
+$rp1Rid = Assert-RequestId -Resp $rp1 -Context "GET /ops/visitors/:id/timeline regression page1"
+$rcursor = Get-BodyProp -Resp $rp1 -Name "nextCursor"
+Assert-True ($rcursor) "Timeline regression page1 expected nextCursor"
+
+$ritems1 = Get-BodyProp -Resp $rp1 -Name "items"
+Assert-True ($ritems1 -and $ritems1.Count -eq 1) "Timeline regression page1 expected exactly 1 item"
+$rseq1 = $ritems1[0].metadata.seq
+
+$rp2 = OpsRequest -BaseUrl $BaseUrl -Method GET -Path ("/ops/visitors/{0}/timeline?limit=1&cursor={1}" -f $regVid, $rcursor)
+Assert-True ($rp2.Status -eq 200) "Timeline regression page2 expected 200"
+$rp2Rid = Assert-RequestId -Resp $rp2 -Context "GET /ops/visitors/:id/timeline regression page2"
+
+$ritems2 = Get-BodyProp -Resp $rp2 -Name "items"
+Assert-True ($ritems2 -and $ritems2.Count -eq 1) "Timeline regression page2 expected exactly 1 item"
+$rseq2 = $ritems2[0].metadata.seq
+
+Assert-True ($rseq2 -ne $rseq1) "Timeline regression failed: page2 overlapped page1"
+Assert-True ($rseq1 -eq 2) "Timeline regression failed: expected page1 newest seq=2, got seq=$rseq1"
+Assert-True ($rseq2 -eq 1) "Timeline regression failed: expected page2 next seq=1, got seq=$rseq2"
+
+Write-Host "Timeline cursor contract regression OK (limit=1 no skip/no overlap)"
+
 Write-Host "Timeline page1 OK (nextCursor present)"
 
 $cursor = Get-BodyProp -Resp $page1 -Name "nextCursor"

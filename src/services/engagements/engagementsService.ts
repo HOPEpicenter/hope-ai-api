@@ -1,4 +1,5 @@
 ﻿import { EngagementEventEnvelopeV1, validateEngagementEventEnvelopeV1 } from "../../contracts/engagementEvent.v1";
+import { normalizeEngagementEventEnvelopeV1 } from "../../domain/engagement/normalizeEngagementEventEnvelopeV1";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { deriveEngagementStatusFromEvents } from "../../domain/engagement/deriveEngagementStatus.v1";
 
@@ -15,7 +16,8 @@ export class EngagementsService {
     }
 
     const evt = validated.value;
-    await this.repo.appendEvent(evt as EngagementEventEnvelopeV1);
+    const normalized = normalizeEngagementEventEnvelopeV1(evt as EngagementEventEnvelopeV1);
+    await this.repo.appendEvent(normalized);
   }
 
   async readTimeline(visitorId: string, limit: number, cursor?: string) {

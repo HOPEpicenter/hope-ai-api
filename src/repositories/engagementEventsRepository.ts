@@ -76,11 +76,17 @@ export class EngagementEventsRepository {
     }
 
     const hasMore = items.length > limit;
-    const sliced = hasMore ? items.slice(0, limit) : items;
+    const pageItems = hasMore ? items.slice(0, limit) : items;
+
+    const lastReturned =
+      pageItems.length > 0 ? makeRowKey(pageItems[pageItems.length - 1]) : undefined;
 
     return {
-      items: sliced,
-      nextCursor: hasMore && lastRowKey ? encodeCursorV1({ visitorId, after: lastRowKey }) : undefined,
+      items: pageItems,
+      nextCursor:
+        hasMore && lastReturned
+          ? encodeCursorV1({ visitorId, after: lastReturned })
+          : undefined,
     };
   }
 }

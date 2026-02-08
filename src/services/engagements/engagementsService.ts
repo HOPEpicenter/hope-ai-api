@@ -1,9 +1,6 @@
 ﻿import { EngagementEventEnvelopeV1, validateEngagementEventEnvelopeV1 } from "../../contracts/engagementEvent.v1";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-<<<<<<< HEAD
 import { deriveEngagementStatusFromEvents } from "../../domain/engagement/deriveEngagementStatus.v1";
-=======
->>>>>>> a9b28ba (feat(engagement): envelope v1 + timeline v1 (no deps))
 
 export class EngagementsService {
   constructor(private repo: EngagementEventsRepository) {}
@@ -18,17 +15,12 @@ export class EngagementsService {
     }
 
     const evt = validated.value;
-<<<<<<< HEAD
-=======
-
->>>>>>> a9b28ba (feat(engagement): envelope v1 + timeline v1 (no deps))
     await this.repo.appendEvent(evt as EngagementEventEnvelopeV1);
   }
 
   async readTimeline(visitorId: string, limit: number, cursor?: string) {
     return this.repo.readTimeline(visitorId, limit, cursor);
   }
-<<<<<<< HEAD
 
   /**
    * Status v1 is derived from status.transition events (auditable/derivable).
@@ -42,6 +34,4 @@ export class EngagementsService {
 
     return deriveEngagementStatusFromEvents(visitorId, events);
   }
-=======
->>>>>>> a9b28ba (feat(engagement): envelope v1 + timeline v1 (no deps))
 }

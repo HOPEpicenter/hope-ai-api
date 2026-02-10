@@ -8,6 +8,27 @@ import { EngagementsService } from "../../services/engagements/engagementsServic
 
 export const engagementsStatusRouter = Router();
 
+function normalizeStatus(s: string): string {
+  return (s ?? "").trim().toLowerCase();
+}
+
+// Minimal v1 transition rules (tight + explicit).
+function isAllowedTransition(from: string, to: string): boolean {
+  // disallow transitions TO unknown (clients shouldn't set this explicitly)
+  if (to === "unknown" || to === "") return false;
+
+  // unknown/null can go to known states
+  if (from === "unknown" || from === "") return to === "engaged" || to === "disengaged";
+
+  // common states: engaged <-> disengaged only
+  if (from === "engaged") return to === "disengaged";
+  if (from === "disengaged") return to === "engaged";
+
+  // If we don't recognize current state, be conservative: only allow known states.
+  return to === "engaged" || to === "disengaged";
+}
+
+
 const service = new EngagementsService(new EngagementEventsRepository());
 
 function newEventId(): string {
@@ -95,11 +116,27 @@ engagementsStatusRouter.post("/engagements/status/transitions", async (req, res,
     // derive current status first so we can populate data.from
     const current = await service.getCurrentStatus(visitorId);
     const from = clampFromStatus(current.status);
+    
+    const toNorm = normalizeStatus(to);
+    const fromNorm = normalizeStatus(from);
 
-    const eventId = idempotencyKey
-      ? uuidFromSha256(`${visitorId}|${idempotencyKey}`)
-      : newEventId();
+    // NOOP_TRANSITION: if state is unchanged, return current status without writing an event.
+    if (toNorm === fromNorm) {
+      return res.status(200).json(current);
+    }
 
+    // Enforce allowed transitions
+    if (!isAllowedTransition(fromNorm, toNorm)) {
+      return res.status(409).json({
+        error: {
+          code: "INVALID_TRANSITION",
+          message: `Invalid transition from '${from}' to '${to}'`,
+          details: { from, to },
+        },
+      });
+    }
+// Enforce allowed transitions
+    const eventId = idempotencyKey ? uuidFromSha256(`${visitorId}|${idempotencyKey}`) : newEventId();
     const evt = {
       v: 1,
       eventId,
@@ -118,3 +155,15 @@ engagementsStatusRouter.post("/engagements/status/transitions", async (req, res,
     return next(err);
   }
 });
+
+
+
+
+
+
+
+
+
+
+
+

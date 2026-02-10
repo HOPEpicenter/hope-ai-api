@@ -1,4 +1,4 @@
-﻿import { EngagementEventEnvelopeV1 } from "../contracts/engagementEvent.v1";
+import { EngagementEventEnvelopeV1 } from "../contracts/engagementEvent.v1";
 import { decodeCursorV1, encodeCursorV1 } from "../contracts/timeline.v1";
 import { getTableClient } from "../storage/tableClient";
 
@@ -18,15 +18,42 @@ function escapeOData(value: string): string {
   return value.replace(/'/g, "''");
 }
 
+function safeJsonStringify(v: unknown): string {
+  try {
+    return JSON.stringify(v ?? {});
+  } catch {
+    return "{}";
+  }
+}
+
+function safeJsonParse<T>(s: unknown, fallback: T): T {
+  if (typeof s !== "string" || s.trim() === "") return fallback;
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 export class EngagementEventsRepository {
   async appendEvent(evt: EngagementEventEnvelopeV1): Promise<void> {
     const table = await getTableClient(TABLE_NAME);
 
+    // IMPORTANT: Azure Tables only supports primitive EDM types. Do not store objects directly.
     const entity: any = {
       partitionKey: evt.visitorId,
       rowKey: makeRowKey(evt),
-      ...evt,
-      data: evt.data ?? {},
+
+      // envelope primitives
+      v: evt.v,
+      eventId: evt.eventId,
+      visitorId: evt.visitorId,
+      type: evt.type,
+      occurredAt: evt.occurredAt,
+
+      // store complex payload as JSON strings
+      sourceJson: safeJsonStringify(evt.source ?? {}),
+      dataJson: safeJsonStringify(evt.data ?? {}),
     };
 
     await table.createEntity(entity);
@@ -46,7 +73,6 @@ export class EngagementEventsRepository {
     const safeAfter = afterRowKey ? escapeOData(afterRowKey) : undefined;
 
     const items: EngagementEventEnvelopeV1[] = [];
-    let lastRowKey: string | undefined;
 
     const pageSize = limit + 1;
 
@@ -65,12 +91,11 @@ export class EngagementEventsRepository {
         visitorId: e.visitorId,
         type: e.type,
         occurredAt: e.occurredAt,
-        source: e.source,
-        data: e.data ?? {},
+        source: (() => { const parsed = safeJsonParse<{ system?: string; actorId?: string }>(e.sourceJson ?? e.source, {}); const system = typeof parsed.system === "string" && parsed.system.trim() ? parsed.system : "unknown"; const actorId = typeof parsed.actorId === "string" && parsed.actorId.trim() ? parsed.actorId : undefined; return actorId ? { system, actorId } : { system }; })(),
+        data: safeJsonParse<Record<string, unknown>>(e.dataJson ?? e.data, {}),
       };
 
       items.push(evt);
-      lastRowKey = e.rowKey;
 
       if (items.length >= pageSize) break;
     }
@@ -90,3 +115,5 @@ export class EngagementEventsRepository {
     };
   }
 }
+
+

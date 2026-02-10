@@ -1,4 +1,4 @@
-﻿import { EngagementEventEnvelopeV1, validateEngagementEventEnvelopeV1 } from "../../contracts/engagementEvent.v1";
+import { EngagementEventEnvelopeV1, validateEngagementEventEnvelopeV1 } from "../../contracts/engagementEvent.v1";
 import { normalizeEngagementEventEnvelopeV1 } from "../../domain/engagement/normalizeEngagementEventEnvelopeV1";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { deriveEngagementStatusFromEvents } from "../../domain/engagement/deriveEngagementStatus.v1";
@@ -6,7 +6,7 @@ import { deriveEngagementStatusFromEvents } from "../../domain/engagement/derive
 export class EngagementsService {
   constructor(private repo: EngagementEventsRepository) {}
 
-  async appendEvent(raw: unknown): Promise<void> {
+  async appendEvent(raw: unknown, opts?: { idempotencyKey?: string }): Promise<void> {
     const validated = validateEngagementEventEnvelopeV1(raw);
     if (!validated.ok) {
       const err: any = new Error("Validation failed");
@@ -17,7 +17,7 @@ export class EngagementsService {
 
     const evt = validated.value;
     const normalized = normalizeEngagementEventEnvelopeV1(evt as EngagementEventEnvelopeV1);
-    await this.repo.appendEvent(normalized);
+    await this.repo.appendEvent(normalized, opts);
   }
 
   async readTimeline(visitorId: string, limit: number, cursor?: string) {
@@ -37,3 +37,6 @@ export class EngagementsService {
     return deriveEngagementStatusFromEvents(visitorId, events);
   }
 }
+
+
+

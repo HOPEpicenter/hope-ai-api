@@ -36,8 +36,23 @@ function safeJsonParse<T>(s: unknown, fallback: T): T {
 }
 
 export class EngagementEventsRepository {
-  async appendEvent(evt: EngagementEventEnvelopeV1): Promise<void> {
+  async appendEvent(
+    evt: EngagementEventEnvelopeV1,
+    opts?: { idempotencyKey?: string }
+  ): Promise<void> {
     const table = await getTableClient(TABLE_NAME);
+
+    // Idempotency dedupe (best-effort): if caller provides Idempotency-Key, route generates deterministic eventId.
+    // Avoid duplicate rows by checking for existing entity with same visitorId + eventId.
+    if (opts?.idempotencyKey) {
+      const safeVisitorId = escapeOData(evt.visitorId);
+      const safeEventId = escapeOData(evt.eventId);
+      const filter = `PartitionKey eq '${safeVisitorId}' and eventId eq '${safeEventId}'`;
+      const iter = table.listEntities<any>({ queryOptions: { filter } });
+      for await (const _ of iter) {
+        return; // already exists
+      }
+    }
 
     // IMPORTANT: Azure Tables only supports primitive EDM types. Do not store objects directly.
     const entity: any = {
@@ -85,13 +100,23 @@ export class EngagementEventsRepository {
     });
 
     for await (const e of iter) {
+      const sourceParsed = safeJsonParse<{ system?: string; actorId?: string }>(e.sourceJson ?? e.source, {});
+      const system =
+        typeof sourceParsed.system === "string" && sourceParsed.system.trim()
+          ? sourceParsed.system
+          : "unknown";
+      const actorId =
+        typeof sourceParsed.actorId === "string" && sourceParsed.actorId.trim()
+          ? sourceParsed.actorId
+          : undefined;
+
       const evt: EngagementEventEnvelopeV1 = {
         v: e.v,
         eventId: e.eventId,
         visitorId: e.visitorId,
         type: e.type,
         occurredAt: e.occurredAt,
-        source: (() => { const parsed = safeJsonParse<{ system?: string; actorId?: string }>(e.sourceJson ?? e.source, {}); const system = typeof parsed.system === "string" && parsed.system.trim() ? parsed.system : "unknown"; const actorId = typeof parsed.actorId === "string" && parsed.actorId.trim() ? parsed.actorId : undefined; return actorId ? { system, actorId } : { system }; })(),
+        source: actorId ? { system, actorId } : { system },
         data: safeJsonParse<Record<string, unknown>>(e.dataJson ?? e.data, {}),
       };
 
@@ -115,5 +140,3 @@ export class EngagementEventsRepository {
     };
   }
 }
-
-

@@ -11,8 +11,25 @@ export const engagementsStatusRouter = Router();
 const service = new EngagementsService(new EngagementEventsRepository());
 
 function newEventId(): string {
-  // match the repo’s established randomUUID fallback pattern :contentReference[oaicite:6]{index=6}
   return (globalThis.crypto as any)?.randomUUID?.() ?? require("crypto").randomUUID();
+}
+
+// Deterministic UUID-like string from a seed (for idempotency).
+// Not a full RFC4122 v5 implementation, but stable and UUID-shaped.
+function uuidFromSha256(seed: string): string {
+  const hex: string = require("crypto")
+    .createHash("sha256")
+    .update(seed)
+    .digest("hex")
+    .slice(0, 32);
+
+  const a = hex.slice(0, 8);
+  const b = hex.slice(8, 12);
+  const c = "5" + hex.slice(13, 16); // version-ish nibble
+  const dNibble = parseInt(hex.slice(16, 17), 16);
+  const d = ((dNibble & 0x3) | 0x8).toString(16) + hex.slice(17, 20); // variant-ish
+  const e = hex.slice(20, 32);
+  return `${a}-${b}-${c}-${d}-${e}`;
 }
 
 function clampFromStatus(s: string | null): string {
@@ -65,13 +82,27 @@ engagementsStatusRouter.post("/engagements/status/transitions", async (req, res,
 
     const { visitorId, to, reason } = parsed.value;
 
-    // derive current status first so we can populate data.from (required by event validation) :contentReference[oaicite:7]{index=7}
+    const idempotencyKeyRaw =
+      (req.header("Idempotency-Key") ?? req.header("x-idempotency-key") ?? "").trim();
+    const idempotencyKey = idempotencyKeyRaw ? idempotencyKeyRaw : undefined;
+
+    if (idempotencyKey && idempotencyKey.length > 128) {
+      return res.status(400).json({
+        error: { code: "VALIDATION_ERROR", message: "Idempotency-Key too long (max 128 chars)" },
+      });
+    }
+
+    // derive current status first so we can populate data.from
     const current = await service.getCurrentStatus(visitorId);
     const from = clampFromStatus(current.status);
 
+    const eventId = idempotencyKey
+      ? uuidFromSha256(`${visitorId}|${idempotencyKey}`)
+      : newEventId();
+
     const evt = {
       v: 1,
-      eventId: newEventId(),
+      eventId,
       visitorId,
       type: "status.transition",
       occurredAt: new Date().toISOString(),
@@ -79,7 +110,7 @@ engagementsStatusRouter.post("/engagements/status/transitions", async (req, res,
       data: { from, to, ...(reason ? { reason } : {}) },
     };
 
-    await service.appendEvent(evt);
+    await service.appendEvent(evt as any, { idempotencyKey });
 
     const updated = await service.getCurrentStatus(visitorId);
     return res.status(200).json(updated);

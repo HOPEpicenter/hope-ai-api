@@ -2,6 +2,7 @@ import express from "express";
 import visitorsRouter from "./routes/visitors/visitorsRouter";
 import { createOpsRouter } from "./routes/ops/opsRouter";
 import { formationRouter } from "./routes/formation";
+import { engagementsRouter } from "./routes/engagements";
 import { integrationRouter } from "./routes/integration";
 import { legacyRouter } from "./routes/legacy";
 import { requestIdMiddleware, errorMiddleware } from "./http/middleware";
@@ -34,6 +35,7 @@ app.use("/ops", createOpsRouter(visitorsRepository, formationEventsRepository, e
 // Public API routes
 app.use("/api/visitors", visitorsRouter(visitorsRepository));
 app.use("/api", formationRouter);
+app.use("/api", engagementsRouter);
 app.use("/api", integrationRouter);
 app.use("/api", legacyRouter);
 /**
@@ -55,6 +57,11 @@ app.listen(port, () => {
   console.log(`hope-ai-api listening on port ${port}`);
 });
 // Public API routes
+
+
+
+
+
 
 
 

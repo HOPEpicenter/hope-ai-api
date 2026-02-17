@@ -10,8 +10,15 @@ export type TimelinePage = {
 };
 
 function makeRowKey(evt: EngagementEventEnvelopeV1): string {
-  // stable, sortable (ISO sorts lexicographically)
-  return `${evt.occurredAt}|${evt.eventId}`;
+  // Newest-first ordering in Azure Tables (lexicographic ascending => most recent first)
+  // Use an inverted millisecond timestamp so newer events sort "earlier".
+  const MAX_MS = 253402300799999; // 9999-12-31T23:59:59.999Z
+  const ms = Date.parse(evt.occurredAt);
+  const safeMs = Number.isFinite(ms) ? ms : Date.now();
+  const inv = MAX_MS - safeMs;
+  const invKey = String(inv).padStart(15, "0");
+  // Tie-break with eventId so RowKey is unique even for same millisecond
+  return `${invKey}|${evt.eventId}`;
 }
 
 function escapeOData(value: string): string {
@@ -47,7 +54,12 @@ export class EngagementEventsRepository {
     if (opts?.idempotencyKey) {
       const safeVisitorId = escapeOData(evt.visitorId);
       const safeEventId = escapeOData(evt.eventId);
-      const filter = `PartitionKey eq '${safeVisitorId}' and eventId eq '${safeEventId}'`;
+      const filter =
+        "PartitionKey eq '" +
+        safeVisitorId +
+        "' and eventId eq '" +
+        safeEventId +
+        "'";
       const iter = table.listEntities<any>({ queryOptions: { filter } });
       for await (const _ of iter) {
         return; // already exists
@@ -74,13 +86,19 @@ export class EngagementEventsRepository {
     await table.createEntity(entity);
   }
 
-  async readTimeline(visitorId: string, limit: number, cursor?: string): Promise<TimelinePage> {
+  async readTimeline(
+    visitorId: string,
+    limit: number,
+    cursor?: string
+  ): Promise<TimelinePage> {
     const table = await getTableClient(TABLE_NAME);
 
     let afterRowKey: string | undefined;
     if (cursor) {
       const decoded = decodeCursorV1(cursor);
-      if (decoded.visitorId !== visitorId) throw new Error("Cursor visitorId mismatch");
+      if (decoded.visitorId !== visitorId) {
+        throw new Error("Cursor visitorId mismatch");
+      }
       afterRowKey = decoded.after;
     }
 
@@ -88,23 +106,31 @@ export class EngagementEventsRepository {
     const safeAfter = afterRowKey ? escapeOData(afterRowKey) : undefined;
 
     const items: EngagementEventEnvelopeV1[] = [];
-
+    const itemRowKeys: string[] = [];
     const pageSize = limit + 1;
 
+    // For inverted keys (newest-first), "after" means: continue with older items => RowKey > after
     const filter = safeAfter
-      ? `PartitionKey eq '${safeVisitorId}' and RowKey gt '${safeAfter}'`
-      : `PartitionKey eq '${safeVisitorId}'`;
+      ? "PartitionKey eq '" +
+        safeVisitorId +
+        "' and RowKey gt '" +
+        safeAfter +
+        "'"
+      : "PartitionKey eq '" + safeVisitorId + "'";
 
-    const iter = table.listEntities<any>({
-      queryOptions: { filter },
-    });
+    const iter = table.listEntities<any>({ queryOptions: { filter } });
 
     for await (const e of iter) {
-      const sourceParsed = safeJsonParse<{ system?: string; actorId?: string }>(e.sourceJson ?? e.source, {});
+      const sourceParsed = safeJsonParse<{ system?: string; actorId?: string }>(
+        e.sourceJson ?? e.source,
+        {}
+      );
+
       const system =
         typeof sourceParsed.system === "string" && sourceParsed.system.trim()
           ? sourceParsed.system
           : "unknown";
+
       const actorId =
         typeof sourceParsed.actorId === "string" && sourceParsed.actorId.trim()
           ? sourceParsed.actorId
@@ -121,21 +147,24 @@ export class EngagementEventsRepository {
       };
 
       items.push(evt);
+      itemRowKeys.push(e.rowKey);
 
       if (items.length >= pageSize) break;
     }
 
     const hasMore = items.length > limit;
     const pageItems = hasMore ? items.slice(0, limit) : items;
+    const pageRowKeys = hasMore ? itemRowKeys.slice(0, limit) : itemRowKeys;
 
-    const lastReturned =
-      pageItems.length > 0 ? makeRowKey(pageItems[pageItems.length - 1]) : undefined;
+    // DURABLE CURSOR: must use the actual stored RowKey, not recompute it from occurredAt
+    const lastReturnedRowKey =
+      pageRowKeys.length > 0 ? pageRowKeys[pageRowKeys.length - 1] : undefined;
 
     return {
       items: pageItems,
       nextCursor:
-        hasMore && lastReturned
-          ? encodeCursorV1({ visitorId, after: lastReturned })
+        hasMore && lastReturnedRowKey
+          ? encodeCursorV1({ visitorId, after: lastReturnedRowKey })
           : undefined,
     };
   }

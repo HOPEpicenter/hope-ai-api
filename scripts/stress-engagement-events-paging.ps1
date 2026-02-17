@@ -1,19 +1,10 @@
 # scripts/stress-engagement-events-paging.ps1
 [CmdletBinding()]
 param(
-  # Root server URL (no /api). Example: http://localhost:3000
   [string]$BaseUrl = $(if ($env:HOPE_BASE_URL) { $env:HOPE_BASE_URL } else { "http://localhost:3000" }),
-
-  # Optional: provide a fixed visitorId (must be >= 8 chars). If omitted, a GUID will be generated.
   [string]$VisitorId = $null,
-
-  # Total events to seed
   [int]$Total = 260,
-
-  # Timeline page limit
   [int]$Limit = 200,
-
-  # Optional: slow down posting a little (ms) if you want
   [int]$PostDelayMs = 0,
 
   # Event generation mode:
@@ -61,7 +52,6 @@ function Invoke-HttpJson {
 }
 
 function New-Id([string]$prefix) {
-  # satisfies >= 8
   return ($prefix + "-" + [Guid]::NewGuid().ToString("N"))
 }
 
@@ -70,7 +60,6 @@ function NowIsoUtc([datetime]$dt) {
 }
 
 function Get-ItemKey([object]$it) {
-  # Prefer eventId (contract), else id, else rowKey, else a JSON-ish fallback
   try {
     $props = $it.PSObject.Properties.Name
     if ($props -contains "eventId" -and -not [string]::IsNullOrWhiteSpace([string]$it.eventId)) { return [string]$it.eventId }
@@ -107,9 +96,9 @@ Write-Host ("API     : {0}" -f $api)
 Write-Host ("Visitor : {0}" -f $VisitorId)
 Write-Host ("Seed    : {0} events" -f $Total)
 Write-Host ("Limit   : {0}" -f $Limit)
+Write-Host ("Mode    : {0}" -f $Mode)
 Write-Host ""
 
-# Quick health check
 try {
   $h = Invoke-HttpJson -Method GET -Uri "$api/health" -Headers $headers
   Write-Host ("Health  : " + (Safe-Json $h 6))
@@ -118,12 +107,8 @@ try {
 }
 Write-Host ""
 
-# --------------------------
-# 1) POST N events
-# --------------------------
 Write-Host ("[1/2] Posting {0} events to POST /api/engagements/events ..." -f $Total)
 
-# Spread occurredAt so row keys are unlikely to collide (monotonic-ish)
 $start = (Get-Date).ToUniversalTime().AddMinutes(-5)
 
 for ($i = 0; $i -lt $Total; $i++) {
@@ -138,17 +123,11 @@ for ($i = 0; $i -lt $Total; $i++) {
     visitorId  = $VisitorId
     type       = $type
     occurredAt = $occurredAt
-    source     = @{
-      system = "stress.ps1"
-    }
-    data       = @{
-      seq  = $i
-      note = "stress seed"
-    }
+    source     = @{ system = "stress.ps1" }
+    data       = @{ seq = $i; note = "stress seed" }
   }
 
   if ($Mode -eq "status") {
-    # Required by validator when type == "status.transition" (1-64 chars)
     $from = if ($i % 2 -eq 0) { "open" } else { "in_progress" }
     $to   = if ($i % 2 -eq 0) { "in_progress" } else { "open" }
     $body.data.from = $from
@@ -167,9 +146,6 @@ for ($i = 0; $i -lt $Total; $i++) {
 Write-Host "Posting complete."
 Write-Host ""
 
-# --------------------------
-# 2) Page timeline
-# --------------------------
 Write-Host ("[2/2] Paging GET /api/engagements/timeline?visitorId=...&limit={0} ..." -f $Limit)
 
 $allKeys   = New-Object System.Collections.Generic.HashSet[string]
@@ -186,31 +162,21 @@ while ($true) {
 
   $resp = Invoke-HttpJson -Method GET -Uri $uri -Headers $headers
 
-  # Accept either { items: [...] } or direct array
   $items = @()
   if ($resp -is [System.Collections.IEnumerable] -and $resp -isnot [string]) {
-    try {
-      if ($resp.PSObject.Properties.Name -contains "items") { $items = @($resp.items) }
-      else { $items = @($resp) }
-    } catch {
-      $items = @($resp)
-    }
+    try { if ($resp.PSObject.Properties.Name -contains "items") { $items = @($resp.items) } else { $items = @($resp) } }
+    catch { $items = @($resp) }
   } else {
-    try {
-      if ($resp.PSObject.Properties.Name -contains "items") { $items = @($resp.items) }
-      else { $items = @() }
-    } catch { $items = @() }
+    try { if ($resp.PSObject.Properties.Name -contains "items") { $items = @($resp.items) } else { $items = @() } }
+    catch { $items = @() }
   }
 
   $pageCount = $items.Count
   $pageSizes.Add($pageCount) | Out-Null
 
   $next = $null
-  try {
-    if ($resp.PSObject.Properties.Name -contains "nextCursor") { $next = $resp.nextCursor }
-  } catch { }
+  try { if ($resp.PSObject.Properties.Name -contains "nextCursor") { $next = $resp.nextCursor } } catch { }
 
-  # Dedupe check
   $dupes = 0
   foreach ($it in $items) {
     $k = Get-ItemKey $it
@@ -227,7 +193,6 @@ $totalGot = $allKeys.Count
 $page1    = if ($pageSizes.Count -ge 1) { $pageSizes[0] } else { 0 }
 $page2    = if ($pageSizes.Count -ge 2) { $pageSizes[1] } else { 0 }
 
-# If we got to page2, page1 necessarily had nextCursor
 $page1HasNext     = ($pageSizes.Count -gt 1)
 $lastCursorIsNull = [string]::IsNullOrWhiteSpace([string]$cursor)
 
@@ -251,4 +216,3 @@ Write-Host "FAIL ❌" -ForegroundColor Red
 $failures | ForEach-Object { Write-Host (" - " + $_) -ForegroundColor Red }
 Write-Host ("Observed: total={0} page1={1} page2={2} pages={3}" -f $totalGot, $page1, $page2, $pageSizes.Count)
 exit 1
-

@@ -1,5 +1,6 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import { engagementsStatusRouter } from "./status";
+import { engagementsAnalyticsRouter } from "./analytics";
 import { engagementsEventsRouter } from "./events";
 import { engagementsTimelineRouter } from "./timeline";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
@@ -88,4 +89,8 @@ engagementsRouter.use(engagementsTimelineRouter);
 
 // Engagement status v1 (derived from events)
 engagementsRouter.use(engagementsStatusRouter);
+
+
+engagementsRouter.use(engagementsAnalyticsRouter);
+
 

@@ -2,7 +2,8 @@ import { Router } from "express";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { FormationEventRepository } from "../../storage/formationEventRepository";
 import { recordFormationEvent } from "../../domain/formation/recordFormationEvent";
-import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
+import { listFormationEventsByVisitor } from "../../storage/formation/formationEventsRepo";
+import { getFormationProfilesTableClient, getFormationEventsTableClient } from "../../storage/formation/formationTables";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import { getFormationProfile, listFormationProfiles } from "../../storage/formation/formationProfilesRepo";
 
@@ -38,19 +39,23 @@ function toHttpStatus(err: any, fallback = 400): number {
 // POST /formation/events  (mounted under /api in src/index.ts)
 // Now uses the domain recorder so we ALWAYS update FormationProfile snapshot.
 formationEventsRouter.post("/formation/events", async (req, res) => {
+  const body = req.body || {};
+
+  // Accept both legacy and envelope v1
+  const visitorId = body.visitorId;
+  const type = body.type;
+  const occurredAt = body.occurredAt;
+
+  const id = body.id ?? body.eventId;
+  const metadata = body.metadata ?? body.data;
+  const idempotencyKey = body.idempotencyKey ?? body.eventId;
+
   const {
-    visitorId,
-    type,
-    occurredAt,
-    id,
-    // allow extra optional fields for the domain recorder
     channel,
     visibility,
     sensitivity,
     summary,
-    metadata,
-    idempotencyKey,
-  } = req.body || {};
+  } = body;
 
   const storageConnectionString = process.env.STORAGE_CONNECTION_STRING;
   if (!storageConnectionString) {
@@ -108,11 +113,64 @@ formationEventsRouter.post("/formation/events", async (req, res) => {
 formationEventsRouter.get("/visitors/:id/formation/events", async (req, res) => {
   try {
     const visitorId = String(req.params.id || "").trim();
+
+    const storageConnectionString = process.env.STORAGE_CONNECTION_STRING;
+    if (!storageConnectionString) {
+      return res.status(500).json({ ok: false, error: "Missing STORAGE_CONNECTION_STRING" });
+    }
+
     const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
+
+    // Cursor is a RowKey (from previous response). We use it as "beforeRowKey" (older-than paging).
     const cursor = req.query.cursor ? String(req.query.cursor) : undefined;
 
-    const out = await eventsRepo.listByVisitor(visitorId, limit, cursor);
-    return res.status(200).json({ ok: true, visitorId, items: out.items, cursor: out.cursor });
+    const eventsTable = getFormationEventsTableClient(storageConnectionString);
+    await ensureTableExists(eventsTable);
+
+    // Azure Tables lists ascending RowKey within PartitionKey (oldest -> newest).
+    const fetchLimit = Math.max(500, limit * 50);
+
+const ascAll = await listFormationEventsByVisitor(eventsTable as any, visitorId, {
+  limit: fetchLimit,
+  beforeRowKey: cursor,
+});
+
+// Keep only the newest 'limit' events in ascending order
+const start = Math.max(0, ascAll.length - limit);
+    const pageAsc = ascAll.slice(start);
+    // For API clients + scripts, return newest-first
+    const items = pageAsc
+      .slice()
+      .reverse()
+      .map((e: any) => {
+        let metadataObj: any = undefined;
+        try {
+          if (typeof e.metadata === "string" && e.metadata.trim()) metadataObj = JSON.parse(e.metadata);
+        } catch {
+          metadataObj = undefined;
+        }
+
+        return {
+          // scripts historically expect "id" sometimes; prefer idempotencyKey if present
+          id: e.idempotencyKey ?? e.rowKey,
+          visitorId: e.visitorId,
+          type: e.type,
+          occurredAt: e.occurredAt,
+          recordedAt: e.recordedAt,
+          channel: e.channel,
+          visibility: e.visibility,
+          sensitivity: e.sensitivity,
+          summary: e.summary,
+          metadata: metadataObj,
+          rowKey: e.rowKey,
+        };
+      });
+
+    // Next cursor should represent "older than this" => the smallest RowKey returned (oldest in this page).
+    const nextCursor = pageAsc.length > 0 ? (pageAsc[0] as any).rowKey : null;
+
+    // Return both names to be extra compatible with scripts
+    return res.status(200).json({ ok: true, visitorId, items, cursor: nextCursor, nextCursor });
   } catch (e: any) {
     return res.status(toHttpStatus(e, 400)).json({ ok: false, error: e?.message || "Bad Request" });
   }

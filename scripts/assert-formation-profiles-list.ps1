@@ -3,6 +3,27 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+function New-FormationEnvelope {
+  param(
+    [string]$visitorId,
+    [string]$type,
+    [datetime]$occurredAt,
+    [hashtable]$data,
+    [string]$sourceSystem
+  )
+
+  if (-not $data) { $data = @{} }
+
+  return @{
+    v = 1
+    eventId = [Guid]::NewGuid().ToString()
+    visitorId = $visitorId
+    type = $type
+    occurredAt = $occurredAt.ToUniversalTime().ToString("o")
+    source = @{ system = $sourceSystem }
+    data = $data
+  }
+}
 
 function Require-Env([string]$name) {
   $v = [Environment]::GetEnvironmentVariable($name)
@@ -52,27 +73,51 @@ $visitor = Invoke-PostJson -uri "$ApiBase/visitors" -headers $headers -body @{
   lastName  = "Profiles"
   email     = $email
 }
-$visitorId = $visitor.id
+$visitorId = $visitor.visitorId; if ([string]::IsNullOrWhiteSpace($visitorId)) { $visitorId = $visitor.id }
 if ([string]::IsNullOrWhiteSpace($visitorId)) { throw "Visitor id missing." }
 Write-Host "[assert-formation-profiles-list] visitorId=$visitorId"
 
 # generate snapshot via events (moves stage -> Connected + assignedTo)
 $now = (Get-Date).ToUniversalTime()
-Invoke-PostJson -uri "$ApiBase/formation/events" -headers $headers -body @{
+$body = @{
   id         = [Guid]::NewGuid().ToString()
   visitorId  = $visitorId
   type       = "FOLLOWUP_ASSIGNED"
   occurredAt = $now.ToString("o")
   metadata   = @{ assigneeId = "ops-user-1" }
-} | Out-Null
+}
 
-Invoke-PostJson -uri "$ApiBase/formation/events" -headers $headers -body @{
+$evt = @{
+  v = 1
+  eventId = $body.id
+  visitorId = $body.visitorId
+  type = $body.type
+  occurredAt = $body.occurredAt
+  source = @{ system = "assert-formation-profiles-list" }
+  data = $body.metadata
+}
+
+Invoke-PostJson -uri "$ApiBase/formation/events" -headers $headers -body $evt | Out-Null
+
+$body = @{
   id         = [Guid]::NewGuid().ToString()
   visitorId  = $visitorId
   type       = "NEXT_STEP_SELECTED"
   occurredAt = $now.AddSeconds(3).ToString("o")
   metadata   = @{ nextStep = "JoinGroup" }
-} | Out-Null
+}
+
+$evt = @{
+  v = 1
+  eventId = $body.id
+  visitorId = $body.visitorId
+  type = $body.type
+  occurredAt = $body.occurredAt
+  source = @{ system = "assert-formation-profiles-list" }
+  data = $body.metadata
+}
+
+Invoke-PostJson -uri "$ApiBase/formation/events" -headers $headers -body $evt | Out-Null
 
 # 1) visitorId fast path should return the single profile (deterministic)
 Write-Host "[assert-formation-profiles-list] GET /formation/profiles (visitorId fast path)..."

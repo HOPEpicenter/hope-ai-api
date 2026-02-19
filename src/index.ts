@@ -1,7 +1,7 @@
 import express from "express";
 import visitorsRouter from "./routes/visitors/visitorsRouter";
 import { createOpsRouter } from "./routes/ops/opsRouter";
-import { formationRouter } from "./routes/formation";
+import { formationEventsRouter as formationRouter } from "./routes/formationEvents";
 import { engagementsRouter } from "./routes/engagements";
 import { integrationRouter } from "./routes/integration";
 import { legacyRouter } from "./routes/legacy";

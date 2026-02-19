@@ -10,7 +10,23 @@ function isValidEmail(email: string): boolean {
 export function createCreateVisitorAdapter(visitorsRepository: VisitorsRepository) {
   return async function createVisitorAdapter(req: Request, res: Response) {
     try {
-      const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+      const body = req.body ?? {};
+
+
+      // Back-compat input normalization:
+      // - preferred: body.name
+      // - alias: body.fullName
+      // - legacy: body.firstName + body.lastName
+      const first = typeof body.firstName === "string" ? body.firstName.trim() : "";
+      const last  = typeof body.lastName === "string" ? body.lastName.trim() : "";
+      const legacyFull = [first, last].filter(Boolean).join(" ").trim();
+
+      const nameRaw =
+        (typeof body.name === "string" ? body.name : undefined) ??
+        (typeof body.fullName === "string" ? body.fullName : undefined) ??
+        (legacyFull.length > 0 ? legacyFull : undefined);
+
+      const name = typeof nameRaw === "string" ? nameRaw.trim() : "";
       const emailRaw = typeof req.body?.email === "string" ? req.body.email.trim() : "";
 
       if (!name) return res.status(400).json({ ok: false, error: "name is required" });

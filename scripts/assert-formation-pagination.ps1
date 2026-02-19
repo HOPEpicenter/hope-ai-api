@@ -25,7 +25,7 @@ $visitor = Invoke-RestMethod -Method Post -Uri "$ApiBase/visitors" -Headers $hea
   email     = $email
 } | ConvertTo-Json -Depth 10)
 
-$visitorId = $visitor.id
+$visitorId = $visitor.visitorId; if ([string]::IsNullOrWhiteSpace($visitorId)) { $visitorId = $visitor.id }
 if ([string]::IsNullOrWhiteSpace($visitorId)) { throw "Visitor id missing from response." }
 Write-Host "[assert-formation-pagination] visitorId=$visitorId"
 
@@ -49,7 +49,16 @@ Write-Host "[assert-formation-pagination] Creating $createCount formation events
   }
 
   try {
-    Invoke-RestMethod -Method Post -Uri "$ApiBase/formation/events" -Headers $headers -ContentType "application/json" -Body ($body | ConvertTo-Json -Depth 10) | Out-Null
+        $evt = @{
+      v = 1
+      eventId = $body.id
+      visitorId = $body.visitorId
+      type = $body.type
+      occurredAt = $body.occurredAt
+      source = @{ system = "assert-formation-pagination" }
+      data = $body.metadata
+    }
+    Invoke-RestMethod -Method Post -Uri "$ApiBase/formation/events" -Headers $headers -ContentType "application/json" -Body ($evt | ConvertTo-Json -Depth 10) | Out-Null
   } catch {
     $resp = $_.Exception.Response
     if ($resp) {

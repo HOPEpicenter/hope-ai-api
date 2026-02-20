@@ -127,12 +127,16 @@ error: { code: "VALIDATION_ERROR", message: "Idempotency-Key too long (max 128 c
 
     // NOOP_TRANSITION: if state is unchanged, return current status without writing an event.
     if (toNorm === fromNorm) {
-      return res.status(200).json(current);
+      return res.status(200).json({
+        ok: true,
+        ...current,
+      });
     }
 
     // Enforce allowed transitions
     if (!isAllowedTransition(fromNorm, toNorm)) {
       return res.status(409).json({
+        ok: false,
         error: {
           code: "INVALID_TRANSITION",
           message: `Invalid transition from '${from}' to '${to}'`,
@@ -140,7 +144,7 @@ error: { code: "VALIDATION_ERROR", message: "Idempotency-Key too long (max 128 c
         },
       });
     }
-// Enforce allowed transitions
+
     const eventId = idempotencyKey ? uuidFromSha256(`${visitorId}|${idempotencyKey}`) : newEventId();
     const evt = {
       v: 1,
@@ -163,17 +167,4 @@ error: { code: "VALIDATION_ERROR", message: "Idempotency-Key too long (max 128 c
     return next(err);
   }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
 

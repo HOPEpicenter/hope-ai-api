@@ -3,7 +3,7 @@
 > Single source of truth for what’s built, what’s locked, and what’s next.
 > Update this file in the same PR as any change that materially affects behavior or contracts.
 
-## Current state (as of 60eb9ac)
+## Current state (as of 3097691)
 
 - Repo status: main is green locally (smoke passes) and merges only via PR with CI.
 - Last known merge on main: 60eb9ac
@@ -13,7 +13,7 @@
 ## Phase 1 — Identity (LOCKED / COMPLETE)
 
 ### Product outcomes
-- [x] Canonical isitorId as the stable identifier for a person.
+- [x] Canonical visitorId as the stable identifier for a person.
 - [x] Visitor creation is idempotent by normalized email (trim + lowercase).
 
 ### Engineering / contracts
@@ -25,9 +25,9 @@
 
 ### Storage invariants (Azure Table Storage)
 - [x] VISITOR entity: PartitionKey="VISITOR", RowKey=visitorId
-- [x] EMAIL index entity: PartitionKey="EMAIL", RowKey=encodeURIComponent(emailLower) => { visitorId }
+- [x] EMAIL index entity: PartitionKey="EMAIL", RowKey=encodeURIComponent(eemailLower) => { visitorId }
 - [x] Stale EMAIL index repair:
-  - If EMAIL index points to missing visitor, recover VISITOR by mailLower, repair index, return existing visitor.
+  - If EMAIL index points to missing visitor, recover VISITOR by emailLower, repair index, return existing visitor.
 
 ### Tests
 - [x] Smoke coverage:
@@ -38,7 +38,7 @@
 
 ### Change log / references
 - [x] PR #68 merged: stale EMAIL index delete+retry + docs for 200/201 behavior
-- [x] PR #69 merged: recover-by-emailLower + smoke regression for stale EMAIL index
+- [x] PR #69 merged: recover-by-eemailLower + smoke regression for stale EMAIL index
 
 ---
 
@@ -83,3 +83,5 @@
 - Keep smoke green and CI green.
 - No direct pushes to main; PRs only.
 - Focus: only changes that prevent major issues later or advance the master plan.
+
+

@@ -345,7 +345,6 @@ followupQueueRouter.get("/formation/followup-queue2", async (req, res, next) => 
       ok: true,
       items,
       cursor: encodeCursor(continuationToken),
-      meta: { scannedPages, returned: items.length },
     });
   } catch (err) {
     next(err);
@@ -353,4 +352,7 @@ followupQueueRouter.get("/formation/followup-queue2", async (req, res, next) => 
 });
 
 export default followupQueueRouter;
+
+
+
 

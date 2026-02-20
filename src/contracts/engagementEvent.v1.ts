@@ -1,4 +1,4 @@
-﻿export type EngagementEventEnvelopeV1 = {
+export type EngagementEventEnvelopeV1 = {
   v: 1;
   eventId: string;
   visitorId: string;
@@ -77,6 +77,48 @@ export function validateEngagementEventEnvelopeV1(input: unknown): ValidationRes
     }
   }
 
+  // Notes + tags v1 (ministry-friendly; append-only, derive views later)
+  if (type === "note.add") {
+    if (!isRecord(data)) {
+      issues.push({ path: "data", message: "note.add requires data object" });
+    } else {
+      const text = (data as any).text;
+      const visibility = (data as any).visibility;
+
+      if (typeof text !== "string") {
+        issues.push({ path: "data.text", message: "must be a string" });
+      } else {
+        const t = text.trim();
+        if (t.length < 1 || t.length > 2000) issues.push({ path: "data.text", message: "must be a string (1-2000 chars)" });
+      }
+
+      if (visibility !== undefined) {
+        if (typeof visibility !== "string") {
+          issues.push({ path: "data.visibility", message: "must be a string if provided" });
+        } else {
+          const v = visibility.trim().toLowerCase();
+          if (v !== "team" && v !== "private") issues.push({ path: "data.visibility", message: "must be 'team' or 'private' if provided" });
+        }
+      }
+    }
+  }
+
+  if (type === "tag.add" || type === "tag.remove") {
+    if (!isRecord(data)) {
+      issues.push({ path: "data", message: `${type} requires data object` });
+    } else {
+      const tag = (data as any).tag;
+      if (typeof tag !== "string") {
+        issues.push({ path: "data.tag", message: "must be a string" });
+      } else {
+        const t = tag.trim().toLowerCase();
+        // slug-ish: 1..48, starts with alnum, then alnum/._-
+        if (t.length < 1 || t.length > 48) issues.push({ path: "data.tag", message: "must be a string (1-48 chars)" });
+        if (!/^[a-z0-9][a-z0-9._-]{0,47}$/.test(t)) issues.push({ path: "data.tag", message: "must match ^[a-z0-9][a-z0-9._-]{0,47}$" });
+      }
+    }
+  }
+
   if (issues.length > 0) return { ok: false, issues };
 
     return {
@@ -91,7 +133,21 @@ export function validateEngagementEventEnvelopeV1(input: unknown): ValidationRes
         system: (source as any).system as string,
         actorId: (source as any).actorId as string | undefined,
       },
-      data: (data as any) ?? {},
+      data: (() => {
+        const d: any = (data as any) ?? {};
+        const t = (type as any) as string;
+
+        if (t === "note.add" && typeof d.text === "string") {
+          d.text = d.text.trim();
+          if (typeof d.visibility === "string") d.visibility = d.visibility.trim().toLowerCase();
+        }
+
+        if ((t === "tag.add" || t === "tag.remove") && typeof d.tag === "string") {
+          d.tag = d.tag.trim().toLowerCase();
+        }
+
+        return d;
+      })(),
     },
   };
 }

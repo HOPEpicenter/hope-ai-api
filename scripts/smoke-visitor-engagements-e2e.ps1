@@ -140,10 +140,10 @@ $evt1 = @{
   v          = 1
   eventId    = New-Id "evt"
   visitorId  = $visitorId
-  type       = "note"
+  type       = "note.add"
   occurredAt = NowIsoUtc ($start.AddMilliseconds(10))
   source     = @{ system = "smoke.ps1" }
-  data       = @{ note = "hello"; seq = 1 }
+  data       = @{ text = "hello"; seq = 1 }
 }
 
 $evt2 = @{
@@ -160,46 +160,62 @@ $evt2 = @{
   }
 }
 
+$evt3 = @{
+  v          = 1
+  eventId    = New-Id "evt"
+  visitorId  = $visitorId
+  type       = "tag.add"
+  occurredAt = NowIsoUtc ($start.AddMilliseconds(30))
+  source     = @{ system = "smoke.ps1" }
+  data       = @{ tag = "follow_up"; seq = 3 }
+}
+
+$evt4 = @{
+  v          = 1
+  eventId    = New-Id "evt"
+  visitorId  = $visitorId
+  type       = "tag.remove"
+  occurredAt = NowIsoUtc ($start.AddMilliseconds(40))
+  source     = @{ system = "smoke.ps1" }
+  data       = @{ tag = "follow_up"; seq = 4 }
+}
+
 try {
+  function Assert-EventEnvelope($resp, $label) {
+    try {
+      if (-not $resp -or ($resp.PSObject.Properties.Name -notcontains "ok") -or ($resp.ok -ne $true)) {
+        $failures.Add("$label expected ok=true") | Out-Null
+      }
+    } catch { }
+    try {
+      if (-not $resp -or ($resp.PSObject.Properties.Name -notcontains "accepted") -or ($resp.accepted -ne $true)) {
+        $failures.Add("$label expected accepted=true") | Out-Null
+      }
+    } catch { }
+    try {
+      if (-not $resp -or ($resp.PSObject.Properties.Name -notcontains "v") -or ([int]$resp.v -ne 1)) {
+        $failures.Add("$label expected v=1") | Out-Null
+      }
+    } catch { }
+  }
+
   $evtResp1 = Invoke-HttpJson -Method POST -Uri "$api/engagements/events" -Headers $headers -Body $evt1
   Write-Host ("Event#1 response: " + (Safe-Json $evtResp1 6))
-
-  try {
-    if (-not $evtResp1 -or ($evtResp1.PSObject.Properties.Name -notcontains "ok") -or ($evtResp1.ok -ne $true)) {
-      $failures.Add("event#1 expected ok=true") | Out-Null
-    }
-  } catch { }
-  try {
-    if (-not $evtResp1 -or ($evtResp1.PSObject.Properties.Name -notcontains "accepted") -or ($evtResp1.accepted -ne $true)) {
-      $failures.Add("event#1 expected accepted=true") | Out-Null
-    }
-  } catch { }
-  try {
-    if (-not $evtResp1 -or ($evtResp1.PSObject.Properties.Name -notcontains "v") -or ([int]$evtResp1.v -ne 1)) {
-      $failures.Add("event#1 expected v=1") | Out-Null
-    }
-  } catch { }
+  Assert-EventEnvelope $evtResp1 "event#1"
 
   $evtResp2 = Invoke-HttpJson -Method POST -Uri "$api/engagements/events" -Headers $headers -Body $evt2
   Write-Host ("Event#2 response: " + (Safe-Json $evtResp2 6))
+  Assert-EventEnvelope $evtResp2 "event#2"
 
-  try {
-    if (-not $evtResp2 -or ($evtResp2.PSObject.Properties.Name -notcontains "ok") -or ($evtResp2.ok -ne $true)) {
-      $failures.Add("event#2 expected ok=true") | Out-Null
-    }
-  } catch { }
-  try {
-    if (-not $evtResp2 -or ($evtResp2.PSObject.Properties.Name -notcontains "accepted") -or ($evtResp2.accepted -ne $true)) {
-      $failures.Add("event#2 expected accepted=true") | Out-Null
-    }
-  } catch { }
-  try {
-    if (-not $evtResp2 -or ($evtResp2.PSObject.Properties.Name -notcontains "v") -or ([int]$evtResp2.v -ne 1)) {
-      $failures.Add("event#2 expected v=1") | Out-Null
-    }
-  } catch { }
+  $evtResp3 = Invoke-HttpJson -Method POST -Uri "$api/engagements/events" -Headers $headers -Body $evt3
+  Write-Host ("Event#3 response: " + (Safe-Json $evtResp3 6))
+  Assert-EventEnvelope $evtResp3 "event#3"
 
-  Write-Host "Posted 2 events."
+  $evtResp4 = Invoke-HttpJson -Method POST -Uri "$api/engagements/events" -Headers $headers -Body $evt4
+  Write-Host ("Event#4 response: " + (Safe-Json $evtResp4 6))
+  Assert-EventEnvelope $evtResp4 "event#4"
+
+  Write-Host "Posted 4 events."
 } catch {
   $failures.Add("posting events failed: $($_.Exception.Message)") | Out-Null
 }
@@ -275,7 +291,4 @@ Write-Host "FAIL ❌" -ForegroundColor Red
 $failures | ForEach-Object { Write-Host (" - " + $_) -ForegroundColor Red }
 Write-Host ("Context: visitorId={0} timelineItems={1}" -f $visitorId, $timelineItems.Count)
 exit 1
-
-
-
 

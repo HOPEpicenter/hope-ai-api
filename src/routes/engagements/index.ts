@@ -55,26 +55,21 @@ engagementsRouter.post("/engagements", async (req, res) => {
 engagementsRouter.get("/visitors/:id/engagements", async (req, res) => {
   try {
     const visitorId = req.params.id;
-
     const limitRaw = (req.query.limit as any) ?? "50";
-    const cursorRaw = (req.query.cursor as any) ?? undefined;
+    const cursor = (req.query.cursor as any) ?? undefined;
 
-    const limit = Math.max(1, Math.min(parseInt(String(limitRaw), 10) || 50, 200));
-    const cursor = cursorRaw ? String(cursorRaw) : undefined;
+    const limit = Math.max(1, Math.min(parseInt(limitRaw, 10) || 50, 200));
+    const items = await engagementRepo.listByVisitor(visitorId, limit, cursor);
 
-    // Delegate to the same paging contract used by /engagements/timeline
-    const page = await timelineService.readTimeline(visitorId, limit, cursor);
+    const nextCursor =
+      items.length > 0 && items.length >= limit
+        ? `${items[items.length - 1].occurredAt}_${items[items.length - 1].id}`
+        : "";
 
-    return res.status(200).json({
-      ok: true,
-      visitorId,
-      limit,
-      cursor: page.nextCursor ?? null,
-      items: page.items,
-    });
+    return res.status(200).json({ ok: true, visitorId, items, cursor: nextCursor });
   } catch (e: any) {
     console.error("[engagements] GET /visitors/:id/engagements failed", e);
-    return res.status(500).json({ ok: false, error: "internal" });
+    return res.status(500).json({ ok: false, error: "internal_error" });
   }
 });
 
@@ -130,6 +125,7 @@ engagementsRouter.use(engagementsStatusRouter);
 
 
 engagementsRouter.use(engagementsAnalyticsRouter);
+
 
 
 

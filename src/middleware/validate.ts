@@ -1,4 +1,4 @@
-﻿import { RequestHandler } from "express";
+import { RequestHandler } from "express";
 
 export type ValidationIssue = { path: string; message: string };
 export type ValidationResult<T> =
@@ -10,6 +10,7 @@ export function validateBody<T>(validator: (input: unknown) => ValidationResult<
     const result = validator(req.body);
     if (!result.ok) {
       return res.status(400).json({
+      ok: false,
         error: {
           code: "VALIDATION_ERROR",
           message: "Request body validation failed",
@@ -28,3 +29,4 @@ export function validateBody<T>(validator: (input: unknown) => ValidationResult<
 export function getValidatedBody<T>(req: any): T {
   return req.validatedBody as T;
 }
+

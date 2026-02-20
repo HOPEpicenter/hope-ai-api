@@ -3,7 +3,7 @@
 > Single source of truth for what’s built, what’s locked, and what’s next.
 > Update this file in the same PR as any change that materially affects behavior or contracts.
 
-## Current state (as of e47926d)
+## Current state (as of aeb8c67)
 
 - Repo status: main is green locally (smoke passes) and merges only via PR with CI.
 - Last known merge on main: 60eb9ac
@@ -48,7 +48,7 @@
 - [x] Engagement events are stable-contract and ministry-safe (envelope locked).
 - [x] Timeline read contract is stable (cursor paging + ordering).
 - [x] Status transitions are auditable (event-driven preferred).
-- [ ] Notes + tags v1 (ministry-friendly).
+- [x] Notes + tags v1 (ministry-friendly).
 - [ ] Engagement score (derived, not stored).
 
 ### Engineering (already present / verified by smoke)

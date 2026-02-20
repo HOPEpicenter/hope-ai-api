@@ -63,7 +63,8 @@ engagementsStatusRouter.get("/engagements/status", async (req, res, next) => {
     const parsed = validateEngagementStatusQueryV1(req.query);
     if (!parsed.ok) {
       return res.status(400).json({
-        error: {
+        ok: false,
+error: {
           code: "VALIDATION_ERROR",
           message: "Query validation failed",
           details: parsed.issues.map((i: { path: string; message: string }) => ({
@@ -76,8 +77,10 @@ engagementsStatusRouter.get("/engagements/status", async (req, res, next) => {
 
     const { visitorId } = parsed.value;
     const status = await service.getCurrentStatus(visitorId);
-
-    return res.status(200).json(status);
+    return res.status(200).json({
+      ok: true,
+      ...status,
+    });
   } catch (err) {
     return next(err);
   }
@@ -90,7 +93,8 @@ engagementsStatusRouter.post("/engagements/status/transitions", async (req, res,
     const parsed = validateEngagementStatusTransitionRequestV1(req.body);
     if (!parsed.ok) {
       return res.status(400).json({
-        error: {
+        ok: false,
+error: {
           code: "VALIDATION_ERROR",
           message: "Body validation failed",
           details: parsed.issues.map((i: { path: string; message: string }) => ({
@@ -109,7 +113,8 @@ engagementsStatusRouter.post("/engagements/status/transitions", async (req, res,
 
     if (idempotencyKey && idempotencyKey.length > 128) {
       return res.status(400).json({
-        error: { code: "VALIDATION_ERROR", message: "Idempotency-Key too long (max 128 chars)" },
+        ok: false,
+error: { code: "VALIDATION_ERROR", message: "Idempotency-Key too long (max 128 chars)" },
       });
     }
 
@@ -150,11 +155,16 @@ engagementsStatusRouter.post("/engagements/status/transitions", async (req, res,
     await service.appendEvent(evt as any, { idempotencyKey });
 
     const updated = await service.getCurrentStatus(visitorId);
-    return res.status(200).json(updated);
+    return res.status(200).json({
+      ok: true,
+      ...updated,
+    });
   } catch (err) {
     return next(err);
   }
 });
+
+
 
 
 

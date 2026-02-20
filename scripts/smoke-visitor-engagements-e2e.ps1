@@ -107,6 +107,12 @@ try {
 }
 
 $visitorId = $null
+
+# Engagement status envelope (v1-ish): must include ok=true
+Write-Host "Engagement status envelope ..."
+$status = Invoke-RestMethod "$BaseUrl/engagements/status?visitorId=$visitorId" -Headers $Headers -Method Get
+Assert-True ($status.ok -eq $true) "Expected engagements/status ok:true"
+Write-Host "Engagement status envelope OK"
 try {
   if ($created -and ($created.PSObject.Properties.Name -contains "visitorId")) { $visitorId = [string]$created.visitorId }
   elseif ($created -and ($created.PSObject.Properties.Name -contains "id")) { $visitorId = [string]$created.id }
@@ -155,8 +161,44 @@ $evt2 = @{
 }
 
 try {
-  Invoke-HttpJson -Method POST -Uri "$api/engagements/events" -Headers $headers -Body $evt1 | Out-Null
-  Invoke-HttpJson -Method POST -Uri "$api/engagements/events" -Headers $headers -Body $evt2 | Out-Null
+  $evtResp1 = Invoke-HttpJson -Method POST -Uri "$api/engagements/events" -Headers $headers -Body $evt1
+  Write-Host ("Event#1 response: " + (Safe-Json $evtResp1 6))
+
+  try {
+    if (-not $evtResp1 -or ($evtResp1.PSObject.Properties.Name -notcontains "ok") -or ($evtResp1.ok -ne $true)) {
+      $failures.Add("event#1 expected ok=true") | Out-Null
+    }
+  } catch { }
+  try {
+    if (-not $evtResp1 -or ($evtResp1.PSObject.Properties.Name -notcontains "accepted") -or ($evtResp1.accepted -ne $true)) {
+      $failures.Add("event#1 expected accepted=true") | Out-Null
+    }
+  } catch { }
+  try {
+    if (-not $evtResp1 -or ($evtResp1.PSObject.Properties.Name -notcontains "v") -or ([int]$evtResp1.v -ne 1)) {
+      $failures.Add("event#1 expected v=1") | Out-Null
+    }
+  } catch { }
+
+  $evtResp2 = Invoke-HttpJson -Method POST -Uri "$api/engagements/events" -Headers $headers -Body $evt2
+  Write-Host ("Event#2 response: " + (Safe-Json $evtResp2 6))
+
+  try {
+    if (-not $evtResp2 -or ($evtResp2.PSObject.Properties.Name -notcontains "ok") -or ($evtResp2.ok -ne $true)) {
+      $failures.Add("event#2 expected ok=true") | Out-Null
+    }
+  } catch { }
+  try {
+    if (-not $evtResp2 -or ($evtResp2.PSObject.Properties.Name -notcontains "accepted") -or ($evtResp2.accepted -ne $true)) {
+      $failures.Add("event#2 expected accepted=true") | Out-Null
+    }
+  } catch { }
+  try {
+    if (-not $evtResp2 -or ($evtResp2.PSObject.Properties.Name -notcontains "v") -or ([int]$evtResp2.v -ne 1)) {
+      $failures.Add("event#2 expected v=1") | Out-Null
+    }
+  } catch { }
+
   Write-Host "Posted 2 events."
 } catch {
   $failures.Add("posting events failed: $($_.Exception.Message)") | Out-Null
@@ -173,35 +215,53 @@ try {
   $failures.Add("timeline read failed: $($_.Exception.Message)") | Out-Null
 }
 
+try {
+  if (-not $timeline -or ($timeline.PSObject.Properties.Name -notcontains "ok") -or ($timeline.ok -ne $true)) {
+    $failures.Add("timeline expected ok=true") | Out-Null
+  }
+} catch { }
+try {
+  if ($timeline -and ($timeline.PSObject.Properties.Name -contains "v")) {
+    if ([int]$timeline.v -ne 1) { $failures.Add("timeline expected v=1") | Out-Null }
+  } else {
+    $failures.Add("timeline response missing 'v'") | Out-Null
+  }
+} catch { }
+
 $timelineItems = Get-Items $timeline
 if ($timelineItems.Count -lt 2) {
   $failures.Add(("timeline expected at least 2 items but got {0}" -f $timelineItems.Count)) | Out-Null
 }
 
 Write-Host ""
-Write-Host "[4/4] GET /api/engagements/analytics?visitorId=..."
+Write-Host "[4/4] GET /api/engagements/status?visitorId=..."
 
-$analytics = $null
+$status = $null
 try {
-  $analytics = Invoke-HttpJson -Method GET -Uri "$api/engagements/analytics?visitorId=$([uri]::EscapeDataString($visitorId))" -Headers $headers
-  Write-Host ("Analytics response: " + (Safe-Json $analytics 12))
+  $status = Invoke-HttpJson -Method GET -Uri "$api/engagements/status?visitorId=$([uri]::EscapeDataString($visitorId))" -Headers $headers
+  Write-Host ("Status response: " + (Safe-Json $status 12))
 } catch {
-  $failures.Add("analytics read failed: $($_.Exception.Message)") | Out-Null
+  $failures.Add("status read failed: $($_.Exception.Message)") | Out-Null
 }
 
 try {
-  if ($analytics -and ($analytics.PSObject.Properties.Name -contains "v")) {
-    if ([int]$analytics.v -ne 1) { $failures.Add("analytics expected v=1") | Out-Null }
-  } else {
-    $failures.Add("analytics response missing 'v'") | Out-Null
+  if (-not $status -or ($status.PSObject.Properties.Name -notcontains "ok") -or ($status.ok -ne $true)) {
+    $failures.Add("status expected ok=true") | Out-Null
+  }
+} catch { }
+
+# v is optional here because status spreads the domain object; assert only if present
+try {
+  if ($status -and ($status.PSObject.Properties.Name -contains "v")) {
+    if ([int]$status.v -ne 1) { $failures.Add("status expected v=1") | Out-Null }
   }
 } catch { }
 
 try {
-  if ($analytics -and ($analytics.PSObject.Properties.Name -contains "visitorId")) {
-    if ([string]$analytics.visitorId -ne $visitorId) { $failures.Add("analytics visitorId mismatch") | Out-Null }
+  if ($status -and ($status.PSObject.Properties.Name -contains "visitorId")) {
+    if ([string]$status.visitorId -ne $visitorId) { $failures.Add("status visitorId mismatch") | Out-Null }
   } else {
-    $failures.Add("analytics response missing 'visitorId'") | Out-Null
+    $failures.Add("status response missing 'visitorId'") | Out-Null
   }
 } catch { }
 
@@ -215,3 +275,7 @@ Write-Host "FAIL ❌" -ForegroundColor Red
 $failures | ForEach-Object { Write-Host (" - " + $_) -ForegroundColor Red }
 Write-Host ("Context: visitorId={0} timelineItems={1}" -f $visitorId, $timelineItems.Count)
 exit 1
+
+
+
+

@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import { validateTimelineQueryV1 } from "../../contracts/timeline.v1";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { EngagementsService } from "../../services/engagements/engagementsService";
@@ -13,6 +13,7 @@ engagementsTimelineRouter.get("/engagements/timeline", async (req, res, next) =>
 
     if (!parsed.ok) {
       return res.status(400).json({
+        ok: false,
         error: {
           code: "VALIDATION_ERROR",
           message: "Query validation failed",
@@ -28,6 +29,7 @@ engagementsTimelineRouter.get("/engagements/timeline", async (req, res, next) =>
     const page = await service.readTimeline(visitorId, limit, cursor);
 
     return res.status(200).json({
+      ok: true,
       v: 1,
       visitorId,
       limit,
@@ -38,3 +40,4 @@ engagementsTimelineRouter.get("/engagements/timeline", async (req, res, next) =>
     return next(err);
   }
 });
+

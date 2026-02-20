@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
+import { EngagementsService } from "../../services/engagements/engagementsService";
 import { engagementsStatusRouter } from "./status";
 import { engagementsAnalyticsRouter } from "./analytics";
 import { engagementsEventsRouter } from "./events";
@@ -8,6 +10,8 @@ import { EngagementRepository } from "../../storage/engagementRepository";
 import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepository";
 
 export const engagementsRouter = Router();
+
+const timelineService = new EngagementsService(new EngagementEventsRepository());
 engagementsRouter.use(requireApiKey);
 
 const engagementRepo = new EngagementRepository();
@@ -47,7 +51,7 @@ engagementsRouter.post("/engagements", async (req, res) => {
   }
 });
 
-// GET /api/visitors/:id/engagements?limit=50&cursor=...
+// GET /api/visitors/:id/engagements?limit=50&cursor=...  (legacy; prefer /engagements/timeline or /visitors/:id/engagements/v1)
 engagementsRouter.get("/visitors/:id/engagements", async (req, res) => {
   try {
     const visitorId = req.params.id;
@@ -69,6 +73,35 @@ engagementsRouter.get("/visitors/:id/engagements", async (req, res) => {
   }
 });
 
+
+
+// GET /api/visitors/:id/engagements/v1?limit=50&cursor=...
+// Canonical timeline read contract v1 (delegates to EngagementsService.readTimeline)
+engagementsRouter.get("/visitors/:id/engagements/v1", async (req, res) => {
+  try {
+    const visitorId = req.params.id;
+
+    const limitRaw = (req.query.limit as any) ?? "50";
+    const cursorRaw = (req.query.cursor as any) ?? undefined;
+
+    const limit = Math.max(1, Math.min(parseInt(String(limitRaw), 10) || 50, 200));
+    const cursor = cursorRaw ? String(cursorRaw) : undefined;
+
+    const page = await timelineService.readTimeline(visitorId, limit, cursor);
+
+    return res.status(200).json({
+      ok: true,
+      v: 1,
+      visitorId,
+      limit,
+      nextCursor: page.nextCursor ?? null,
+      items: page.items,
+    });
+  } catch (e: any) {
+    console.error("[engagements] GET /visitors/:id/engagements/v1 failed", e);
+    return res.status(500).json({ ok: false, error: "internal" });
+  }
+});
 // GET /api/visitors/:id/engagements/summary
 engagementsRouter.get("/visitors/:id/engagements/summary", async (req, res) => {
   try {
@@ -92,5 +125,9 @@ engagementsRouter.use(engagementsStatusRouter);
 
 
 engagementsRouter.use(engagementsAnalyticsRouter);
+
+
+
+
 
 

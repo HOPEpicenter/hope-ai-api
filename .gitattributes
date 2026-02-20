@@ -1,11 +1,1 @@
-# Normalize line endings across platforms
 * text=auto eol=lf
-
-# Explicitly keep common text formats consistent
-*.ts   text eol=lf
-*.js   text eol=lf
-*.json text eol=lf
-*.md   text eol=lf
-*.yml  text eol=lf
-*.yaml text eol=lf
-*.ps1  text eol=lf

@@ -3,7 +3,7 @@
 > Single source of truth for what’s built, what’s locked, and what’s next.
 > Update this file in the same PR as any change that materially affects behavior or contracts.
 
-## Current state (as of cf43abf)
+## Current state (as of 192ac72)
 
 - Repo status: main is green locally (smoke passes) and merges only via PR with CI.
 - Last known merge on main: 60eb9ac
@@ -61,7 +61,7 @@
 ### Phase 2 — Next PR-sized tasks (choose 1 at a time)
 - [x] Lock “Engagement event envelope v1” in one place (validate + normalize consistently).
 - [x] Lock “Timeline read contract v1” (cursor paging, stable ordering, consistent limits).
-- [ ] Model “Status transitions v1” as events (preferred) or dedicated stream.
+- [x] Model “Status transitions v1” as events (preferred) or dedicated stream.
 
 ---
 
@@ -83,4 +83,6 @@
 - Keep smoke green and CI green.
 - No direct pushes to main; PRs only.
 - Focus: only changes that prevent major issues later or advance the master plan.
+
+
 

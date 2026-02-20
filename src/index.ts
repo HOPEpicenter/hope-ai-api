@@ -2,6 +2,7 @@ import express from "express";
 import visitorsRouter from "./routes/visitors/visitorsRouter";
 import { createOpsRouter } from "./routes/ops/opsRouter";
 import { formationEventsRouter as formationRouter } from "./routes/formationEvents";
+import { followupQueueRouter } from "./routes/followupQueue";
 import { engagementsRouter } from "./routes/engagements";
 import { integrationRouter } from "./routes/integration";
 import { legacyRouter } from "./routes/legacy";
@@ -35,6 +36,7 @@ app.use("/ops", createOpsRouter(visitorsRepository, formationEventsRepository, e
 // Public API routes
 app.use("/api/visitors", visitorsRouter(visitorsRepository));
 app.use("/api", formationRouter);
+app.use("/api", followupQueueRouter);
 app.use("/api", engagementsRouter);
 app.use("/api", integrationRouter);
 app.use("/api", legacyRouter);
@@ -56,16 +58,4 @@ app.listen(port, () => {
   // eslint-disable-next-line no-console
   console.log(`hope-ai-api listening on port ${port}`);
 });
-// Public API routes
-
-
-
-
-
-
-
-
-
-
-
 

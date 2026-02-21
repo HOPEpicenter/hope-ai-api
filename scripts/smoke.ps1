@@ -1,5 +1,5 @@
 param(
-  [string]$BaseUrl = "http://127.0.0.1:7071/api",
+  [string]$BaseUrl = "http://127.0.0.1:3000/api",
   [string]$ApiKey  = $env:HOPE_API_KEY,
   [int]$Limit = 10
 )
@@ -75,7 +75,13 @@ Write-Host ""
 Write-Host "[2] POST /engagements"
 $engBody = @{
   visitorId = $visitorId
-  eventType = "dev_engaged"
+
+    v          = 1
+    eventId    = ([Guid]::NewGuid().ToString())
+    occurredAt = (Get-Date).ToUniversalTime().ToString("o")
+    source     = @{ system = "scripts/smoke.ps1" }
+    data       = @{ channel = "api"; notes = "Smoke engagement ()" }
+  type = "dev_engaged"
   channel   = "api"
   notes     = "Smoke engagement ($runId)"
 }
@@ -98,11 +104,11 @@ Write-Host ""
 Write-Host "[4] GET /engagements?visitorId=...&limit=1&debug=1 (pagination smoke)"
 # Create 2 more engagement rows to make pagination visible
 InvokeJson "POST" "$BaseUrl/engagements" (@{
-  visitorId = $visitorId; eventType="dev_engaged"; channel="api"; notes="pagination test 1"
+  visitorId = $visitorId; type="dev_engaged"; channel="api"; notes="pagination test 1"
 }) | Out-Null
 Start-Sleep -Milliseconds 150
 InvokeJson "POST" "$BaseUrl/engagements" (@{
-  visitorId = $visitorId; eventType="dev_engaged"; channel="api"; notes="pagination test 2"
+  visitorId = $visitorId; type="dev_engaged"; channel="api"; notes="pagination test 2"
 }) | Out-Null
 
 $p1 = InvokeJson "GET" "$BaseUrl/engagements?visitorId=$visitorId&limit=1&debug=1"
@@ -184,3 +190,6 @@ Write-Host ""
 
 Ok "SMOKE TEST COMPLETE"
 Write-Host ("VisitorId used: {0}" -f $visitorId)
+
+
+

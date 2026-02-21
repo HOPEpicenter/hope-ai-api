@@ -382,8 +382,25 @@ if ($nf.Body -and $nfErr) {
   Write-Host ("404 OK (requestId verified; non-JSON or empty body). RawBody={0}" -f $nf.Text) -ForegroundColor Yellow
 }
 
+# 9) Public /api engagement contracts (timeline + score + status)
+$engPath = Join-Path $PSScriptRoot "smoke-visitor-engagements-e2e.ps1"
+if (-not (Test-Path -LiteralPath $engPath)) {
+  throw "Missing engagement E2E script: $engPath"
+}
+
+Write-Host ""
+Write-Host "== Engagement E2E (/api/engagements/*) ==" -ForegroundColor Cyan
+& powershell -NoProfile -ExecutionPolicy Bypass -File $engPath -BaseUrl $BaseUrl
+
+if ($LASTEXITCODE -ne 0) {
+  throw "Engagement E2E failed (exit=$LASTEXITCODE)"
+}
+
+Write-Host "Engagement E2E OK"
+
 Write-Host "SMOKE TESTS PASSED"
 exit 0
+
 
 
 

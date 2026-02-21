@@ -152,3 +152,4 @@ if ($usingDevStorage) {
 }
 
 Write-Host "[assert-formation-profiles-list] OK: formation profiles list assertions passed." -ForegroundColor Green
+

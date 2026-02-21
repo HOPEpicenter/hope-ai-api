@@ -41,7 +41,7 @@ Write-Host "==> Waiting for server readiness at $healthUrl"
   Write-Host "==> Running pagination smoke assertion"
   npm run test:smoke
   if ($LASTEXITCODE -ne 0) { throw "Smoke failed (exit=$LASTEXITCODE)" }
-Write-Host "✅ End-to-end build + server + smoke: SUCCESS"
+Write-Host "OK End-to-end build + server + smoke: SUCCESS"
 }
 finally {
   if ($server -and -not $server.HasExited) {

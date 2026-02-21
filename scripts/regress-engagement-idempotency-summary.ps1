@@ -56,3 +56,4 @@ $eventCount = $sumResp.summary.eventCount
 Assert ($eventCount -eq 1) ("Expected summary.eventCount=1; got {0}" -f $eventCount)
 
 Write-Host "OK: idempotency + summary verified (listCount=1, eventCount=1)"
+

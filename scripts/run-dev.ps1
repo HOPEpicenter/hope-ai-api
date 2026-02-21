@@ -19,3 +19,4 @@ if (-not $az.TcpTestSucceeded) {
 Write-Host "[run-dev] PORT=$env:PORT"
 Write-Host "[run-dev] STORAGE_CONNECTION_STRING=$env:STORAGE_CONNECTION_STRING"
 npm run dev
+

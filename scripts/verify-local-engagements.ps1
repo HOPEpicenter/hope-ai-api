@@ -80,9 +80,9 @@ function Run-Step([string]$label, [scriptblock]$fn) {
   Write-Host $label
   try {
     & $fn
-    Write-Host "OK ✅"
+    Write-Host "OK"
   } catch {
-    Write-Host "FAIL ❌" -ForegroundColor Red
+    Write-Host "FAIL" -ForegroundColor Red
     throw
   }
   Write-Host ""
@@ -136,5 +136,6 @@ Run-Step ("[3/3] Smoke visitor + engagements e2e (timelineLimit={0})" -f $SmokeT
     -TimelineLimit $SmokeTimelineLimit
 }
 
-Write-Host "PASS ✅  All verification steps completed." -ForegroundColor Green
+Write-Host "PASS OK  All verification steps completed." -ForegroundColor Green
 exit 0
+

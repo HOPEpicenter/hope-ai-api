@@ -86,3 +86,4 @@ if ($matches.Count -ne 1) {
 }
 
 Write-Host "[assert-formation-idempotency] OK: formation idempotency assertions passed."
+

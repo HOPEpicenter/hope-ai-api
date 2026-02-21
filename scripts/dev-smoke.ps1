@@ -13,3 +13,4 @@ Write-Host $resp
 Write-Host "[dev-smoke] GET $ApiBase/formation/profiles (auth)"
 $resp = curl.exe -s -H "x-api-key: $env:HOPE_API_KEY" "$ApiBase/formation/profiles"
 Write-Host $resp
+

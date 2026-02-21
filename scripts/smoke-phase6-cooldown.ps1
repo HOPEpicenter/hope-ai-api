@@ -128,4 +128,5 @@ Write-Host "Final counts: cooldown0=$($q0final.count) cooldown24=$($q24final.cou
 Assert-True ($q0final.count -eq 0)  "Expected removed after connected outcome (cooldownHours=0)."
 Assert-True ($q24final.count -eq 0) "Expected removed after connected outcome (cooldownHours=24)."
 
-Write-Host "`n== ALL TESTS PASSED ✅ =="
+Write-Host "`n== ALL TESTS PASSED OK =="
+

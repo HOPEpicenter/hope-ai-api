@@ -348,11 +348,12 @@ exit `$LASTEXITCODE
 
   if ($p.ExitCode -ne 0) {
     throw "Smoke tests failed (exit=$($p.ExitCode)). See $serverOutLog, $serverErrLog, and $runLog"
-  }Write-Host "`n✅ run-smoke completed successfully" -ForegroundColor Green
+  }
+  Write-Host "`nOK run-smoke completed successfully" -ForegroundColor Green
   exit 0
 }
 catch {
-  Write-Host "`n❌ run-smoke failed: $($_.Exception.Message)" -ForegroundColor Red
+  Write-Host "`nFAIL run-smoke failed: $($_.Exception.Message)" -ForegroundColor Red
   Write-Host ("See logs: " + $serverOutLog + " ; " + $serverErrLog + " ; " + $runLog)
   exit 1
 }
@@ -371,8 +372,4 @@ finally {
     } catch { }
   }
 }
-
-
-
-
 

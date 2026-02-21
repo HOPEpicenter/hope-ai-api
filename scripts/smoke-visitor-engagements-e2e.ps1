@@ -89,8 +89,110 @@ try {
 
 $failures = New-Object System.Collections.Generic.List[string]
 
+
+# [0/6] Score query validation (lock 400 shape)
 Write-Host ""
-Write-Host "[1/4] POST /api/visitors"
+Write-Host "[0/6] GET /api/engagements/score validation (400s)"
+
+function Invoke-HttpJsonAllowFail {
+  param(
+    [Parameter(Mandatory=$true)][ValidateSet("GET","POST")][string]$Method,
+    [Parameter(Mandatory=$true)][string]$Uri,
+    [Parameter(Mandatory=$true)][hashtable]$Headers,
+    [object]$Body = $null
+  )
+
+  $json = $null
+  if ($null -ne $Body) { $json = ($Body | ConvertTo-Json -Depth 20) }
+
+  try {
+    try { Add-Type -AssemblyName System.Net.Http -ErrorAction Stop } catch { }
+$Method = $Method.ToUpperInvariant()
+$httpMethod = [System.Net.Http.HttpMethod]::new($Method)
+
+    $client = [System.Net.Http.HttpClient]::new()
+    try {
+      $req = [System.Net.Http.HttpRequestMessage]::new($httpMethod, $Uri)
+      try {
+        foreach ($k in $Headers.Keys) {
+          [void]$req.Headers.TryAddWithoutValidation([string]$k, [string]$Headers[$k])
+        }
+
+        if ($Method -eq "POST") {
+          $req.Content = [System.Net.Http.StringContent]::new($json, [System.Text.Encoding]::UTF8, "application/json")
+        }
+
+        $resp = $client.SendAsync($req).GetAwaiter().GetResult()
+        $status = [int]$resp.StatusCode
+        $bodyText = $resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+
+        $bodyJson = $null
+        if (-not [string]::IsNullOrWhiteSpace($bodyText)) {
+          try { $bodyJson = $bodyText | ConvertFrom-Json } catch { }
+        }
+
+        return [pscustomobject]@{
+          ok       = $false
+          status   = $status
+          bodyText = $bodyText
+          body     = $bodyJson
+        }
+      } finally {
+        if ($req) { $req.Dispose() }
+      }
+    } finally {
+      if ($client) { $client.Dispose() }
+    }
+  } catch {
+    return [pscustomobject]@{
+      ok       = $false
+      status   = $null
+      bodyText = $null
+      body     = $null
+      error    = $_
+    }
+  }
+}
+
+function Assert-Validation400($resp, $label) {
+  if ($resp -and ($resp.PSObject.Properties.Name -contains "error") -and $resp.error) {
+    $failures.Add(("{0}: request failed: {1}" -f $label, $resp.error.Exception.Message)) | Out-Null
+    return
+  }
+  if (-not $resp -or -not $resp.status) {
+    $failures.Add(("{0}: missing status (request likely failed)" -f $label)) | Out-Null
+    return
+  }
+
+  if ([int]$resp.status -ne 400) {
+    $failures.Add(("{0}: expected HTTP 400, got {1}" -f $label, $resp.status)) | Out-Null
+    return
+  }
+
+  $b = $resp.body
+  if (-not $b) {
+    $failures.Add(("{0}: missing JSON body (bodyText={1})" -f $label, $resp.bodyText)) | Out-Null
+    return
+  }
+
+  try { if (($b.PSObject.Properties.Name -notcontains "ok") -or ($b.ok -ne $false)) { $failures.Add(("{0}: expected ok=false" -f $label)) | Out-Null } } catch { }
+  try {
+    if (($b.PSObject.Properties.Name -notcontains "error") -or -not $b.error) { $failures.Add(("{0}: expected error object" -f $label)) | Out-Null }
+    elseif (($b.error.PSObject.Properties.Name -notcontains "code") -or ($b.error.code -ne "VALIDATION_ERROR")) { $failures.Add(("{0}: expected error.code=VALIDATION_ERROR" -f $label)) | Out-Null }
+  } catch { }
+}
+
+$bad1 = Invoke-HttpJsonAllowFail -Method GET -Uri "$api/engagements/score?windowDays=14" -Headers $headers
+Assert-Validation400 $bad1 "score missing visitorId"
+
+$bad2 = Invoke-HttpJsonAllowFail -Method GET -Uri "$api/engagements/score?visitorId=fakevisitor123&windowDays=0" -Headers $headers
+Assert-Validation400 $bad2 "score windowDays=0"
+
+$bad3 = Invoke-HttpJsonAllowFail -Method GET -Uri "$api/engagements/score?visitorId=fakevisitor123&windowDays=366" -Headers $headers
+Assert-Validation400 $bad3 "score windowDays=366"
+
+Write-Host ""
+Write-Host "[1/5] POST /api/visitors"
 
 $visitorBody = @{
   v = 1
@@ -120,7 +222,7 @@ if ([string]::IsNullOrWhiteSpace($visitorId) -or $visitorId.Length -lt 8) {
 
 if ($failures.Count -gt 0) {
   Write-Host ""
-  Write-Host "FAIL ❌" -ForegroundColor Red
+  Write-Host "FAIL" -ForegroundColor Red
   $failures | ForEach-Object { Write-Host (" - " + $_) -ForegroundColor Red }
   exit 1
 }
@@ -317,18 +419,53 @@ try {
     $failures.Add("status response missing 'visitorId'") | Out-Null
   }
 } catch { }
+# [6/6] Score for a brand-new visitor (no events) should be empty/needsFollowup
+Write-Host ""
+Write-Host "[6/6] GET /api/engagements/score (empty visitor => engaged=false)"
+
+$emptyVisitorBody = @{
+  v = 1
+  name  = "Smoke Empty Score"
+  email = ("smoke+empty+" + [Guid]::NewGuid().ToString("N") + "@example.com")
+}
+
+$emptyCreated = $null
+$emptyVisitorId = $null
+try {
+  $emptyCreated = Invoke-HttpJson -Method POST -Uri "$api/visitors" -Headers $headers -Body $emptyVisitorBody
+  try {
+    if ($emptyCreated -and ($emptyCreated.PSObject.Properties.Name -contains "visitorId")) { $emptyVisitorId = [string]$emptyCreated.visitorId }
+    elseif ($emptyCreated -and ($emptyCreated.PSObject.Properties.Name -contains "id")) { $emptyVisitorId = [string]$emptyCreated.id }
+  } catch { }
+} catch {
+  $failures.Add(("empty visitor create failed: {0}" -f $_.Exception.Message)) | Out-Null
+}
+
+if ([string]::IsNullOrWhiteSpace($emptyVisitorId) -or $emptyVisitorId.Length -lt 8) {
+  $failures.Add("empty visitor did not return a valid visitorId (>= 8 chars).") | Out-Null
+} else {
+  $emptyScore = $null
+  try {
+    $emptyScore = Invoke-HttpJson -Method GET -Uri "$api/engagements/score?visitorId=$([uri]::EscapeDataString($emptyVisitorId))&windowDays=14" -Headers $headers
+    Write-Host ("Empty score response: " + (Safe-Json $emptyScore 12))
+  } catch {
+    $failures.Add(("empty score read failed: {0}" -f $_.Exception.Message)) | Out-Null
+  }
+
+  try { if ($emptyScore -and ($emptyScore.PSObject.Properties.Name -contains "engaged") -and ($emptyScore.engaged -ne $false)) { $failures.Add("empty score expected engaged=false") | Out-Null } } catch { }
+  try { if ($emptyScore -and ($emptyScore.PSObject.Properties.Name -contains "engagementCount") -and ([int]$emptyScore.engagementCount -ne 0)) { $failures.Add("empty score expected engagementCount=0") | Out-Null } } catch { }
+  try { if ($emptyScore -and ($emptyScore.PSObject.Properties.Name -contains "score") -and ([int]$emptyScore.score -ne 0)) { $failures.Add("empty score expected score=0") | Out-Null } } catch { }
+  try { if ($emptyScore -and ($emptyScore.PSObject.Properties.Name -contains "needsFollowup") -and ($emptyScore.needsFollowup -ne $true)) { $failures.Add("empty score expected needsFollowup=true") | Out-Null } } catch { }
+}
 
 Write-Host ""
 if ($failures.Count -eq 0) {
-  Write-Host ("PASS ✅  visitorId={0}  timelineItems={1}" -f $visitorId, $timelineItems.Count) -ForegroundColor Green
+  Write-Host ("PASS OK  visitorId={0}  timelineItems={1}" -f $visitorId, $timelineItems.Count) -ForegroundColor Green
   exit 0
 }
 
-Write-Host "FAIL ❌" -ForegroundColor Red
+Write-Host "FAIL" -ForegroundColor Red
 $failures | ForEach-Object { Write-Host (" - " + $_) -ForegroundColor Red }
 Write-Host ("Context: visitorId={0} timelineItems={1}" -f $visitorId, $timelineItems.Count)
 exit 1
-
-
-
 

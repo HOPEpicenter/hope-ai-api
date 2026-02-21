@@ -5,10 +5,19 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build-and-smoke:
-    runs-on: windows-latest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
 
     env:
       NODE_ENV: test
@@ -36,7 +45,13 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          npm ci
+          npm ci --no-audit --no-fund
+
+      - name: Guard (no @azure/functions under src)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npm run guard
 
       - name: Build (tsc)
         shell: pwsh
@@ -44,48 +59,14 @@ jobs:
           $ErrorActionPreference = "Stop"
           npm run build
 
-      - name: Start Azurite (Blob/Queue/Table)
+      - name: Express smoke (Azurite owned by script)
         shell: pwsh
+        env:
+          STORAGE_CONNECTION_STRING: UseDevelopmentStorage=true
         run: |
           $ErrorActionPreference = "Stop"
+          ./scripts/ci-run-express-smoke.ps1
 
-          $azDir = Join-Path $env:RUNNER_TEMP "azurite"
-          New-Item -ItemType Directory -Force -Path $azDir | Out-Null
-          $azLog = Join-Path $env:RUNNER_TEMP "azurite.log"
-          # Start Azurite (blob/queue/table) using local devDependency (installed via npm ci)
-          $p = Start-Process -FilePath "npx" -ArgumentList @(
-            "--yes","azurite",            "--silent",
-            "--location", $azDir,
-            "--debug", $azLog,
-            "--blobHost","127.0.0.1","--blobPort","10000",
-            "--queueHost","127.0.0.1","--queuePort","10001",
-            "--tableHost","127.0.0.1","--tablePort","10002"
-          ) -WindowStyle Hidden -PassThru
-
-          function Wait-Port([int]$port, [int]$seconds = 180) {
-            $deadline = (Get-Date).AddSeconds($seconds)
-            while ((Get-Date) -lt $deadline) {
-              $ok = Test-NetConnection -ComputerName 127.0.0.1 -Port $port -WarningAction SilentlyContinue
-              if ($ok.TcpTestSucceeded) { return $true }
-              Start-Sleep -Milliseconds 250
-            }
-            return $false
-          }
-
-          if (-not (Wait-Port 10002 180)) {
-            Write-Host "==== AZURITE LOG (tail 200) ===="
-            if (Test-Path $azLog) { Get-Content $azLog -Tail 200 }
-            if ($p -and $p.HasExited) { Write-Host "Azurite exited early with code $($p.ExitCode)" }
-            throw "Azurite Table port 10002 did not open."
-          }
-
-          "OK: Azurite tables is listening on 127.0.0.1:10002" | Write-Host
-
-      - name: Start Express + Smoke (single step)
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          .\scripts\ci-run-express-smoke.ps1
       - name: Dump Express logs (on failure)
         if: failure()
         shell: pwsh
@@ -94,6 +75,4 @@ jobs:
           if ($env:EXPRESS_OUT_LOG -and (Test-Path $env:EXPRESS_OUT_LOG)) { Get-Content $env:EXPRESS_OUT_LOG -Tail 200 }
           Write-Host "==== EXPRESS ERR (tail 200) ====" -ForegroundColor Yellow
           if ($env:EXPRESS_ERR_LOG -and (Test-Path $env:EXPRESS_ERR_LOG)) { Get-Content $env:EXPRESS_ERR_LOG -Tail 200 }
-
-
 

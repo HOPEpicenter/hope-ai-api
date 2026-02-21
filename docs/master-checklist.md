@@ -8,6 +8,11 @@
 - Repo status: main is green locally (smoke passes) and merges only via PR with CI.
 - Last known merge on main: f7fdf91
 
+> **Phase 2 engagement locks refresh**
+> - Locked via merged work + smoke coverage.
+> - References: #71 (envelope v1), #73 (status transitions v1), #98 (score contract + smoke).
+
+
 ---
 
 ## Phase 1 — Identity (LOCKED / COMPLETE)
@@ -86,4 +91,5 @@
 - Keep smoke green and CI green.
 - No direct pushes to main; PRs only.
 - Focus: only changes that prevent major issues later or advance the master plan.
+
 

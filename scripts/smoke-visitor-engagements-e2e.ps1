@@ -108,11 +108,7 @@ try {
 
 $visitorId = $null
 
-# Engagement status envelope (v1-ish): must include ok=true
-Write-Host "Engagement status envelope ..."
-$status = Invoke-RestMethod "$BaseUrl/engagements/status?visitorId=$visitorId" -Headers $Headers -Method Get
-Assert-True ($status.ok -eq $true) "Expected engagements/status ok:true"
-Write-Host "Engagement status envelope OK"
+
 try {
   if ($created -and ($created.PSObject.Properties.Name -contains "visitorId")) { $visitorId = [string]$created.visitorId }
   elseif ($created -and ($created.PSObject.Properties.Name -contains "id")) { $visitorId = [string]$created.id }
@@ -132,7 +128,7 @@ if ($failures.Count -gt 0) {
 Write-Host ("VisitorId: {0}" -f $visitorId)
 
 Write-Host ""
-Write-Host "[2/4] POST /api/engagements/events (2 events)"
+Write-Host "[2/5] POST /api/engagements/events (4 events)"
 
 $start = (Get-Date).ToUniversalTime().AddSeconds(-10)
 
@@ -221,7 +217,7 @@ try {
 }
 
 Write-Host ""
-Write-Host ("[3/4] GET /api/engagements/timeline?visitorId=...&limit={0}" -f $TimelineLimit)
+Write-Host ("[3/5] GET /api/engagements/timeline?visitorId=...&limit={0}" -f $TimelineLimit)
 
 $timeline = $null
 try {
@@ -250,7 +246,48 @@ if ($timelineItems.Count -lt 2) {
 }
 
 Write-Host ""
-Write-Host "[4/4] GET /api/engagements/status?visitorId=..."
+Write-Host "[4/5] GET /api/engagements/score?visitorId=...&windowDays=14"
+
+$score = $null
+try {
+  $score = Invoke-HttpJson -Method GET -Uri "$api/engagements/score?visitorId=$([uri]::EscapeDataString($visitorId))&windowDays=14" -Headers $headers
+  Write-Host ("Score response: " + (Safe-Json $score 12))
+} catch {
+  $failures.Add("score read failed: $($_.Exception.Message)") | Out-Null
+}
+
+try {
+  if (-not $score -or ($score.PSObject.Properties.Name -notcontains "ok") -or ($score.ok -ne $true)) {
+    $failures.Add("score expected ok=true") | Out-Null
+  }
+} catch { }
+
+try {
+  if ($score -and ($score.PSObject.Properties.Name -contains "v")) {
+    if ([int]$score.v -ne 1) { $failures.Add("score expected v=1") | Out-Null }
+  } else {
+    $failures.Add("score response missing 'v'") | Out-Null
+  }
+} catch { }
+
+try {
+  if ($score -and ($score.PSObject.Properties.Name -contains "visitorId")) {
+    if ([string]$score.visitorId -ne $visitorId) { $failures.Add("score visitorId mismatch") | Out-Null }
+  } else {
+    $failures.Add("score response missing 'visitorId'") | Out-Null
+  }
+} catch { }
+
+try {
+  if ($score -and ($score.PSObject.Properties.Name -contains "windowDays")) {
+    if ([int]$score.windowDays -ne 14) { $failures.Add("score expected windowDays=14") | Out-Null }
+  } else {
+    $failures.Add("score response missing 'windowDays'") | Out-Null
+  }
+} catch { }
+
+Write-Host ""
+Write-Host "[5/5] GET /api/engagements/status?visitorId=..."
 
 $status = $null
 try {
@@ -291,4 +328,7 @@ Write-Host "FAIL ❌" -ForegroundColor Red
 $failures | ForEach-Object { Write-Host (" - " + $_) -ForegroundColor Red }
 Write-Host ("Context: visitorId={0} timelineItems={1}" -f $visitorId, $timelineItems.Count)
 exit 1
+
+
+
 

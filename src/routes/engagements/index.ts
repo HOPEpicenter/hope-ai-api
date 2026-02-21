@@ -3,6 +3,7 @@ import { EngagementEventsRepository } from "../../repositories/engagementEventsR
 import { EngagementsService } from "../../services/engagements/engagementsService";
 import { engagementsStatusRouter } from "./status";
 import { engagementsAnalyticsRouter } from "./analytics";
+import { engagementsScoreRouter } from "./score";
 import { engagementsEventsRouter } from "./events";
 import { engagementsTimelineRouter } from "./timeline";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
@@ -129,5 +130,9 @@ engagementsRouter.use(engagementsAnalyticsRouter);
 
 
 
+
+
+
+engagementsRouter.use(engagementsScoreRouter);
 
 

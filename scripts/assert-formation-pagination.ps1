@@ -147,3 +147,4 @@ if ($times1.Count -ge 2) {
 }
 
 Write-Host "[assert-formation-pagination] OK: formation pagination assertions passed."
+

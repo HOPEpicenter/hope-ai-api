@@ -18,3 +18,4 @@ Run-Script "[assert-foundation] Formation profiles list..." "scripts/assert-form
 Run-Script "[assert-foundation] Formation pagination..." "scripts/assert-formation-pagination.ps1"
 
 Write-Host "[assert-foundation] OK: foundation checks passed."
+

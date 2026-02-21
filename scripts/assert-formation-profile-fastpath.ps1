@@ -52,3 +52,4 @@ foreach ($k in @("visitorId","stage","updatedAt")) {
 }
 
 Write-Host "[assert-formation-profile-fastpath] OK: fast-path shape valid"
+

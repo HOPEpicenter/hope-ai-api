@@ -208,11 +208,12 @@ if (-not $page1HasNext) { $failures.Add("expected nextCursor present on page1 (n
 if (-not $lastCursorIsNull) { $failures.Add("expected nextCursor null/empty on last page") | Out-Null }
 
 if ($failures.Count -eq 0) {
-  Write-Host ("PASS ✅  total={0}  page1={1}  page2={2}  pages={3}" -f $totalGot, $page1, $page2, $pageSizes.Count) -ForegroundColor Green
+  Write-Host ("PASS OK  total={0}  page1={1}  page2={2}  pages={3}" -f $totalGot, $page1, $page2, $pageSizes.Count) -ForegroundColor Green
   exit 0
 }
 
-Write-Host "FAIL ❌" -ForegroundColor Red
+Write-Host "FAIL" -ForegroundColor Red
 $failures | ForEach-Object { Write-Host (" - " + $_) -ForegroundColor Red }
 Write-Host ("Observed: total={0} page1={1} page2={2} pages={3}" -f $totalGot, $page1, $page2, $pageSizes.Count)
 exit 1
+

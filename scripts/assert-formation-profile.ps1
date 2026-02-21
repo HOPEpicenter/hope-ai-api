@@ -70,3 +70,4 @@ if ([string]::IsNullOrWhiteSpace([string]$p.profile.updatedAt)) { throw "Expecte
 if ($p.profile.stage -ne "Connected") { throw "Expected stage=Connected after NEXT_STEP_SELECTED, got $($p.profile.stage)" }
 
 Write-Host "[assert-formation-profile] OK: formation profile snapshot assertions passed."
+

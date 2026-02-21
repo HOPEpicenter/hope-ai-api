@@ -41,7 +41,8 @@ $visitor = Invoke-PostJson -uri "$ApiBase/visitors" -headers $headers -body @{
   email     = $email
 }
 
-$visitorId = $visitor.id
+$visitorId = $visitor.visitorId
+if ([string]::IsNullOrWhiteSpace($visitorId)) { $visitorId = $visitor.id } # optional fallback
 if ([string]::IsNullOrWhiteSpace($visitorId)) { throw "Visitor id missing." }
 Write-Host "[assert-formation-idempotency] visitorId=$visitorId"
 

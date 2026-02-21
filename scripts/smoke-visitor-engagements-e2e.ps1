@@ -230,6 +230,54 @@ if ($failures.Count -gt 0) {
 Write-Host ("VisitorId: {0}" -f $visitorId)
 
 Write-Host ""
+Write-Host "[2a/5] POST /api/engagements/events strict validation (400s)"
+
+function Assert-EventValidation400($resp, $label) {
+  Assert-Validation400 $resp $label
+}
+
+# Build a known-good base envelope, then mutate it for negative tests
+$goodBase = @{
+  v          = 1
+  eventId    = ("evt-" + [Guid]::NewGuid().ToString("N"))
+  visitorId  = $visitorId
+  type       = "note.add"
+  occurredAt = NowIsoUtc ((Get-Date).ToUniversalTime())
+  source     = @{ system = "smoke.ps1" }
+  data       = @{ text = "hello" }
+}
+
+# (1) Missing source.system
+$badEnv1 = @{} + $goodBase
+$badEnv1.source = @{}   # system missing
+$badResp1 = Invoke-HttpJsonAllowFail -Method POST -Uri "$api/engagements/events" -Headers $headers -Body $badEnv1
+Assert-EventValidation400 $badResp1 "events missing source.system"
+
+# (2) occurredAt missing timezone (strict should reject)
+$badEnv2 = @{} + $goodBase
+$badEnv2.occurredAt = "2026-02-21T20:00:00.000"  # no Z / offset
+$badResp2 = Invoke-HttpJsonAllowFail -Method POST -Uri "$api/engagements/events" -Headers $headers -Body $badEnv2
+Assert-EventValidation400 $badResp2 "events occurredAt missing timezone"
+
+# (3) invalid eventId format
+$badEnv3 = @{} + $goodBase
+$badEnv3.eventId = "not-an-event-id"
+$badResp3 = Invoke-HttpJsonAllowFail -Method POST -Uri "$api/engagements/events" -Headers $headers -Body $badEnv3
+Assert-EventValidation400 $badResp3 "events invalid eventId format"
+
+# (4) status.transition missing required field (to)
+$badEnv4 = @{
+  v          = 1
+  eventId    = ("evt-" + [Guid]::NewGuid().ToString("N"))
+  visitorId  = $visitorId
+  type       = "status.transition"
+  occurredAt = NowIsoUtc ((Get-Date).ToUniversalTime())
+  source     = @{ system = "smoke.ps1" }
+  data       = @{ from = "open" } # missing "to"
+}
+$badResp4 = Invoke-HttpJsonAllowFail -Method POST -Uri "$api/engagements/events" -Headers $headers -Body $badEnv4
+Assert-EventValidation400 $badResp4 "events status.transition missing data.to"
+Write-Host ""
 Write-Host "[2/5] POST /api/engagements/events (4 events)"
 
 $start = (Get-Date).ToUniversalTime().AddSeconds(-10)

@@ -1,6 +1,6 @@
 param(
   [string]$RepoRoot = (Get-Location).Path,
-  [string]$BaseUrl = "http://127.0.0.1:3000/api"
+  [string]$BaseUrl = "http://127.0.0.1:7071/api"
 )
 
 $ErrorActionPreference = "Stop"
@@ -154,14 +154,14 @@ if (-not $vid) {
 Ok "Created visitorId=$vid"
 
 # Create a couple engagements to ensure paging has data
-$e1 = @{ visitorId = $vid; type = "DEV"; notes = "regression engagement 1"; channel="api"; source="regression" } | ConvertTo-Json
-$e2 = @{ visitorId = $vid; type = "DEV"; notes = "regression engagement 2"; channel="api"; source="regression" } | ConvertTo-Json
+$e1 = @{ visitorId = $vid; eventType = "DEV"; notes = "regression engagement 1"; channel="api"; source="regression" } | ConvertTo-Json
+$e2 = @{ visitorId = $vid; eventType = "DEV"; notes = "regression engagement 2"; channel="api"; source="regression" } | ConvertTo-Json
 
-$e1r = Invoke-JsonSafe -Method "POST" -Uri "$BaseUrl/engagements/events" -Headers $headers -Body $e1
-if (-not $e1r.ok) { Fail "POST /engagements/events (1) failed." }
+$e1r = Invoke-JsonSafe -Method "POST" -Uri "$BaseUrl/engagements" -Headers $headers -Body $e1
+if (-not $e1r.ok) { Fail "POST /engagements (1) failed." }
 
-$e2r = Invoke-JsonSafe -Method "POST" -Uri "$BaseUrl/engagements/events" -Headers $headers -Body $e2
-if (-not $e2r.ok) { Fail "POST /engagements/events (2) failed." }
+$e2r = Invoke-JsonSafe -Method "POST" -Uri "$BaseUrl/engagements" -Headers $headers -Body $e2
+if (-not $e2r.ok) { Fail "POST /engagements (2) failed." }
 
 Ok "Posted 2 engagements"
 
@@ -216,5 +216,3 @@ if ($r1.nextCursor) {
 }
 
 Ok "Regression checks complete."
-
-

@@ -1,7 +1,8 @@
 import express from "express";
 import visitorsRouter from "./routes/visitors/visitorsRouter";
 import { createOpsRouter } from "./routes/ops/opsRouter";
-import { formationEventsRouter as formationRouter } from "./routes/formationEvents";
+import { formationRouter } from "./routes/formation";
+import { formationEventsRouter } from "./routes/formationEvents";
 import { followupQueueRouter } from "./routes/followupQueue";
 import { engagementsRouter } from "./routes/engagements";
 import { integrationRouter } from "./routes/integration";
@@ -58,4 +59,5 @@ app.listen(port, () => {
   // eslint-disable-next-line no-console
   console.log(`hope-ai-api listening on port ${port}`);
 });
+
 

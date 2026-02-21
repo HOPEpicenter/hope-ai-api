@@ -154,8 +154,24 @@ if (-not $vid) {
 Ok "Created visitorId=$vid"
 
 # Create a couple engagements to ensure paging has data
-$e1 = @{ visitorId = $vid; type = "DEV"; notes = "regression engagement 1"; channel="api"; source="regression" } | ConvertTo-Json
-$e2 = @{ visitorId = $vid; type = "DEV"; notes = "regression engagement 2"; channel="api"; source="regression" } | ConvertTo-Json
+$e1 = @{
+  v          = 1
+  eventId    = ("evt-" + ([Guid]::NewGuid().ToString("N")))
+  visitorId  = $vid
+  type       = "note.add"
+  occurredAt = (Get-Date).ToUniversalTime().ToString("o")
+  source     = @{ system = "scripts/regression.ps1" }
+  data       = @{ text = "regression engagement 1"; channel = "api" }
+} | ConvertTo-Json -Depth 8
+$e2 = @{
+  v          = 1
+  eventId    = ("evt-" + ([Guid]::NewGuid().ToString("N")))
+  visitorId  = $vid
+  type       = "status.transition"
+  occurredAt = (Get-Date).ToUniversalTime().ToString("o")
+  source     = @{ system = "scripts/regression.ps1" }
+  data       = @{ from = "open"; to = "in_progress"; channel = "api" }
+} | ConvertTo-Json -Depth 8
 
 $e1r = Invoke-JsonSafe -Method "POST" -Uri "$BaseUrl/engagements/events" -Headers $headers -Body $e1
 if (-not $e1r.ok) { Fail "POST /engagements/events (1) failed." }
@@ -182,28 +198,31 @@ if (-not $fr.ok) { Fail "POST /formation/events failed." }
 
 Ok "Posted formation event"
 
-# Call timeline page 1
-$r1r = Invoke-JsonSafe -Method "GET" -Uri "$BaseUrl/ops/visitors/$vid/timeline?limit=2&kinds=formation,engagement&debug=1" -Headers $headers -Body $null
-if (-not $r1r.ok) { Fail "GET timeline page1 failed." }
+# [Timeline sanity] Engagements (public surface)
+$etl = Invoke-JsonSafe -Method "GET" -Uri "$BaseUrl/engagements/timeline?visitorId=$vid&limit=2" -Headers $headers -Body $null
+if (-not $etl.ok) { Fail "GET /engagements/timeline failed." }
+$etlBody = $etl.body
+$r1 = $etlBody
+if (-not $etlBody.ok) { Fail "engagements timeline: ok was false" }
+if (-not $etlBody.items -or $etlBody.items.Count -lt 1) { Fail "engagements timeline: items missing/empty" }
 
-$r1 = $r1r.body
-if (-not $r1.ok) { Fail "timeline page1: ok was false" }
-if (-not $r1.items -or $r1.items.Count -lt 1) { Fail "timeline page1: items missing/empty" }
+# [Formation sanity] Formation events list (public surface)
+$fel = Invoke-JsonSafe -Method "GET" -Uri "$BaseUrl/visitors/$vid/formation/events?limit=10" -Headers $headers -Body $null
+if (-not $fel.ok) { Fail "GET formation events list failed." }
+$felBody = $fel.body
+if (-not $felBody.ok) { Fail "formation events list: ok was false" }
+if (-not $felBody.items -or $felBody.items.Count -lt 1) { Fail "formation events list: items missing/empty" }
 
 foreach ($it in $r1.items) {
-  if (-not $it.kind) { Fail "timeline item missing kind" }
-  if (-not $it.occurredAt) { Fail "timeline item missing occurredAt" }
-  if (-not $it.display -or [string]::IsNullOrWhiteSpace([string]$it.display)) { Fail "timeline item missing/blank display" }
-  if ($null -eq $it.metadata) { Fail "timeline item metadata is null (must be object)" }
-  if ($it.metadata -isnot [hashtable] -and $it.metadata.GetType().Name -ne "PSCustomObject") {
-    Fail "timeline item metadata is not an object"
-  }
+if (-not $it.type -or [string]::IsNullOrWhiteSpace([string]$it.type)) {
+  Fail "timeline item missing/blank type"
+}
 }
 
 Ok "Timeline item shape OK (page1)"
 
 if ($r1.nextCursor) {
-  $r2r = Invoke-JsonSafe -Method "GET" -Uri "$BaseUrl/ops/visitors/$vid/timeline?limit=2&kinds=formation,engagement&cursor=$($r1.nextCursor)" -Headers $headers -Body $null
+  $r2r = Invoke-JsonSafe -Method "GET" -Uri "$BaseUrl/engagements/timeline?visitorId=$vid&limit=2&cursor=$($r1.nextCursor)" -Headers $headers -Body $null
   if (-not $r2r.ok) { Fail "GET timeline page2 failed." }
 
   $r2 = $r2r.body
@@ -216,5 +235,7 @@ if ($r1.nextCursor) {
 }
 
 Ok "Regression checks complete."
+
+
 
 

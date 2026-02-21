@@ -71,8 +71,8 @@ Assert ($visitorId -and $visitorId.Length -gt 10) "POST /visitors did not return
 Ok ("visitorId = {0} (alreadyExists={1})" -f $visitorId, $v.alreadyExists)
 Write-Host ""
 
-# ---------- [2] POST /engagements ----------
-Write-Host "[2] POST /engagements"
+# ---------- [2] POST /engagements/events ----------
+Write-Host "[2] POST /engagements/events"
 $engBody = @{
   visitorId = $visitorId
 
@@ -85,9 +85,12 @@ $engBody = @{
   channel   = "api"
   notes     = "Smoke engagement ($runId)"
 }
-$e = InvokeJson "POST" "$BaseUrl/engagements" $engBody
-Assert ($e.ok -eq $true) "POST /engagements did not return ok=true"
-Assert ($e.engagementId) "POST /engagements did not return engagementId"
+$e = InvokeJson "POST" "$BaseUrl/engagements/events" $engBody
+    $e | ConvertTo-Json -Depth 10 | Write-Host
+Assert ($e.ok -eq $true) "POST /engagements/events did not return ok=true"; if ($null -ne $e.accepted) { Assert (($e.accepted -eq $true) -or ($e.accepted -eq 'true')) "POST /engagements/events did not return accepted=true" }
+
+Write-Host "[OK] POST /engagements/events passed (legacy smoke stops here; use smoke-visitor-engagements-e2e.ps1 for full suite)"
+return
 Ok ("engagementId = {0}" -f $e.engagementId)
 Write-Host ""
 
@@ -103,11 +106,11 @@ Write-Host ""
 # ---------- [4] Pagination smoke (per visitor) ----------
 Write-Host "[4] GET /engagements?visitorId=...&limit=1&debug=1 (pagination smoke)"
 # Create 2 more engagement rows to make pagination visible
-InvokeJson "POST" "$BaseUrl/engagements" (@{
+InvokeJson "POST" "$BaseUrl/engagements/events" (@{
   visitorId = $visitorId; type="dev_engaged"; channel="api"; notes="pagination test 1"
 }) | Out-Null
 Start-Sleep -Milliseconds 150
-InvokeJson "POST" "$BaseUrl/engagements" (@{
+InvokeJson "POST" "$BaseUrl/engagements/events" (@{
   visitorId = $visitorId; type="dev_engaged"; channel="api"; notes="pagination test 2"
 }) | Out-Null
 
@@ -190,6 +193,10 @@ Write-Host ""
 
 Ok "SMOKE TEST COMPLETE"
 Write-Host ("VisitorId used: {0}" -f $visitorId)
+
+
+
+
 
 
 

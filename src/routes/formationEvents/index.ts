@@ -85,8 +85,7 @@ formationEventsRouter.post("/formation/events", async (req, res) => {
     // For HTTP response: preserve existing contract expected by asserts:
     // return an object that includes an "id" key when client supplied one.
     // (Your idempotency assert checks response.id === clientId.)
-    return res.status(201).json({
-      id: id ?? idempotencyKey,
+    return res.status(201).json({ ok: true, accepted: true, id: id ?? idempotencyKey,
       visitorId,
       type,
       occurredAt: occurredAt ?? new Date().toISOString(),
@@ -98,7 +97,7 @@ formationEventsRouter.post("/formation/events", async (req, res) => {
     if ((id || idempotencyKey) && isConflictAlreadyExists(e)) {
       try {
         const existing = await eventsRepo.getByVisitorAndId(String(visitorId ?? "").trim(), String(id ?? idempotencyKey));
-        if (existing) return res.status(200).json(existing);
+        if (existing) return res.status(200).json({ ok: true, ...existing });
       } catch {
         // fall through
       }
@@ -240,3 +239,4 @@ formationEventsRouter.get("/visitors/:id/formation/profile", async (req, res) =>
     return res.status(toHttpStatus(e, 400)).json({ ok: false, error: e?.message || "Bad Request" });
   }
 });
+

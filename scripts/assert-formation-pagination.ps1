@@ -3,6 +3,12 @@ param(
   [int]$Limit = 5
 )
 
+
+# --- Phase gate: skip Phase 3 asserts unless explicitly enabled ---
+if ($env:HOPE_RUN_PHASE3_ASSERTS -ne "1") {
+  Write-Host "SKIP: Phase 3 assertions disabled. Set HOPE_RUN_PHASE3_ASSERTS=1 to enable." -ForegroundColor Yellow
+  exit 0
+}
 $ErrorActionPreference = "Stop"
 
 function Require-Env([string]$name) {

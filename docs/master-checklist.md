@@ -51,6 +51,10 @@
 - [x] Notes + tags v1 (ministry-friendly).
 - [x] Engagement score (derived, not stored).
 ### Engineering (already present / verified by smoke)
+- [x] Public engagement append works: POST /api/engagements/events
+- [x] Public engagement timeline works: GET /api/engagements/timeline
+- [x] Public engagement score works: GET /api/engagements/score
+- [x] Public engagement status works: GET /api/engagements/status
 - [x] Append event endpoint exists and works: POST /ops/visitors/:id/events
 - [x] Dashboard endpoint exists and works: GET /ops/visitors/:id/dashboard
 - [x] Timeline paging works (nextCursor + page2).

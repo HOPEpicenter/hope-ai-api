@@ -73,11 +73,13 @@
 
 ---
 
-## Phase 3 — Formation (NOT STARTED)
+## Phase 3 — Formation (ACTIVE / PARTIALLY COMPLETE)
+- [x] Public formation append works: POST /api/formation/events
+- [x] Public formation list works (paging): GET /api/visitors/:id/formation/events
+- [x] Public formation profile snapshot works: GET /api/visitors/:id/formation/profile
+- [x] CI asserts cover formation pagination + idempotency + profile snapshot
 - [ ] Define formation milestones/events and derivations.
-- [ ] Track journey steps in an auditable way (prefer derive from events).
-
-## Phase 4 — Integration (NOT STARTED)
+- [ ] Track journey steps in an auditable way (prefer derive from events).## Phase 4 — Integration (NOT STARTED)
 - [ ] Connect people to groups/programs/workflows.
 - [ ] Ownership / follow-up assignments.
 
@@ -91,6 +93,7 @@
 - Keep smoke green and CI green.
 - No direct pushes to main; PRs only.
 - Focus: only changes that prevent major issues later or advance the master plan.
+
 
 
 

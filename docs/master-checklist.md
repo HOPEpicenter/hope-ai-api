@@ -3,10 +3,10 @@
 > Single source of truth for what’s built, what’s locked, and what’s next.
 > Update this file in the same PR as any change that materially affects behavior or contracts.
 
-## Current state (as of f7fdf91)
+## Current state (as of eead5fd)
 
 - Repo status: main is green locally (smoke passes) and merges only via PR with CI.
-- Last known merge on main: f7fdf91
+- Last known merge on main: eead5fd
 
 > **Phase 2 engagement locks refresh**
 > - Locked via merged work + smoke coverage.
@@ -91,5 +91,6 @@
 - Keep smoke green and CI green.
 - No direct pushes to main; PRs only.
 - Focus: only changes that prevent major issues later or advance the master plan.
+
 
 

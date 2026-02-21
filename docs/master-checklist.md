@@ -1,376 +1,90 @@
-# scripts/run-smoke.ps1
-# Builds, starts server on a random port, waits for /ops/health, runs smoke-tests.ps1, then stops server.
+# HOPE AI API Master Checklist (Product + Engineering)
 
-Set-StrictMode -Version Latest
+> Single source of truth for what’s built, what’s locked, and what’s next.
+> Update this file in the same PR as any change that materially affects behavior or contracts.
 
-function Test-TcpOpenQuiet {
-  param(
-    [Parameter(Mandatory=$true)][string]$HostName,
-    [Parameter(Mandatory=$true)][int]$Port,
-    [int]$TimeoutMs = 400
-  )
+## Current state (as of f7fdf91)
 
-  $client = $null
-  try {
-    $client = [System.Net.Sockets.TcpClient]::new()
-    $iar = $client.BeginConnect($HostName, $Port, $null, $null)
-    $ok = $iar.AsyncWaitHandle.WaitOne($TimeoutMs)
-    if (-not $ok) { return $false }
-    $client.EndConnect($iar)
-    return $true
-  } catch {
-    return $false
-  } finally {
-    if ($client) { try { $client.Close() } catch { } }
-  }
-}
+- Repo status: main is green locally (smoke passes) and merges only via PR with CI.
+- Last known merge on main: f7fdf91
 
-$ErrorActionPreference = "Stop"
+---
 
+## Phase 1 — Identity (LOCKED / COMPLETE)
 
+### Product outcomes
+- [x] Canonical visitorId as the stable identifier for a person.
+- [x] Visitor creation is idempotent by normalized email (trim + lowercase).
 
-$script:AzStarted = $false
-$script:AzPid = $null
-# ---- guard: scripts integrity (ops.ps1 etc.) ----
-$guard = Join-Path $PSScriptRoot "guard-scripts.ps1"
-if (-not (Test-Path -LiteralPath $guard)) {
-  throw "Missing guard script: $guard"
-}
+### Engineering / contracts
+- [x] Public create visitor: POST /api/visitors
+  - Returns 201 when created; 200 when reused (idempotent repeat).
+  - Always returns { ok: true, visitorId } on success.
+- [x] Public get visitor: GET /api/visitors/:id
+- [x] Validation: missing email => 400; invalid email => 400.
 
-Write-Host "== Run guard-scripts ==" -ForegroundColor Cyan
-powershell -NoProfile -ExecutionPolicy Bypass -File $guard
+### Storage invariants (Azure Table Storage)
+- [x] VISITOR entity: PartitionKey="VISITOR", RowKey=visitorId
+- [x] EMAIL index entity: PartitionKey="EMAIL", RowKey=encodeURIComponent(eemailLower) => { visitorId }
+- [x] Stale EMAIL index repair:
+  - If EMAIL index points to missing visitor, recover VISITOR by emailLower, repair index, return existing visitor.
 
-if ($LASTEXITCODE -ne 0) {
-  throw "guard-scripts failed (exit=$LASTEXITCODE)."
-}# ---- end guard ----
-function Get-ScriptDir {
-  $d = $PSScriptRoot
-  if (-not $d -or $d.Trim().Length -eq 0) {
-    $cwd = (Get-Location).Path
-    $maybeScripts = Join-Path $cwd "scripts"
-    if (Test-Path $maybeScripts) { return $maybeScripts }
-    return $cwd
-  }
-  return $d
-}
+### Tests
+- [x] Smoke coverage:
+  - [x] Public create idempotency (same email returns same visitorId)
+  - [x] Stale EMAIL index regression (corrupt index -> API repairs -> returns same visitorId)
+  - [x] Public get visitor
+  - [x] Public create missing email => 400
 
-function Find-RepoRoot {
-  param([Parameter(Mandatory=$true)][string]$StartDir)
+### Change log / references
+- [x] PR #68 merged: stale EMAIL index delete+retry + docs for 200/201 behavior
+- [x] PR #69 merged: recover-by-eemailLower + smoke regression for stale EMAIL index
 
-  $d = $StartDir
-  while ($true) {
-    $pkg = Join-Path $d "package.json"
-    if (Test-Path $pkg) { return $d }
+---
 
-    $parent = Split-Path $d -Parent
-    if (-not $parent -or $parent -eq $d) { break }
-    $d = $parent
-  }
-  throw "Could not find repo root (package.json) starting from: $StartDir"
-}
+## Phase 2 — Engagement (ACTIVE / PARTIALLY COMPLETE)
 
-# Ensure Azurite Tables is available when using UseDevelopmentStorage=true
-function Ensure-AzuriteTables {
-  param([int]$Port = 10002)
+### Product outcomes
+- [x] Engagement events are stable-contract and ministry-safe (envelope locked).
+- [x] Timeline read contract is stable (cursor paging + ordering).
+- [x] Status transitions are auditable (event-driven preferred).
+- [x] Notes + tags v1 (ministry-friendly).
+- [x] Engagement score (derived, not stored).
+### Engineering (already present / verified by smoke)
+- [x] Public engagement append works: POST /api/engagements/events
+- [x] Public engagement timeline works: GET /api/engagements/timeline
+- [x] Public engagement score works: GET /api/engagements/score
+- [x] Public engagement status works: GET /api/engagements/status
+- [x] Append event endpoint exists and works: POST /ops/visitors/:id/events
+- [x] Dashboard endpoint exists and works: GET /ops/visitors/:id/dashboard
+- [x] Timeline paging works (nextCursor + page2).
+- [x] Oversized metadata protection returns 400.
+- [x] 404 JSON includes requestId (verified in smoke).
 
-  $cs = $env:STORAGE_CONNECTION_STRING
-  if (-not $cs) { return }
-  if ($cs -notmatch '(?i)UseDevelopmentStorage\s*=\s*true') { return }
-  $isOpen = Test-TcpOpenQuiet -HostName "127.0.0.1" -Port $Port
-  if ($isOpen) {
-    $listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+### Phase 2 — Next PR-sized tasks (choose 1 at a time)
+- [x] Lock “Engagement event envelope v1” in one place (validate + normalize consistently).
+- [x] Lock “Timeline read contract v1” (cursor paging, stable ordering, consistent limits).
+- [x] Model “Status transitions v1” as events (preferred) or dedicated stream.
 
-    if ($env:OPS_AZURITE_KILL_EXISTING -eq "1" -and $listener) {
-      Write-Host ("Stopping existing listener on 127.0.0.1:{0} (pid={1}) because OPS_AZURITE_KILL_EXISTING=1" -f $Port, $listener.OwningProcess) -ForegroundColor Yellow
-      Stop-Process -Id $listener.OwningProcess -Force -ErrorAction SilentlyContinue
+---
 
-      # wait briefly for port to free
-      $deadlineKill = (Get-Date).AddSeconds(5)
-      do {
-        Start-Sleep -Milliseconds 200
-        $isOpen = Test-TcpOpenQuiet -HostName "127.0.0.1" -Port $Port
-      } while ($isOpen -and (Get-Date) -lt $deadlineKill)
+## Phase 3 — Formation (NOT STARTED)
+- [ ] Define formation milestones/events and derivations.
+- [ ] Track journey steps in an auditable way (prefer derive from events).
 
-      if ($isOpen) { throw "Port $Port is still in use after attempting to stop existing listener." }
-    }
-    else {
-      if ($listener) {
-        $proc = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
-        if ($proc) {
-          Write-Host ("Azurite Tables already listening on 127.0.0.1:{0} (pid={1}, name={2})" -f $Port, $proc.Id, $proc.Name)
-        } else {
-          Write-Host ("Azurite Tables already listening on 127.0.0.1:{0} (pid={1})" -f $Port, $listener.OwningProcess)
-        }
-      } else {
-        Write-Host ("Azurite Tables already listening on 127.0.0.1:{0}" -f $Port)
-      }
-      return
-    }
-  }
+## Phase 4 — Integration (NOT STARTED)
+- [ ] Connect people to groups/programs/workflows.
+- [ ] Ownership / follow-up assignments.
 
-  if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw "node not found in PATH (required for Azurite)" }
-  if (-not (Get-Command npm  -ErrorAction SilentlyContinue)) { throw "npm not found in PATH (required for Azurite)" }
+## Phase 5 — Legacy (NOT STARTED)
+- [ ] Long-horizon outcomes and history views.
+- [ ] Derived insights (avoid storing derived state unless necessary).
 
-  $repoRoot  = Find-RepoRoot -StartDir $PSScriptRoot
-  $logsDir   = Join-Path $repoRoot "logs"
-  $azDataDir = Join-Path $repoRoot ".azurite"
-  New-Item -ItemType Directory -Force -Path $logsDir   | Out-Null
-  New-Item -ItemType Directory -Force -Path $azDataDir | Out-Null
+---
 
-  $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-  $azOut = Join-Path $logsDir ("azurite-autostart-{0}.out.log" -f $stamp)
-  $azErr = Join-Path $logsDir ("azurite-autostart-{0}.err.log" -f $stamp)
-
-  $azJs = Join-Path $repoRoot "node_modules\azurite\dist\src\azurite.js"
-
-  $argsCommon = @(
-    "--silent",
-    "--location", $azDataDir,
-    "--blobHost", "127.0.0.1", "--blobPort", "10000",
-    "--queueHost","127.0.0.1", "--queuePort","10001",
-    "--tableHost","127.0.0.1", "--tablePort", "$Port"
-  )
-
-  Write-Host ("Starting Azurite (tables:{0})..." -f $Port)
-
-  $p = $null
-
-  if (Test-Path $azJs) {
-    # Best: use local devDependency (avoids npx/.cmd shim issues)
-    $p = Start-Process -FilePath "node" -ArgumentList (@($azJs) + $argsCommon) `
-      -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
-      -RedirectStandardOutput $azOut -RedirectStandardError $azErr
-  } else {
-    $azCmd = Get-Command azurite -ErrorAction SilentlyContinue
-    if ($azCmd) {
-      # Next best: azurite on PATH
-      $p = Start-Process -FilePath "cmd.exe" -ArgumentList (@("/c","azurite") + $argsCommon) `
-        -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
-        -RedirectStandardOutput $azOut -RedirectStandardError $azErr
-    } else {
-      # Fallback: npx (must run through cmd.exe on Windows)
-      $npx = Get-Command npx -ErrorAction SilentlyContinue
-      if (-not $npx) { throw "Neither local node_modules azurite nor 'azurite' nor 'npx' found. Run: npm ci" }
-
-      $cmdParts = @("npx","--yes","azurite") + $argsCommon
-      $cmdLine  = ($cmdParts | ForEach-Object {
-        $s = [string]$_
-        if ($s -match '\s|"' ) { '"' + ($s -replace '"','\"') + '"' } else { $s }
-      }) -join ' '
-
-      $p = Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", $cmdLine) `
-        -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru `
-        -RedirectStandardOutput $azOut -RedirectStandardError $azErr
-    }
-  }
-
-  if (-not $p) { throw "Failed to start Azurite (unknown reason)." }
-
-  $deadline = (Get-Date).AddSeconds(45)
-  do {
-    Start-Sleep -Milliseconds 500
-    if ($p.HasExited) { throw ("Azurite exited early (exit={0}). See: {1} ; {2}" -f $p.ExitCode,$azOut,$azErr) }
-    $isOpen = Test-TcpOpenQuiet -HostName "127.0.0.1" -Port $Port
-  } while (-not $isOpen -and (Get-Date) -lt $deadline)
-
-  if (-not $isOpen) { throw ("Azurite did not open port {0} in time. See: {1} ; {2}" -f $Port,$azOut,$azErr) }
-
-  Write-Host ("Azurite Tables is listening on 127.0.0.1:{0} (pid={1})" -f $Port,$p.Id)
-  $script:AzStarted = $true
-  $script:AzPid = $p.Id
-}
-
-
-function Import-DotEnv {
-  param([Parameter(Mandatory=$true)][string]$Path)
-
-  if (-not (Test-Path $Path)) { return }
-
-  $lines = Get-Content -LiteralPath $Path
-  foreach ($line in $lines) {
-    $t = $line.Trim()
-    if ($t.Length -eq 0) { continue }
-    if ($t.StartsWith("#")) { continue }
-
-    $eq = $t.IndexOf("=")
-    if ($eq -lt 1) { continue }
-
-    $key = $t.Substring(0, $eq).Trim()
-    $val = $t.Substring($eq + 1).Trim()
-
-    if (($val.StartsWith('"') -and $val.EndsWith('"')) -or ($val.StartsWith("'") -and $val.EndsWith("'"))) {
-      $val = $val.Substring(1, $val.Length - 2)
-    }
-
-    if ($key.Length -gt 0) {
-      # do not overwrite existing env vars
-      if (-not (Test-Path ("Env:\" + $key))) {
-        Set-Item -Path ("Env:\" + $key) -Value $val
-      }
-    }
-  }
-}
-
-function Require-Env {
-  param([Parameter(Mandatory=$true)][string]$Name)
-
-  $v = [Environment]::GetEnvironmentVariable($Name)
-  if (-not $v -or $v.Trim().Length -eq 0) {
-    throw "$Name is not set. Set it in your shell OR add it to .env in repo root."
-  }
-}
-
-function Wait-ForHealth {
-  param(
-    [Parameter(Mandatory=$true)][string]$BaseUrl,
-    [int]$TimeoutSec = 60
-  )
-
-  $deadline = (Get-Date).AddSeconds($TimeoutSec)
-  $healthUrl = $BaseUrl.TrimEnd("/") + "/ops/health"
-
-  while ((Get-Date) -lt $deadline) {
-    try {
-      $resp = Invoke-WebRequest -Uri $healthUrl -Method GET -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
-      if ([int]$resp.StatusCode -eq 200) {
-        try {
-          $obj = $resp.Content | ConvertFrom-Json
-          if ($obj.ok -eq $true) { return $true }
-        } catch { }
-      }
-    } catch { }
-    Start-Sleep -Milliseconds 300
-  }
-  return $false
-}
-
-$ScriptDir = Get-ScriptDir
-$RepoRoot  = Find-RepoRoot -StartDir $ScriptDir
-
-# Load .env if present (repo root)
-$envPath = Join-Path $RepoRoot ".env"
-if (Test-Path $envPath) {
-  Import-DotEnv -Path $envPath
-  Write-Host ("Loaded .env from: " + $envPath) -ForegroundColor DarkGray
-} else {
-  Write-Host ("No .env found at: " + $envPath + " (ok if env vars are set in shell/CI)") -ForegroundColor DarkGray
-}# Required for server boot
-Require-Env -Name "STORAGE_CONNECTION_STRING"
-Ensure-AzuriteTables
-
-Write-Host "STORAGE_CONNECTION_STRING is set (value not shown)" -ForegroundColor DarkGray
-
-# Run legacy API error-shape guard (fails CI if old patterns reappear)
-$legacyGuard = Join-Path $PSScriptRoot "guard-no-legacy-api-errors.ps1"
-if (Test-Path $legacyGuard) {
-  & powershell -NoProfile -ExecutionPolicy Bypass -File $legacyGuard
-} else {
-  Write-Host ("WARN: Legacy-error guard not found at: {0}" -f $legacyGuard) -ForegroundColor Yellow
-}
-Write-Host "STORAGE_CONNECTION_STRING is set (value not shown)" -ForegroundColor DarkGray
-# Logs under repo root
-$LogsDir = Join-Path $RepoRoot "logs"
-if (-not (Test-Path $LogsDir)) { New-Item -ItemType Directory -Path $LogsDir | Out-Null }
-
-$stamp = (Get-Date).ToString("yyyyMMdd-HHmmss")
-$serverOutLog = Join-Path $LogsDir ("smoke-server-{0}.out.log" -f $stamp)
-$serverErrLog = Join-Path $LogsDir ("smoke-server-{0}.err.log" -f $stamp)
-$runLog       = Join-Path $LogsDir ("smoke-run-{0}.log" -f $stamp)
-
-# Pick a random port
-$port = Get-Random -Minimum 20000 -Maximum 45000
-$baseUrl = "http://localhost:{0}" -f $port
-
-# Choose which npm script to run for the server (default: start:dist for CI friendliness)
-$serverScript = $env:OPS_SERVER_SCRIPT
-if (-not $serverScript -or $serverScript.Trim().Length -eq 0) { $serverScript = "start:dist" }
-
-Write-Host ("RepoRoot:      " + $RepoRoot)
-Write-Host ("ScriptDir:     " + $ScriptDir)
-Write-Host ("Port:          " + $port)
-Write-Host ("BaseUrl:       " + $baseUrl)
-Write-Host ("ServerScript:  npm run " + $serverScript)
-Write-Host ("ServerOutLog:  " + $serverOutLog)
-Write-Host ("ServerErrLog:  " + $serverErrLog)
-Write-Host ("RunLog:        " + $runLog)
-
-Push-Location $RepoRoot
-$serverProc = $null
-try {
-  Write-Host "`n== npm run build =="
-  & npm run build 2>&1 | Tee-Object -FilePath $runLog -Append | Out-Host
-  if ($LASTEXITCODE -ne 0) { throw "npm run build failed (exit=$LASTEXITCODE). See $runLog" }
-
-  Write-Host "`n== Start server =="
-  $cmd = "set ""PORT={0}""&& set ""OPS_PORT={0}""&& npm run {1}" -f $port, $serverScript
-  $serverProc = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $cmd `
-    -WorkingDirectory $RepoRoot `
-    -RedirectStandardOutput $serverOutLog `
-    -RedirectStandardError  $serverErrLog `
-    -NoNewWindow `
-    -PassThru
-
-  Write-Host ("Server PID: " + $serverProc.Id)
-
-  Write-Host "`n== Wait for /ops/health =="
-  $ok = Wait-ForHealth -BaseUrl $baseUrl -TimeoutSec 60
-  if (-not $ok) {
-    Write-Host "`n--- Server stdout (tail) ---"
-    if (Test-Path $serverOutLog) { Get-Content $serverOutLog -Tail 120 | ForEach-Object { Write-Host $_ } }
-    Write-Host "`n--- Server stderr (tail) ---"
-    if (Test-Path $serverErrLog) { Get-Content $serverErrLog -Tail 200 | ForEach-Object { Write-Host $_ } }
-    throw "Server did not become healthy within timeout. See $serverOutLog and $serverErrLog"
-  }
-  Write-Host "Health OK"
-
-  Write-Host "`n== Run smoke tests =="
-  $smokePath = Join-Path $ScriptDir "smoke-tests.ps1"
-  if (-not (Test-Path $smokePath)) { throw "Smoke tests file not found: $smokePath" }
-
-    # --- Run smoke tests (quiet progress) ---
-  $argList = @(
-    "-NoProfile",
-    "-ExecutionPolicy","Bypass",
-    "-Command",
-    @"
-`$env:OPS_BASE_URL = '$baseUrl'
-`$ProgressPreference = 'SilentlyContinue'
-& '$smokePath' -BaseUrl '$baseUrl'
-exit `$LASTEXITCODE
-"@
-  )
-
-  $p = Start-Process -FilePath "pwsh" -ArgumentList $argList `
-    -WorkingDirectory $RepoRoot `
-    -NoNewWindow `
-    -Wait `
-    -PassThru
-
-  if ($p.ExitCode -ne 0) {
-    throw "Smoke tests failed (exit=$($p.ExitCode)). See $serverOutLog, $serverErrLog, and $runLog"
-  }
-  Write-Host "`nOK run-smoke completed successfully" -ForegroundColor Green
-  exit 0
-}
-catch {
-  Write-Host "`nFAIL run-smoke failed: $($_.Exception.Message)" -ForegroundColor Red
-  Write-Host ("See logs: " + $serverOutLog + " ; " + $serverErrLog + " ; " + $runLog)
-  exit 1
-}
-finally {
-  Pop-Location
-  if ($script:AzStarted -and $script:AzPid) {
-    try {
-      Write-Host "
-== Stop Azurite ==" -ForegroundColor DarkGray
-      Stop-Process -Id $script:AzPid -Force -ErrorAction SilentlyContinue
-    } catch { }
-  }  if ($serverProc -and -not $serverProc.HasExited) {
-    try {
-      Write-Host "`n== Stop server =="
-      Stop-Process -Id $serverProc.Id -Force -ErrorAction SilentlyContinue
-    } catch { }
-  }
-}
+## Guardrails (always)
+- Keep smoke green and CI green.
+- No direct pushes to main; PRs only.
+- Focus: only changes that prevent major issues later or advance the master plan.
 
 

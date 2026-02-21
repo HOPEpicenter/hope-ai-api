@@ -49,8 +49,7 @@
 - [x] Timeline read contract is stable (cursor paging + ordering).
 - [x] Status transitions are auditable (event-driven preferred).
 - [x] Notes + tags v1 (ministry-friendly).
-- [ ] Engagement score (derived, not stored).
-
+- [x] Engagement score (derived, not stored).
 ### Engineering (already present / verified by smoke)
 - [x] Append event endpoint exists and works: POST /ops/visitors/:id/events
 - [x] Dashboard endpoint exists and works: GET /ops/visitors/:id/dashboard
@@ -83,5 +82,4 @@
 - Keep smoke green and CI green.
 - No direct pushes to main; PRs only.
 - Focus: only changes that prevent major issues later or advance the master plan.
-
 

@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
   [Parameter(Mandatory = $false)]
   [string]$BaseUrl = $env:HOPE_AI_API_BASE_URL,
@@ -228,13 +228,48 @@ Write-Host ("LIST {0}" -f $listUrl)
 $list = Invoke-HttpJson -Method GET -Uri $listUrl
 if ($list.StatusCode -eq 404) {
   Write-Host "SKIP: LIST /visitors not implemented in Express yet."
-  Write-Host "OK: CI Express smoke passed."
-  exit 0
+  if ($env:HOPE_RUN_PHASE3_ASSERTS -eq "1") {
+  Write-Host ""
+  Write-Host "=== Phase 3: Integration tie paging assert ==="
+
+  if ([string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+    Write-Host "FAIL: HOPE_API_KEY not set; cannot run Phase 3 tie paging assert."
+    exit 1
+  }
+
+  $assertPath = Join-Path $PSScriptRoot "assert-integration-paging-ties.ps1"
+  if (-not (Test-Path $assertPath)) {
+    Write-Host ("FAIL: Missing assert script: {0}" -f $assertPath)
+    exit 1
+  }
+
+  pwsh -NoProfile -ExecutionPolicy Bypass -File $assertPath -ApiBaseUrl $workingBase -ApiKey $env:HOPE_API_KEY
+}
+Write-Host "OK: CI Express smoke passed."
+exit 0
 }
 if (-not $list.Ok) {
   Write-Host ("FAIL: LIST /visitors failed. Status={0} Body={1}" -f $list.StatusCode, ($list.BodyText | ForEach-Object { $_ }))
   exit 1
 }
 
+if ($env:HOPE_RUN_PHASE3_ASSERTS -eq "1") {
+  Write-Host ""
+  Write-Host "=== Phase 3: Integration tie paging assert ==="
+
+  if ([string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+    Write-Host "FAIL: HOPE_API_KEY not set; cannot run Phase 3 tie paging assert."
+    exit 1
+  }
+
+  $assertPath = Join-Path $PSScriptRoot "assert-integration-paging-ties.ps1"
+  if (-not (Test-Path $assertPath)) {
+    Write-Host ("FAIL: Missing assert script: {0}" -f $assertPath)
+    exit 1
+  }
+
+  pwsh -NoProfile -ExecutionPolicy Bypass -File $assertPath -ApiBaseUrl $workingBase -ApiKey $env:HOPE_API_KEY
+}
 Write-Host "OK: CI Express smoke passed."
 exit 0
+

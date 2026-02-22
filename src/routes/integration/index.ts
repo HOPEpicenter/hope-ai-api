@@ -20,6 +20,7 @@ integrationRouter.get("/integration/timeline", async (req, res, next) => {
     const parsed = validateTimelineQueryV1(req.query);
     if (!parsed.ok) {
       return res.status(400).json({
+        ok: false,
         error: {
           code: "VALIDATION_ERROR",
           message: "Query validation failed",
@@ -35,12 +36,11 @@ integrationRouter.get("/integration/timeline", async (req, res, next) => {
     const page = await service.readIntegratedTimeline(visitorId, limit, cursor);
 
     return res.status(200).json({
-  ok: true,
-  items: page.items,
-  nextCursor: page.nextCursor ?? null,
-});} catch (err) {
+      ok: true,
+      items: page.items,
+      nextCursor: page.nextCursor ?? null,
+    });
+  } catch (err) {
     return next(err);
   }
 });
-
-

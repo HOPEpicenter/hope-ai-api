@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { validateTimelineQueryV1 } from "../../contracts/timeline.v1";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
@@ -20,6 +20,7 @@ integrationRouter.get("/integration/timeline", async (req, res, next) => {
     const parsed = validateTimelineQueryV1(req.query);
     if (!parsed.ok) {
       return res.status(400).json({
+        ok: false,
         error: {
           code: "VALIDATION_ERROR",
           message: "Query validation failed",
@@ -35,14 +36,11 @@ integrationRouter.get("/integration/timeline", async (req, res, next) => {
     const page = await service.readIntegratedTimeline(visitorId, limit, cursor);
 
     return res.status(200).json({
-      v: 1,
-      visitorId,
-      limit,
-      nextCursor: page.nextCursor,
+      ok: true,
       items: page.items,
+      nextCursor: page.nextCursor ?? null,
     });
   } catch (err) {
     return next(err);
   }
 });
-

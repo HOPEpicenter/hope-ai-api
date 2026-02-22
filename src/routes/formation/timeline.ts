@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import { validateTimelineQueryV1 } from "../../contracts/timeline.v1";
 import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
 import { FormationService } from "../../services/formation/formationService";
@@ -11,8 +11,7 @@ formationTimelineRouter.get("/timeline", async (req, res, next) => {
   try {
     const parsed = validateTimelineQueryV1(req.query);
     if (!parsed.ok) {
-      return res.status(400).json({
-        error: {
+      return res.status(400).json({ ok: false, error: {
           code: "VALIDATION_ERROR",
           message: "Query validation failed",
           details: parsed.issues.map((i: { path: string; message: string }) => ({
@@ -37,4 +36,5 @@ formationTimelineRouter.get("/timeline", async (req, res, next) => {
     return next(err);
   }
 });
+
 

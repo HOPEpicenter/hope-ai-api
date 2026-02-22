@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { validateTimelineQueryV1 } from "../../contracts/timeline.v1";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
@@ -35,14 +35,12 @@ integrationRouter.get("/integration/timeline", async (req, res, next) => {
     const page = await service.readIntegratedTimeline(visitorId, limit, cursor);
 
     return res.status(200).json({
-      v: 1,
-      visitorId,
-      limit,
-      nextCursor: page.nextCursor,
-      items: page.items,
-    });
-  } catch (err) {
+  ok: true,
+  items: page.items,
+  nextCursor: page.nextCursor ?? null,
+});} catch (err) {
     return next(err);
   }
 });
+
 

@@ -1,4 +1,4 @@
-﻿param(
+param(
   [Parameter(Mandatory=$true)]
   [string]$ApiBaseUrl,
 
@@ -143,16 +143,30 @@ $it = Invoke-HttpJson -Method GET -Uri $itUrl -Headers $auth
 Assert-True ($it.StatusCode -eq 200) "Expected 200 for integration timeline with API key; got $($it.StatusCode). Body=$($it.BodyText)"
 
 Assert-True ($null -ne $it.Json) "Integration timeline response was not JSON."
-Assert-True ($it.Json.v -eq 1) "Integration timeline expected v=1 but got v=$($it.Json.v)"
-Assert-True ([string]$it.Json.visitorId -eq $visitorId) "Integration timeline visitorId mismatch."
+
+# Accept either Phase 4 shape { ok, items, nextCursor } or legacy shape { v, visitorId, items, nextCursor }
+$items = $null
+
+if ($it.Json.PSObject.Properties.Name -contains "ok") {
+  Assert-True ($it.Json.ok -eq $true) "Integration timeline expected ok=true."
+  Assert-True ($it.Json.PSObject.Properties.Name -contains "items") "Integration timeline missing 'items'."
+  $items = $it.Json.items
+}
+elseif ($it.Json.PSObject.Properties.Name -contains "v") {
+  Assert-True ($it.Json.v -eq 1) "Integration timeline expected v=1 but got v=$($it.Json.v)"
+  Assert-True ([string]$it.Json.visitorId -eq $visitorId) "Integration timeline visitorId mismatch."
+  $items = $it.Json.items
+}
+else {
+  throw "ASSERT FAIL: Integration timeline unexpected response shape (missing ok or v). Body=$($it.BodyText)"
+}
 
 # stable ordering (only assert if there are 2+ items)
-$items = $it.Json.items
 if ($null -ne $items -and $items.Count -ge 2) {
   for ($i = 1; $i -lt $items.Count; $i++) {
     $prev = Make-StableKey $items[$i-1]
     $curr = Make-StableKey $items[$i]
-    Assert-True ($prev -le $curr) "Integration items not sorted. prev=$prev curr=$curr"
+    Assert-True ($prev -ge $curr) "Integration items not sorted (expected newest-first). prev=$prev curr=$curr"
   }
 }
 
@@ -177,3 +191,4 @@ Assert-True ($le.Json.formation.v -eq 1)  "Legacy export formation.v expected 1"
 Assert-True ($le.Json.integration.v -eq 1) "Legacy export integration.v expected 1"
 
 Write-Host "OK: Integration timeline + Legacy export assertions passed."
+

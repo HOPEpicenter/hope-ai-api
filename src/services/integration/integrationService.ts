@@ -6,6 +6,7 @@ import {
   encodeIntegrationCursorV1,
   type IntegrationAfterV1,
 } from "../../contracts/integrationTimelineCursor.v1";
+import { encodeCursorV1 } from "../../contracts/timeline.v1";
 
 export type IntegratedTimelinePageV1 = {
   items: any[];
@@ -46,45 +47,125 @@ function isOlderThanAfter(item: any, after: IntegrationAfterV1): boolean {
   return itemTie > afterTie;
 }
 
+function padLeft(s: string, width: number): string {
+  return s.length >= width ? s : "0".repeat(width - s.length) + s;
+}
+
+function invMillis(ms: number, width: number, max: number): string {
+  const inv = max - ms;
+  return padLeft(String(inv), width);
+}
+
+// Engagement RowKey format: invMillis15|eventId
+function engagementRowKey(occurredAtIso: string, eventId: string): string {
+  const ms = Date.parse(occurredAtIso);
+  const inv15 = invMillis(ms, 15, 253402300799999);
+  return `${inv15}|${eventId}`;
+}
+
+// Formation RowKey prefix: invMillis13_uuid (cursor is base64(rowKey))
+function formationInvPrefix(occurredAtIso: string): string {
+  const ms = Date.parse(occurredAtIso);
+  return invMillis(ms, 13, 9999999999999);
+}
+
+function toBase64(s: string): string {
+  return Buffer.from(s, "utf8").toString("base64");
+}
+
 export class IntegrationService {
   constructor(
     private engagementRepo: EngagementEventsRepository,
-    private formationRepo: FormationEventsRepository
+    private formationRepo: FormationEventsRepository,
   ) {}
 
   async readIntegratedTimeline(
     visitorId: string,
     limit: number,
-    cursor?: string
+    cursor?: string,
   ): Promise<IntegratedTimelinePageV1> {
     const safeLimit = Math.max(1, Math.min(200, limit || 50));
 
     let after: IntegrationAfterV1 | undefined;
     if (cursor) {
       const decoded = decodeIntegrationCursorV1(cursor);
-      if (decoded.visitorId !== visitorId) throw new Error("Cursor visitorId mismatch");
+      if (decoded.visitorId !== visitorId)
+        throw new Error("Cursor visitorId mismatch");
       after = decoded.after;
     }
 
     const perStream = Math.min(200, Math.max(50, safeLimit * 5));
 
-    // NOTE: Do not pass integration cursor into repos (cursor contracts differ).
-    const engagementPage = await this.engagementRepo.readTimeline(visitorId, perStream, undefined);
+    let engagementCursorForRepo: string | undefined;
+    let formationCursorForRepo: string | undefined;
+
+    if (after) {
+      // Engagement per-stream cursor:
+      // - If after.stream is engagement: start after that exact engagement rowKey.
+      // - If after.stream is formation: skip ALL engagement items at that same timestamp.
+      //   Use "~" sentinel at same invMillis15 (since "~" sorts after typical event ids).
+      if (after.stream === "engagement") {
+        // Exact mapping: engagement cursor is the durable RowKey format (invMillis15|eventId)
+        const engagementAfterRowKey = engagementRowKey(
+          after.occurredAt,
+          String(after.eventId),
+        );
+
+        engagementCursorForRepo = encodeCursorV1({
+          visitorId,
+          after: engagementAfterRowKey,
+        });
+      } else {
+        // Cross-stream translation:
+        // When the integration cursor is a FORMATION item, we still need to advance the engagement stream.
+        // We do this by computing the engagement RowKey at the same occurredAt using a HIGH eventId suffix,
+        // so "RowKey gt after" returns strictly older engagement items.
+        const engInvPrefix = engagementRowKey(after.occurredAt, "~").split(
+          "|",
+        )[0];
+        const engagementAfterRowKey = `${engInvPrefix}|~`;
+
+        engagementCursorForRepo = encodeCursorV1({
+          visitorId,
+          after: engagementAfterRowKey,
+        });
+      }
+
+      // Formation per-stream cursor:
+      // - If after.stream is formation: start after that exact formation rowKey (= eventId).
+      // - If after.stream is engagement: include ALL formation items at that same timestamp.
+      //   Use inv13 + "_" sentinel so RowKey gt inv13_ includes inv13_uuid.
+      const formationAfterRowKey =
+        after.stream === "formation"
+          ? String(after.eventId)
+          : `${formationInvPrefix(after.occurredAt)}_`;
+
+      formationCursorForRepo = toBase64(formationAfterRowKey);
+    }
+
+    const engagementPage = await this.engagementRepo.readTimeline(
+      visitorId,
+      perStream,
+      engagementCursorForRepo,
+    );
+
     const formationPage = await this.formationRepo.listByVisitor({
       visitorId,
       limit: perStream,
-      cursor: undefined,
+      cursor: formationCursorForRepo,
     });
 
-    const merged = mergeTimelines(engagementPage.items ?? [], formationPage.items ?? []);
+    const merged = mergeTimelines(
+      engagementPage.items ?? [],
+      formationPage.items ?? [],
+    );
     merged.sort(compareItemsNewestFirst);
-
-    const filtered = after ? merged.filter((it) => isOlderThanAfter(it, after)) : merged;
-
+    const filtered = after
+      ? merged.filter((it) => isOlderThanAfter(it, after))
+      : merged;
     const pagePlus = filtered.slice(0, safeLimit + 1);
     const pageItems = pagePlus.slice(0, safeLimit);
     const hasMore = pagePlus.length > safeLimit;
-
     const nextCursor =
       hasMore && pageItems.length > 0
         ? encodeIntegrationCursorV1({

@@ -1,4 +1,4 @@
-﻿export type TimelineBaseV1 = {
+export type TimelineBaseV1 = {
   occurredAt: string;
   eventId: string;
 };
@@ -22,6 +22,6 @@ export function mergeTimelines<
   const b = formation.map(e => ({ ...e, stream: "formation" as const }));
 
   const merged = [...a, ...b];
-  merged.sort((x, y) => makeStableKey(x).localeCompare(makeStableKey(y)));
+  merged.sort((x, y) => makeStableKey(y).localeCompare(makeStableKey(x)));
   return merged;
 }

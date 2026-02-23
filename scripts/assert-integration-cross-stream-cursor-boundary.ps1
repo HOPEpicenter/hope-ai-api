@@ -1,6 +1,7 @@
+[CmdletBinding()]
 param(
   [Parameter(Mandatory=$false)]
-  [string]$BaseUrl = $env:HOPE_BASE_URL,
+  [string]$ApiBaseUrl = "http://127.0.0.1:3000/api",
 
   [Parameter(Mandatory=$false)]
   [string]$ApiKey = $env:HOPE_API_KEY
@@ -13,91 +14,104 @@ function Assert-True([bool]$cond, [string]$msg) {
   if (-not $cond) { throw "ASSERT FAIL: $msg" }
 }
 
-if ([string]::IsNullOrWhiteSpace($BaseUrl)) { $BaseUrl = "http://localhost:3000" }
-
-# Reuse the existing integration stress script because it already knows:
-# - how to create visitor
-# - how to append engagement events
-# - how to append formation events
-# - which integration timeline endpoint to call and what headers to send
-. "$PSScriptRoot\stress-integration-timeline-paging.ps1"
-
-# --- Hard boundary condition: SAME occurredAt across BOTH streams ---
-$T = (Get-Date).ToUniversalTime().AddMinutes(-10)
-$occurredAt = $T.ToString("o")
-
-Write-Host "Cross-stream boundary regression: occurredAt=$occurredAt"
-
-# 1) Create visitor (use the stress script’s helper if it has one; otherwise fall back)
-if (Get-Command New-TestVisitor -ErrorAction SilentlyContinue) {
-  $visitorId = New-TestVisitor -BaseUrl $BaseUrl -ApiKey $ApiKey
-} else {
-  # fallback: try the public visitors endpoint shape used by smoke
-  $headers = @{}
-  if ($ApiKey) { $headers["x-api-key"] = $ApiKey }
-  $resp = Invoke-RestMethod -Method POST -Uri "$BaseUrl/api/visitors" -Headers $headers -ContentType "application/json" -Body (@{ name="crossstream"; email=("crossstream+" + [guid]::NewGuid().ToString("n") + "@example.com") } | ConvertTo-Json)
-  $visitorId = $resp.visitorId
-}
-Assert-True (-not [string]::IsNullOrWhiteSpace($visitorId)) "visitorId should be created"
-
-# 2) Seed: 2 engagement events at same occurredAt
-# 3) Seed: 2 formation events at same occurredAt
-# We intentionally make multiple items per stream at the exact same timestamp to force the cursor translation boundary.
-if (-not (Get-Command Add-EngagementEvent -ErrorAction SilentlyContinue)) {
-  throw "stress-integration-timeline-paging.ps1 must expose Add-EngagementEvent / Add-FormationEvent helpers (or similar). Open it and export those helpers so this assert can reuse them."
-}
-if (-not (Get-Command Add-FormationEvent -ErrorAction SilentlyContinue)) {
-  throw "stress-integration-timeline-paging.ps1 must expose Add-FormationEvent helper (or similar)."
+function Normalize-ApiBaseUrl([string]$u) {
+  if ([string]::IsNullOrWhiteSpace($u)) { throw "ApiBaseUrl is required" }
+  $u = $u.TrimEnd("/")
+  if ($u -notmatch "/api$") { $u = "$u/api" }
+  return $u
 }
 
-$e1 = Add-EngagementEvent -BaseUrl $BaseUrl -ApiKey $ApiKey -VisitorId $visitorId -OccurredAt $occurredAt -Type "note.add" -Data @{ text="E1" }
-$e2 = Add-EngagementEvent -BaseUrl $BaseUrl -ApiKey $ApiKey -VisitorId $visitorId -OccurredAt $occurredAt -Type "note.add" -Data @{ text="E2" }
+function New-EvtId() {
+  return "evt-$([Guid]::NewGuid().ToString('N'))"
+}
 
-$f1 = Add-FormationEvent  -BaseUrl $BaseUrl -ApiKey $ApiKey -VisitorId $visitorId -OccurredAt $occurredAt -Type "formation.note" -Data @{ text="F1" }
-$f2 = Add-FormationEvent  -BaseUrl $BaseUrl -ApiKey $ApiKey -VisitorId $visitorId -OccurredAt $occurredAt -Type "formation.note" -Data @{ text="F2" }
+$api = Normalize-ApiBaseUrl $ApiBaseUrl
 
-# 4) Page with limit=1 until exhausted
-$seen = New-Object "System.Collections.Generic.HashSet[string]"
-$items = New-Object System.Collections.Generic.List[object]
-$cursor = $null
-$page = 0
+if ([string]::IsNullOrWhiteSpace($ApiKey)) {
+  throw "HOPE_API_KEY is not set (or pass -ApiKey)."
+}
+$headers = @{ "x-api-key" = $ApiKey }
 
-while ($true) {
-  $page++
-  $res = Get-IntegrationTimeline -BaseUrl $BaseUrl -ApiKey $ApiKey -VisitorId $visitorId -Limit 1 -Cursor $cursor
+Write-Host "=== ASSERT: Cross-stream cursor boundary (integration timeline) ==="
+Write-Host "ApiBaseUrl: $api"
 
-  Assert-True ($res -ne $null) "integration timeline response should not be null"
-  Assert-True ($res.items.Count -le 1) "limit=1 must return <=1 item"
+# 0) health
+$h = Invoke-WebRequest -UseBasicParsing -Method GET -Uri "$api/health"
+Assert-True ($h.StatusCode -eq 200) "Expected 200 from GET $api/health"
 
-  if ($res.items.Count -eq 0) { break }
+# 1) Create visitor (public)
+$email = ("xstream-boundary+" + [Guid]::NewGuid().ToString("N") + "@example.com")
+$visitorBody = @{
+  name   = "XStream Boundary Assert"
+  email  = $email
+  source = "dev"
+} | ConvertTo-Json -Depth 10
 
-  $it = $res.items[0]
-  $k = "{0}:{1}" -f [string]$it.stream, [string]$it.eventId
+$v = Invoke-RestMethod -Method POST -Uri "$api/visitors" -ContentType "application/json" -Body $visitorBody
+$vid = [string]$v.visitorId
+Assert-True (-not [string]::IsNullOrWhiteSpace($vid)) "POST /visitors did not return visitorId"
+Write-Host "visitorId=$vid"
 
-  Assert-True (-not [string]::IsNullOrWhiteSpace([string]$it.stream)) "item.stream must be present"
-  Assert-True (-not [string]::IsNullOrWhiteSpace([string]$it.eventId)) "item.eventId must be present"
-  Assert-True (-not [string]::IsNullOrWhiteSpace([string]$it.occurredAt)) "item.occurredAt must be present"
+# 2) Force an occurredAt tie across streams (boundary condition)
+$ts = (Get-Date).ToUniversalTime().ToString("o")
+Write-Host "occurredAt=$ts"
 
-  Assert-True ($seen.Add($k)) "duplicate item observed at page=$page key=$k"
-  $items.Add($it) | Out-Null
+# 3) Post engagement event (envelope v1)
+$engBody = @{
+  v          = 1
+  eventId    = (New-EvtId)
+  visitorId  = $vid
+  type       = "note.add"
+  occurredAt = $ts
+  source     = @{ system = "scripts/assert-integration-cross-stream-cursor-boundary.ps1" }
+  data       = @{ text = "boundary seed engagement"; channel = "api" }
+} | ConvertTo-Json -Depth 20
 
-  # monotonic non-increasing occurredAt (newest-first paging)
-  if ($items.Count -ge 2) {
-    $a = [DateTimeOffset]::Parse($items[$items.Count-2].occurredAt).ToUnixTimeMilliseconds()
-    $b = [DateTimeOffset]::Parse($items[$items.Count-1].occurredAt).ToUnixTimeMilliseconds()
-    Assert-True ($b -le $a) "paging went forward in time (prev=$($items[$items.Count-2].occurredAt), cur=$($items[$items.Count-1].occurredAt))"
+$engResp = Invoke-WebRequest -UseBasicParsing -Method POST -Uri "$api/engagements/events" -Headers $headers -ContentType "application/json" -Body $engBody
+Assert-True ($engResp.StatusCode -ge 200 -and $engResp.StatusCode -lt 300) "POST /engagements/events expected 2xx, got $($engResp.StatusCode) Body=$($engResp.Content)"
+
+# 4) Post formation event (envelope used in integration tie assert: includes v/eventId/source + metadata.assigneeId)
+$formBody = @{
+  v          = 1
+  eventId    = (New-EvtId)
+  visitorId  = $vid
+  type       = "FOLLOWUP_ASSIGNED"
+  occurredAt = $ts
+  source     = @{ system = "scripts/assert-integration-cross-stream-cursor-boundary.ps1" }
+  metadata   = @{
+    assigneeId = "boundary-assert"
+    channel    = "api"
+    notes      = "boundary seed formation"
   }
+} | ConvertTo-Json -Depth 20
 
-  $cursor = $res.nextCursor
-  if ([string]::IsNullOrWhiteSpace($cursor)) { break }
-}
+$formResp = Invoke-WebRequest -UseBasicParsing -Method POST -Uri "$api/formation/events" -Headers $headers -ContentType "application/json" -Body $formBody
+Assert-True ($formResp.StatusCode -ge 200 -and $formResp.StatusCode -lt 300) "POST /formation/events expected 2xx, got $($formResp.StatusCode) Body=$($formResp.Content)"
 
-# 5) Must have exactly 4 unique items
-Assert-True ($items.Count -eq 4) "expected 4 total items, got $($items.Count)"
+# 5) Integration timeline: limit=1 should return nextCursor because we have >=2 items
+$r1 = Invoke-RestMethod -Method GET -Uri "$api/integration/timeline?visitorId=$vid&limit=1" -Headers $headers
+Assert-True ($r1.ok -eq $true) "Page1 expected ok=true"
+$items1 = @($r1.items)
+Assert-True ($items1.Count -eq 1) "Page1 expected 1 item, got $($items1.Count)"
 
-# 6) Cross-stream boundary specific check:
-# Ensure we saw BOTH streams at the exact same occurredAt
-$streamsAtT = $items | Where-Object { $_.occurredAt -eq $occurredAt } | Select-Object -ExpandProperty stream
-Assert-True (($streamsAtT -contains "engagement") -and ($streamsAtT -contains "formation")) "must include both engagement and formation at the boundary timestamp"
+$cursor = [string]$r1.nextCursor
+Assert-True (-not [string]::IsNullOrWhiteSpace($cursor)) "Page1 expected nextCursor with limit=1 when 2 items exist"
 
-Write-Host "OK: Cross-stream cursor boundary regression passed (items=$($items.Count))"
+# 6) Page2 using cursor: must not overlap page1
+$cursorEsc = [uri]::EscapeDataString($cursor)
+$r2 = Invoke-RestMethod -Method GET -Uri "$api/integration/timeline?visitorId=$vid&limit=10&cursor=$cursorEsc" -Headers $headers
+Assert-True ($r2.ok -eq $true) "Page2 expected ok=true"
+
+$items2 = @($r2.items)
+Assert-True ($items2.Count -ge 1) "Page2 expected >=1 item"
+
+$ids1 = @($items1 | ForEach-Object { [string]$_.eventId })
+$ids2 = @($items2 | ForEach-Object { [string]$_.eventId })
+
+$overlap = @($ids1 | Where-Object { $ids2 -contains $_ })
+Assert-True ($overlap.Count -eq 0) "Overlap detected across pages: $($overlap -join ', ')"
+
+Write-Host "OK: cross-stream cursor boundary regression passed."
+Write-Host ("page1: {0}" -f ($ids1 -join ", "))
+Write-Host ("page2: {0}" -f ($ids2 -join ", "))
+

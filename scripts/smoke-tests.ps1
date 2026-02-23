@@ -12,6 +12,9 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 if (-not $BaseUrl -or $BaseUrl.Trim().Length -eq 0) {
+  $BaseUrl = $env:OPS_BASE_URL
+}
+if (-not $BaseUrl -or $BaseUrl.Trim().Length -eq 0) {
   throw "BaseUrl is required. Pass -BaseUrl or set OPS_BASE_URL."
 }
 $BaseUrl = $BaseUrl.TrimEnd("/")
@@ -177,7 +180,10 @@ Write-Host "Public create idempotency OK"
 # 2c) Stale EMAIL index repair regression
 # Corrupt the EMAIL index row for the public email, then POST /api/visitors again and ensure it repairs back to the original visitorId.
 Write-Host ""
-Write-Host "Public stale EMAIL index repair (regression) ..."
+if (-not $env:STORAGE_CONNECTION_STRING -or $env:STORAGE_CONNECTION_STRING.Trim().Length -eq 0) {
+  Write-Host "SKIP: Public stale EMAIL index repair (regression) - STORAGE_CONNECTION_STRING is not set" -ForegroundColor Yellow
+} else {
+  Write-Host "Public stale EMAIL index repair (regression) ..."
 
 $emailLower = ([string]$pubEmail).Trim().ToLowerInvariant()
 $bogusId = ([Guid]::NewGuid().ToString())
@@ -232,7 +238,7 @@ $jsRead = @"
 $idxVisitorId = (node -e $jsRead "Visitors" "$emailLower").Trim()
 Assert-True ($idxVisitorId -eq $pubVisitorId) "EMAIL index was not repaired to real visitorId (expected $pubVisitorId, got $idxVisitorId)"
 Write-Host "Public EMAIL index repaired in storage OK"
-
+}
 # Public API: Get visitor (GET /api/visitors/:id)
 $pubGet = OpsRequest -BaseUrl $BaseUrl -Method GET -Path ("/api/visitors/{0}" -f $pubVisitorId)
 Assert-True ($pubGet.Status -eq 200) "Public get visitor expected 200"
@@ -418,5 +424,4 @@ Write-Host "Engagement E2E OK"
 
 Write-Host "SMOKE TESTS PASSED"
 exit 0
-
 

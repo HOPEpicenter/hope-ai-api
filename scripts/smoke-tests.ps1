@@ -367,6 +367,15 @@ Assert-True ($rseq2 -eq 1) "Timeline regression failed: expected page2 next seq=
 
 Write-Host "Timeline cursor contract regression OK (limit=1 no skip/no overlap)"
 
+# Cursor should be URL-safe and stable (no whitespace/newlines)
+# Use page1 response in this section (avoid assuming variable names like $res1).
+$nextCursor1 = Get-BodyProp -Resp $page1 -Name "nextCursor"
+if ($nextCursor1) {
+  Assert-True (-not ([string]$nextCursor1 -match "\s")) "nextCursor must not contain whitespace/newlines"
+  $enc = [uri]::EscapeDataString([string]$nextCursor1)
+  $dec = [uri]::UnescapeDataString($enc)
+  Assert-True ($dec -eq [string]$nextCursor1) "nextCursor must round-trip through URL escaping"
+}
 Write-Host ""
 Write-Host "Cross-stream cursor boundary regression ..."
 pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-integration-cross-stream-cursor-boundary.ps1" -BaseUrl $BaseUrl -ApiKey $ApiKey
@@ -418,5 +427,8 @@ Write-Host "Engagement E2E OK"
 
 Write-Host "SMOKE TESTS PASSED"
 exit 0
+
+
+
 
 

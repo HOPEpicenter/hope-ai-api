@@ -1,7 +1,10 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory=$false)]
-  [string]$ApiBaseUrl = "http://127.0.0.1:3000/api",
+[string]$BaseUrl = $env:HOPE_BASE_URL,
+
+[Parameter(Mandatory=$false)]
+[string]$ApiBaseUrl = "http://127.0.0.1:3000/api",
 
   [Parameter(Mandatory=$false)]
   [string]$ApiKey = $env:HOPE_API_KEY
@@ -25,6 +28,12 @@ function New-EvtId() {
   return "evt-$([Guid]::NewGuid().ToString('N'))"
 }
 
+if ([string]::IsNullOrWhiteSpace($ApiBaseUrl) -or $ApiBaseUrl -eq "http://127.0.0.1:3000/api") {
+  # smoke passes -BaseUrl like http://127.0.0.1:3000 ; convert to /api base once
+  if (-not [string]::IsNullOrWhiteSpace($BaseUrl)) {
+    $ApiBaseUrl = $BaseUrl.TrimEnd("/")
+  }
+}
 $api = Normalize-ApiBaseUrl $ApiBaseUrl
 
 if ([string]::IsNullOrWhiteSpace($ApiKey)) {
@@ -114,4 +123,5 @@ Assert-True ($overlap.Count -eq 0) "Overlap detected across pages: $($overlap -j
 Write-Host "OK: cross-stream cursor boundary regression passed."
 Write-Host ("page1: {0}" -f ($ids1 -join ", "))
 Write-Host ("page2: {0}" -f ($ids2 -join ", "))
+
 

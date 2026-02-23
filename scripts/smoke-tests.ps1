@@ -3,7 +3,9 @@
 
 [CmdletBinding()]
 param(
-  [string]$BaseUrl = $env:OPS_BASE_URL
+  [Parameter(Mandatory=$false)]
+  [string]$ApiKey = $env:HOPE_API_KEY,
+[string]$BaseUrl = $env:OPS_BASE_URL
 )
 
 Set-StrictMode -Version Latest
@@ -19,7 +21,9 @@ $BaseUrl = $BaseUrl.TrimEnd("/")
 
 function Assert-True {
   param(
-    $Value,
+  [Parameter(Mandatory=$false)]
+  [string]$ApiKey = $env:HOPE_API_KEY,
+$Value,
     [string]$Message = "Assertion failed."
   )
   $ok = $false
@@ -33,7 +37,9 @@ function Assert-True {
 
 function Get-BodyProp {
   param(
-    [Parameter(Mandatory=$true)]$Resp,
+  [Parameter(Mandatory=$false)]
+  [string]$ApiKey = $env:HOPE_API_KEY,
+[Parameter(Mandatory=$true)]$Resp,
     [Parameter(Mandatory=$true)][string]$Name
   )
   if (-not $Resp) { return $null }
@@ -46,7 +52,9 @@ function Get-BodyProp {
 
 function Get-HeaderValue {
   param(
-    [Parameter(Mandatory=$true)]$Headers,
+  [Parameter(Mandatory=$false)]
+  [string]$ApiKey = $env:HOPE_API_KEY,
+[Parameter(Mandatory=$true)]$Headers,
     [Parameter(Mandatory=$true)][string]$Name
   )
   if (-not $Headers) { return $null }
@@ -88,7 +96,9 @@ function Get-HeaderValue {
 
 function Assert-RequestId {
   param(
-    [Parameter(Mandatory=$true)]$Resp,
+  [Parameter(Mandatory=$false)]
+  [string]$ApiKey = $env:HOPE_API_KEY,
+[Parameter(Mandatory=$true)]$Resp,
     [Parameter(Mandatory=$true)][string]$Context
   )
 
@@ -104,7 +114,9 @@ function Assert-RequestId {
 
 function Assert-HasJsonError {
   param(
-    [Parameter(Mandatory=$true)]$Resp,
+  [Parameter(Mandatory=$false)]
+  [string]$ApiKey = $env:HOPE_API_KEY,
+[Parameter(Mandatory=$true)]$Resp,
     [Parameter(Mandatory=$true)][string]$ExpectedError,
     [Parameter(Mandatory=$true)][string]$Context
   )
@@ -355,6 +367,12 @@ Assert-True ($rseq2 -eq 1) "Timeline regression failed: expected page2 next seq=
 
 Write-Host "Timeline cursor contract regression OK (limit=1 no skip/no overlap)"
 
+Write-Host ""
+Write-Host "Cross-stream cursor boundary regression ..."
+pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-integration-cross-stream-cursor-boundary.ps1" -BaseUrl $BaseUrl -ApiKey $ApiKey
+if ($LASTEXITCODE -ne 0) { throw "Cross-stream cursor boundary regression failed (exit=$LASTEXITCODE)" }
+Write-Host "OK: Cross-stream cursor boundary regression OK"
+
 Write-Host "Timeline page1 OK (nextCursor present)"
 
 $cursor = Get-BodyProp -Resp $page1 -Name "nextCursor"
@@ -400,4 +418,5 @@ Write-Host "Engagement E2E OK"
 
 Write-Host "SMOKE TESTS PASSED"
 exit 0
+
 

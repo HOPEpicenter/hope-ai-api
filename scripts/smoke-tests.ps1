@@ -353,7 +353,11 @@ Assert-True ($rseq2 -ne $rseq1) "Timeline regression failed: page2 overlapped pa
 Assert-True ($rseq1 -eq 2) "Timeline regression failed: expected page1 newest seq=2, got seq=$rseq1"
 Assert-True ($rseq2 -eq 1) "Timeline regression failed: expected page2 next seq=1, got seq=$rseq2"
 
-Write-Host "Timeline cursor contract regression OK (limit=1 no skip/no overlap)"
+Write-Host "Timeline cursor contract regression OK
+  Write-Host ""
+  Write-Host "Cross-stream cursor boundary regression ..."
+  pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-integration-cross-stream-cursor-boundary.ps1"
+  Write-Host "OK: Cross-stream cursor boundary regression OK" (limit=1 no skip/no overlap)"
 
 Write-Host "Timeline page1 OK (nextCursor present)"
 

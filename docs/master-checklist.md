@@ -78,7 +78,32 @@
 - [ ] Track journey steps in an auditable way (prefer derive from events).## Phase 4 — Integration (NOT STARTED)
 - [ ] Connect people to groups/programs/workflows.
 - [ ] Ownership / follow-up assignments.
+## Cross-cutting — Auth scoping (COMPLETED, stub surfaces only)
 
+- Protected endpoints are enforced via API key middleware:
+  - `/api/formation/timeline`
+  - `/api/integration/timeline`
+  - `/api/legacy/export`
+- Expected behavior (stubs only):
+  - No API key => 401
+  - With API key but missing required query => 400
+- Remaining:
+  - Add/verify CI assertions for 401/400 expectations for all scoped endpoints.
+
+---
+
+## Phase 4 — Integration (NOT STARTED / PARTIAL INFRA)
+
+- [x] `/api/integration/timeline` stub exists (protected)
+- [x] Deep paging + cursor translation hardened at integration layer
+- [x] Cross-stream cursor boundary regression coverage exists
+- [ ] Implement integration timeline aggregation logic (beyond stubs)
+- [ ] Define cross-stream ordering contract
+- [ ] Define aggregation model (engagement + formation merge rules)
+- [ ] Model ownership / follow-up assignments
+- [ ] Connect people to groups / programs / workflows
+
+---
 ## Phase 5 — Legacy (NOT STARTED)
 - [ ] Long-horizon outcomes and history views.
 - [ ] Derived insights (avoid storing derived state unless necessary).
@@ -89,6 +114,7 @@
 - Keep smoke green and CI green.
 - No direct pushes to main; PRs only.
 - Focus: only changes that prevent major issues later or advance the master plan.
+
 
 
 

@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import visitorsRouter from "./routes/visitors/visitorsRouter";
 import { createOpsRouter } from "./routes/ops/opsRouter";
 import { formationRouter } from "./routes/formation";
@@ -86,6 +86,4 @@ if (process.env.DEBUG_ROUTES === "1") {
   console.log("[DEBUG_ROUTES] Registered routes:");
   for (const r of seen.sort()) console.log("[DEBUG_ROUTES] " + r);
 }
-
-
 

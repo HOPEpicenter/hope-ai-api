@@ -75,9 +75,7 @@
 - [x] Public formation profile snapshot works: GET /api/visitors/:id/formation/profile
 - [x] CI asserts cover formation pagination + idempotency + profile snapshot
 - [ ] Define formation milestones/events and derivations.
-- [ ] Track journey steps in an auditable way (prefer derive from events).## Phase 4 — Integration (NOT STARTED)
-- [ ] Connect people to groups/programs/workflows.
-- [ ] Ownership / follow-up assignments.
+- [ ] Track journey steps in an auditable way (prefer derive from events).
 ## Cross-cutting — Auth scoping (COMPLETED, stub surfaces only)
 
 - Protected endpoints are enforced via API key middleware:
@@ -114,12 +112,4 @@
 - Keep smoke green and CI green.
 - No direct pushes to main; PRs only.
 - Focus: only changes that prevent major issues later or advance the master plan.
-
-
-
-
-
-
-
-
 

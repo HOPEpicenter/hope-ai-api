@@ -56,10 +56,9 @@ Implemented:
 - [x] CI asserts formation pagination + idempotency + profile snapshot behavior
 
 Remaining:
-- [ ] Define formation milestones/events formally
-- [ ] Define and document derivation rules for stage/milestone changes
-- [ ] Lock milestone model contract (v1)
-- [ ] Add regression coverage for milestone derivation rules
+- [ ] Expand milestones v1 beyond the initial two types (if/when needed)
+- [ ] Expand regression coverage: ordering/tie-break scenarios, repeated events, idempotency + profile invariants per milestone type
+- [ ] Decide whether “stageUpdatedAt / stageReason / stageUpdatedBy” become enforced derivation outputs (or remain optional fields)
 
 Notes:
 - Formation should follow the same event-driven derivation discipline as Engagement.
@@ -143,4 +142,5 @@ Planned:
 1. Lock Formation milestone model (small, safe PR-sized work).
 2. Implement Integration aggregation logic (incremental, contract-first).
 3. Add CI coverage for scoped auth expectations if not already fully asserted.
+
 

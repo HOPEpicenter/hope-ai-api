@@ -70,12 +70,13 @@
 ---
 
 ## Phase 3 — Formation (ACTIVE / PARTIALLY COMPLETE)
+- [x] Milestone derivation regression assert exists (scripts/assert-formation-milestones-v1.ps1)
 - [x] Formation stage model contract exists (FormationStage + stage fields on profile snapshot)
 - [x] Public formation append works: POST /api/formation/events
 - [x] Public formation list works (paging): GET /api/visitors/:id/formation/events
 - [x] Public formation profile snapshot works: GET /api/visitors/:id/formation/profile
 - [x] CI asserts cover formation pagination + idempotency + profile snapshot
-- [ ] Define formation milestones/events and derivations.
+- [x] Define formation milestones/events and derivations (docs/formation-milestones-v1.md + assert script)
 - [ ] Track journey steps in an auditable way (prefer derive from events).
 ## Cross-cutting — Auth scoping (COMPLETED, stub surfaces only)
 
@@ -118,4 +119,5 @@ Remaining (business logic expansion):
 - Keep smoke green and CI green.
 - No direct pushes to main; PRs only.
 - Focus: only changes that prevent major issues later or advance the master plan.
+
 

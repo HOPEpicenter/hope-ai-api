@@ -11,6 +11,12 @@ if ($env:HOPE_RUN_PHASE3_ASSERTS -ne "1") {
 }
 $ErrorActionPreference = "Stop"
 
+# Optional deep paging mode (kept behind its own flag to avoid slowing normal runs)
+$deepPaging = ($env:HOPE_RUN_PHASE3_DEEP_PAGING -eq "1")
+if ($deepPaging) {
+  Write-Host "[assert-formation-pagination] Deep paging mode ENABLED (HOPE_RUN_PHASE3_DEEP_PAGING=1)" -ForegroundColor Cyan
+}
+
 function Require-Env([string]$name) {
   $v = [Environment]::GetEnvironmentVariable($name)
   if ([string]::IsNullOrWhiteSpace($v)) { throw "Missing required env var: $name" }
@@ -37,7 +43,13 @@ Write-Host "[assert-formation-pagination] visitorId=$visitorId"
 
 # --- Create formation events (make enough for 2 pages)
 # NOTE: keep payload conservative so it matches your current server validation.
-$createCount = [Math]::Max($Limit * 2 + 2, 12)
+$createCount = if ($deepPaging) {
+  # force multiple pages even when Limit is small
+  [Math]::Max($Limit * 8 + 3, 25)
+} else {
+  # enough for 2 pages
+  [Math]::Max($Limit * 2 + 2, 12)
+}
 Write-Host "[assert-formation-pagination] Creating $createCount formation events..."
 
 1..$createCount | ForEach-Object {
@@ -103,6 +115,87 @@ if ([string]::IsNullOrWhiteSpace($cursor1)) { throw "Expected nextCursor/cursor 
 
 Write-Host "[assert-formation-pagination] page1 count=$($items1.Count) cursor=$cursor1"
 
+if ($deepPaging) {
+  # Deep paging: walk pages until cursor exhausts (or safety max pages)
+  function Get-EventKey($e) {
+    if ($e.id) { return [string]$e.id }
+    if ($e.rowKey) { return [string]$e.rowKey }
+    if ($e.RowKey) { return [string]$e.RowKey }
+    return ($e | ConvertTo-Json -Depth 6)
+  }
+
+  function Get-TimeIso($e) {
+    if ($e.occurredAt) { return [string]$e.occurredAt }
+    if ($e.createdAt) { return [string]$e.createdAt }
+    if ($e.timestamp) { return [string]$e.timestamp }
+    return $null
+  }
+
+  function Assert-NewestFirst($items, [string]$label) {
+    $times = $items | ForEach-Object { Get-TimeIso $_ } | Where-Object { $_ }
+    if ($times.Count -ge 2) {
+      for ($i=0; $i -lt $times.Count-1; $i++) {
+        $a = [DateTime]::Parse($times[$i]).ToUniversalTime()
+        $b = [DateTime]::Parse($times[$i+1]).ToUniversalTime()
+        if ($a -lt $b) { throw "[$label] Expected newest-first ordering but found $($times[$i]) < $($times[$i+1]) at index $i" }
+      }
+    }
+  }
+
+  $seen = @{}
+  $allCount = 0
+  $pageNo = 1
+  $cursor = $cursor1
+  $maxPages = 50
+
+  foreach ($e in $items1) {
+    $k = Get-EventKey $e
+    if ($seen.ContainsKey($k)) { throw "Duplicate detected on page1: $k" }
+    $seen[$k] = $true
+    $allCount++
+  }
+  Assert-NewestFirst $items1 "page1"
+
+  while (-not [string]::IsNullOrWhiteSpace($cursor) -and $pageNo -lt $maxPages) {
+    $pageNo++
+    Write-Host "[assert-formation-pagination] Listing page$pageNo..."
+    $p = Invoke-RestMethod -Method Get -Uri "$ApiBase/visitors/$visitorId/formation/events?limit=$Limit&cursor=$([Uri]::EscapeDataString($cursor))" -Headers $headers
+
+    $items = $null
+    $next = $null
+    if ($p -is [System.Array]) {
+      $items = $p
+    } else {
+      $items = $p.items
+      $next = $p.nextCursor
+      if (-not $next) { $next = $p.cursor }
+    }
+
+    if ($null -eq $items) {
+  $raw = $p | ConvertTo-Json -Depth 10
+  throw "page$pageNo missing ''items''. Response: $raw"
+}
+    Assert-NewestFirst $items "page$pageNo"
+
+    foreach ($e in $items) {
+      $k = Get-EventKey $e
+      if ($seen.ContainsKey($k)) { throw "Duplicate detected across deep paging: $k" }
+      $seen[$k] = $true
+      $allCount++
+    }
+
+    if ($next -and $next -eq $cursor) { throw "Cursor did not progress at page$pageNo (next==current)." }
+    $cursor = $next
+
+    if ($items.Count -lt $Limit) { break }
+  }
+
+  if ($allCount -lt ($Limit * 3)) { throw "Deep paging did not traverse enough items (count=$allCount)." }
+
+  Write-Host "[assert-formation-pagination] OK: formation pagination assertions passed." -ForegroundColor Green
+  exit 0
+}
+
 # --- List page 2 using cursor
 Write-Host "[assert-formation-pagination] Listing page2..."
 $page2 = Invoke-RestMethod -Method Get -Uri "$ApiBase/visitors/$visitorId/formation/events?limit=$Limit&cursor=$([Uri]::EscapeDataString($cursor1))" -Headers $headers
@@ -113,44 +206,6 @@ if ($items2.Count -ne $Limit) { throw "Expected page2 count=$Limit but got $($it
 
 Write-Host "[assert-formation-pagination] page2 count=$($items2.Count)"
 
+Write-Host "[assert-formation-pagination] OK: formation pagination assertions passed." -ForegroundColor Green
+
 # --- Assert no overlap by id (or RowKey)
-function Get-EventKey($e) {
-  if ($e.id) { return [string]$e.id }
-  if ($e.rowKey) { return [string]$e.rowKey }
-  if ($e.RowKey) { return [string]$e.RowKey }
-  # fallback: stringify minimal stable fields
-  return ($e | ConvertTo-Json -Depth 6)
-}
-
-$keys1 = @{}
-$items1 | ForEach-Object { $keys1[(Get-EventKey $_)] = $true }
-
-$overlap = @()
-$items2 | ForEach-Object {
-  $k = Get-EventKey $_
-  if ($keys1.ContainsKey($k)) { $overlap += $k }
-}
-
-if ($overlap.Count -gt 0) {
-  throw "Overlap detected between pages: $((( $overlap | Select-Object -First 3 ) -join ', '))"
-}
-
-# --- Basic newest-first ordering check on occurredAt/createdAt if present
-function Get-TimeIso($e) {
-  if ($e.occurredAt) { return [string]$e.occurredAt }
-  if ($e.createdAt) { return [string]$e.createdAt }
-  if ($e.timestamp) { return [string]$e.timestamp }
-  return $null
-}
-
-$times1 = $items1 | ForEach-Object { Get-TimeIso $_ } | Where-Object { $_ }
-if ($times1.Count -ge 2) {
-  for ($i=0; $i -lt $times1.Count-1; $i++) {
-    $a = [DateTime]::Parse($times1[$i]).ToUniversalTime()
-    $b = [DateTime]::Parse($times1[$i+1]).ToUniversalTime()
-    if ($a -lt $b) { throw "Expected newest-first ordering but found $($times1[$i]) < $($times1[$i+1]) at index $i" }
-  }
-}
-
-Write-Host "[assert-formation-pagination] OK: formation pagination assertions passed."
-

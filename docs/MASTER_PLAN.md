@@ -93,17 +93,17 @@ Remaining:
 
 Status: 🟡 ACTIVE (timeline + cursor contract implemented; more business logic pending)
 
-Infrastructure present:
-- [x] `/api/integration/timeline` stub exists (protected)
+Implemented:
+- [x] GET `/api/integration/timeline` v1 aggregation + cursor paging (protected)
+- [x] Cursor contract exists (`integrationTimelineCursor.v1` base64url JSON round-trip)
 - [x] Deep paging + cursor translation hardened at integration layer
 - [x] Cross-stream cursor boundary regression coverage exists
-- [x] GET /api/integration/summary v1 (read-only derived view)
-- [x] scripts/assert-integration-summary.ps1 (gated)
-- [x] integration timeline formation stream reads via storage repo (consistency hardening)
-- [x] formation cursor decode for beforeRowKey + perStream+1 tail slice paging
+- [x] GET `/api/integration/summary` v1 (read-only derived view)
+- [x] Gated assert script exists (`scripts/assert-integration-summary.ps1`)
+- [x] Consistency hardening: integration timeline reads formation via storage repo (cursor decode + perStream+1 tail slice paging)
+
 Remaining:
-- [ ] Implement integration timeline aggregation logic (beyond stubs)
-- [ ] Define cross-stream ordering contract
+- [ ] Define cross-stream ordering contract (explicitly documented)
 - [ ] Define aggregation model (engagement + formation merge rules)
 - [ ] Model ownership / follow-up assignments
 - [ ] Connect people to groups / programs / workflows

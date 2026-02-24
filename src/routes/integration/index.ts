@@ -66,13 +66,12 @@ integrationRouter.get("/integration/summary", async (req, res, next) => {
     const { visitorId } = parsed.value;
     const summary = await service.readIntegrationSummary(visitorId);
 
-    return res.status(200).json({
-      ok: true,
-      visitorId,
+    return res.status(200).json({`n      ok: true,`n      v: 1,`n      visitorId,
       summary,
     });
   } catch (err) {
     return next(err);
   }
 });
+
 

@@ -206,4 +206,6 @@ if ($items2.Count -ne $Limit) { throw "Expected page2 count=$Limit but got $($it
 
 Write-Host "[assert-formation-pagination] page2 count=$($items2.Count)"
 
+Write-Host "[assert-formation-pagination] OK: formation pagination assertions passed." -ForegroundColor Green
+
 # --- Assert no overlap by id (or RowKey)

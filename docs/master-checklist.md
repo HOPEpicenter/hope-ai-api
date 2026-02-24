@@ -105,7 +105,7 @@
 Remaining (business logic expansion):
 - [ ] Define cross-stream ordering contract (explicitly documented)
 - [x] Define aggregation model (engagement + formation merge rules) (docs/integration-aggregation-model-v1.md)
-- [ ] Model ownership / follow-up assignments
+- [x] Model ownership / follow-up assignments (docs/ownership-followup-model-v1.md)
 - [ ] Connect people to groups / programs / workflows
 
 ---

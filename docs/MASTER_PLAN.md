@@ -143,6 +143,3 @@ Planned:
 2. Implement Integration aggregation logic (incremental, contract-first).
 3. Add CI coverage for scoped auth expectations if not already fully asserted.
 
-
-
-

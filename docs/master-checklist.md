@@ -104,7 +104,7 @@
 
 Remaining (business logic expansion):
 - [ ] Define cross-stream ordering contract (explicitly documented)
-- [ ] Define aggregation model (engagement + formation merge rules)
+- [x] Define aggregation model (engagement + formation merge rules) (docs/integration-aggregation-model-v1.md)
 - [ ] Model ownership / follow-up assignments
 - [ ] Connect people to groups / programs / workflows
 
@@ -119,5 +119,4 @@ Remaining (business logic expansion):
 - Keep smoke green and CI green.
 - No direct pushes to main; PRs only.
 - Focus: only changes that prevent major issues later or advance the master plan.
-
 

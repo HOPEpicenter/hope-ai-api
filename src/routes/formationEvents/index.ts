@@ -5,7 +5,7 @@ import { recordFormationEvent } from "../../domain/formation/recordFormationEven
 import { listFormationEventsByVisitor } from "../../storage/formation/formationEventsRepo";
 import { getFormationProfilesTableClient, getFormationEventsTableClient } from "../../storage/formation/formationTables";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
-import { getFormationProfile, listFormationProfiles, upsertFormationProfile } from "../../storage/formation/formationProfilesRepo";
+import { getFormationProfile, listFormationProfiles } from "../../storage/formation/formationProfilesRepo";
 
 export const formationEventsRouter = Router();
 formationEventsRouter.use(requireApiKey);
@@ -81,25 +81,6 @@ formationEventsRouter.post("/formation/events", async (req, res) => {
       } as any,
       { storageConnectionString }
     );
-
-    // Ensure FormationProfile snapshot exists (required by Phase 3 milestones assert).
-    const profilesTable = getFormationProfilesTableClient(storageConnectionString);
-    await ensureTableExists(profilesTable);
-
-    // Prefer the domain-produced profile if present; otherwise upsert a minimal stub.
-    const profileEntity: any =
-      (out as any)?.profile ??
-      ({
-        partitionKey: "VISITOR",
-        rowKey: String(visitorId ?? "").trim(),
-        visitorId: String(visitorId ?? "").trim(),
-        updatedAt: new Date().toISOString(),
-        lastEventAt: occurredAt ?? new Date().toISOString(),
-      } as any);
-
-    // Guarantee keys for repo upsert semantics
-    if (!profileEntity.visitorId) profileEntity.visitorId = String(visitorId ?? "").trim();
-    await upsertFormationProfile(profilesTable as any, profileEntity);
 
     // For HTTP response: preserve existing contract expected by asserts:
     // return an object that includes an "id" key when client supplied one.
@@ -223,8 +204,7 @@ let nextCursor: string | null = null;
 
 if (visitorIdQ) {
   const one = await getFormationProfile(profilesTable as any, visitorIdQ);
-  // Contract: visitorId fast path returns exactly 1 item (profile may be null)
-  items = one ? [one] : [{ partitionKey: "VISITOR", rowKey: visitorIdQ, visitorId: visitorIdQ } as any];
+  items = one ? [one] : [];
 } else {
   const out = await listFormationProfiles(profilesTable as any, {
     limit,
@@ -259,6 +239,4 @@ formationEventsRouter.get("/visitors/:id/formation/profile", async (req, res) =>
     return res.status(toHttpStatus(e, 400)).json({ ok: false, error: e?.message || "Bad Request" });
   }
 });
-
-
 

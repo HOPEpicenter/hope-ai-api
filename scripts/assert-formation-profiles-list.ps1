@@ -89,29 +89,15 @@ $body = @{
 
 $evt = @{
   v = 1
-  eventId = ([guid]::NewGuid().ToString())
+  eventId = $body.id
   visitorId = $body.visitorId
-  type = "FOLLOWUP_ASSIGNED"
-  occurredAt = (Get-Date).ToString("o")
+  type = $body.type
+  occurredAt = $body.occurredAt
   source = @{ system = "assert-formation-profiles-list" }
-  data = @{ assigneeId = "ops-user-1" }
+  data = $body.metadata
 }
 
 Invoke-PostJson -uri "$ApiBase/formation/events" -headers $headers -body $evt | Out-Null
-
-# Advance to Connected (Phase 3.1)
-Start-Sleep -Milliseconds 500
-$evt2 = @{
-  v = 1
-  eventId = ([guid]::NewGuid().ToString())
-  visitorId = $evt.visitorId
-  type = "NEXT_STEP_SELECTED"
-  occurredAt = (Get-Date).ToString("o")
-  source = @{ system = "assert-formation-profiles-list" }
-  data = @{ nextStep = "DISCOVER_HOPE" }
-}
-Invoke-PostJson -uri "$ApiBase/formation/events" -headers $headers -body $evt2 | Out-Null
-
 
 $body = @{
   id         = [Guid]::NewGuid().ToString()
@@ -123,29 +109,15 @@ $body = @{
 
 $evt = @{
   v = 1
-  eventId = ([guid]::NewGuid().ToString())
+  eventId = $body.id
   visitorId = $body.visitorId
-  type = "FOLLOWUP_ASSIGNED"
-  occurredAt = (Get-Date).ToString("o")
+  type = $body.type
+  occurredAt = $body.occurredAt
   source = @{ system = "assert-formation-profiles-list" }
-  data = @{ assigneeId = "ops-user-1" }
+  data = $body.metadata
 }
 
 Invoke-PostJson -uri "$ApiBase/formation/events" -headers $headers -body $evt | Out-Null
-
-# Advance to Connected (Phase 3.1)
-Start-Sleep -Milliseconds 500
-$evt2 = @{
-  v = 1
-  eventId = ([guid]::NewGuid().ToString())
-  visitorId = $evt.visitorId
-  type = "NEXT_STEP_SELECTED"
-  occurredAt = (Get-Date).ToString("o")
-  source = @{ system = "assert-formation-profiles-list" }
-  data = @{ nextStep = "DISCOVER_HOPE" }
-}
-Invoke-PostJson -uri "$ApiBase/formation/events" -headers $headers -body $evt2 | Out-Null
-
 
 # 1) visitorId fast path should return the single profile (deterministic)
 Write-Host "[assert-formation-profiles-list] GET /formation/profiles (visitorId fast path)..."
@@ -163,18 +135,8 @@ if ($usingDevStorage) {
   if ($null -eq $out2.items) { throw "Expected items array (stage filter)" }
   Write-Host "[assert-formation-profiles-list] SKIP: stage paging presence assert on dev storage." -ForegroundColor Yellow
 } else {
-  # On real storage, paging presence can be flaky/non-deterministic (large lists, ordering/cursor semantics).
-  # Keep the endpoint check, but validate deterministically via visitorId fast-path.
-  $out2 = Invoke-RestMethod -Method Get -Uri "$ApiBase/formation/profiles?stage=Connected&limit=10" -Headers $headers
-  if (-not $out2.ok) { throw "Expected ok=true (stage filter)" }
-  if ($null -eq $out2.items) { throw "Expected items array (stage filter)" }
-
-  $fast2 = Invoke-RestMethod -Method Get -Uri "$ApiBase/formation/profiles?visitorId=$visitorId" -Headers $headers
-  if (-not $fast2.ok) { throw "Expected ok=true (visitorId fast path for stage verification)" }
-  if (($fast2.items | Measure-Object).Count -ne 1) { throw "Expected exactly 1 item for visitorId fast path (stage verification)." }
-
-  $stage = $fast2.items[0].stage
-  if ($stage -ne "Connected") { throw "Expected stage=Connected after NEXT_STEP_SELECTED; got stage=$stage" }
+  $found2 = Find-VisitorInPagedList -uriBase "$ApiBase/formation/profiles?stage=Connected" -headers $headers -visitorId $visitorId
+  if (-not $found2) { throw "Expected visitorId=$visitorId to appear in stage=Connected list (after paging)." }
 }
 
 # 3) assignedTo filter
@@ -185,17 +147,8 @@ if ($usingDevStorage) {
   if ($null -eq $out3.items) { throw "Expected items array (assignedTo filter)" }
   Write-Host "[assert-formation-profiles-list] SKIP: assignedTo paging presence assert on dev storage." -ForegroundColor Yellow
 } else {
-  # On real storage, paging presence can be flaky/non-deterministic. Validate deterministically via fast-path.
-  $out3 = Invoke-RestMethod -Method Get -Uri "$ApiBase/formation/profiles?assignedTo=ops-user-1&limit=10" -Headers $headers
-  if (-not $out3.ok) { throw "Expected ok=true (assignedTo filter)" }
-  if ($null -eq $out3.items) { throw "Expected items array (assignedTo filter)" }
-
-  $fast3 = Invoke-RestMethod -Method Get -Uri "$ApiBase/formation/profiles?visitorId=$visitorId" -Headers $headers
-  if (-not $fast3.ok) { throw "Expected ok=true (visitorId fast path for assignedTo verification)" }
-  if (($fast3.items | Measure-Object).Count -ne 1) { throw "Expected exactly 1 item for visitorId fast path (assignedTo verification)." }
-
-  $assignee = $fast3.items[0].assignedTo
-  if ($assignee -ne "ops-user-1") { throw "Expected assignedTo=ops-user-1 after FOLLOWUP_ASSIGNED; got assignedTo=$assignee" }
+  $found3 = Find-VisitorInPagedList -uriBase "$ApiBase/formation/profiles?assignedTo=ops-user-1" -headers $headers -visitorId $visitorId
+  if (-not $found3) { throw "Expected visitorId=$visitorId to appear in assignedTo list (after paging)." }
 }
 
 Write-Host "[assert-formation-profiles-list] OK: formation profiles list assertions passed." -ForegroundColor Green

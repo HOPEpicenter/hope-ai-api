@@ -249,6 +249,3 @@ const merged = mergeTimelines(
 
 }
 
-
-
-

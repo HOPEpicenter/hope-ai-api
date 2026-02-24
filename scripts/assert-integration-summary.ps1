@@ -45,7 +45,12 @@ if ($r.ok -ne $true) { throw "Expected ok=true" }
 if ($r.visitorId -ne $visitorId) { throw "visitorId mismatch" }
 if ($null -eq $r.summary) { throw "summary missing" }
 
+# Additive contract assertions (v1 response envelope + minimal summary shape)
+if ($r.v -ne 1) { throw "Expected v=1" }
+if ($r.summary.needsFollowup -isnot [bool]) { throw "Expected summary.needsFollowup to be boolean" }
+if ($r.summary.sources.engagement -isnot [bool]) { throw "Expected summary.sources.engagement to be boolean" }
+if ($r.summary.sources.formation  -isnot [bool]) { throw "Expected summary.sources.formation to be boolean" }
+
 # Minimal shape checks (derived view may be nulls when no events exist)
-if ($null -eq $r.summary.sources) { throw "summary.sources missing" }
 
 Write-Host "OK: Integration summary assertions passed." -ForegroundColor Green

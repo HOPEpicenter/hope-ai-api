@@ -66,5 +66,6 @@ export function validateIntegrationSummaryQueryV1(
   }
 
   if (issues.length > 0) return { ok: false, issues };
-  return { ok: true, value: { visitorId } };
+  const visitorIdStr = visitorId as string;
+  return { ok: true, value: { visitorId: visitorIdStr } };
 }

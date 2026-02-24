@@ -49,6 +49,7 @@ Locked:
 Status: 🟡 ACTIVE
 
 Implemented:
+- [x] Formation stage model exists in contract (FormationStage + stage fields on profile snapshot)
 - [x] POST `/api/formation/events`
 - [x] GET `/api/visitors/:id/formation/events` (paging supported)
 - [x] GET `/api/visitors/:id/formation/profile` (derived snapshot)
@@ -88,15 +89,18 @@ Remaining:
 
 ---
 
-## Phase 4 — INTEGRATION (NOT STARTED / PARTIAL INFRA)
+## Phase 4 — INTEGRATION (ACTIVE / PARTIALLY COMPLETE)
 
-Status: 🔵 NOT STARTED (business logic)
+Status: 🟡 ACTIVE (timeline + cursor contract implemented; more business logic pending)
 
 Infrastructure present:
 - [x] `/api/integration/timeline` stub exists (protected)
 - [x] Deep paging + cursor translation hardened at integration layer
 - [x] Cross-stream cursor boundary regression coverage exists
-
+- [x] GET /api/integration/summary v1 (read-only derived view)
+- [x] scripts/assert-integration-summary.ps1 (gated)
+- [x] integration timeline formation stream reads via storage repo (consistency hardening)
+- [x] formation cursor decode for beforeRowKey + perStream+1 tail slice paging
 Remaining:
 - [ ] Implement integration timeline aggregation logic (beyond stubs)
 - [ ] Define cross-stream ordering contract
@@ -139,3 +143,4 @@ Planned:
 1. Lock Formation milestone model (small, safe PR-sized work).
 2. Implement Integration aggregation logic (incremental, contract-first).
 3. Add CI coverage for scoped auth expectations if not already fully asserted.
+

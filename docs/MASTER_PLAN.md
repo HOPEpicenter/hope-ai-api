@@ -105,8 +105,7 @@ Remaining:
 - [x] Define cross-stream ordering contract (explicitly documented) (docs/integration-ordering-contract-v1.md)
 - [x] Define aggregation model (engagement + formation merge rules) (docs/integration-aggregation-model-v1.md)
 - [x] Model ownership / follow-up assignments (docs/ownership-followup-model-v1.md)
-- [ ] Connect people to groups / programs / workflows
-
+- [x] Connect people to groups / programs / workflows (docs/groups-programs-workflows-model-v1.md)
 Notes:
 - Integration must preserve stable ordering guarantees from Phase 2.
 - Aggregation must not break cursor contract.

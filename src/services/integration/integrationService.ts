@@ -244,8 +244,20 @@ const merged = mergeTimelines(
         engagement: !!lastEngagementAt,
         formation: !!lastFormationAt,
       },
+
+      // Phase 4 additive fields (v1 contract). No business logic yet.
+      // Minimal default: if no engagement has ever happened, treat as needs follow-up.
+      needsFollowup: !lastEngagementAt,
+
+      // Optional / unset until we model business rules + persistence/events:
+      // assignedTo: undefined,
+      // followupReason: undefined,
+      // groups: undefined,
+      // programs: undefined,
+      // workflows: undefined,
     };
   }
 
 }
+
 

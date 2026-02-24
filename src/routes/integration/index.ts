@@ -68,6 +68,7 @@ integrationRouter.get("/integration/summary", async (req, res, next) => {
 
     return res.status(200).json({
       ok: true,
+      v: 1,
       visitorId,
       summary,
     });
@@ -75,4 +76,5 @@ integrationRouter.get("/integration/summary", async (req, res, next) => {
     return next(err);
   }
 });
+
 

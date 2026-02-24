@@ -19,23 +19,28 @@ All formation events use the v1 envelope:
 Required:
 - data.nextStep (string)
 
-Derivations:
-- profile.nextStep := data.nextStep
+Derivations (v1 intent):
+- profile.lastNextStepAt := occurredAt
 - profile.stage := Connected (if not already)
 
 ### FOLLOWUP_ASSIGNED
 Required:
 - data.assigneeId (string)
 
-Derivations:
+Derivations (v1 intent):
 - profile.assignedTo := data.assigneeId
+- profile.lastFollowupAssignedAt := occurredAt
 - profile.stage := Connected (if not already)
 
-## Profile fields (v1)
-- visitorId (string)
-- stage (string)  # currently queried as Connected
-- assignedTo (string|null)
-- nextStep (string|null)
+## Profile snapshot fields (v1)
+At minimum, profile includes:
+- visitorId
+- stage
+- assignedTo (nullable)
+- lastEventType / lastEventAt
+- updatedAt
+
+(Additional touchpoint timestamps may be present, e.g. lastNextStepAt, lastFollowupAssignedAt, etc.)
 
 ## Query surfaces that must remain stable
 - GET /api/visitors/:id/formation/profile

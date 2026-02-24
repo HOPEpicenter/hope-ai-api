@@ -16,10 +16,11 @@ Checklist:
 
 Notes:
 - Phase 1 is locked unless a change prevents major problems later.
+- Idempotent visitor creation and stale EMAIL index repair are covered by smoke.
 
 ---
 
-## Phase 2 — ENGAGEMENT (COMPLETED)
+## Phase 2 — ENGAGEMENT (COMPLETED / LOCKED)
 
 Status: ✅ COMPLETE
 
@@ -27,34 +28,114 @@ Checklist:
 - [x] Engagement Event Envelope v1 (validation + strict contract)
 - [x] POST `/api/engagements/events` accepts engagement events (envelope)
 - [x] GET `/api/engagements/timeline` supports cursor paging (`nextCursor`) and stable ordering
+- [x] Timeline contract hardened:
+  - limit=1 no skip / no overlap regression
+  - cross-stream cursor boundary regression
+  - cursor is URL-safe and round-trips via URL escaping
 - [x] GET `/api/engagements/status` returns current status derived from events
 - [x] Notes + tags supported as first-class engagement event types
 - [x] GET `/api/engagements/score` exists and returns `{ ok: true, ... }`
+- [x] Oversized metadata returns 400
+- [x] 404 JSON includes `requestId`
 
 Locked:
 - Phase 2 is production-ready and should not be reworked unless it prevents major problems later.
+- Paging + cursor logic is hardened and should not be revisited without a major contract change.
 
 ---
 
-## Phase 3 — AUTH-SCOPING (STUB SURFACES ONLY)
+## Phase 3 — FORMATION (ACTIVE / PARTIALLY COMPLETE)
 
-Status: ✅ COMPLETE (stubs only)
+Status: 🟡 ACTIVE
+
+Implemented:
+- [x] POST `/api/formation/events`
+- [x] GET `/api/visitors/:id/formation/events` (paging supported)
+- [x] GET `/api/visitors/:id/formation/profile` (derived snapshot)
+- [x] CI asserts formation pagination + idempotency + profile snapshot behavior
+
+Remaining:
+- [ ] Define formation milestones/events formally
+- [ ] Define and document derivation rules for stage/milestone changes
+- [ ] Lock milestone model contract (v1)
+- [ ] Add regression coverage for milestone derivation rules
+
+Notes:
+- Formation should follow the same event-driven derivation discipline as Engagement.
+- Prefer deriving state from events rather than storing derived fields.
+
+---
+
+## Cross-cutting — AUTH SCOPING (COMPLETED, STUB SURFACES ONLY)
+
+Status: ✅ COMPLETE (stub behavior only)
 
 Goal:
-- Keep public endpoints unaffected.
-- Add protected endpoints as *stubs* only:
-  - No API key => 401
-  - With API key but missing required query => 400
-  - (No real business logic required yet.)
+- Public endpoints remain unaffected.
+- Protected endpoints enforce API key and required query validation.
+- No real business logic required yet.
 
-Checklist:
-- [x] GET `/api/formation/timeline` is protected (scoped) and returns 400 if query invalid/missing
-- [x] GET `/api/integration/timeline` is protected (scoped) and returns 400 if query invalid/missing
-- [x] GET `/api/legacy/export` is protected (scoped) and returns 400 if query invalid/missing
+Implemented:
+- [x] GET `/api/formation/timeline` requires API key
+- [x] GET `/api/integration/timeline` requires API key
+- [x] GET `/api/legacy/export` requires API key
+- [x] Without API key => 401
+- [x] With API key but missing required query => 400
 - [x] Auth scoping verified: public endpoints remain unaffected
 
-Next (later phases):
-- [ ] Implement integration timeline aggregation logic (beyond stubs)
-- [ ] Implement legacy export payload + streaming / export format
-- [ ] Add CI coverage for Phase 3 auth expectations
+Remaining:
+- [ ] Ensure CI explicitly asserts 401/400 expectations for all scoped endpoints
 
+---
+
+## Phase 4 — INTEGRATION (NOT STARTED / PARTIAL INFRA)
+
+Status: 🔵 NOT STARTED (business logic)
+
+Infrastructure present:
+- [x] `/api/integration/timeline` stub exists (protected)
+- [x] Deep paging + cursor translation hardened at integration layer
+- [x] Cross-stream cursor boundary regression coverage exists
+
+Remaining:
+- [ ] Implement integration timeline aggregation logic (beyond stubs)
+- [ ] Define cross-stream ordering contract
+- [ ] Define aggregation model (engagement + formation merge rules)
+- [ ] Model ownership / follow-up assignments
+- [ ] Connect people to groups / programs / workflows
+
+Notes:
+- Integration must preserve stable ordering guarantees from Phase 2.
+- Aggregation must not break cursor contract.
+
+---
+
+## Phase 5 — LEGACY (NOT STARTED)
+
+Status: ⚪ NOT STARTED
+
+Planned:
+- [ ] Implement legacy export payload
+- [ ] Streaming / export format
+- [ ] Long-horizon history views
+- [ ] Derived insights (avoid storing derived state unless necessary)
+
+---
+
+## Guardrails (Always)
+
+- Keep smoke green and CI green.
+- No direct pushes to `main`; PRs only.
+- Only ship changes that:
+  - Prevent major future problems, or
+  - Advance the master plan deliberately.
+- Keep `/ops/*` as dev/admin tooling only.
+- Treat `/api/*` as the product surface and contract.
+
+---
+
+## Next Focus (Priority Order)
+
+1. Lock Formation milestone model (small, safe PR-sized work).
+2. Implement Integration aggregation logic (incremental, contract-first).
+3. Add CI coverage for scoped auth expectations if not already fully asserted.

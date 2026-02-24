@@ -51,6 +51,5 @@ if ($r.summary.needsFollowup -isnot [bool]) { throw "Expected summary.needsFollo
 if ($r.summary.sources.engagement -isnot [bool]) { throw "Expected summary.sources.engagement to be boolean" }
 if ($r.summary.sources.formation  -isnot [bool]) { throw "Expected summary.sources.formation to be boolean" }
 
-# Minimal shape checks (derived view may be nulls when no events exist)
 
 Write-Host "OK: Integration summary assertions passed." -ForegroundColor Green

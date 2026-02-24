@@ -181,4 +181,32 @@ export class IntegrationService {
 
     return { items: pageItems, nextCursor };
   }
+  async readIntegrationSummary(visitorId: string) {
+    // Read-only derived view: no new writes, no persistence.
+    // Pull "latest" from each stream via their existing read methods.
+    const [eng, form] = await Promise.all([
+      this.engagementRepo.readTimeline(visitorId, 1, undefined),
+      this.formationRepo.listByVisitor({ visitorId, limit: 1, cursor: undefined }),
+    ]);
+
+    const lastEngagementAt = eng.items?.[0]?.occurredAt ?? null;
+    const lastFormationAt = form.items?.[0]?.occurredAt ?? null;
+
+    const lastIntegratedAt =
+      lastEngagementAt && lastFormationAt
+        ? (Date.parse(lastEngagementAt) >= Date.parse(lastFormationAt) ? lastEngagementAt : lastFormationAt)
+        : (lastEngagementAt ?? lastFormationAt ?? null);
+
+    return {
+      visitorId,
+      lastEngagementAt,
+      lastFormationAt,
+      lastIntegratedAt,
+      sources: {
+        engagement: !!lastEngagementAt,
+        formation: !!lastFormationAt,
+      },
+    };
+  }
+
 }

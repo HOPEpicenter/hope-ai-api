@@ -70,6 +70,7 @@
 ---
 
 ## Phase 3 — Formation (ACTIVE / PARTIALLY COMPLETE)
+- [x] Formation stage model contract exists (FormationStage + stage fields on profile snapshot)
 - [x] Public formation append works: POST /api/formation/events
 - [x] Public formation list works (paging): GET /api/visitors/:id/formation/events
 - [x] Public formation profile snapshot works: GET /api/visitors/:id/formation/profile
@@ -90,13 +91,18 @@
 
 ---
 
-## Phase 4 — Integration (NOT STARTED / PARTIAL INFRA)
+## Phase 4 — Integration (ACTIVE / PARTIALLY COMPLETE)
 
-- [x] `/api/integration/timeline` stub exists (protected)
+- [x] `/api/integration/timeline` v1 aggregation exists (protected)
+- [x] Cursor contract exists (`integrationTimelineCursor.v1` base64url JSON round-trip)
 - [x] Deep paging + cursor translation hardened at integration layer
 - [x] Cross-stream cursor boundary regression coverage exists
-- [ ] Implement integration timeline aggregation logic (beyond stubs)
-- [ ] Define cross-stream ordering contract
+- [x] `/api/integration/summary` v1 exists (read-only derived view)
+- [x] Gated assert exists for integration summary (`scripts/assert-integration-summary.ps1`)
+- [x] Consistency hardening: integration timeline reads formation via storage repo (cursor decode + perStream+1 tail slice paging)
+
+Remaining (business logic expansion):
+- [ ] Define cross-stream ordering contract (explicitly documented)
 - [ ] Define aggregation model (engagement + formation merge rules)
 - [ ] Model ownership / follow-up assignments
 - [ ] Connect people to groups / programs / workflows

@@ -3,15 +3,11 @@
 > Single source of truth for what’s built, what’s locked, and what’s next.
 > Update this file in the same PR as any change that materially affects behavior or contracts.
 
-## Current state (as of ec850ba)
+## Current state
 
-- Repo status: main is green locally (smoke passes) and merges only via PR with CI.
-- Last known merge on main: ec850ba
-
-> **Phase 2 engagement locks refresh**
-> - Locked via merged work + smoke coverage.
-> - References: #71 (envelope v1), #73 (status transitions v1), #98 (score contract + smoke).
-
+- Repo status: merge to `main` via PR only; keep CI green.
+- This checklist is implementation-focused; `docs/MASTER_PLAN.md` is the phase truth source.
+- After any behavior/contract change: update BOTH this file and `docs/MASTER_PLAN.md`.
 
 ---
 
@@ -47,7 +43,7 @@
 
 ---
 
-## Phase 2 — Engagement (ACTIVE / PARTIALLY COMPLETE)
+## Phase 2 — Engagement (LOCKED / COMPLETE)
 
 ### Product outcomes
 - [x] Engagement events are stable-contract and ministry-safe (envelope locked).
@@ -79,10 +75,33 @@
 - [x] Public formation profile snapshot works: GET /api/visitors/:id/formation/profile
 - [x] CI asserts cover formation pagination + idempotency + profile snapshot
 - [ ] Define formation milestones/events and derivations.
-- [ ] Track journey steps in an auditable way (prefer derive from events).## Phase 4 — Integration (NOT STARTED)
-- [ ] Connect people to groups/programs/workflows.
-- [ ] Ownership / follow-up assignments.
+- [ ] Track journey steps in an auditable way (prefer derive from events).
+## Cross-cutting — Auth scoping (COMPLETED, stub surfaces only)
 
+- Protected endpoints are enforced via API key middleware:
+  - `/api/formation/timeline`
+  - `/api/integration/timeline`
+  - `/api/legacy/export`
+- Expected behavior (stubs only):
+  - No API key => 401
+  - With API key but missing required query => 400
+- Remaining:
+  - Add/verify CI assertions for 401/400 expectations for all scoped endpoints.
+
+---
+
+## Phase 4 — Integration (NOT STARTED / PARTIAL INFRA)
+
+- [x] `/api/integration/timeline` stub exists (protected)
+- [x] Deep paging + cursor translation hardened at integration layer
+- [x] Cross-stream cursor boundary regression coverage exists
+- [ ] Implement integration timeline aggregation logic (beyond stubs)
+- [ ] Define cross-stream ordering contract
+- [ ] Define aggregation model (engagement + formation merge rules)
+- [ ] Model ownership / follow-up assignments
+- [ ] Connect people to groups / programs / workflows
+
+---
 ## Phase 5 — Legacy (NOT STARTED)
 - [ ] Long-horizon outcomes and history views.
 - [ ] Derived insights (avoid storing derived state unless necessary).
@@ -93,9 +112,4 @@
 - Keep smoke green and CI green.
 - No direct pushes to main; PRs only.
 - Focus: only changes that prevent major issues later or advance the master plan.
-
-
-
-
-
 

@@ -1,4 +1,4 @@
-import express from "express";
+﻿import express from "express";
 import visitorsRouter from "./routes/visitors/visitorsRouter";
 import { createOpsRouter } from "./routes/ops/opsRouter";
 import { formationRouter } from "./routes/formation";
@@ -36,11 +36,13 @@ const engagementsRepository = new AzureTableEngagementsRepository();
 app.use("/ops", createOpsRouter(visitorsRepository, formationEventsRepository, engagementsRepository));
 // Public API routes
 app.use("/api/visitors", visitorsRouter(visitorsRepository));
+app.use("/api", formationEventsRouter);
 app.use("/api", formationRouter);
 app.use("/api", followupQueueRouter);
 app.use("/api", engagementsRouter);
 app.use("/api", integrationRouter);
 app.use("/api", legacyRouter);
+
 /**
  * Global JSON error handler
  * Ensures we never leak Express HTML error pages to API clients.
@@ -60,6 +62,30 @@ app.listen(port, () => {
   console.log(`hope-ai-api listening on port ${port}`);
 });
 
+
+if (process.env.DEBUG_ROUTES === "1") {
+  const seen: string[] = [];
+
+  const walk = (stack: any[]) => {
+    for (const layer of stack) {
+      if (!layer) continue;
+
+      if (layer.route?.path && layer.route?.methods) {
+        const methods = Object.keys(layer.route.methods)
+          .filter(k => layer.route.methods[k])
+          .map(k => k.toUpperCase())
+          .join(",");
+        seen.push(`${methods} ${layer.route.path}`);
+      }
+
+      if (layer.handle?.stack) walk(layer.handle.stack);
+    }
+  };
+
+  walk((app as any)._router?.stack ?? []);
+  console.log("[DEBUG_ROUTES] Registered routes:");
+  for (const r of seen.sort()) console.log("[DEBUG_ROUTES] " + r);
+}
 
 
 

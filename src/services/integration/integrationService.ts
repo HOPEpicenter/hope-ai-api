@@ -161,12 +161,16 @@ await ensureTableExists(eventsTable);
 // cursor should be a formation RowKey (older-than paging)
 const fetchLimit = perStream + 1;
 
+// Decode integration’s base64(rowKey) per-stream cursor into a real RowKey for storage
+const formationBeforeRowKey = formationCursorForRepo
+  ? Buffer.from(String(formationCursorForRepo), "base64").toString("utf8")
+  : undefined;
+
 // cursor should be a formation RowKey (older-than paging)
 const formationAscAll = await listFormationEventsByVisitor(eventsTable as any, visitorId, {
   limit: fetchLimit,
-  beforeRowKey: formationCursorForRepo,
+  beforeRowKey: formationBeforeRowKey,
 });
-
 // Keep the newest perStream from the ascending list
 const formationAscSlice = formationAscAll.slice(-perStream);
 
@@ -244,6 +248,7 @@ const merged = mergeTimelines(
   }
 
 }
+
 
 
 

@@ -102,7 +102,7 @@ Implemented:
 - [x] Consistency hardening: integration timeline reads formation via storage repo (cursor decode + perStream+1 tail slice paging)
 
 Remaining:
-- [ ] Define cross-stream ordering contract (explicitly documented)
+- [x] Define cross-stream ordering contract (explicitly documented) (docs/integration-ordering-contract-v1.md)
 - [ ] Define aggregation model (engagement + formation merge rules)
 - [ ] Model ownership / follow-up assignments
 - [ ] Connect people to groups / programs / workflows
@@ -142,5 +142,6 @@ Planned:
 1. Lock Formation milestone model (small, safe PR-sized work).
 2. Implement Integration aggregation logic (incremental, contract-first).
 3. Add CI coverage for scoped auth expectations if not already fully asserted.
+
 
 

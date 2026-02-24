@@ -1,6 +1,9 @@
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { FormationEventsRepository } from "../../repositories/formationEventsRepository";
 import { mergeTimelines } from "../../domain/integration/mergeTimelines.v1";
+import { listFormationEventsByVisitor } from "../../storage/formation/formationEventsRepo";
+import { getFormationEventsTableClient } from "../../storage/formation/formationTables";
+import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import {
   decodeIntegrationCursorV1,
   encodeIntegrationCursorV1,
@@ -149,13 +152,38 @@ export class IntegrationService {
       engagementCursorForRepo,
     );
 
-    const formationPage = await this.formationRepo.listByVisitor({
-      visitorId,
-      limit: perStream,
-      cursor: formationCursorForRepo,
-    });
+    const storageConnectionString = process.env.STORAGE_CONNECTION_STRING;
+if (!storageConnectionString) throw new Error("Missing STORAGE_CONNECTION_STRING");
 
-    const merged = mergeTimelines(
+const eventsTable = getFormationEventsTableClient(storageConnectionString);
+await ensureTableExists(eventsTable);
+
+// cursor should be a formation RowKey (older-than paging)
+const formationAsc = await listFormationEventsByVisitor(eventsTable as any, visitorId, {
+  limit: perStream,
+  beforeRowKey: formationCursorForRepo,
+});
+
+// Convert to newest-first items for merge/sort
+const formationItems = formationAsc
+  .slice()
+  .reverse()
+  .map((e: any) => ({
+    v: 1,
+    eventId: e.id ?? e.eventId ?? e.rowKey,
+    visitorId: e.visitorId ?? visitorId,
+    type: e.type,
+    occurredAt: e.occurredAt,
+    source: { system: "formation" },
+    data: e.metadata ? { metadata: e.metadata } : undefined,
+  }));
+
+// nextCursor should be the oldest rowKey returned (so we can page older-than it)
+const formationPage = {
+  items: formationItems,
+  nextCursor: formationAsc.length > 0 ? (formationAsc[0] as any).rowKey : null,
+};
+const merged = mergeTimelines(
       engagementPage.items ?? [],
       formationPage.items ?? [],
     );

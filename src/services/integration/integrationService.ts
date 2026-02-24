@@ -159,13 +159,19 @@ const eventsTable = getFormationEventsTableClient(storageConnectionString);
 await ensureTableExists(eventsTable);
 
 // cursor should be a formation RowKey (older-than paging)
-const formationAsc = await listFormationEventsByVisitor(eventsTable as any, visitorId, {
-  limit: perStream,
+const fetchLimit = perStream + 1;
+
+// cursor should be a formation RowKey (older-than paging)
+const formationAscAll = await listFormationEventsByVisitor(eventsTable as any, visitorId, {
+  limit: fetchLimit,
   beforeRowKey: formationCursorForRepo,
 });
 
+// Keep the newest perStream from the ascending list
+const formationAscSlice = formationAscAll.slice(-perStream);
+
 // Convert to newest-first items for merge/sort
-const formationItems = formationAsc
+const formationItems = formationAscSlice
   .slice()
   .reverse()
   .map((e: any) => ({
@@ -181,7 +187,7 @@ const formationItems = formationAsc
 // nextCursor should be the oldest rowKey returned (so we can page older-than it)
 const formationPage = {
   items: formationItems,
-  nextCursor: formationAsc.length > 0 ? (formationAsc[0] as any).rowKey : null,
+  nextCursor: formationAscSlice.length > 0 ? (formationAscSlice[0] as any).rowKey : null,
 };
 const merged = mergeTimelines(
       engagementPage.items ?? [],
@@ -238,3 +244,6 @@ const merged = mergeTimelines(
   }
 
 }
+
+
+

@@ -1,1 +1,17 @@
-* text=auto eol=lf
+# Normalize text files to LF in repo to avoid CRLF/LF churn across Windows + CI
+* text=auto
+
+# Ensure this file stays LF in repo
+.gitattributes text eol=lf
+
+# PowerShell
+*.ps1 text eol=lf
+
+# Docs
+*.md  text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# JSON / TS
+*.json text eol=lf
+*.ts   text eol=lf

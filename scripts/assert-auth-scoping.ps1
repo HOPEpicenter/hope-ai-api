@@ -1,9 +1,9 @@
 param(
-  [Parameter(Mandatory=$true)]
-  [string]$BaseUrl
+  [Parameter(Mandatory=$false)]
+  [string]$BaseUrl = $(if ($env:HOPE_BASE_URL) { $env:HOPE_BASE_URL } else { "http://127.0.0.1:3000/api" })
 )
 
-
+if ([string]::IsNullOrWhiteSpace($BaseUrl)) { throw "BaseUrl is required." }
 # --- Phase gate: skip Phase 3 asserts unless explicitly enabled ---
 if ($env:HOPE_RUN_PHASE3_ASSERTS -ne "1") {
   Write-Host "SKIP: Phase 3 assertions disabled. Set HOPE_RUN_PHASE3_ASSERTS=1 to enable." -ForegroundColor Yellow

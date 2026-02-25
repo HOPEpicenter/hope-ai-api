@@ -46,6 +46,36 @@ formationEventsRouter.post("/formation/events", async (req, res) => {
   // - legacy clients can keep sending { id, visitorId, type, occurredAt, metadata }
   // - v1 envelope clients MUST send { v:1, eventId, visitorId, type, occurredAt, source:{system}, data }
 
+  const isV1 = body && body.v === 1;
+  if (isV1) {
+    // Top-level v1 envelope guard (fail fast, 400, no mixed legacy fields)
+    if (body.id !== undefined) {
+      return res.status(400).json({ ok: false, error: "v1 envelope must not include id (use eventId)" });
+    }
+    if (body.metadata !== undefined) {
+      return res.status(400).json({ ok: false, error: "v1 envelope must not include metadata (use data)" });
+    }
+    if (typeof body.eventId !== "string" || body.eventId.trim() === "") {
+      return res.status(400).json({ ok: false, error: "v1 envelope requires eventId (string)" });
+    }
+    if (typeof body.visitorId !== "string" || body.visitorId.trim() === "") {
+      return res.status(400).json({ ok: false, error: "v1 envelope requires visitorId (string)" });
+    }
+    if (typeof body.type !== "string" || body.type.trim() === "") {
+      return res.status(400).json({ ok: false, error: "v1 envelope requires type (string)" });
+    }
+    if (typeof body.occurredAt !== "string" || body.occurredAt.trim() === "") {
+      return res.status(400).json({ ok: false, error: "v1 envelope requires occurredAt (string ISO)" });
+    }
+    const system = body?.source?.system;
+    if (typeof system !== "string" || system.trim() === "") {
+      return res.status(400).json({ ok: false, error: "v1 envelope requires source.system (string)" });
+    }
+    if (body.data === null || typeof body.data !== "object" || Array.isArray(body.data)) {
+      return res.status(400).json({ ok: false, error: "v1 envelope requires data (object)" });
+    }
+  }
+
   // Accept both legacy and envelope v1
   const visitorId = body.visitorId;
   const type = body.type;

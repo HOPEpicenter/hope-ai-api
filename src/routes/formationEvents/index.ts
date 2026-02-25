@@ -45,9 +45,6 @@ formationEventsRouter.post("/formation/events", async (req, res) => {
   // Backward-compatible + strict-for-v1:
   // - legacy clients can keep sending { id, visitorId, type, occurredAt, metadata }
   // - v1 envelope clients MUST send { v:1, eventId, visitorId, type, occurredAt, source:{system}, data }
-  if (looksLikeFormationEnvelopeV1(body)) {
-    validateFormationEventEnvelopeV1Strict(body);
-  }
 
   // Accept both legacy and envelope v1
   const visitorId = body.visitorId;
@@ -71,6 +68,9 @@ formationEventsRouter.post("/formation/events", async (req, res) => {
   }
 
   try {
+    if (body && body.v === 1) {
+      validateFormationEventEnvelopeV1Strict(body);
+    }
     // recordFormationEvent writes:
     // - append-only event entity
     // - upserts FormationProfile snapshot

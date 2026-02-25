@@ -87,7 +87,7 @@ $formBody = @{
   type       = "FOLLOWUP_ASSIGNED"
   occurredAt = $ts
   source     = @{ system = "scripts/assert-integration-cross-stream-cursor-boundary.ps1" }
-  metadata   = @{
+  data       = @{
     assigneeId = "boundary-assert"
     channel    = "api"
     notes      = "boundary seed formation"

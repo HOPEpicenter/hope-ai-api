@@ -244,6 +244,17 @@ if ($list.StatusCode -eq 404) {
   }
 
   pwsh -NoProfile -ExecutionPolicy Bypass -File $assertPath -ApiBaseUrl $workingBase -ApiKey $env:HOPE_API_KEY
+  Write-Host ""
+  Write-Host "=== Phase 3: Formation envelope v1 strict + legacy back-compat ==="
+
+  $assertPath2 = Join-Path $PSScriptRoot "assert-formation-envelope-v1-strict.ps1"
+  if (-not (Test-Path $assertPath2)) {
+    Write-Host ("FAIL: Missing assert script: {0}" -f $assertPath2)
+    exit 1
+  }
+
+  pwsh -NoProfile -ExecutionPolicy Bypass -File $assertPath2 -ApiBaseUrl $workingBase -ApiKey $env:HOPE_API_KEY
+
 }
 Write-Host "OK: CI Express smoke passed."
 exit 0

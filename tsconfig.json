@@ -1,16 +1,22 @@
-﻿{
+{
   "compilerOptions": {
     "target": "ES2020",
-    "module": "commonjs",
-    "lib": ["ES2020"],
+    "module": "CommonJS",
     "rootDir": "src",
     "outDir": "dist",
-    "strict": true,
+    "moduleResolution": "Node",
     "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "moduleResolution": "node",
-    "sourceMap": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/_disabled*/**",
+    "src/**/*_disabled/**",
+    "src/createVisitor_disabled/**",
+    "src/functions/**"
+  ]
 }

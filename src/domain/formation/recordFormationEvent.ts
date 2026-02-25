@@ -50,7 +50,11 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function makeRowKey(occurredAtIso: string): string {
+function makeRowKey(occurredAtIso: string, eventId?: string): string {
+  // Stable RowKey when client supplies an id/idempotencyKey
+  const stable = String(eventId ?? "").trim();
+  if (stable) return `${occurredAtIso}__${stable}`;
+
   const suffix = crypto.randomBytes(6).toString("hex");
   return `${occurredAtIso}__${suffix}`;
 }
@@ -213,14 +217,17 @@ export async function recordFormationEvent(
     profile = createDefaultFormationProfile(input.visitorId);
   }
 
-  // 🔒 Guarantee PK/RK alignment with Ops dashboard expectations
+  // ÃƒÆ’Ã‚Â°Ãƒâ€¦Ã‚Â¸ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ Guarantee PK/RK alignment with Ops dashboard expectations
   profile = enforceProfileKeys(profile, input.visitorId);
 
-  const rowKey = makeRowKey(occurredAt);
+    const clientId = String((input as any).id ?? (input as any).idempotencyKey ?? (input as any).idempotency_key ?? "").trim();
+  const eventId = clientId || crypto.randomUUID();
+  const rowKey = makeRowKey(occurredAt, eventId);
 
   const eventEntity: FormationEventEntity = {
     partitionKey: input.visitorId,
     rowKey,
+    id: eventId,
     visitorId: input.visitorId,
     type: input.type,
     occurredAt,
@@ -230,15 +237,27 @@ export async function recordFormationEvent(
     sensitivity: input.sensitivity ?? defaults.sensitivity,
     summary: input.summary,
     metadata: stringifyMetadata(input.metadata),
-    idempotencyKey: input.idempotencyKey,
+    idempotencyKey: clientId || input.idempotencyKey,
   };
 
+  // Idempotency: if client supplied id/idempotencyKey and we've already stored this event, return early.
+  // IMPORTANT: do not re-apply profile touchpoints on retry.
+  if (clientId) {
+    const safePk = String(input.visitorId ?? "").replace(/'/g, "''");
+    const safeId = String(eventId ?? "").replace(/'/g, "''");
+    const filter = `PartitionKey eq '${safePk}' and id eq '${safeId}'`;
+
+    for await (const existing of eventsTable.listEntities<any>({ queryOptions: { filter } })) {
+      const existingRowKey = String((existing as any).rowKey ?? (existing as any).RowKey ?? "");
+      return { eventRowKey: existingRowKey || rowKey, profile };
+    }
+  }
   await insertFormationEvent(eventsTable, eventEntity);
 
   // Update snapshot based on the event
   applyProfileTouchpoint(profile, input.type, occurredAt, input.metadata);
 
-  // ✅ Snapshot fields Ops dashboard should rely on (always set)
+  // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Snapshot fields Ops dashboard should rely on (always set)
   (profile as any).lastEventType = input.type;
   (profile as any).lastEventAt = occurredAt;
   (profile as any).updatedAt = recordedAt;

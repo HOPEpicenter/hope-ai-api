@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 # ================= CONFIG =================
 $base = "http://localhost:7071/api"
@@ -221,5 +221,5 @@ $q24f = Get-Queue $vid 24
 Assert-True ($q0f.count -eq 0)  "Expected removed after outcome"
 Assert-True ($q24f.count -eq 0) "Expected removed after outcome"
 
-Write-Host "`n== ALL TESTS PASSED ✅ =="
+Write-Host "`n== ALL TESTS PASSED OK =="
 

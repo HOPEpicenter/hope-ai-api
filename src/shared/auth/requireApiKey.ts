@@ -1,28 +1,36 @@
-﻿// src/shared/auth/requireApiKey.ts
-import { HttpRequest, HttpResponseInit } from "@azure/functions";
+﻿import type { Request, Response, NextFunction } from "express";
 
-/**
- * Expected header: x-api-key
- * Expected env var: HOPE_API_KEY (fallback: API_KEY)
- */
-export function requireApiKey(req: HttpRequest): HttpResponseInit | null {
-  const expectedKey = process.env.HOPE_API_KEY || process.env.API_KEY;
+function pickHeader(req: Request): string {
+  // Express normalizes headers to lower-case keys, but req.get() is safest.
+  const v =
+    req.get("x-api-key") ??
+    req.get("X-API-KEY") ??
+    req.headers["x-api-key"];
 
-  if (!expectedKey) {
-    return {
-      status: 500,
-      jsonBody: { error: "Server missing HOPE_API_KEY (or API_KEY) configuration." },
-    };
+  if (typeof v === "string") return v;
+  if (Array.isArray(v) && typeof v[0] === "string") return v[0];
+  return "";
+}
+
+export function requireApiKey(req: Request, res: Response, next: NextFunction) {
+  try {
+    const expected = (process.env.HOPE_API_KEY ?? "").trim();
+    if (!expected) {
+      // Server misconfigured — don’t 401 the client for a server issue
+      return res.status(500).json({ ok: false, error: "Server missing HOPE_API_KEY" });
+    }
+
+    const provided = pickHeader(req).trim();
+    if (!provided) {
+      return res.status(401).json({ ok: false, error: "Missing x-api-key" });
+    }
+
+    if (provided !== expected) {
+      return res.status(401).json({ ok: false, error: "Invalid x-api-key" });
+    }
+
+    return next();
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, error: err?.message ?? "auth error" });
   }
-
-  const providedKey =
-    req.headers.get("x-api-key") ||
-    req.headers.get("x-functions-key") || // optional fallback if you ever want it
-    "";
-
-  if (!providedKey || providedKey !== expectedKey) {
-    return { status: 401, jsonBody: { error: "Unauthorized" } };
-  }
-
-  return null;
 }

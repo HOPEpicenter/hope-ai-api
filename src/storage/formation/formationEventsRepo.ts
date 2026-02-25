@@ -9,6 +9,7 @@ import {
 export type FormationEventEntity = {
   partitionKey: string; // visitorId
   rowKey: string; // ISO timestamp + random suffix (sortable)
+  id?: string;
 
   visitorId: string;
   type: FormationEventType;

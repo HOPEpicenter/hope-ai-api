@@ -276,6 +276,14 @@ if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
 
 
 Write-Host ""
+# Add formation milestones v1 contract assertion (safe, standalone)
+if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+  Write-Host "[regression] Formation milestones v1 contract..."
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-formation-milestones-v1.ps1") -ApiBase $BaseUrl -ApiKey $env:HOPE_API_KEY
+  if ($LASTEXITCODE -ne 0) { throw "Formation milestones v1 asserts failed ($LASTEXITCODE)" }
+} else {
+  Write-Host "[regression] Skipping formation milestones v1 contract (HOPE_API_KEY not set)."
+}
 Write-Host "[4] Auth scoping assertions (401/400 expectations)"
 $env:HOPE_RUN_PHASE3_ASSERTS = "1"
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-auth-scoping.ps1 -BaseUrl $BaseUrl

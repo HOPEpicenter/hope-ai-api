@@ -122,7 +122,7 @@ Remaining (business logic expansion):
 ### 2026-02-25 (session closeout)
 
 - ✅ CI: use HOPE_API_KEY GitHub secret with safe fallback (ci-key) — merged in **#140**
-- ✅ Storage: make nsureTableExists idempotent across Azurite races — merged in **#141**
+- ✅ Storage: make ensureTableExists idempotent across Azurite races — merged in **#141**
 - ✅ Tests: regression runner includes integration summary followupReason/assignedTo consistency contract (gated on HOPE_API_KEY) — merged in **#139**
 - 🧹 Hygiene: closed stale bundled CI PRs (#2–#5); kept only minimal safe changes
 

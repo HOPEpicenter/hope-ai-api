@@ -1,5 +1,12 @@
 # UPDATE_NOTES.md
 
+## 2026-02-25
+
+- ✅ Merged **#139**: regression runner now includes integration summary followupReason/assignedTo consistency contract (runs only when HOPE_API_KEY is set).
+- ✅ Merged **#140**: CI uses repo secret HOPE_API_KEY with a safe fallback to ci-key (keeps CI green until secrets are configured).
+- ✅ Merged **#141**: nsureTableExists hardened for Azurite/CI races (treat already-exists cases as OK: 409 + common codes).
+- 🧹 Closed stale bundled CI PRs (**#2–#5**) and recreated minimal safe changes on current main.
+
 
 ### OPS vs API surface (dev discipline)
 

@@ -1,5 +1,20 @@
 # HOPE AI — MASTER PLAN
 
+## 2026-02-25 Update
+
+**What landed**
+- ✅ **#139**: regression runner now asserts integration summary followupReason/assignedTo consistency (only when HOPE_API_KEY is set).
+- ✅ **#140**: CI uses HOPE_API_KEY secret with safe fallback so CI stays green until secrets are configured.
+- ✅ **#141**: nsureTableExists made race-tolerant for Azurite/CI (already-exists treated as OK).
+- 🧹 Closed stale/bundled CI PRs (#2–#5) to avoid merging risky YAML bundles.
+
+**Why this matters (master plan alignment)**
+- Keeps CI green and reduces Azurite flake, without expanding scope beyond “major-problems-later” fixes.
+- Keeps regression contracts tightening around API behavior while remaining gated for local-only secrets.
+
+**Next**
+- Stay on the master plan: focus on the next API surface milestones; avoid bundling CI refactors unless a real block appears.
+
 This document tracks the *public-ish* API surface under `/api/*` and dev/admin tooling under `/ops/*`.
 
 ---

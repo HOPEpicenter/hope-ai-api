@@ -47,14 +47,15 @@ if ($null -eq $r.summary) { throw "summary missing" }
 
 # Additive contract assertions (v1 response envelope + minimal summary shape)
 if ($r.v -ne 1) { throw "Expected v=1" }
-if ($r.summary.needsFollowup -isnot [bool]) { throw "Expected summary.needsFollowup to be boolean" }
-if ($r.summary.needsFollowup -eq $true) {
+if ($r.summary.needsFollowup -isnot [bool]) { throw "Expected summary.needsFollowup to be boolean" }
 
 # assignedTo is optional; if present, validate shape
 if ($null -ne $r.summary.assignedTo) {
   if ($r.summary.assignedTo.ownerType -notin @("user","team")) { throw "Expected assignedTo.ownerType to be 'user' or 'team'" }
   if ($r.summary.assignedTo.ownerId -isnot [string] -or [string]::IsNullOrWhiteSpace($r.summary.assignedTo.ownerId)) { throw "Expected assignedTo.ownerId to be non-empty string" }
 }
+
+if ($r.summary.needsFollowup -eq $true) {
   if ($r.summary.followupReason -isnot [string] -or [string]::IsNullOrWhiteSpace($r.summary.followupReason)) {
     throw "Expected summary.followupReason to be a non-empty string when needsFollowup=true"
   }
@@ -64,3 +65,4 @@ if ($r.summary.sources.formation  -isnot [bool]) { throw "Expected summary.sourc
 
 
 Write-Host "OK: Integration summary assertions passed." -ForegroundColor Green
+

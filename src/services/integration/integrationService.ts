@@ -219,7 +219,6 @@ const merged = mergeTimelines(
           })
         : null;
 
-
     return { items: pageItems, nextCursor };
   }
   async readIntegrationSummary(visitorId: string) {
@@ -282,6 +281,7 @@ const merged = mergeTimelines(
   }
 
 }
+
 
 
 

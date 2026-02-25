@@ -1,9 +1,9 @@
 param(
   [string]$Base = "http://localhost:3000",
-  [string]$ApiKey = $env:API_KEY
+  [string]$ApiKey = $(if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) { $env:HOPE_API_KEY } else { $env:API_KEY })
 )
 
-if ([string]::IsNullOrWhiteSpace($ApiKey)) { throw "API_KEY is required in env or -ApiKey" }
+if ([string]::IsNullOrWhiteSpace($ApiKey)) { throw "HOPE_API_KEY (preferred) or API_KEY is required in env, or pass -ApiKey" }
 $headers = @{ "x-api-key" = $ApiKey }
 
 function New-SafeEmail([string]$prefix) {
@@ -60,3 +60,4 @@ if ($sumYes.summary.assignedTo.ownerId -ne $assigneeId) {
   throw "assignedTo mismatch for visitorYes='${visitorYes}': expected '$assigneeId' got '$($sumYes.summary.assignedTo.ownerId)'"
 }
 "OK assigned: visitorId=$visitorYes ownerId=$assigneeId"
+

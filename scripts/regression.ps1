@@ -139,7 +139,7 @@ Write-Host ""
 Write-Host "[3] API contract: timeline cursor + item shape (requires func start)"
 
 if (-not $env:HOPE_API_KEY) {
-  Fail "HOPE_API_KEY env var is not set in this shell."
+  Fail "HOPE_HOPE_API_KEY env var is not set in this shell."
 }
 
 $headers = @{ "x-api-key" = $env:HOPE_API_KEY }
@@ -264,14 +264,14 @@ if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
   Write-Host "[regression] Integration summary assignedTo contract..."
   pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-integration-summary-assignedto.ps1")
 } else {
-  Write-Host "[regression] Skipping assignedTo contract (HOPE_API_KEY not set)."
+  Write-Host "[regression] Skipping assignedTo contract (HOPE_HOPE_API_KEY not set)."
 }
 # Add integration summary followupReason/assignedTo consistency assertion (safe, standalone)
 if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
   Write-Host "[regression] Integration summary followup consistency contract..."
   pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-integration-summary-followup-consistency.ps1")
 } else {
-  Write-Host "[regression] Skipping followup consistency contract (HOPE_API_KEY not set)."
+  Write-Host "[regression] Skipping followup consistency contract (HOPE_HOPE_API_KEY not set)."
 }
 
 
@@ -282,9 +282,10 @@ if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
   pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-formation-milestones-v1.ps1") -ApiBase $BaseUrl -ApiKey $env:HOPE_API_KEY
   if ($LASTEXITCODE -ne 0) { throw "Formation milestones v1 asserts failed ($LASTEXITCODE)" }
 } else {
-  Write-Host "[regression] Skipping formation milestones v1 contract (HOPE_API_KEY not set)."
+  Write-Host "[regression] Skipping formation milestones v1 contract (HOPE_HOPE_API_KEY not set)."
 }
 Write-Host "[4] Auth scoping assertions (401/400 expectations)"
 $env:HOPE_RUN_PHASE3_ASSERTS = "1"
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-auth-scoping.ps1 -BaseUrl $BaseUrl
 if ($LASTEXITCODE -ne 0) { throw "Auth scoping asserts failed ($LASTEXITCODE)" }
+

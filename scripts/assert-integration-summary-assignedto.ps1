@@ -47,7 +47,6 @@ function Post-FollowupAssigned([string]$visitorId, [string]$assigneeId) {
 }
 
 function Get-IntegrationSummary([string]$visitorId) {
-  # Prefer /api surface; this endpoint is expected to exist in repo flows.
   return Invoke-RestMethod -Method Get -Uri "$ApiBase/integration/summary?visitorId=$visitorId" -Headers $headers
 }
 

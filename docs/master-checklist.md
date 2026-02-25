@@ -26,9 +26,9 @@
 
 ### Storage invariants (Azure Table Storage)
 - [x] VISITOR entity: PartitionKey="VISITOR", RowKey=visitorId
-- [x] EMAIL index entity: PartitionKey="EMAIL", RowKey=encodeURIComponent(eemailLower) => { visitorId }
+- [x] EMAIL index entity: PartitionKey="EMAIL", RowKey=encodeURIComponent(emailLower) => { visitorId }
 - [x] Stale EMAIL index repair:
-  - If EMAIL index points to missing visitor, recover VISITOR by emailLower, repair index, return existing visitor.
+  - If EMAIL index points to missing visitor, recover VISITOR by emailLower, repair index, return existing visitor.
 
 ### Tests
 - [x] Smoke coverage:
@@ -39,7 +39,7 @@
 
 ### Change log / references
 - [x] PR #68 merged: stale EMAIL index delete+retry + docs for 200/201 behavior
-- [x] PR #69 merged: recover-by-eemailLower + smoke regression for stale EMAIL index
+- [x] PR #69 merged: recover-by-emailLower + smoke regression for stale EMAIL index
 
 ---
 
@@ -118,4 +118,11 @@ Remaining (business logic expansion):
 - Keep smoke green and CI green.
 - No direct pushes to main; PRs only.
 - Focus: only changes that prevent major issues later or advance the master plan.
+
+### 2026-02-25 (session closeout)
+
+- ✅ CI: use HOPE_API_KEY GitHub secret with safe fallback (ci-key) — merged in **#140**
+- ✅ Storage: make ensureTableExists idempotent across Azurite races — merged in **#141**
+- ✅ Tests: regression runner includes integration summary followupReason/assignedTo consistency contract (gated on HOPE_API_KEY) — merged in **#139**
+- 🧹 Hygiene: closed stale bundled CI PRs (#2–#5); kept only minimal safe changes
 

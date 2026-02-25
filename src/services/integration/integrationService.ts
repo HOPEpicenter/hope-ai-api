@@ -1,4 +1,6 @@
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
+import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
+import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
 import { FormationEventsRepository } from "../../repositories/formationEventsRepository";
 import { mergeTimelines } from "../../domain/integration/mergeTimelines.v1";
 import { listFormationEventsByVisitor } from "../../storage/formation/formationEventsRepo";
@@ -247,11 +249,29 @@ const merged = mergeTimelines(
 
       // Phase 4 additive fields (v1 contract). No business logic yet.
       // Minimal default: if no engagement has ever happened, treat as needs follow-up.
+
+      // Derive assignedTo from Formation Profile snapshot (read-only).
+      // This is additive: only populate when we have a real assignee id.
+      let assignedTo: { ownerType: "user" | "team"; ownerId: string; displayName?: string } | undefined;
+      try {
+        const cs = process.env.STORAGE_CONNECTION_STRING;
+        if (cs) {
+          const profiles = getFormationProfilesTableClient(cs);
+          await ensureTableExists(profiles as any);
+          const profile = await getFormationProfile(profiles as any, visitorId);
+          const assigneeId = String(profile?.assignedTo ?? "").trim();
+          if (assigneeId) {
+            assignedTo = { ownerType: "user", ownerId: assigneeId };
+          }
+        }
+      } catch {
+        // swallow: summary should still work even if profile table is missing
+      }
       needsFollowup: !lastEngagementAt,
       followupReason: !lastEngagementAt ? "no_engagement_yet" : undefined,
 
       // Optional / unset until we model business rules + persistence/events:
-      // assignedTo: undefined,
+      assignedTo,
       // followupReason: undefined,
       // groups: undefined,
       // programs: undefined,
@@ -260,5 +280,6 @@ const merged = mergeTimelines(
   }
 
 }
+
 
 

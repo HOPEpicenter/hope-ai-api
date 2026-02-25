@@ -242,4 +242,11 @@ if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
 } else {
   Write-Host "[regression] Skipping assignedTo contract (HOPE_API_KEY not set)."
 }
+# Add integration summary followupReason/assignedTo consistency assertion (safe, standalone)
+if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+  Write-Host "[regression] Integration summary followup consistency contract..."
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-integration-summary-followup-consistency.ps1")
+} else {
+  Write-Host "[regression] Skipping followup consistency contract (HOPE_API_KEY not set)."
+}
 

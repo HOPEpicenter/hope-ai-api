@@ -40,6 +40,8 @@ if (-not $env:AzureWebJobsStorage) {
 }
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$env:HOPE_RUN_PHASE3_ASSERTS = "1"
+
 
 function Get-TempRoot {
   if (-not [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) { return $env:RUNNER_TEMP }

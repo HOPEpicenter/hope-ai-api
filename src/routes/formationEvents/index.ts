@@ -6,6 +6,7 @@ import { listFormationEventsByVisitor } from "../../storage/formation/formationE
 import { getFormationProfilesTableClient, getFormationEventsTableClient } from "../../storage/formation/formationTables";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import { getFormationProfile, listFormationProfiles, upsertFormationProfile } from "../../storage/formation/formationProfilesRepo";
+import { looksLikeFormationEnvelopeV1, validateFormationEventEnvelopeV1Strict } from "../../contracts/formationEventEnvelope.v1";
 
 export const formationEventsRouter = Router();
 formationEventsRouter.use(requireApiKey);
@@ -40,6 +41,13 @@ function toHttpStatus(err: any, fallback = 400): number {
 // Now uses the domain recorder so we ALWAYS update FormationProfile snapshot.
 formationEventsRouter.post("/formation/events", async (req, res) => {
   const body = req.body || {};
+
+  // Backward-compatible + strict-for-v1:
+  // - legacy clients can keep sending { id, visitorId, type, occurredAt, metadata }
+  // - v1 envelope clients MUST send { v:1, eventId, visitorId, type, occurredAt, source:{system}, data }
+  if (looksLikeFormationEnvelopeV1(body)) {
+    validateFormationEventEnvelopeV1Strict(body);
+  }
 
   // Accept both legacy and envelope v1
   const visitorId = body.visitorId;

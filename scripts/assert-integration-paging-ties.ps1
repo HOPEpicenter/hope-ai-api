@@ -75,7 +75,7 @@ $formBody = @{
   type       = "FOLLOWUP_ASSIGNED"
   occurredAt = $ts
   source     = @{ system = "scripts/assert-integration-paging-ties.ps1" }
-  metadata   = @{
+  data   = @{
     assigneeId = "tie-assert"
     channel    = "api"
     notes      = "tie-break formation"

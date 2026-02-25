@@ -107,3 +107,4 @@ PostJson "$ApiBase/formation/events" $headers $goodV1 | Out-Null
 Write-Host "[OK] v1 envelope accepted" -ForegroundColor Green
 
 Write-Host "[assert-formation-envelope-v1-strict] OK" -ForegroundColor Green
+

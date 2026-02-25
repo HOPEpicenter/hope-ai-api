@@ -235,7 +235,11 @@ if ($r1.nextCursor) {
 }
 
 Ok "Regression checks complete."
-
-
-
+# Add assignedTo integration summary assertion (safe, standalone)
+if (-not [string]::IsNullOrWhiteSpace($env:API_KEY)) {
+  Write-Host "[regression] Integration summary assignedTo contract..."
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-integration-summary-assignedto.ps1")
+} else {
+  Write-Host "[regression] Skipping assignedTo contract (API_KEY not set)."
+}
 

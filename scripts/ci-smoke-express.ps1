@@ -253,7 +253,7 @@ if ($list.StatusCode -eq 404) {
     exit 1
   }
 
-  pwsh -NoProfile -ExecutionPolicy Bypass -File $assertPath2 -ApiBaseUrl $workingBase -ApiKey $env:HOPE_API_KEY
+  pwsh -NoProfile -ExecutionPolicy Bypass -File $assertPath2 -ApiBase $workingBase -ApiKey $env:HOPE_API_KEY
 
 }
 Write-Host "OK: CI Express smoke passed."
@@ -283,4 +283,5 @@ if ($env:HOPE_RUN_PHASE3_ASSERTS -eq "1") {
 }
 Write-Host "OK: CI Express smoke passed."
 exit 0
+
 

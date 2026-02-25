@@ -219,6 +219,7 @@ const merged = mergeTimelines(
           })
         : null;
 
+
     return { items: pageItems, nextCursor };
   }
   async readIntegrationSummary(visitorId: string) {
@@ -237,6 +238,24 @@ const merged = mergeTimelines(
         ? (Date.parse(lastEngagementAt) >= Date.parse(lastFormationAt) ? lastEngagementAt : lastFormationAt)
         : (lastEngagementAt ?? lastFormationAt ?? null);
 
+
+    // Derive assignedTo from Formation Profile snapshot (read-only).
+    // Additive: only populate when we have a real assignee id.
+    let assignedTo: { ownerType: "user" | "team"; ownerId: string; displayName?: string } | undefined;
+    try {
+      const cs = process.env.STORAGE_CONNECTION_STRING;
+      if (cs) {
+        const profiles = getFormationProfilesTableClient(cs);
+        const profile = await getFormationProfile(profiles as any, visitorId);
+        const assigneeId = String((profile as any)?.assignedTo ?? "").trim();
+        if (assigneeId) {
+          assignedTo = { ownerType: "user", ownerId: assigneeId };
+        }
+      }
+    } catch {
+      // swallow: summary should still work even if profile table is missing
+    }
+
     return {
       visitorId,
       lastEngagementAt,
@@ -250,23 +269,6 @@ const merged = mergeTimelines(
       // Phase 4 additive fields (v1 contract). No business logic yet.
       // Minimal default: if no engagement has ever happened, treat as needs follow-up.
 
-      // Derive assignedTo from Formation Profile snapshot (read-only).
-      // This is additive: only populate when we have a real assignee id.
-      let assignedTo: { ownerType: "user" | "team"; ownerId: string; displayName?: string } | undefined;
-      try {
-        const cs = process.env.STORAGE_CONNECTION_STRING;
-        if (cs) {
-          const profiles = getFormationProfilesTableClient(cs);
-          await ensureTableExists(profiles as any);
-          const profile = await getFormationProfile(profiles as any, visitorId);
-          const assigneeId = String(profile?.assignedTo ?? "").trim();
-          if (assigneeId) {
-            assignedTo = { ownerType: "user", ownerId: assigneeId };
-          }
-        }
-      } catch {
-        // swallow: summary should still work even if profile table is missing
-      }
       needsFollowup: !lastEngagementAt,
       followupReason: !lastEngagementAt ? "no_engagement_yet" : undefined,
 

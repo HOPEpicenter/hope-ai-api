@@ -8,6 +8,30 @@ $ErrorActionPreference = "Stop"
 Write-Host "=== HOPE AI REGRESSION CHECKS ==="
 Write-Host "RepoRoot: $RepoRoot"
 Write-Host "BaseUrl:  $BaseUrl"
+Write-Host ""
+Write-Host "[0] Preflight: API reachable"
+
+function Test-ApiReachable {
+  param([Parameter(Mandatory=$true)][string]$BaseUrl)
+
+  $healthUrl = "$BaseUrl/health"
+
+  try {
+    # Try /health first (preferred if available)
+    $null = Invoke-WebRequest -Method GET -Uri $healthUrl -UseBasicParsing -TimeoutSec 5
+    return
+  } catch {
+    # If /health doesn't exist, still allow reachability check via BaseUrl root
+    try {
+      $null = Invoke-WebRequest -Method GET -Uri $BaseUrl -UseBasicParsing -TimeoutSec 5
+      return
+    } catch {
+      throw "API not reachable at BaseUrl=$BaseUrl (tried $healthUrl and $BaseUrl). Start the local server, then re-run regression."
+    }
+  }
+}
+
+Test-ApiReachable -BaseUrl $BaseUrl
 
 function Fail($msg) {
   Write-Host "[FAIL] $msg" -ForegroundColor Red

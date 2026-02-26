@@ -53,3 +53,6 @@ src/unassignedTasks_disabled_disabled_disabled_disabled/
 # Local logs
 .logs/
 
+
+_local_backup/
+

@@ -1,35 +1,28 @@
 param(
-  [string]$Base = "http://127.0.0.1:3000",
-  [string]$ApiBase = "http://127.0.0.1:3000/api"
+  [string]$Base = "http://localhost:3000",
+  [string]$ApiKey = $(if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) { $env:HOPE_API_KEY } else { $env:API_KEY })
 )
 
-$ErrorActionPreference = "Stop"
+if ([string]::IsNullOrWhiteSpace($ApiKey)) { throw "HOPE_API_KEY (preferred) or API_KEY is required in env, or pass -ApiKey" }
+$headers = @{ "x-api-key" = $ApiKey }
 
-function Fail($msg) {
-  Write-Host "[FAIL] $msg" -ForegroundColor Red
-  exit 1
+function New-SafeEmail([string]$prefix) {
+  $safe = ($prefix.ToLower() -replace '[^a-z0-9]+','-').Trim('-')
+  return "$safe+$(New-Guid)@example.com"
 }
 
-function Ok($msg) {
-  Write-Host $msg -ForegroundColor Green
+function New-Visitor([string]$namePrefix) {
+  $email = New-SafeEmail $namePrefix
+  $body  = @{ name = $namePrefix; email = $email } | ConvertTo-Json
+  $res   = Invoke-RestMethod -ErrorAction Stop -Method Post -Uri "$Base/api/visitors" -Headers $headers -ContentType "application/json" -Body $body
+  if ($res.ok -ne $true) { throw "Create visitor returned non-ok: $($res | ConvertTo-Json -Depth 10)" }
+  if ([string]::IsNullOrWhiteSpace($res.visitorId)) { throw "Create visitor missing visitorId: $($res | ConvertTo-Json -Depth 10)" }
+  return $res.visitorId
 }
 
-if ([string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
-  Fail "HOPE_API_KEY env var is not set in this shell."
-}
-
-$headers = @{ "x-api-key" = $env:HOPE_API_KEY }
-
-function New-VisitorId {
-  $body = @{
-    name   = "AssignedTo Regression"
-    email  = ("assignedto+" + (Get-Date -Format "yyyyMMddHHmmss") + "@example.com")
-    source = "assert-integration-summary-assignedto"
-  } | ConvertTo-Json
-
-  $res = Invoke-RestMethod -Method Post -Uri "$ApiBase/visitors" -Headers $headers -ContentType "application/json" -Body $body
-  if (-not $res.visitorId) { Fail "Create visitor did not return visitorId" }
-  return [string]$res.visitorId
+function Get-IntegrationSummary([string]$visitorId) {
+  $sumUrl = "$Base/api/integration/summary?visitorId=$([Uri]::EscapeDataString($visitorId))"
+  return Invoke-RestMethod -Method Get -Uri $sumUrl -Headers $headers
 }
 
 function Post-FollowupAssigned([string]$visitorId, [string]$assigneeId) {
@@ -39,36 +32,36 @@ function Post-FollowupAssigned([string]$visitorId, [string]$assigneeId) {
     type = "FOLLOWUP_ASSIGNED"
     occurredAt = (Get-Date).ToUniversalTime().ToString("o")
     source = @{ system = "assert-integration-summary-assignedto" }
-    data = @{ assigneeId = $assigneeId }
+eventId = [guid]::NewGuid().ToString()
+data = @{ eventId = [guid]::NewGuid().ToString(); assigneeId = $assigneeId }
   } | ConvertTo-Json -Depth 10
 
-  $res = Invoke-RestMethod -Method Post -Uri "$ApiBase/formation/events" -Headers $headers -ContentType "application/json" -Body $evt
-  if ($res.ok -ne $true) { Fail "FOLLOWUP_ASSIGNED returned non-ok: $($res | ConvertTo-Json -Depth 10)" }
+  $res = Invoke-RestMethod -ErrorAction Stop -Method Post -Uri "$Base/api/formation/events" -Headers $headers -ContentType "application/json" -Body $evt
+  if ($res.ok -ne $true) { throw "FOLLOWUP_ASSIGNED returned non-ok: $($res | ConvertTo-Json -Depth 10)" }
 }
 
-function Get-IntegrationSummary([string]$visitorId) {
-  return Invoke-RestMethod -Method Get -Uri "$ApiBase/integration/summary?visitorId=$visitorId" -Headers $headers
+# --- Case 1: no assignee => assignedTo MUST be absent ---
+$visitorNo = New-Visitor "No AssignedTo"
+$sumNo = Get-IntegrationSummary $visitorNo
+if ($sumNo.summary.PSObject.Properties.Name -contains "assignedTo") {
+  throw "expected summary.assignedTo absent for visitorNo='${visitorNo}', but got: $($sumNo.summary.assignedTo | ConvertTo-Json -Depth 10)"
 }
+"OK no-assignee: visitorId=$visitorNo assignedTo absent"
 
-# --- Case 1: no-assignee -> assignedTo absent/null ---
-$vid1 = New-VisitorId
-$sum1 = Get-IntegrationSummary -visitorId $vid1
+# --- Case 2: has assignee => assignedTo MUST be present + match ---
+$visitorYes = New-Visitor "AssignedTo Smoke"
+$assigneeId = "ops-user-1"
+Post-FollowupAssigned -visitorId $visitorYes -assigneeId $assigneeId
+$sumYes = Get-IntegrationSummary $visitorYes
 
-if ($null -ne $sum1.assignedTo -and -not [string]::IsNullOrWhiteSpace([string]$sum1.assignedTo)) {
-  Fail "Expected assignedTo absent/blank for no-assignee visitorId=$vid1; got: $($sum1.assignedTo)"
+if (-not ($sumYes.summary.PSObject.Properties.Name -contains "assignedTo")) {
+  throw "expected summary.assignedTo present for visitorYes='${visitorYes}', but it was absent. summary=$($sumYes.summary | ConvertTo-Json -Depth 20)"
 }
-Ok "OK no-assignee: visitorId=$vid1 assignedTo absent"
-
-# --- Case 2: assigned -> assignedTo matches expected ---
-$vid2 = New-VisitorId
-Post-FollowupAssigned -visitorId $vid2 -assigneeId "ops-user-1"
-
-$sum2 = Get-IntegrationSummary -visitorId $vid2
-
-if ([string]::IsNullOrWhiteSpace([string]$sum2.assignedTo)) {
-  Fail "Expected assignedTo present for assigned visitorId=$vid2; got blank"
+if ($sumYes.summary.assignedTo.ownerId -ne $assigneeId) {
+  throw "assignedTo mismatch for visitorYes='${visitorYes}': expected '$assigneeId' got '$($sumYes.summary.assignedTo.ownerId)'"
 }
-if ([string]$sum2.assignedTo -ne "ops-user-1") {
-  Fail "Expected assignedTo=ops-user-1 for visitorId=$vid2; got: $($sum2.assignedTo)"
-}
-Ok "OK assigned: visitorId=$vid2 ownerId=ops-user-1"
+"OK assigned: visitorId=$visitorYes ownerId=$assigneeId"
+
+
+
+

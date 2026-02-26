@@ -14,7 +14,7 @@ function New-SafeEmail([string]$prefix) {
 function New-Visitor([string]$namePrefix) {
   $email = New-SafeEmail $namePrefix
   $body  = @{ name = $namePrefix; email = $email } | ConvertTo-Json
-  $res   = Invoke-RestMethod -Method Post -Uri "$Base/api/visitors" -Headers $headers -ContentType "application/json" -Body $body
+  $res   = Invoke-RestMethod -ErrorAction Stop -Method Post -Uri "$Base/api/visitors" -Headers $headers -ContentType "application/json" -Body $body
   if ($res.ok -ne $true) { throw "Create visitor returned non-ok: $($res | ConvertTo-Json -Depth 10)" }
   if ([string]::IsNullOrWhiteSpace($res.visitorId)) { throw "Create visitor missing visitorId: $($res | ConvertTo-Json -Depth 10)" }
   return $res.visitorId
@@ -32,10 +32,11 @@ function Post-FollowupAssigned([string]$visitorId, [string]$assigneeId) {
     type = "FOLLOWUP_ASSIGNED"
     occurredAt = (Get-Date).ToUniversalTime().ToString("o")
     source = @{ system = "assert-integration-summary-assignedto" }
-    metadata = @{ assigneeId = $assigneeId }
+eventId = [guid]::NewGuid().ToString()
+data = @{ eventId = [guid]::NewGuid().ToString(); assigneeId = $assigneeId }
   } | ConvertTo-Json -Depth 10
 
-  $res = Invoke-RestMethod -Method Post -Uri "$Base/api/formation/events" -Headers $headers -ContentType "application/json" -Body $evt
+  $res = Invoke-RestMethod -ErrorAction Stop -Method Post -Uri "$Base/api/formation/events" -Headers $headers -ContentType "application/json" -Body $evt
   if ($res.ok -ne $true) { throw "FOLLOWUP_ASSIGNED returned non-ok: $($res | ConvertTo-Json -Depth 10)" }
 }
 
@@ -60,4 +61,7 @@ if ($sumYes.summary.assignedTo.ownerId -ne $assigneeId) {
   throw "assignedTo mismatch for visitorYes='${visitorYes}': expected '$assigneeId' got '$($sumYes.summary.assignedTo.ownerId)'"
 }
 "OK assigned: visitorId=$visitorYes ownerId=$assigneeId"
+
+
+
 

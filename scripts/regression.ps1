@@ -263,6 +263,7 @@ Ok "Regression checks complete."
 if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
   Write-Host "[regression] Integration summary assignedTo contract..."
   pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-integration-summary-assignedto.ps1")
+if ($LASTEXITCODE -ne 0) { Fail "Integration summary assignedTo contract failed (exit=$LASTEXITCODE)" }
 } else {
   Write-Host "[regression] Skipping assignedTo contract (HOPE_API_KEY not set)."
 }
@@ -270,6 +271,7 @@ if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
 if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
   Write-Host "[regression] Integration summary followup consistency contract..."
   pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-integration-summary-followup-consistency.ps1")
+if ($LASTEXITCODE -ne 0) { Fail "Integration summary followup consistency contract failed (exit=$LASTEXITCODE)" }
 } else {
   Write-Host "[regression] Skipping followup consistency contract (HOPE_API_KEY not set)."
 }
@@ -288,3 +290,4 @@ Write-Host "[4] Auth scoping assertions (401/400 expectations)"
 $env:HOPE_RUN_PHASE3_ASSERTS = "1"
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-auth-scoping.ps1 -BaseUrl $BaseUrl
 if ($LASTEXITCODE -ne 0) { throw "Auth scoping asserts failed ($LASTEXITCODE)" }
+

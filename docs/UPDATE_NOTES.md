@@ -18,3 +18,11 @@
   - Smoke now validates cursor is URL-safe (no whitespace) and round-trips with URL escaping.
   - Local dev: smoke storage-backed EMAIL index repair requires STORAGE_CONNECTION_STRING (Azurite ok via UseDevelopmentStorage=true); otherwise it is skipped.
 
+## 2026-02-26
+
+- ✅ Fixed regression runner parse failure by removing leftover merge markers in scripts/regression.ps1.
+- ✅ Verified local regression runs green with HOPE_API_KEY set (integration summary assignedTo + followup consistency contracts executed).
+
+
+- ✅ Contract suite normalizes HOPE_BASE_URL to root (prevents /api/api path bugs).
+

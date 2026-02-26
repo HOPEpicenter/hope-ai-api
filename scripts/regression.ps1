@@ -136,6 +136,30 @@ finally {
 # 3) Timeline contract check (requires Functions running)
 # -----------------------------
 Write-Host ""
+# Start Express for API contract checks (regression expects a running server)
+# Stop existing listener on port 3000 (avoid EADDRINUSE)
+try {
+  $existing = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction Stop | Select-Object -First 1
+  if ($existing -and $existing.OwningProcess) {
+    Stop-Process -Id $existing.OwningProcess -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 300
+  }
+} catch { }
+$regProc = Start-Process -FilePath "node" -ArgumentList @("dist/index.js") -PassThru -WindowStyle Hidden
+
+# Wait for /api/health
+$health = "$($BaseUrl -replace '/api$','')/api/health"
+$deadline = (Get-Date).AddSeconds(60)
+while ((Get-Date) -lt $deadline) {
+  try {
+    $null = Invoke-RestMethod -Method Get -Uri $health -TimeoutSec 3
+    break
+  } catch {
+    Start-Sleep -Milliseconds 500
+  }
+}
+
+try {
 Write-Host "[3] API contract: timeline cursor + item shape (requires func start)"
 
 if (-not $env:HOPE_API_KEY) {
@@ -275,6 +299,7 @@ if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
 }
 
 
+<<<<<<< HEAD
 Write-Host ""
 # Add formation milestones v1 contract assertion (safe, standalone)
 if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
@@ -288,4 +313,12 @@ Write-Host "[4] Auth scoping assertions (401/400 expectations)"
 $env:HOPE_RUN_PHASE3_ASSERTS = "1"
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-auth-scoping.ps1 -BaseUrl $BaseUrl
 if ($LASTEXITCODE -ne 0) { throw "Auth scoping asserts failed ($LASTEXITCODE)" }
+=======
+} finally {
+  if ($regProc -and -not $regProc.HasExited) {
+    try { Stop-Process -Id $regProc.Id -Force } catch { }
+  }
+}
+>>>>>>> 4ce95d1 (test: add integration summary assignedTo regression assertion)
+
 

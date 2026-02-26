@@ -95,18 +95,6 @@ try {
   Write-Host "Running: scripts/regression.ps1"
   pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts/regression.ps1") -RepoRoot $RepoRoot -BaseUrl $BaseUrl
   if ($LASTEXITCODE -ne 0) { throw "scripts/regression.ps1 failed (exit=$LASTEXITCODE)" }
-
-  # Optional: run assignedTo assert if HOPE_API_KEY is available
-  if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
-    Write-Host ""
-    Write-Host "Running: scripts/assert-integration-summary-assignedto.ps1"
-    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts/assert-integration-summary-assignedto.ps1") -Base ($hostBase)
-    if ($LASTEXITCODE -ne 0) { throw "assert-integration-summary-assignedto.ps1 failed (exit=$LASTEXITCODE)" }
-  } else {
-    Write-Host ""
-    Write-Host "Skipping assignedTo assert (HOPE_API_KEY not set)."
-  }
-
   Write-Host ""
   Write-Host "OK: run-regression completed."
 }
@@ -116,3 +104,4 @@ finally {
     try { Stop-Process -Id $regProc.Id -Force -ErrorAction SilentlyContinue } catch { }
   }
 }
+

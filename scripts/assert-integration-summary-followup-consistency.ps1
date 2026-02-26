@@ -72,6 +72,7 @@ Assert ($sumYes.summary.assignedTo.ownerId -eq $assigneeId) "assignedTo mismatch
 
 Assert ($sumYes.summary.needsFollowup -eq $true) "expected needsFollowup=true when assignedTo is present (visitorYes='${visitorYes}')"
 Assert (-not [string]::IsNullOrWhiteSpace([string]$sumYes.summary.followupReason)) "expected followupReason to be present/non-empty when assignedTo is present (visitorYes='${visitorYes}')"
+Assert ($sumYes.summary.followupReason -eq "FOLLOWUP_ASSIGNED") "expected followupReason='FOLLOWUP_ASSIGNED' when assignedTo is present (visitorYes='${visitorYes}')"
 
 "OK followup consistency (assigned): visitorId=$visitorYes ownerId=$assigneeId followupReason=$($sumYes.summary.followupReason)"
 

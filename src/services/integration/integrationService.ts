@@ -255,6 +255,7 @@ const merged = mergeTimelines(
       // swallow: summary should still work even if profile table is missing
     }
 
+    const hasAssignee = !!(assignedTo && typeof (assignedTo as any).ownerId === "string" && String((assignedTo as any).ownerId).trim());
     return {
       visitorId,
       lastEngagementAt,
@@ -267,10 +268,8 @@ const merged = mergeTimelines(
 
       // Phase 4 additive fields (v1 contract). No business logic yet.
       // Minimal default: if no engagement has ever happened, treat as needs follow-up.
-
-      needsFollowup: !lastEngagementAt,
-      followupReason: !lastEngagementAt ? "no_engagement_yet" : undefined,
-
+      needsFollowup: !!hasAssignee || !lastEngagementAt,
+      followupReason: hasAssignee ? "FOLLOWUP_ASSIGNED" : !lastEngagementAt ? "no_engagement_yet" : undefined,
       // Optional / unset until we model business rules + persistence/events:
       assignedTo,
       // followupReason: undefined,

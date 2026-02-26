@@ -24,3 +24,5 @@
 - ✅ Verified local regression runs green with HOPE_API_KEY set (integration summary assignedTo + followup consistency contracts executed).
 
 
+- ✅ Contract suite normalizes HOPE_BASE_URL to root (prevents /api/api path bugs).
+

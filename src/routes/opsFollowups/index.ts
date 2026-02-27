@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
+import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 
 export const opsFollowupsRouter = Router();
 opsFollowupsRouter.use(requireApiKey);
@@ -13,6 +14,7 @@ function toMs(v: any): number | null {
 
 opsFollowupsRouter.get("/", async (_req, res) => {
   const table = getFormationProfilesTableClient();
+  await ensureTableExists(table);
 
   const items: any[] = [];
 
@@ -51,3 +53,4 @@ opsFollowupsRouter.get("/", async (_req, res) => {
 
   return res.json({ ok: true, items });
 });
+

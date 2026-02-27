@@ -139,7 +139,15 @@ function applyProfileTouchpoint(
 
     case FormationEventType.FOLLOWUP_ASSIGNED:
       (profile as any).lastFollowupAssignedAt = occurredAt;
-      if (metadata?.assigneeId) (profile as any).assignedTo = String(metadata.assigneeId);
+      {
+      const rawAssignee =
+        (metadata as any)?.assigneeId ??
+        (metadata as any)?.assignedTo ??
+        (metadata as any)?.assignee;
+
+      const assigneeId = String(rawAssignee ?? "").trim();
+      if (assigneeId) (profile as any).assignedTo = assigneeId;
+    }
       break;
 
     case FormationEventType.FOLLOWUP_CONTACTED:

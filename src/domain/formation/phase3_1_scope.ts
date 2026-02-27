@@ -214,8 +214,19 @@ export function validateFormationEvent(input: FormationEventInput): ValidationRe
 
   switch (input.type) {
     case FormationEventType.FOLLOWUP_ASSIGNED:
-      if (!md.assigneeId || typeof md.assigneeId !== "string") {
-        return { ok: false, error: "metadata.assigneeId required for FOLLOWUP_ASSIGNED" };
+      {
+        const raw =
+          (md as any)?.assigneeId ??
+          (md as any)?.assignedTo ??
+          (md as any)?.assignee;
+
+        const assigneeId = typeof raw === "string" ? raw.trim() : "";
+        if (!assigneeId) {
+          return { ok: false, error: "metadata.assigneeId required for FOLLOWUP_ASSIGNED" };
+        }
+
+        // normalize to canonical key
+        (md as any).assigneeId = assigneeId;
       }
       break;
 

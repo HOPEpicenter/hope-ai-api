@@ -129,7 +129,7 @@ Remaining (business logic expansion):
 
 ### 2026-02-27 (session closeout)
 
-- ✅ OPS followups: ensure formation profiles table exists before listing (fresh Azurite doesn’t 500).
-- ✅ OPS followups: include resolvedForAssignment in response items (queue consumer can filter resolved rows).
-- ✅ Dev discipline maintained: OPS remains read/projection; writes stay in formation events (/api/formation/events).
+- [x] OPS followups: ensure formation profiles table exists before listing (fresh Azurite doesn't 500).
+- [x] OPS followups: include resolvedForAssignment in response items (queue consumer can filter resolved rows).
+- [x] Dev discipline maintained: OPS remains read/projection; writes stay in formation events (/api/formation/events).
 

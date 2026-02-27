@@ -10,6 +10,7 @@ import { legacyRouter } from "./routes/legacy";
 import { requestIdMiddleware, errorMiddleware } from "./http/middleware";
 import { requestLogMiddleware } from "./http/requestLog";
 import { AzureTableVisitorsRepository, AzureTableFormationEventsRepository } from "./repositories";
+import { opsFollowupsRouter } from "./routes/opsFollowups";
 
 import { AzureTableEngagementsRepository } from "./repositories/engagementsRepository";
 process.on("unhandledRejection", (reason) => {
@@ -34,6 +35,7 @@ const visitorsRepository = new AzureTableVisitorsRepository();
 const formationEventsRepository = new AzureTableFormationEventsRepository();
 const engagementsRepository = new AzureTableEngagementsRepository();
 app.use("/ops", createOpsRouter(visitorsRepository, formationEventsRepository, engagementsRepository));
+app.use("/ops/followups", opsFollowupsRouter);
 // Public API routes
 app.use("/api/visitors", visitorsRouter(visitorsRepository));
 app.use("/api", formationEventsRouter);

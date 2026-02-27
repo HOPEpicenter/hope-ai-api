@@ -126,3 +126,10 @@ Remaining (business logic expansion):
 - ✅ Tests: regression runner includes integration summary followupReason/assignedTo consistency contract (gated on HOPE_API_KEY) — merged in **#139**
 - 🧹 Hygiene: closed stale bundled CI PRs (#2–#5); kept only minimal safe changes
 
+
+### 2026-02-27 (session closeout)
+
+- [x] OPS followups: ensure formation profiles table exists before listing (fresh Azurite doesn't 500).
+- [x] OPS followups: include resolvedForAssignment in response items (queue consumer can filter resolved rows).
+- [x] Dev discipline maintained: OPS remains read/projection; writes stay in formation events (/api/formation/events).
+

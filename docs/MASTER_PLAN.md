@@ -1,5 +1,18 @@
 # HOPE AI — MASTER PLAN
 
+## 2026-02-27 Update
+
+**What landed**
+- ✅ OPS followups queue: ensure formation profiles table exists before listing (fresh Azurite/Azurite resets don’t 500).
+- ✅ OPS followups queue: include esolvedForAssignment in response items (queue consumers can decide what to hide).
+
+**Why this matters (master plan alignment)**
+- Keeps /ops/* as dev/admin tooling while preserving write discipline via /api/* (OPS reads projections; writes remain formation events).
+- Reduces “major problems later” risk: fewer flaky/local-first failures caused by missing dev tables.
+
+**Next**
+- Add/refresh a smoke/regression check that exercises /ops/followups against a fresh Azurite (empty tables) and after recording a followup assignment/outcome.
+- Stay focused on master plan milestones; avoid broad refactors unless blocked.
 ## 2026-02-25 Update
 
 **What landed**
@@ -157,4 +170,6 @@ Planned:
 1. Lock Formation milestone model (small, safe PR-sized work).
 2. Implement Integration aggregation logic (incremental, contract-first).
 3. Add CI coverage for scoped auth expectations if not already fully asserted.
+
+
 

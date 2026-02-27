@@ -133,4 +133,3 @@ Remaining (business logic expansion):
 - ✅ OPS followups: include resolvedForAssignment in response items (queue consumer can filter resolved rows).
 - ✅ Dev discipline maintained: OPS remains read/projection; writes stay in formation events (/api/formation/events).
 
-

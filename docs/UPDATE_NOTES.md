@@ -30,5 +30,3 @@
 
 - ✅ Contract suite normalizes HOPE_BASE_URL to root (prevents /api/api path bugs).
 
-
-

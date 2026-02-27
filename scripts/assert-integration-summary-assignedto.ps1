@@ -33,7 +33,7 @@ function Post-FollowupAssigned([string]$visitorId, [string]$assigneeId) {
     occurredAt = (Get-Date).ToUniversalTime().ToString("o")
     source = @{ system = "assert-integration-summary-assignedto" }
 eventId = [guid]::NewGuid().ToString()
-data = @{ eventId = [guid]::NewGuid().ToString(); assigneeId = $assigneeId }
+data = @{ eventId = [guid]::NewGuid().ToString(); assignedTo = $assigneeId }
   } | ConvertTo-Json -Depth 10
 
   $res = Invoke-RestMethod -ErrorAction Stop -Method Post -Uri "$Base/api/formation/events" -Headers $headers -ContentType "application/json" -Body $evt

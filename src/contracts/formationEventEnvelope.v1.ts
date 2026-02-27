@@ -43,9 +43,13 @@ export function validateFormationEventEnvelopeV1Strict(body: unknown): Formation
   const d: any = asObject(data) ?? {};
 
   if (t === "FOLLOWUP_ASSIGNED") {
-    if (!isNonEmptyString(d.assigneeId)) {
+    const raw = (d as any)?.assigneeId ?? (d as any)?.assignedTo ?? (d as any)?.assignee;
+    const assigneeId = typeof raw === "string" ? raw.trim() : "";
+    if (!assigneeId) {
       throw new Error("FOLLOWUP_ASSIGNED requires data.assigneeId (string)");
     }
+    // normalize to canonical key
+    (d as any).assigneeId = assigneeId;
   }
 
   if (t === "NEXT_STEP_SELECTED") {

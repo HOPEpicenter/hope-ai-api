@@ -46,6 +46,7 @@ opsFollowupsRouter.get("/", async (_req, res) => {
       lastFollowupAssignedAt: assignedAt,
       lastFollowupContactedAt: contactedAt,
       lastFollowupOutcomeAt: outcomeAt,
+      resolvedForAssignment: resolvedForAssignment,
       stage: (p as any).stage ?? null,
       needsFollowup,
     });

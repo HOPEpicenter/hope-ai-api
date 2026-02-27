@@ -139,3 +139,4 @@ $itemO = @($fuO.items) | Where-Object { $_.visitorId -eq $visitorId } | Select-O
 if ($itemO) { throw "Expected visitorId=$visitorId to be resolved and not present after outcome." }
 
 Write-Host "[assert-ops-followups] OK: followups lifecycle regression passed." -ForegroundColor Green
+

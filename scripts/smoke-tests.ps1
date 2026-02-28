@@ -419,19 +419,60 @@ if (-not (Test-Path -LiteralPath $engPath)) {
 }
 
 Write-Host ""
+Write-Host ""
+Write-Host ""
+Write-Host ""
 Write-Host "== Engagement E2E (/api/engagements/*) ==" -ForegroundColor Cyan
-& powershell -NoProfile -ExecutionPolicy Bypass -File $engPath -BaseUrl $BaseUrl
 
-if ($LASTEXITCODE -ne 0) {
-  throw "Engagement E2E failed (exit=$LASTEXITCODE)"
+# CI should enforce a real key; local smoke can skip if unset/placeholder to keep momentum.
+$ci = ($env:CI -eq "true")
+$key = $env:HOPE_API_KEY
+$keyText = if ($null -eq $key) { "" } else { [string]$key }
+$keyLower = $keyText.ToLowerInvariant().Trim()
+
+# Robust placeholder detection (no regex)
+$looksPlaceholder =
+  [string]::IsNullOrWhiteSpace($keyText) -or
+  ($keyLower.StartsWith("<") -and $keyLower.EndsWith(">")) -or
+  ($keyLower.Contains("placeholder")) -or
+  ($keyLower.Contains("changeme")) -or
+  ($keyLower.Contains("dev key")) -or
+  ($keyLower.Contains("your dev")) -or
+  ($keyLower.Contains("your key")) -or
+  ($keyLower -eq "your dev key")
+
+if ($looksPlaceholder) {
+  if ($ci) {
+    throw "HOPE_API_KEY is missing/placeholder in CI. Provide a real key for Engagement E2E."
+  }
+  Write-Host "SKIP: Engagement E2E (set HOPE_API_KEY to run locally)" -ForegroundColor Yellow
+} else {
+  $e2ePath = Join-Path $PSScriptRoot "smoke-visitor-engagements-e2e.ps1"
+  if (-not (Test-Path -LiteralPath $e2ePath)) {
+    throw "Missing Engagement E2E script: $e2ePath"
+  }
+
+  & pwsh -NoProfile -ExecutionPolicy Bypass -File $e2ePath -BaseUrl $BaseUrl
+  if ($LASTEXITCODE -ne 0) {
+    throw "Engagement E2E failed (exit=$LASTEXITCODE)"
+  }
+  Write-Host "Engagement E2E OK"
 }
 
-Write-Host "Engagement E2E OK"
+# OPS followups smoke
+$fuPath = Join-Path $PSScriptRoot "smoke-followups.ps1"
+if (-not (Test-Path -LiteralPath $fuPath)) {
+  throw "Missing followups smoke script: $fuPath"
+}
+
+Write-Host ""
+Write-Host "== Followups (OPS) ==" -ForegroundColor Cyan
+& pwsh -NoProfile -ExecutionPolicy Bypass -File $fuPath -BaseUrl $BaseUrl
+if ($LASTEXITCODE -ne 0) {
+  throw "Followups smoke failed (exit=$LASTEXITCODE)"
+}
+Write-Host "Followups smoke OK"
 
 Write-Host "SMOKE TESTS PASSED"
 exit 0
-
-
-
-
 

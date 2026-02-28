@@ -35,7 +35,7 @@ export default async function (context: any, req: any): Promise<void> {
 
     // NOTE: This table name must match your formation profiles table.
     // If your actual table name differs, change it here once, and dashboard will work.
-    const tableName = "FormationProfiles";
+    const tableName = (process.env.FORMATION_PROFILES_TABLE ?? "devFormationProfiles").trim();
     const table = TableClient.fromConnectionString(conn, tableName);
 
     await ensureTableExists(table);
@@ -114,3 +114,4 @@ async function ensureTableExists(table: TableClient) {
     throw e;
   }
 }
+

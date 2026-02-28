@@ -210,14 +210,32 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     const table = await getTableClient(TABLE);
     const limit = Math.max(1, Math.min(input?.limit ?? 5, 200));
 
-    const items: Visitor[] = [];
+    // NOTE: Azure Table iteration order is not guaranteed. Make results deterministic.
+    // We cap the scan to avoid unbounded reads in early phases; add pagination later if needed.
+    const scanCap = 500;
+
+    const all: Visitor[] = [];
     const filter = "PartitionKey eq 'VISITOR'";
 
     for await (const e of table.listEntities<VisitorEntity>({ queryOptions: { filter } })) {
-      items.push(toVisitor(e as any));
-      if (items.length >= limit) break;
+      all.push(toVisitor(e as any));
+      if (all.length >= scanCap) break;
     }
 
+    all.sort((a, b) => {
+      const au = a.updatedAt || a.createdAt || "";
+      const bu = b.updatedAt || b.createdAt || "";
+      if (au < bu) return 1;
+      if (au > bu) return -1;
+
+      const ai = a.visitorId || "";
+      const bi = b.visitorId || "";
+      if (ai < bi) return -1;
+      if (ai > bi) return 1;
+      return 0;
+    });
+
+    const items = all.slice(0, limit);
     return { items, count: items.length };
   }
 

@@ -1,3 +1,12 @@
+## Session Closeout
+
+### 2026-02-28 (Session Closeout)
+
+- Merged PR #165: GET /api/visitors list endpoint + CI smoke alignment
+- Merged PR #166: remove duplicate email reservation block
+- Merged PR #167: deterministic visitors list ordering (updatedAt desc)
+- Confirmed CI auth scoping expectations run (assert-auth-scoping.ps1)
+
 # HOPE AI API Master Checklist (Product + Engineering)
 
 > Single source of truth for what’s built, what’s locked, and what’s next.
@@ -132,4 +141,5 @@ Remaining (business logic expansion):
 - [x] OPS followups: ensure formation profiles table exists before listing (fresh Azurite doesn't 500).
 - [x] OPS followups: include resolvedForAssignment in response items (queue consumer can filter resolved rows).
 - [x] Dev discipline maintained: OPS remains read/projection; writes stay in formation events (/api/formation/events).
+
 

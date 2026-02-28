@@ -1,5 +1,12 @@
 # UPDATE_NOTES.md
 
+## 2026-02-28
+
+- Merged: #165 feat(api): list visitors (GET /api/visitors) + CI smoke/auth-scoping alignment
+- Merged: #166 chore(visitors): remove duplicate email reservation block
+- Merged: #167 chore(visitors): make visitor list ordering deterministic (sort by updatedAt desc)
+- CI: Auth scoping expectations (401/400) are executed in CI (assert-auth-scoping.ps1) via ci-run-express-smoke.
+
 ## 2026-02-27
 
 - ✅ OPS: GET /ops/followups now ensures the formation profiles table exists before listing (prevents errors on fresh Azurite).

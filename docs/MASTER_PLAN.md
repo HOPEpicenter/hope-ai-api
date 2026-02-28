@@ -1,5 +1,12 @@
 # HOPE AI — MASTER PLAN
 
+## Completed (2026-02-28)
+
+- Visitors: GET /api/visitors list endpoint shipped (#165)
+- Visitors: deterministic list ordering (updatedAt desc) shipped (#167)
+- Visitors: removed duplicate email reservation block shipped (#166)
+- CI: auth scoping expectations (assert-auth-scoping.ps1) run in CI via ci-run-express-smoke
+
 ## 2026-02-27 Update
 
 **What landed**

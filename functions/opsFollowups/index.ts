@@ -1,24 +1,8 @@
-import type { AzureFunction, Context, HttpRequest } from "@azure/functions";
-import { getFormationProfilesTableClient } from "../../src/storage/formation/formationTables";
-import { ensureTableExists } from "../../src/shared/storage/ensureTableExists";
+import { TableClient } from "@azure/data-tables";
 
-function pickHeader(req: HttpRequest): string {
-  const h: any = (req as any).headers ?? {};
-  const v =
-    h["x-api-key"] ??
-    h["X-API-KEY"] ??
-    h["x-api-Key"] ??
-    h["X-Api-Key"];
-  return typeof v === "string" ? v : "";
-}
-
-function toMs(v: any): number | null {
-  if (!v) return null;
-  const ms = Date.parse(String(v));
-  return Number.isFinite(ms) ? ms : null;
-}
-
-const httpTrigger: AzureFunction = async function (context: Context, req: HttpRequest): Promise<void> {
+// Avoid depending on @azure/functions legacy type exports.
+// The runtime will call this default export with (context, req).
+export default async function (context: any, req: any): Promise<void> {
   try {
     const expected = (process.env.HOPE_API_KEY ?? "").trim();
     if (!expected) {
@@ -26,28 +10,51 @@ const httpTrigger: AzureFunction = async function (context: Context, req: HttpRe
       return;
     }
 
-    const provided = pickHeader(req).trim();
-    if (!provided) {
+    const headers = (req?.headers ?? {}) as Record<string, any>;
+    const provided =
+      (headers["x-api-key"] ??
+        headers["X-API-KEY"] ??
+        headers["x-api-Key"] ??
+        headers["X-Api-Key"] ??
+        "") as string;
+
+    if (!provided || String(provided).trim().length === 0) {
       context.res = { status: 401, body: { ok: false, error: "Missing x-api-key" } };
       return;
     }
-    if (provided !== expected) {
+    if (String(provided).trim() !== expected) {
       context.res = { status: 401, body: { ok: false, error: "Invalid x-api-key" } };
       return;
     }
 
-    const table = getFormationProfilesTableClient();
+    const conn = (process.env.STORAGE_CONNECTION_STRING ?? "").trim();
+    if (!conn) {
+      context.res = { status: 500, body: { ok: false, error: "Server missing STORAGE_CONNECTION_STRING" } };
+      return;
+    }
+
+    // NOTE: This table name must match your formation profiles table.
+    // If your actual table name differs, change it here once, and dashboard will work.
+    const tableName = "FormationProfiles";
+    const table = TableClient.fromConnectionString(conn, tableName);
+
     await ensureTableExists(table);
 
     const items: any[] = [];
 
-    for await (const p of table.listEntities<any>({})) {
-      const assignedTo = String((p as any).assignedTo ?? "").trim();
+    // Pull only entities that have an assignee (filter server-side where possible).
+    // (assignedTo ne '') should work for string props. If it errors, we can fall back to a full scan.
+    const entities = table.listEntities<any>({
+      queryOptions: { filter: "assignedTo ne ''" }
+    });
+
+    for await (const p of entities) {
+      const assignedTo = String(p.assignedTo ?? "").trim();
       if (!assignedTo) continue;
 
-      const assignedAt = (p as any).lastFollowupAssignedAt ?? null;
-      const contactedAt = (p as any).lastFollowupContactedAt ?? null;
-      const outcomeAt = (p as any).lastFollowupOutcomeAt ?? null;
+      const assignedAt = p.lastFollowupAssignedAt ?? null;
+      const contactedAt = p.lastFollowupContactedAt ?? null;
+      const outcomeAt = p.lastFollowupOutcomeAt ?? null;
 
       const assignedAtMs = toMs(assignedAt);
       const contactedAtMs = toMs(contactedAt);
@@ -56,7 +63,7 @@ const httpTrigger: AzureFunction = async function (context: Context, req: HttpRe
       const resolvedForAssignment =
         assignedAtMs !== null && outcomeAtMs !== null && outcomeAtMs >= assignedAtMs;
 
-      // Mirror current ops route behavior: hide resolved rows from queue view
+      // Match ops route: omit resolved rows from queue view
       if (resolvedForAssignment) continue;
 
       const needsFollowup =
@@ -64,13 +71,13 @@ const httpTrigger: AzureFunction = async function (context: Context, req: HttpRe
         (assignedAtMs !== null && contactedAtMs !== null && assignedAtMs > contactedAtMs);
 
       items.push({
-        visitorId: String((p as any).rowKey ?? (p as any).RowKey ?? ""),
+        visitorId: String(p.rowKey ?? ""),
         assignedTo: { ownerType: "user", ownerId: assignedTo },
         lastFollowupAssignedAt: assignedAt,
         lastFollowupContactedAt: contactedAt,
         lastFollowupOutcomeAt: outcomeAt,
         resolvedForAssignment,
-        stage: (p as any).stage ?? null,
+        stage: p.stage ?? null,
         needsFollowup
       });
     }
@@ -87,6 +94,23 @@ const httpTrigger: AzureFunction = async function (context: Context, req: HttpRe
       body: { ok: false, error: err?.message ?? "ops_followups_error" }
     };
   }
-};
+}
 
-export default httpTrigger;
+function toMs(v: any): number | null {
+  if (!v) return null;
+  const ms = Date.parse(String(v));
+  return Number.isFinite(ms) ? ms : null;
+}
+
+async function ensureTableExists(table: TableClient) {
+  try {
+    await table.createTable();
+  } catch (e: any) {
+    // 409 conflict => already exists
+    const code = e?.statusCode ?? e?.code ?? "";
+    if (code === 409 || code === "TableAlreadyExists") return;
+    // Some SDK versions throw RestError with statusCode
+    if (String(code) === "409") return;
+    throw e;
+  }
+}

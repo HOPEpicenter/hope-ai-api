@@ -179,6 +179,34 @@ if ([string]::IsNullOrWhiteSpace($workingBase)) {
 Write-Host ("HEALTH {0}/health" -f $workingBase)
 
 Write-Host ("BaseUrl: {0}" -f $workingBase)
+
+# Auth scoping expectations (401/400) — run once BaseUrl is known
+if ($env:HOPE_RUN_PHASE3_ASSERTS -eq "1") {
+  if ([string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+    Write-Host "FAIL: HOPE_API_KEY not set; cannot run Auth scoping expectations."
+    exit 1
+  }
+
+  $assertAuthPath = Join-Path $PSScriptRoot "assert-auth-scoping.ps1"
+  if (-not (Test-Path -LiteralPath $assertAuthPath)) {
+    Write-Host ("FAIL: Missing assert script: {0}" -f $assertAuthPath)
+    exit 1
+  }
+
+  # Provide BaseUrl both ways (param + env) for robustness
+  $prevHopeBase = $env:HOPE_BASE_URL
+  $env:HOPE_BASE_URL = $workingBase
+
+  pwsh -NoProfile -ExecutionPolicy Bypass -File $assertAuthPath -BaseUrl $workingBase
+  $exitCode = $LASTEXITCODE
+
+  $env:HOPE_BASE_URL = $prevHopeBase
+  if ($exitCode -ne 0) {
+    Write-Host ("FAIL: Auth scoping expectations failed (exit={0})" -f $exitCode)
+    exit $exitCode
+  }
+}
+
 Write-Host ("POST {0}/visitors" -f $workingBase)
 
 $visitorEmail = ("smoke+" + [Guid]::NewGuid().ToString("N") + "@example.com")

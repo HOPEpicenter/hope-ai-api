@@ -4,6 +4,9 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "http.ps1")
+
+
 function OpsUrl {
   param(
     [Parameter(Mandatory = $true)][string]$BaseUrl,
@@ -57,6 +60,15 @@ function OpsRequest {
   }
   if (-not $reqHeaders.ContainsKey("accept")) { $reqHeaders["accept"] = "application/json" }
 
+# Default x-api-key for ops/admin routes when available
+$k = $env:HOPE_API_KEY
+if (-not $reqHeaders.ContainsKey("x-api-key")) {
+  if ($k -and $k.Trim().Length -gt 0 -and -not ($k.Trim().StartsWith("<") -and $k.Trim().EndsWith(">"))) {
+    $reqHeaders["x-api-key"] = $k.Trim()
+  }
+}
+
+
   $json = $null
   if ($null -ne $Body) {
     $json = ($Body | ConvertTo-Json -Depth 20 -Compress)
@@ -82,7 +94,9 @@ function OpsRequest {
   catch {
     # capture non-2xx responses with body (PS 5.1 safe)
     $we = $_.Exception
-    $r = $we.Response
+    $r = $null
+    $p = $we.PSObject.Properties.Match('Response')
+    if (@($p).Count -gt 0) { $r = $we.Response }
 
     if ($r -and $r.StatusCode) {
       $status = [int]$r.StatusCode
@@ -177,3 +191,13 @@ function OpsTimeline {
   if ($Cursor -and $Cursor.Trim().Length -gt 0) { $p = $p + "&cursor=" + [uri]::EscapeDataString($Cursor) }
   OpsRequest -BaseUrl $BaseUrl -Method GET -Path $p
 }
+
+function OpsFollowups {
+  param(
+    [Parameter(Mandatory = $true)][string]$BaseUrl
+  )
+  OpsRequest -BaseUrl $BaseUrl -Method GET -Path "/ops/followups"
+}
+
+
+

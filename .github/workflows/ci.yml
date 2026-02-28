@@ -53,6 +53,13 @@ jobs:
           $ErrorActionPreference = "Stop"
           npm run guard
 
+
+      - name: Guard scripts (PowerShell)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          ./scripts/guard-scripts.ps1
+
       - name: Build (tsc)
         shell: pwsh
         run: |

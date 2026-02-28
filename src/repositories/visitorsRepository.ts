@@ -67,8 +67,6 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
 
     // Reserve email FIRST (prevents concurrent duplicates)
     if (emailLower) {
-    // Reserve email FIRST (prevents concurrent duplicates)
-    if (emailLower) {
       const emailKey = encodeURIComponent(emailLower);
 
       // One repair attempt for a stale EMAIL index (index exists but visitor row missing)
@@ -143,8 +141,6 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
           throw new Error("EMAIL_INDEX_STALE_OR_UNREADABLE");
         }
       }
-    }
-
     }
 
     const entity: VisitorEntity = {
@@ -246,8 +242,4 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     return toVisitor(entity);
   }
 }
-
-
-
-
 

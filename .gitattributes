@@ -1,17 +1,20 @@
-# Normalize text files to LF in repo to avoid CRLF/LF churn across Windows + CI
+# Default: let Git normalize text files
 * text=auto
 
-# Ensure this file stays LF in repo
-.gitattributes text eol=lf
-
-# PowerShell
-*.ps1 text eol=lf
-
-# Docs
-*.md  text eol=lf
+# Force LF for source + scripts (cross-platform consistency)
+*.ts  text eol=lf
+*.tsx text eol=lf
+*.js  text eol=lf
+*.json text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+*.md  text eol=lf
+*.ps1 text eol=lf
+*.sh  text eol=lf
 
-# JSON / TS
-*.json text eol=lf
-*.ts   text eol=lf
+# Common binary types (never normalize)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary

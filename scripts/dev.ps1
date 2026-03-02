@@ -39,6 +39,12 @@ Examples:
 $repoRoot = (& git rev-parse --show-toplevel 2>$null)
 if (-not $repoRoot) { throw "Not in a git repo." }
 
+# If user runs 'pull' with staged changes, warn (stash/pop can be confusing)
+$staged = & git diff --name-only --cached
+if ($Cmd -eq "pull" -and ($staged | Measure-Object).Count -gt 0) {
+  Write-Host "WARNING: You have staged changes. 'pull' may stash/unstash unexpectedly. Consider committing first." -ForegroundColor Yellow
+}
+
 switch ($Cmd) {
   "help"   { Show-Help; break }
 
@@ -60,3 +66,4 @@ switch ($Cmd) {
     break
   }
 }
+

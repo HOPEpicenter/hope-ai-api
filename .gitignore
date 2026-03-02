@@ -61,3 +61,4 @@ azure-cleanup-evidence-*/
 # Local backups/logs
 ops/
 
+publishProfile-*.xml

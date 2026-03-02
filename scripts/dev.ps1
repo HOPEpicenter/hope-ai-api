@@ -104,6 +104,16 @@ switch ($Cmd) {
     & npm ci
     if ($LASTEXITCODE -ne 0) { throw "npm ci failed." }
 
+    # Sanity: ensure npm didn't modify tracked files
+    $dirty = @(& git status --porcelain)
+    if ($dirty.Count -gt 0) {
+      Write-Host "WARNING: repo has changes after npm ci:" -ForegroundColor Yellow
+      $dirty | ForEach-Object { Write-Host ("  " + $_) -ForegroundColor Yellow }
+      Write-Host "If this is unexpected, run: git restore -- ." -ForegroundColor Yellow
+    }
+
+    Write-Host "NOTE: npm reported vulnerabilities; run 'npm audit' for details." -ForegroundColor Yellow
+
     # Ensure .env
     if (-not (Test-Path ".\.env")) {
       if (Test-Path ".\.env.example") {
@@ -140,9 +150,3 @@ switch ($Cmd) {
     break
   }
 }
-
-
-
-
-
-

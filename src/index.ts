@@ -1,4 +1,6 @@
 import express from "express";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import visitorsRouter from "./routes/visitors/visitorsRouter";
 import { createOpsRouter } from "./routes/ops/opsRouter";
 import { formationRouter } from "./routes/formation";
@@ -27,6 +29,37 @@ const app = express();
 app.get("/api/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
+app.get("/api/version", (req, res) => {
+  let name: string | undefined;
+  let version: string | undefined;
+
+  try {
+    // When running from dist/, __dirname is dist/. package.json is one level up.
+    const pkgPath = path.resolve(__dirname, "..", "package.json");
+    const raw = fs.readFileSync(pkgPath, "utf8");
+    const pkg = JSON.parse(raw) as { name?: string; version?: string };
+    name = pkg.name;
+    version = pkg.version;
+  } catch {
+    // best-effort; don't fail the endpoint just because package.json couldn't be read
+  }
+
+  const requestId = (req as any).requestId as string | undefined;
+
+  res.status(200).json({
+    ok: true,
+    name: name ?? "hope-ai-api",
+    version: version ?? "unknown",
+    commit:
+      process.env.GITHUB_SHA ??
+      process.env.COMMIT_SHA ??
+      process.env.SOURCE_VERSION ??
+      "unknown",
+    node: process.version,
+    requestId,
+  });
+});
+
 app.use(express.json({ limit: "256kb" }));
 app.use(requestIdMiddleware);
 app.use(requestLogMiddleware);
@@ -88,4 +121,3 @@ if (process.env.DEBUG_ROUTES === "1") {
   console.log("[DEBUG_ROUTES] Registered routes:");
   for (const r of seen.sort()) console.log("[DEBUG_ROUTES] " + r);
 }
-

@@ -1,6 +1,6 @@
 param(
   [Parameter(Position=0)]
-  [ValidateSet("help","pull","smoke","verify","status")]
+  [ValidateSet("help","pull","smoke","verify","status","bootstrap")]
   [string]$Cmd = "help",
 
   [switch]$FreshAzurite
@@ -27,10 +27,11 @@ Usage:
   pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev.ps1 verify [-FreshAzurite]
 
 Commands:
-  status  - Show branch/dirty/ahead-behind/env snapshot
-  pull    - Safe fast-forward pull (auto-stash tracked changes)
-  smoke   - Run local smoke (optionally with fresh Azurite)
-  verify  - pull + smoke
+  bootstrap - Install deps + ensure .env + show status
+  status    - Show branch/dirty/ahead-behind/env snapshot
+  pull      - Safe fast-forward pull (auto-stash tracked changes)
+  smoke     - Run local smoke (optionally with fresh Azurite)
+  verify    - pull + smoke
 
 Examples:
   .\scripts\dev.ps1 verify -FreshAzurite
@@ -50,6 +51,7 @@ switch ($Cmd) {
   "help"   { Show-Help; break }
 
   "status" {
+
     $branch = (& git branch --show-current)
     $staged = @(& git diff --name-only --cached)
     $unstaged = @(& git diff --name-only)
@@ -84,6 +86,52 @@ switch ($Cmd) {
     break
   }
 
+  "bootstrap" {
+    Write-Host "=== dev bootstrap ===" -ForegroundColor Cyan
+
+    # Check node
+    $node = (& node --version 2>$null)
+    if (-not $node) { throw "Node.js not found in PATH." }
+    Write-Host ("node version : {0}" -f $node)
+
+    # Check npm
+    $npm = (& npm --version 2>$null)
+    if (-not $npm) { throw "npm not found in PATH." }
+    Write-Host ("npm version  : {0}" -f $npm)
+
+    # Install deps
+    Write-Host "Running: npm ci" -ForegroundColor Cyan
+    & npm ci
+    if ($LASTEXITCODE -ne 0) { throw "npm ci failed." }
+
+    # Sanity: ensure npm didn't modify tracked files
+    $dirty = @(& git status --porcelain)
+    if ($dirty.Count -gt 0) {
+      Write-Host "WARNING: repo has changes after npm ci:" -ForegroundColor Yellow
+      $dirty | ForEach-Object { Write-Host ("  " + $_) -ForegroundColor Yellow }
+      Write-Host "If this is unexpected, run: git restore -- ." -ForegroundColor Yellow
+    }
+
+    Write-Host "NOTE: npm reported vulnerabilities; run 'npm audit' for details." -ForegroundColor Yellow
+
+    # Ensure .env
+    if (-not (Test-Path ".\.env")) {
+      if (Test-Path ".\.env.example") {
+        Copy-Item ".\.env.example" ".\.env"
+        Write-Host ".env created from .env.example" -ForegroundColor Yellow
+      } else {
+        Write-Host "WARNING: .env not found and .env.example missing." -ForegroundColor Yellow
+      }
+    } else {
+      Write-Host ".env present."
+    }
+
+    # Show status snapshot
+    Write-Host ""
+    & pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev.ps1 status
+
+    break
+  }
   "pull"   {
     Exec "pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\git-safe-pull.ps1"
     break
@@ -102,6 +150,3 @@ switch ($Cmd) {
     break
   }
 }
-
-
-

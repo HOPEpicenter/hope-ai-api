@@ -113,9 +113,18 @@ function Ensure-AzuriteTables {
 
   $repoRoot  = Find-RepoRoot -StartDir $PSScriptRoot
   $logsDir   = Join-Path $repoRoot "logs"
-  $azDataDir = Join-Path $repoRoot ".azurite"
-  New-Item -ItemType Directory -Force -Path $logsDir   | Out-Null
+  New-Item -ItemType Directory -Force -Path $logsDir | Out-Null
+
+  # Optional: run smoke against a truly empty Azurite store (avoid persisted local state masking missing bootstrap)
+  if ($env:OPS_AZURITE_FRESH -eq "1") {
+    $stampFresh = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $azDataDir = Join-Path $logsDir ("azurite-fresh\{0}" -f $stampFresh)
+  } else {
+    $azDataDir = Join-Path $repoRoot ".azurite"
+  }
+
   New-Item -ItemType Directory -Force -Path $azDataDir | Out-Null
+  Write-Host ("Azurite location: {0} (OPS_AZURITE_FRESH={1})" -f $azDataDir, ($(if ($env:OPS_AZURITE_FRESH) { $env:OPS_AZURITE_FRESH } else { "0" })))
 
   $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
   $azOut = Join-Path $logsDir ("azurite-autostart-{0}.out.log" -f $stamp)

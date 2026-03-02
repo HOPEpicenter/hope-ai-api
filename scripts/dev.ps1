@@ -27,6 +27,7 @@ Usage:
   pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev.ps1 verify [-FreshAzurite]
 
 Commands:
+  status  - Show branch/dirty/ahead-behind/env snapshot
   pull    - Safe fast-forward pull (auto-stash tracked changes)
   smoke   - Run local smoke (optionally with fresh Azurite)
   verify  - pull + smoke
@@ -101,5 +102,6 @@ switch ($Cmd) {
     break
   }
 }
+
 
 

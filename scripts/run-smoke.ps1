@@ -330,8 +330,16 @@ try {
     if (Test-Path $serverErrLog) { Get-Content $serverErrLog -Tail 200 | ForEach-Object { Write-Host $_ } }
     throw "Server did not become healthy within timeout. See $serverOutLog and $serverErrLog"
   }
-  Write-Host "Health OK"
+Write-Host "Health OK"
 
+Write-Host ""
+Write-Host "== GET /api/version ==" -ForegroundColor Cyan
+$ver = Invoke-RestMethod -Method Get -Uri ("$BaseUrl/api/version")
+if (-not $ver.ok) { throw "/api/version: ok!=true" }
+if (-not $ver.name) { throw "/api/version: missing name" }
+if (-not $ver.version) { throw "/api/version: missing version" }
+if (-not $ver.node) { throw "/api/version: missing node" }
+Write-Host ("Version OK: {0}@{1} node={2} commit={3}" -f $ver.name, $ver.version, $ver.node, $ver.commit)
   Write-Host "`n== Run smoke tests =="
   $smokePath = Join-Path $ScriptDir "smoke-tests.ps1"
   if (-not (Test-Path $smokePath)) { throw "Smoke tests file not found: $smokePath" }
@@ -381,4 +389,3 @@ finally {
     } catch { }
   }
 }
-

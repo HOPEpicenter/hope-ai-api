@@ -47,7 +47,7 @@ if ($null -eq $r.summary) { throw "summary missing" }
 
 # Additive contract assertions (v1 response envelope + minimal summary shape)
 if ($r.v -ne 1) { throw "Expected v=1" }
-if ($r.summary.needsFollowup -isnot [bool]) { throw "Expected summary.needsFollowup to be boolean" }
+if ($r.summary.needsFollowup -isnot [bool]) { throw "Expected summary.needsFollowup to be boolean" }
 
 # assignedTo is optional; if present, validate shape
 if ($null -ne $r.summary.assignedTo) {

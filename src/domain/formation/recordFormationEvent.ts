@@ -266,8 +266,45 @@ export async function recordFormationEvent(
   applyProfileTouchpoint(profile, input.type, occurredAt, input.metadata);
 
   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Snapshot fields Ops dashboard should rely on (always set)
-  (profile as any).lastEventType = input.type;
-  (profile as any).lastEventAt = occurredAt;
+    /* Deterministic "last event" snapshot:
+   * - Tolerates out-of-order arrivals
+   * - Advances only if (occurredAt, idempotencyKey) is newer than the current snapshot
+   * - If existing lastEventAt is present but un-parseable, DO NOT overwrite it (avoid regressions)
+   */
+  const existingRaw = (profile as any).lastEventAt;
+  const hasExisting =
+    existingRaw !== undefined &&
+    existingRaw !== null &&
+    String(existingRaw).trim().length > 0;
+
+  const incomingAtMs = Date.parse(String(occurredAt ?? ""));
+  const existingAtMs = Date.parse(String(existingRaw ?? ""));
+
+  const incomingEventId = String((input as any).idempotencyKey ?? "");
+  const existingEventId = String((profile as any).lastEventId ?? "");
+
+  let advanceLast = false;
+
+  // If there's no existing snapshot, accept incoming (even if time parsing fails).
+  if (!hasExisting) {
+    advanceLast = true;
+  } else if (Number.isFinite(incomingAtMs) && Number.isFinite(existingAtMs)) {
+    // Both times parse => safe comparison
+    if (incomingAtMs > existingAtMs) advanceLast = true;
+    else if (incomingAtMs === existingAtMs && incomingEventId && incomingEventId > existingEventId) {
+      advanceLast = true;
+    }
+  } else {
+    // Existing exists but time comparison isn't safe => preserve existing snapshot
+    advanceLast = false;
+  }
+
+  if (advanceLast) {
+    (profile as any).lastEventType = input.type;
+    (profile as any).lastEventAt = occurredAt;
+    (profile as any).lastEventId = incomingEventId || (profile as any).lastEventId;
+  }
+
   (profile as any).updatedAt = recordedAt;
 
   // Write snapshot (Merge semantics are handled in repo)
@@ -275,3 +312,5 @@ export async function recordFormationEvent(
 
   return { eventRowKey: rowKey, profile };
 }
+
+

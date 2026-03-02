@@ -1,21 +1,18 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+type HttpContext = {
+  res?: any;
+  log?: (...args: any[]) => void;
+};
 
-export async function version(_req: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> {
-  // Keep response stable + cheap. Enrich later if needed.
-  return {
+const handler = async (context: HttpContext, _req: any): Promise<void> => {
+  context.res = {
     status: 200,
-    jsonBody: {
+    headers: { "content-type": "application/json" },
+    body: {
       ok: true,
       service: "hope-ai-api",
-      // If you already have a shared version helper, swap to that (minimal change now).
       version: process.env.npm_package_version ?? "unknown"
     }
   };
-}
+};
 
-app.http("version", {
-  methods: ["GET"],
-  authLevel: "anonymous",
-  route: "version",
-  handler: version
-});
+export = handler;

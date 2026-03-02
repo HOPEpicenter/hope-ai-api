@@ -24,11 +24,12 @@ scripts/dev.ps1
 
 Usage:
   pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev.ps1 help
+  pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev.ps1 bootstrap [-Audit]
+  pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev.ps1 status
   pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev.ps1 pull
   pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev.ps1 smoke [-FreshAzurite]
   pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev.ps1 verify [-FreshAzurite]
 
-  pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev.ps1 bootstrap [-Audit]
 Commands:
   bootstrap - Install deps + ensure .env + show status
   status    - Show branch/dirty/ahead-behind/env snapshot

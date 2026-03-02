@@ -1,5 +1,4 @@
-name: Deploy hope-ai-api to Azure Functions
-
+name: Deploy hope-ai-api-staging to Azure Functions
 on:
   push:
     branches: [ "main" ]
@@ -31,5 +30,6 @@ jobs:
           app-name: hope-ai-api-staging
           package: .
           publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_STAGING }}
+
 
 

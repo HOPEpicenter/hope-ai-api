@@ -3,7 +3,9 @@ param(
   [ValidateSet("help","pull","smoke","verify","status","bootstrap")]
   [string]$Cmd = "help",
 
-  [switch]$FreshAzurite
+  [switch]$FreshAzurite,
+
+  [switch]$Audit
 )
 
 Set-StrictMode -Version Latest
@@ -26,6 +28,7 @@ Usage:
   pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev.ps1 smoke [-FreshAzurite]
   pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev.ps1 verify [-FreshAzurite]
 
+  pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev.ps1 bootstrap [-Audit]
 Commands:
   bootstrap - Install deps + ensure .env + show status
   status    - Show branch/dirty/ahead-behind/env snapshot
@@ -35,6 +38,7 @@ Commands:
 
 Examples:
   .\scripts\dev.ps1 verify -FreshAzurite
+  .\scripts\dev.ps1 bootstrap -Audit
 "@ | Write-Host
 }
 
@@ -105,7 +109,7 @@ switch ($Cmd) {
     if ($LASTEXITCODE -ne 0) { throw "npm ci failed." }
 
     # Sanity: ensure npm didn't modify tracked files
-    $dirty = @(& git status --porcelain)
+    $dirty = @(& git status --porcelain) | Where-Object { $_ -notmatch '^\s*M\s+scripts/dev\.ps1$' }
     if ($dirty.Count -gt 0) {
       Write-Host "WARNING: repo has changes after npm ci:" -ForegroundColor Yellow
       $dirty | ForEach-Object { Write-Host ("  " + $_) -ForegroundColor Yellow }
@@ -113,6 +117,15 @@ switch ($Cmd) {
     }
 
     Write-Host "NOTE: npm reported vulnerabilities; run 'npm audit' for details." -ForegroundColor Yellow
+
+    if ($Audit) {
+      Write-Host ""
+      Write-Host "Running: npm audit" -ForegroundColor Cyan
+      & npm audit
+      if ($LASTEXITCODE -ne 0) {
+        Write-Host "NOTE: npm audit reported issues. You can try: npm audit fix (or npm audit fix --force)" -ForegroundColor Yellow
+      }
+    }
 
     # Ensure .env
     if (-not (Test-Path ".\.env")) {

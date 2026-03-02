@@ -11,9 +11,8 @@
     {
       "type": "http",
       "direction": "out",
-      "name": "$return"
+      "name": "res"
     }
   ],
-  "scriptFile": "../dist/functions/version/index.js",
-  "entryPoint": "version"
+  "scriptFile": "../dist/functions/version/index.js"
 }

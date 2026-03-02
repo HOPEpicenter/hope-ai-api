@@ -1,6 +1,6 @@
 param(
   [Parameter(Position=0)]
-  [ValidateSet("help","pull","smoke","verify")]
+  [ValidateSet("help","pull","smoke","verify","status")]
   [string]$Cmd = "help",
 
   [switch]$FreshAzurite
@@ -48,6 +48,41 @@ if ($Cmd -eq "pull" -and ($staged | Measure-Object).Count -gt 0) {
 switch ($Cmd) {
   "help"   { Show-Help; break }
 
+  "status" {
+    $branch = (& git branch --show-current)
+    $staged = @(& git diff --name-only --cached)
+    $unstaged = @(& git diff --name-only)
+
+    # ahead/behind vs origin/main (handles detached/other remotes gracefully)
+    & git fetch origin --prune | Out-Null
+    $aheadBehind = (& git rev-list --left-right --count origin/main...HEAD 2>$null)
+    $ahead = $null; $behind = $null
+    if ($aheadBehind) {
+      $parts = ($aheadBehind -split "\s+")
+      if ($parts.Length -ge 2) { $behind = $parts[0]; $ahead = $parts[1] }
+    }
+
+    Write-Host "=== dev status ===" -ForegroundColor Cyan
+    Write-Host ("branch            : {0}" -f $branch)
+    Write-Host ("staged files      : {0}" -f $staged.Count)
+    Write-Host ("unstaged files    : {0}" -f $unstaged.Count)
+    if ($behind -ne $null -and $ahead -ne $null) {
+      Write-Host ("origin/main behind: {0}" -f $behind)
+      Write-Host ("origin/main ahead : {0}" -f $ahead)
+    } else {
+      Write-Host "origin/main ahead/behind: (unknown)" -ForegroundColor Yellow
+    }
+
+    $fresh = [Environment]::GetEnvironmentVariable("OPS_AZURITE_FRESH")
+    Write-Host ("OPS_AZURITE_FRESH  : {0}" -f ($(if ($fresh) { $fresh } else { "(not set)" })))
+
+    if ($staged.Count -gt 0) { Write-Host "WARNING: staged changes present" -ForegroundColor Yellow }
+    if ($unstaged.Count -gt 0) { Write-Host "WARNING: unstaged changes present" -ForegroundColor Yellow }
+    if ($behind -ne $null -and [int]$behind -gt 0) { Write-Host "WARNING: branch behind origin/main (run: .\scripts\dev.ps1 pull)" -ForegroundColor Yellow }
+
+    break
+  }
+
   "pull"   {
     Exec "pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\git-safe-pull.ps1"
     break
@@ -66,4 +101,5 @@ switch ($Cmd) {
     break
   }
 }
+
 

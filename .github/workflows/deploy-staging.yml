@@ -64,26 +64,60 @@ jobs:
 
       # IMPORTANT:
       # If WEBSITE_RUN_FROM_PACKAGE is a SAS URL (typical after `func azure functionapp publish`),
-      # Kudu ZipDeploy fails. Force it back to "1" using Kudu + publish-profile creds.
+      # Kudu ZipDeploy can fail. Force it back to "1" using Kudu + publish-profile creds.
       - name: Force WEBSITE_RUN_FROM_PACKAGE=1 (Kudu)
         shell: pwsh
         env:
+          APP_NAME: hope-ai-api-staging
           PUBLISH_PROFILE: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_STAGING }}
         run: |
           $ErrorActionPreference = "Stop"
 
-          $xml = [xml]$env:PUBLISH_PROFILE
-          $p = $xml.publishData.publishProfile | Where-Object { $_.publishMethod -eq "MSDeploy" } | Select-Object -First 1
-          if (-not $p) { throw "Could not find MSDeploy publishProfile in secret." }
+          if (-not $env:PUBLISH_PROFILE) { throw "PUBLISH_PROFILE secret is empty." }
 
-          $user = $p.userName
-          $pass = $p.userPWD
-          $scm  = "https://$($p.publishUrl)/api/settings"
+          $xml = [xml]$env:PUBLISH_PROFILE
+          $profiles = @($xml.publishData.publishProfile)
+
+          if (-not $profiles -or $profiles.Count -eq 0) {
+            throw "No publishProfile entries found in secret."
+          }
+
+          # Pick the best available profile:
+          #  1) One whose publishUrl contains '.scm.'
+          #  2) Otherwise one with publishMethod ZipDeploy/MSDeploy
+          #  3) Otherwise first with username/password
+          $p =
+            ($profiles | Where-Object { $_.publishUrl -match "\.scm\." } | Select-Object -First 1)
+
+          if (-not $p) {
+            $p = ($profiles | Where-Object { $_.publishMethod -match "ZipDeploy|MSDeploy" } | Select-Object -First 1)
+          }
+
+          if (-not $p) {
+            $p = ($profiles | Where-Object { $_.userName -and $_.userPWD } | Select-Object -First 1)
+          }
+
+          if (-not $p) { throw "Could not find a usable publishProfile (no userName/userPWD)." }
+
+          $user = [string]$p.userName
+          $pass = [string]$p.userPWD
+
+          if (-not $user -or -not $pass) { throw "Publish profile missing userName/userPWD." }
+
+          # Determine SCM host
+          $scmHost = [string]$p.publishUrl
+          if (-not $scmHost) { $scmHost = "$($env:APP_NAME).scm.azurewebsites.net" }
+
+          # publishUrl may include :443; that's fine
+          if ($scmHost -notmatch "\.scm\.") { $scmHost = "$($env:APP_NAME).scm.azurewebsites.net" }
+
+          $scm = "https://$scmHost/api/settings"
 
           $pair = "{0}:{1}" -f $user, $pass
           $b64  = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($pair))
           $hdrs = @{ Authorization = "Basic $b64" }
 
+          Write-Host "Using SCM: $scm"
           Invoke-RestMethod -Method POST -Uri $scm -Headers $hdrs `
             -Body (@{ WEBSITE_RUN_FROM_PACKAGE = "1" } | ConvertTo-Json) `
             -ContentType "application/json" | Out-Null

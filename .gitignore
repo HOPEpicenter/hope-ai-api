@@ -62,3 +62,15 @@ azure-cleanup-evidence-*/
 ops/
 
 publishProfile-*.xml
+# Local deployment artifacts
+_deploy_stage/
+deploy*.zip
+publishProfile*.xml
+
+# Local emulator logs
+logs/
+
+# Stray compiled files accidentally created in repo root
+version/index.js
+health/index.js
+opsFollowups/index.js

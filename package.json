@@ -8,6 +8,7 @@
     "build": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/clean.ps1 && tsc -p tsconfig.json && tsc -p tsconfig.functions.json",
     "clean": "rimraf dist",
     "copy": "copyfiles -u 2 \"src/functions/**/function.json\" ./",
+    "deploy:staging": "npm run build && npm run copy && npm run verify:layout && func azure functionapp publish hope-ai-api-staging --no-build --source .",
     "dev": "ts-node src/index.ts",
     "guard": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/guard-no-azure-functions.ps1",
     "start:dist": "node dist/index.js",

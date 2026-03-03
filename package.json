@@ -5,7 +5,7 @@
   "private": true,
   "description": "Azure Functions v4 (Node.js + TypeScript) backend for HOPE",
   "scripts": {
-    "build": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/clean.ps1 && tsc -p tsconfig.json && tsc -p tsconfig.functions.json",
+    "build": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/write-version.ps1 && pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/clean.ps1 && tsc -p tsconfig.json && tsc -p tsconfig.functions.json",
     "clean": "rimraf dist",
     "copy": "copyfiles -u 2 \"src/functions/**/function.json\" ./",
     "deploy:staging": "npm run build && npm run copy && npm run verify:layout && func azure functionapp publish hope-ai-api-staging --no-build --source .",

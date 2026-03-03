@@ -121,13 +121,33 @@ jobs:
           # 1) Force run-from-package and disable build flags (important for zipdeploy stability)
           $settingsUri = "https://$scmHost/api/settings"
           $settingsBody = @{
-            WEBSITE_RUN_FROM_PACKAGE       = "1"
-            SCM_DO_BUILD_DURING_DEPLOYMENT = "false"
-            ENABLE_ORYX_BUILD              = "false"
+            WEBSITE_RUN_FROM_PACKAGE                  = "1"
+            APPSETTING_WEBSITE_RUN_FROM_PACKAGE       = "1"
+            WEBSITES_ENABLE_APP_SERVICE_STORAGE       = "true"
+            APPSETTING_WEBSITES_ENABLE_APP_SERVICE_STORAGE = "true"
+            SCM_DO_BUILD_DURING_DEPLOYMENT            = "false"
+            ENABLE_ORYX_BUILD                         = "false"
           } | ConvertTo-Json
 
           Invoke-RestMethod -Method POST -Uri $settingsUri -Headers $hdrs -Body $settingsBody -ContentType "application/json" | Out-Null
           Write-Host "Kudu settings updated."
+
+          # 1b) Verify what Kudu thinks the settings are (and give it a moment to settle)
+          $verifyUri = "https://$scmHost/api/settings"
+          for ($i = 1; $i -le 6; $i++) {
+            $s = Invoke-RestMethod -Method GET -Uri $verifyUri -Headers $hdrs -SkipHttpErrorCheck
+            $w = $s.WEBSITE_RUN_FROM_PACKAGE
+            $a = $s.APPSETTING_WEBSITE_RUN_FROM_PACKAGE
+
+            Write-Host ("Kudu settings check #{0}: WEBSITE_RUN_FROM_PACKAGE={1} APPSETTING_WEBSITE_RUN_FROM_PACKAGE={2}" -f $i, $w, $a)
+
+            if ($w -eq "1" -or $a -eq "1") { break }
+            Start-Sleep -Seconds 2
+          }
+
+          if (-not (($s.WEBSITE_RUN_FROM_PACKAGE -eq "1") -or ($s.APPSETTING_WEBSITE_RUN_FROM_PACKAGE -eq "1"))) {
+            throw "Kudu still does not report run-from-package as enabled (expected '1'). Aborting before ZipDeploy."
+          }
 
           # 2) Start ZipDeploy async
           $zipDeployUri = "https://$scmHost/api/zipdeploy?isAsync=true"

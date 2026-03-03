@@ -24,12 +24,76 @@ jobs:
       - name: Build (TypeScript -> dist)
         run: npm run build
 
-      - name: Deploy to Azure Functions
+      - name: Copy function.json to root (required for discovery)
+        run: npm run copy
+
+      - name: Verify Functions layout
+        run: npm run verify:layout
+
+      - name: Stage minimal deploy package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $repoRoot  = (Get-Location).Path
+          $deployDir = Join-Path $repoRoot ".deploy"
+
+          if (Test-Path $deployDir) { Remove-Item -Recurse -Force $deployDir }
+          New-Item -ItemType Directory -Force $deployDir | Out-Null
+
+          # host.json is required
+          if (-not (Test-Path (Join-Path $repoRoot "host.json"))) { throw "host.json missing at repo root." }
+          Copy-Item -Force (Join-Path $repoRoot "host.json") (Join-Path $deployDir "host.json")
+
+          # compiled JS is required
+          $distSrc = Join-Path $repoRoot "dist"
+          if (-not (Test-Path $distSrc)) { throw "dist/ missing. Did npm run build run?" }
+          Copy-Item -Recurse -Force $distSrc (Join-Path $deployDir "dist")
+
+          # function folders at repo root (created by npm run copy)
+          $exclude = @("src","dist","node_modules",".git",".github",".deploy","docs","scripts")
+          Get-ChildItem -Path $repoRoot -Directory |
+            Where-Object { $_.Name -notin $exclude } |
+            Where-Object { Test-Path (Join-Path $_.FullName "function.json") } |
+            ForEach-Object {
+              Copy-Item -Recurse -Force $_.FullName (Join-Path $deployDir $_.Name)
+            }
+
+          Write-Host "Staged deploy folder: $deployDir"
+          Write-Host ("Staged size (MB): {0:N2}" -f ((Get-ChildItem -Recurse $deployDir -File | Measure-Object -Sum Length).Sum / 1MB))
+
+      # IMPORTANT:
+      # If WEBSITE_RUN_FROM_PACKAGE is a SAS URL (typical after `func azure functionapp publish`),
+      # Kudu ZipDeploy fails. Force it back to "1" using Kudu + publish-profile creds.
+      - name: Force WEBSITE_RUN_FROM_PACKAGE=1 (Kudu)
+        shell: pwsh
+        env:
+          PUBLISH_PROFILE: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_STAGING }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $xml = [xml]$env:PUBLISH_PROFILE
+          $p = $xml.publishData.publishProfile | Where-Object { $_.publishMethod -eq "MSDeploy" } | Select-Object -First 1
+          if (-not $p) { throw "Could not find MSDeploy publishProfile in secret." }
+
+          $user = $p.userName
+          $pass = $p.userPWD
+          $scm  = "https://$($p.publishUrl)/api/settings"
+
+          $pair = "{0}:{1}" -f $user, $pass
+          $b64  = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($pair))
+          $hdrs = @{ Authorization = "Basic $b64" }
+
+          Invoke-RestMethod -Method POST -Uri $scm -Headers $hdrs `
+            -Body (@{ WEBSITE_RUN_FROM_PACKAGE = "1" } | ConvertTo-Json) `
+            -ContentType "application/json" | Out-Null
+
+          Write-Host "Set WEBSITE_RUN_FROM_PACKAGE=1 via Kudu."
+
+      - name: Deploy to Azure Functions (ZipDeploy)
         uses: Azure/functions-action@v1.5.1
         with:
           app-name: hope-ai-api-staging
-          package: .
+          package: ./.deploy
           publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_STAGING }}
-
-
-
+          respect-funcignore: true

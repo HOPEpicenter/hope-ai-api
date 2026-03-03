@@ -8,7 +8,7 @@
     "test:smoke": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/run-smoke.ps1",
     "start:dist": "node dist/index.js",
     "build": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/clean.ps1 && tsc -p tsconfig.json && tsc -p tsconfig.functions.json",
-    "copy": "copyfiles -u 1 src/**/function.json dist/",
+    "copy": "copyfiles -u 2 \"src/functions/**/function.json\" ./",
     "clean": "rimraf dist",
     "test": "npm run test:smoke",
     "guard": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/guard-no-azure-functions.ps1",

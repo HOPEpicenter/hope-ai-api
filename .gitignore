@@ -78,3 +78,7 @@ opsFollowups/index.js
 _azure_running/
 _azure_running_latest/
 azure-running*.zip
+
+# Local deploy staging folder
+.deploy/
+

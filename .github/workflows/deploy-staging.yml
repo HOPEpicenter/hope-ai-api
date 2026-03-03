@@ -1,4 +1,5 @@
 name: Deploy hope-ai-api-staging to Azure Functions
+
 on:
   push:
     branches: [ "main" ]
@@ -30,7 +31,7 @@ jobs:
       - name: Verify Functions layout
         run: npm run verify:layout
 
-      - name: Stage minimal deploy package
+      - name: Stage minimal deploy package (.deploy)
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -41,16 +42,20 @@ jobs:
           if (Test-Path $deployDir) { Remove-Item -Recurse -Force $deployDir }
           New-Item -ItemType Directory -Force $deployDir | Out-Null
 
-          # host.json is required
+          # Required
           if (-not (Test-Path (Join-Path $repoRoot "host.json"))) { throw "host.json missing at repo root." }
           Copy-Item -Force (Join-Path $repoRoot "host.json") (Join-Path $deployDir "host.json")
 
-          # compiled JS is required
+          # Optional (some tooling expects these at root)
+          if (Test-Path (Join-Path $repoRoot "package.json")) { Copy-Item -Force (Join-Path $repoRoot "package.json") (Join-Path $deployDir "package.json") }
+          if (Test-Path (Join-Path $repoRoot "package-lock.json")) { Copy-Item -Force (Join-Path $repoRoot "package-lock.json") (Join-Path $deployDir "package-lock.json") }
+
+          # Compiled JS
           $distSrc = Join-Path $repoRoot "dist"
           if (-not (Test-Path $distSrc)) { throw "dist/ missing. Did npm run build run?" }
           Copy-Item -Recurse -Force $distSrc (Join-Path $deployDir "dist")
 
-          # function folders at repo root (created by npm run copy)
+          # Function folders at repo root (created by npm run copy)
           $exclude = @("src","dist","node_modules",".git",".github",".deploy","docs","scripts")
           Get-ChildItem -Path $repoRoot -Directory |
             Where-Object { $_.Name -notin $exclude } |
@@ -62,72 +67,115 @@ jobs:
           Write-Host "Staged deploy folder: $deployDir"
           Write-Host ("Staged size (MB): {0:N2}" -f ((Get-ChildItem -Recurse $deployDir -File | Measure-Object -Sum Length).Sum / 1MB))
 
-      # IMPORTANT:
-      # If WEBSITE_RUN_FROM_PACKAGE is a SAS URL (typical after `func azure functionapp publish`),
-      # Kudu ZipDeploy can fail. Force it back to "1" using Kudu + publish-profile creds.
-      - name: Force WEBSITE_RUN_FROM_PACKAGE=1 (Kudu)
+      - name: Create deploy.zip (zip contents of .deploy, not the folder)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (-not (Test-Path ".deploy")) { throw ".deploy folder missing." }
+
+          $zipPath = Join-Path (Get-Location).Path "deploy.zip"
+          if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
+
+          Compress-Archive -Path ".deploy/*" -DestinationPath $zipPath -Force
+          Write-Host "Created $zipPath"
+          Get-Item $zipPath | Format-List Name,Length,FullName
+
+      - name: Deploy via Kudu ZipDeploy (PowerShell)
         shell: pwsh
         env:
-          APP_NAME: hope-ai-api-staging
           PUBLISH_PROFILE: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_STAGING }}
         run: |
           $ErrorActionPreference = "Stop"
 
           if (-not $env:PUBLISH_PROFILE) { throw "PUBLISH_PROFILE secret is empty." }
 
+          # Parse publish profile XML (supports MSDeploy, ZipDeploy, etc.)
           $xml = [xml]$env:PUBLISH_PROFILE
           $profiles = @($xml.publishData.publishProfile)
+          if (-not $profiles -or $profiles.Count -eq 0) { throw "No publishProfile entries found in secret." }
 
-          if (-not $profiles -or $profiles.Count -eq 0) {
-            throw "No publishProfile entries found in secret."
-          }
-
-          # Pick the best available profile:
-          #  1) One whose publishUrl contains '.scm.'
-          #  2) Otherwise one with publishMethod ZipDeploy/MSDeploy
-          #  3) Otherwise first with username/password
-          $p =
-            ($profiles | Where-Object { $_.publishUrl -match "\.scm\." } | Select-Object -First 1)
-
-          if (-not $p) {
-            $p = ($profiles | Where-Object { $_.publishMethod -match "ZipDeploy|MSDeploy" } | Select-Object -First 1)
-          }
-
-          if (-not $p) {
-            $p = ($profiles | Where-Object { $_.userName -and $_.userPWD } | Select-Object -First 1)
-          }
-
+          # Pick best available:
+          #  1) publishUrl contains '.scm.'
+          #  2) publishMethod ZipDeploy/MSDeploy
+          #  3) otherwise first with username/password
+          $p = ($profiles | Where-Object { $_.publishUrl -match "\.scm\." } | Select-Object -First 1)
+          if (-not $p) { $p = ($profiles | Where-Object { $_.publishMethod -match "ZipDeploy|MSDeploy" } | Select-Object -First 1) }
+          if (-not $p) { $p = ($profiles | Where-Object { $_.userName -and $_.userPWD } | Select-Object -First 1) }
           if (-not $p) { throw "Could not find a usable publishProfile (no userName/userPWD)." }
 
-          $user = [string]$p.userName
-          $pass = [string]$p.userPWD
-
-          if (-not $user -or -not $pass) { throw "Publish profile missing userName/userPWD." }
-
-          # Determine SCM host
           $scmHost = [string]$p.publishUrl
-          if (-not $scmHost) { $scmHost = "$($env:APP_NAME).scm.azurewebsites.net" }
+          $user    = [string]$p.userName
+          $pass    = [string]$p.userPWD
 
-          # publishUrl may include :443; that's fine
-          if ($scmHost -notmatch "\.scm\.") { $scmHost = "$($env:APP_NAME).scm.azurewebsites.net" }
+          if (-not $scmHost -or -not $user -or -not $pass) {
+            throw "publishUrl/userName/userPWD missing in selected publishProfile."
+          }
 
-          $scm = "https://$scmHost/api/settings"
+          $zipPath = Join-Path (Get-Location).Path "deploy.zip"
+          if (-not (Test-Path $zipPath)) { throw "deploy.zip missing." }
 
           $pair = "{0}:{1}" -f $user, $pass
           $b64  = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($pair))
           $hdrs = @{ Authorization = "Basic $b64" }
 
-          Write-Host "Using SCM: $scm"
-          Invoke-RestMethod -Method POST -Uri $scm -Headers $hdrs `
-            -Body (@{ WEBSITE_RUN_FROM_PACKAGE = "1" } | ConvertTo-Json) `
-            -ContentType "application/json" | Out-Null
+          # 1) Force run-from-package and disable build flags (important for zipdeploy stability)
+          $settingsUri = "https://$scmHost/api/settings"
+          $settingsBody = @{
+            WEBSITE_RUN_FROM_PACKAGE       = "1"
+            SCM_DO_BUILD_DURING_DEPLOYMENT = "false"
+            ENABLE_ORYX_BUILD              = "false"
+          } | ConvertTo-Json
 
-          Write-Host "Set WEBSITE_RUN_FROM_PACKAGE=1 via Kudu."
+          Invoke-RestMethod -Method POST -Uri $settingsUri -Headers $hdrs -Body $settingsBody -ContentType "application/json" | Out-Null
+          Write-Host "Kudu settings updated."
 
-      - name: Deploy to Azure Functions (ZipDeploy)
-        uses: Azure/functions-action@v1.5.1
-        with:
-          app-name: hope-ai-api-staging
-          package: ./.deploy
-          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_STAGING }}
-          respect-funcignore: true
+          # 2) Start ZipDeploy async
+          $zipDeployUri = "https://$scmHost/api/zipdeploy?isAsync=true"
+          Write-Host "Starting ZipDeploy -> $zipDeployUri"
+
+          $resp = Invoke-WebRequest -Method POST -Uri $zipDeployUri -Headers $hdrs -InFile $zipPath -ContentType "application/zip" -SkipHttpErrorCheck
+          Write-Host "ZipDeploy start status: $($resp.StatusCode)"
+
+          if ($resp.StatusCode -ge 400) {
+            Write-Host "ZipDeploy start failed response body:"
+            $resp.Content
+            throw "ZipDeploy start failed with HTTP $($resp.StatusCode)"
+          }
+
+          # 3) Poll status (Location header if present; else /api/deployments/latest)
+          $pollUri = $resp.Headers.Location
+          if (-not $pollUri) { $pollUri = "https://$scmHost/api/deployments/latest" }
+          if ($pollUri -notmatch '^https?://') { $pollUri = "https://$scmHost$pollUri" }
+
+          $deadline = (Get-Date).AddMinutes(6)
+          do {
+            Start-Sleep -Seconds 5
+            $d = Invoke-WebRequest -Method GET -Uri $pollUri -Headers $hdrs -SkipHttpErrorCheck
+            Write-Host "Poll: $($d.StatusCode) $pollUri"
+
+            if ($d.StatusCode -eq 200 -and $d.Content) {
+              try {
+                $j = $d.Content | ConvertFrom-Json
+                Write-Host ("status={0} complete={1} message={2}" -f $j.status, $j.complete, $j.message)
+
+                # Kudu: status 4 is failed; complete true means terminal
+                if ($j.complete -eq $true -and $j.status -eq 4) {
+                  Write-Host "Deployment reported failure payload:"
+                  $d.Content
+                  throw "Kudu deployment failed."
+                }
+
+                if ($j.complete -eq $true -and $j.status -ne 4) {
+                  Write-Host "Deployment reported success."
+                  break
+                }
+              } catch {
+                Write-Host "Non-JSON poll response:"
+                Write-Host $d.Content
+              }
+            }
+          } while ((Get-Date) -lt $deadline)
+
+          if ((Get-Date) -ge $deadline) {
+            throw "Timed out waiting for Kudu deployment to complete."
+          }

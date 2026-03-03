@@ -31,7 +31,7 @@ jobs:
       - name: Verify Functions layout
         run: npm run verify:layout
 
-      - name: Stage minimal deploy package
+      - name: Stage minimal deploy package (.deploy)
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -46,7 +46,7 @@ jobs:
           if (-not (Test-Path (Join-Path $repoRoot "host.json"))) { throw "host.json missing at repo root." }
           Copy-Item -Force (Join-Path $repoRoot "host.json") (Join-Path $deployDir "host.json")
 
-          # Optional but common (helps some hosts/tools)
+          # Optional (some tooling expects these at root)
           if (Test-Path (Join-Path $repoRoot "package.json")) { Copy-Item -Force (Join-Path $repoRoot "package.json") (Join-Path $deployDir "package.json") }
           if (Test-Path (Join-Path $repoRoot "package-lock.json")) { Copy-Item -Force (Join-Path $repoRoot "package-lock.json") (Join-Path $deployDir "package-lock.json") }
 
@@ -67,18 +67,17 @@ jobs:
           Write-Host "Staged deploy folder: $deployDir"
           Write-Host ("Staged size (MB): {0:N2}" -f ((Get-ChildItem -Recurse $deployDir -File | Measure-Object -Sum Length).Sum / 1MB))
 
-      - name: Zip deploy package
+      - name: Create deploy.zip (zip contents of .deploy, not the folder)
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $repoRoot  = (Get-Location).Path
-          $deployDir = Join-Path $repoRoot ".deploy"
-          $zipPath   = Join-Path $repoRoot "deploy.zip"
+          if (-not (Test-Path ".deploy")) { throw ".deploy folder missing." }
 
-          if (-not (Test-Path $deployDir)) { throw ".deploy folder missing." }
+          $zipPath = Join-Path (Get-Location).Path "deploy.zip"
           if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
 
-          Compress-Archive -Path (Join-Path $deployDir "*") -DestinationPath $zipPath -Force
+          Compress-Archive -Path ".deploy/*" -DestinationPath $zipPath -Force
+          Write-Host "Created $zipPath"
           Get-Item $zipPath | Format-List Name,Length,FullName
 
       - name: Deploy via Kudu ZipDeploy (PowerShell)
@@ -88,36 +87,38 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
-          # Parse publish profile XML (supports non-MSDeploy too)
+          if (-not $env:PUBLISH_PROFILE) { throw "PUBLISH_PROFILE secret is empty." }
+
+          # Parse publish profile XML (supports MSDeploy, ZipDeploy, etc.)
           $xml = [xml]$env:PUBLISH_PROFILE
           $profiles = @($xml.publishData.publishProfile)
           if (-not $profiles -or $profiles.Count -eq 0) { throw "No publishProfile entries found in secret." }
 
-          # Prefer MSDeploy if present, else fall back to first
-          $p = $profiles | Where-Object { $_.publishMethod -eq "MSDeploy" } | Select-Object -First 1
-          if (-not $p) { $p = $profiles | Select-Object -First 1 }
+          # Pick best available:
+          #  1) publishUrl contains '.scm.'
+          #  2) publishMethod ZipDeploy/MSDeploy
+          #  3) otherwise first with username/password
+          $p = ($profiles | Where-Object { $_.publishUrl -match "\.scm\." } | Select-Object -First 1)
+          if (-not $p) { $p = ($profiles | Where-Object { $_.publishMethod -match "ZipDeploy|MSDeploy" } | Select-Object -First 1) }
+          if (-not $p) { $p = ($profiles | Where-Object { $_.userName -and $_.userPWD } | Select-Object -First 1) }
+          if (-not $p) { throw "Could not find a usable publishProfile (no userName/userPWD)." }
 
-          $publishUrl = [string]$p.publishUrl
-          $user       = [string]$p.userName
-          $pass       = [string]$p.userPWD
+          $scmHost = [string]$p.publishUrl
+          $user    = [string]$p.userName
+          $pass    = [string]$p.userPWD
 
-          if (-not $publishUrl -or -not $user -or -not $pass) {
+          if (-not $scmHost -or -not $user -or -not $pass) {
             throw "publishUrl/userName/userPWD missing in selected publishProfile."
-          }
-
-          # Normalize publishUrl: some include :443 already
-          $scmHost = $publishUrl
-
-          $pair = "{0}:{1}" -f $user, $pass
-          $b64  = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($pair))
-          $hdrs = @{
-            Authorization = "Basic $b64"
           }
 
           $zipPath = Join-Path (Get-Location).Path "deploy.zip"
           if (-not (Test-Path $zipPath)) { throw "deploy.zip missing." }
 
-          # 1) Force WEBSITE_RUN_FROM_PACKAGE=1 and disable build flags
+          $pair = "{0}:{1}" -f $user, $pass
+          $b64  = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($pair))
+          $hdrs = @{ Authorization = "Basic $b64" }
+
+          # 1) Force run-from-package and disable build flags (important for zipdeploy stability)
           $settingsUri = "https://$scmHost/api/settings"
           $settingsBody = @{
             WEBSITE_RUN_FROM_PACKAGE       = "1"
@@ -128,18 +129,12 @@ jobs:
           Invoke-RestMethod -Method POST -Uri $settingsUri -Headers $hdrs -Body $settingsBody -ContentType "application/json" | Out-Null
           Write-Host "Kudu settings updated."
 
-          # 2) Start ZipDeploy (async)
+          # 2) Start ZipDeploy async
           $zipDeployUri = "https://$scmHost/api/zipdeploy?isAsync=true"
           Write-Host "Starting ZipDeploy -> $zipDeployUri"
 
-          # Use Invoke-WebRequest so we can read headers (Location) even on non-JSON responses
           $resp = Invoke-WebRequest -Method POST -Uri $zipDeployUri -Headers $hdrs -InFile $zipPath -ContentType "application/zip" -SkipHttpErrorCheck
           Write-Host "ZipDeploy start status: $($resp.StatusCode)"
-          if ($resp.Headers.Location) {
-            Write-Host "Poll URL (Location): $($resp.Headers.Location)"
-          } else {
-            Write-Host "No Location header returned. Will poll /api/deployments/latest."
-          }
 
           if ($resp.StatusCode -ge 400) {
             Write-Host "ZipDeploy start failed response body:"
@@ -147,37 +142,35 @@ jobs:
             throw "ZipDeploy start failed with HTTP $($resp.StatusCode)"
           }
 
-          # 3) Poll deployment status
+          # 3) Poll status (Location header if present; else /api/deployments/latest)
           $pollUri = $resp.Headers.Location
-          if (-not $pollUri) {
-            $pollUri = "https://$scmHost/api/deployments/latest"
-          }
-          if ($pollUri -notmatch '^https?://') {
-            $pollUri = "https://$scmHost$pollUri"
-          }
+          if (-not $pollUri) { $pollUri = "https://$scmHost/api/deployments/latest" }
+          if ($pollUri -notmatch '^https?://') { $pollUri = "https://$scmHost$pollUri" }
 
-          $deadline = (Get-Date).AddMinutes(5)
+          $deadline = (Get-Date).AddMinutes(6)
           do {
             Start-Sleep -Seconds 5
             $d = Invoke-WebRequest -Method GET -Uri $pollUri -Headers $hdrs -SkipHttpErrorCheck
             Write-Host "Poll: $($d.StatusCode) $pollUri"
+
             if ($d.StatusCode -eq 200 -and $d.Content) {
-              # Kudu returns JSON; show key fields if present
               try {
                 $j = $d.Content | ConvertFrom-Json
                 Write-Host ("status={0} complete={1} message={2}" -f $j.status, $j.complete, $j.message)
-                if ($j.complete -eq $true -and $j.status -ne 4) {
-                  # status 4 is "failed" in Kudu
-                  Write-Host "Deployment reported success."
-                  break
-                }
+
+                # Kudu: status 4 is failed; complete true means terminal
                 if ($j.complete -eq $true -and $j.status -eq 4) {
-                  Write-Host "Deployment reported failure. Full payload:"
+                  Write-Host "Deployment reported failure payload:"
                   $d.Content
                   throw "Kudu deployment failed."
                 }
+
+                if ($j.complete -eq $true -and $j.status -ne 4) {
+                  Write-Host "Deployment reported success."
+                  break
+                }
               } catch {
-                # If it isn't JSON, just print it once
+                Write-Host "Non-JSON poll response:"
                 Write-Host $d.Content
               }
             }

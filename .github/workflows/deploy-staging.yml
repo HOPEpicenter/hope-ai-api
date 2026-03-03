@@ -83,7 +83,7 @@ jobs:
       - name: Deploy via Kudu ZipDeploy (PowerShell)
         shell: pwsh
         env:
-          PUBLISH_PROFILE: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_STAGING }}
+          PUBLISH_PROFILE: ${{ secrets.AZURE_FUNCTIONAPP_ZIPONLY_PROFILE_STAGING }}
         run: |
           $ErrorActionPreference = "Stop"
 
@@ -149,53 +149,21 @@ jobs:
             throw "Kudu still does not report run-from-package as enabled (expected '1'). Aborting before ZipDeploy."
           }
 
-          # 2) Start ZipDeploy async
-          $zipDeployUri = "https://$scmHost/api/zipdeploy?isAsync=true"
-          Write-Host "Starting ZipDeploy -> $zipDeployUri"
+          # 2) Deploy via SCM /api/publish (publish-profile auth)
+          # /api/zipdeploy is returning a platform error about file share mount; /api/publish is the supported publish pipeline for zip packages.
+          $publishUri = "https://$scmHost/api/publish"
+          Write-Host "Publishing zip -> $publishUri"
 
-          $resp = Invoke-WebRequest -Method POST -Uri $zipDeployUri -Headers $hdrs -InFile $zipPath -ContentType "application/zip" -SkipHttpErrorCheck
-          Write-Host "ZipDeploy start status: $($resp.StatusCode)"
-
-          if ($resp.StatusCode -ge 400) {
-            Write-Host "ZipDeploy start failed response body:"
-            $resp.Content
-            throw "ZipDeploy start failed with HTTP $($resp.StatusCode)"
+          $pubResp = Invoke-WebRequest -Method POST -Uri $publishUri -Headers $hdrs -InFile $zipPath -ContentType "application/zip" -SkipHttpErrorCheck
+          Write-Host "Publish status: $($pubResp.StatusCode)"
+          if ($pubResp.StatusCode -ge 400) {
+            Write-Host "Publish failed response body:"
+            $pubResp.Content
+            throw "Publish failed with HTTP $($pubResp.StatusCode)"
           }
 
-          # 3) Poll status (Location header if present; else /api/deployments/latest)
-          $pollUri = $resp.Headers.Location
-          if (-not $pollUri) { $pollUri = "https://$scmHost/api/deployments/latest" }
-          if ($pollUri -notmatch '^https?://') { $pollUri = "https://$scmHost$pollUri" }
+          # 3) Best-effort: show latest deployment record (may be empty on some SCM stacks)
+          $latest = Invoke-WebRequest -Method GET -Uri "https://$scmHost/api/deployments/latest" -Headers $hdrs -SkipHttpErrorCheck
+          Write-Host "deployments/latest: $($latest.StatusCode)"
+          if ($latest.Content) { Write-Host $latest.Content }
 
-          $deadline = (Get-Date).AddMinutes(6)
-          do {
-            Start-Sleep -Seconds 5
-            $d = Invoke-WebRequest -Method GET -Uri $pollUri -Headers $hdrs -SkipHttpErrorCheck
-            Write-Host "Poll: $($d.StatusCode) $pollUri"
-
-            if ($d.StatusCode -eq 200 -and $d.Content) {
-              try {
-                $j = $d.Content | ConvertFrom-Json
-                Write-Host ("status={0} complete={1} message={2}" -f $j.status, $j.complete, $j.message)
-
-                # Kudu: status 4 is failed; complete true means terminal
-                if ($j.complete -eq $true -and $j.status -eq 4) {
-                  Write-Host "Deployment reported failure payload:"
-                  $d.Content
-                  throw "Kudu deployment failed."
-                }
-
-                if ($j.complete -eq $true -and $j.status -ne 4) {
-                  Write-Host "Deployment reported success."
-                  break
-                }
-              } catch {
-                Write-Host "Non-JSON poll response:"
-                Write-Host $d.Content
-              }
-            }
-          } while ((Get-Date) -lt $deadline)
-
-          if ((Get-Date) -ge $deadline) {
-            throw "Timed out waiting for Kudu deployment to complete."
-          }

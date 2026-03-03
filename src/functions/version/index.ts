@@ -1,6 +1,6 @@
 import { VERSION } from "./version";
 
-export async function version(context: any, req: any): Promise<void> {
+export default async function (context: any, _req: any): Promise<void> {
   context.res = {
     status: 200,
     headers: { "content-type": "application/json; charset=utf-8" },

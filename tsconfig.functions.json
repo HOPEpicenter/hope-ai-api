@@ -1,9 +1,14 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "rootDir": "functions",
+    "rootDir": "src/functions",
     "outDir": "dist/functions"
   },
-  "include": ["functions/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/functions/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

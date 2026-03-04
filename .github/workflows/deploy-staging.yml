@@ -170,7 +170,8 @@ jobs:
           Write-Host "config-zip command completed."
 
           # Quick health check (staging) - retry (cold start + package mount can take time)
-          # Optional: restart to force host reload after config-zip          # 2b) Wait for Kudu to report the latest deployment is complete (best-effort)
+          # Optional: restart to force host reload after config-zip
+          # 2b) Wait for Kudu to report the latest deployment is complete (best-effort)
           # This reduces false 500s during package staging/mount.
           $latestUri = "https://$scmHost/api/deployments/latest"
           $deployDeadline = (Get-Date).AddMinutes(6)
@@ -205,6 +206,7 @@ jobs:
           if (-not $ok) {
             throw "Post-deploy health check failed after retries."
           }
+
 
 
 

@@ -4,7 +4,9 @@ on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
-
+permissions:
+  id-token: write
+  contents: read
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -79,8 +81,13 @@ jobs:
           Compress-Archive -Path ".deploy/*" -DestinationPath $zipPath -Force
           Write-Host "Created $zipPath"
           Get-Item $zipPath | Format-List Name,Length,FullName
-
-      - name: Deploy via Kudu ZipDeploy (PowerShell)
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy via ARM config-zip (PowerShell)
         shell: pwsh
         env:
           PUBLISH_PROFILE: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_STAGING }}
@@ -121,61 +128,56 @@ jobs:
           # 1) Force run-from-package and disable build flags (important for zipdeploy stability)
           $settingsUri = "https://$scmHost/api/settings"
           $settingsBody = @{
-            WEBSITE_RUN_FROM_PACKAGE       = "1"
-            SCM_DO_BUILD_DURING_DEPLOYMENT = "false"
-            ENABLE_ORYX_BUILD              = "false"
+            WEBSITE_RUN_FROM_PACKAGE                  = "1"
+            APPSETTING_WEBSITE_RUN_FROM_PACKAGE       = "1"
+            WEBSITES_ENABLE_APP_SERVICE_STORAGE       = "true"
+            APPSETTING_WEBSITES_ENABLE_APP_SERVICE_STORAGE = "true"
+            SCM_DO_BUILD_DURING_DEPLOYMENT            = "false"
+            ENABLE_ORYX_BUILD                         = "false"
           } | ConvertTo-Json
 
           Invoke-RestMethod -Method POST -Uri $settingsUri -Headers $hdrs -Body $settingsBody -ContentType "application/json" | Out-Null
           Write-Host "Kudu settings updated."
 
-          # 2) Start ZipDeploy async
-          $zipDeployUri = "https://$scmHost/api/zipdeploy?isAsync=true"
-          Write-Host "Starting ZipDeploy -> $zipDeployUri"
+          # 1b) Verify what Kudu thinks the settings are (and give it a moment to settle)
+          $verifyUri = "https://$scmHost/api/settings"
+          for ($i = 1; $i -le 6; $i++) {
+            $s = Invoke-RestMethod -Method GET -Uri $verifyUri -Headers $hdrs -SkipHttpErrorCheck
+            $w = $s.WEBSITE_RUN_FROM_PACKAGE
+            $a = $s.APPSETTING_WEBSITE_RUN_FROM_PACKAGE
 
-          $resp = Invoke-WebRequest -Method POST -Uri $zipDeployUri -Headers $hdrs -InFile $zipPath -ContentType "application/zip" -SkipHttpErrorCheck
-          Write-Host "ZipDeploy start status: $($resp.StatusCode)"
+            Write-Host ("Kudu settings check #{0}: WEBSITE_RUN_FROM_PACKAGE={1} APPSETTING_WEBSITE_RUN_FROM_PACKAGE={2}" -f $i, $w, $a)
 
-          if ($resp.StatusCode -ge 400) {
-            Write-Host "ZipDeploy start failed response body:"
-            $resp.Content
-            throw "ZipDeploy start failed with HTTP $($resp.StatusCode)"
+            if ($w -eq "1" -or $a -eq "1") { break }
+            Start-Sleep -Seconds 2
           }
 
-          # 3) Poll status (Location header if present; else /api/deployments/latest)
-          $pollUri = $resp.Headers.Location
-          if (-not $pollUri) { $pollUri = "https://$scmHost/api/deployments/latest" }
-          if ($pollUri -notmatch '^https?://') { $pollUri = "https://$scmHost$pollUri" }
-
-          $deadline = (Get-Date).AddMinutes(6)
-          do {
-            Start-Sleep -Seconds 5
-            $d = Invoke-WebRequest -Method GET -Uri $pollUri -Headers $hdrs -SkipHttpErrorCheck
-            Write-Host "Poll: $($d.StatusCode) $pollUri"
-
-            if ($d.StatusCode -eq 200 -and $d.Content) {
-              try {
-                $j = $d.Content | ConvertFrom-Json
-                Write-Host ("status={0} complete={1} message={2}" -f $j.status, $j.complete, $j.message)
-
-                # Kudu: status 4 is failed; complete true means terminal
-                if ($j.complete -eq $true -and $j.status -eq 4) {
-                  Write-Host "Deployment reported failure payload:"
-                  $d.Content
-                  throw "Kudu deployment failed."
-                }
-
-                if ($j.complete -eq $true -and $j.status -ne 4) {
-                  Write-Host "Deployment reported success."
-                  break
-                }
-              } catch {
-                Write-Host "Non-JSON poll response:"
-                Write-Host $d.Content
-              }
-            }
-          } while ((Get-Date) -lt $deadline)
-
-          if ((Get-Date) -ge $deadline) {
-            throw "Timed out waiting for Kudu deployment to complete."
+          if (-not (($s.WEBSITE_RUN_FROM_PACKAGE -eq "1") -or ($s.APPSETTING_WEBSITE_RUN_FROM_PACKAGE -eq "1"))) {
+            throw "Kudu still does not report run-from-package as enabled (expected '1'). Aborting before ZipDeploy."
           }
+          # 2) Deploy via ARM (config-zip)
+          $rg = "rg-hope-ai-api-staging"
+          $app = "hope-ai-api-staging"
+
+          Write-Host "Deploying deploy.zip via az functionapp deployment source config-zip..."
+          Write-Host "RG=$rg APP=$app ZIP=$zipPath"
+
+          az functionapp deployment source config-zip `
+            --resource-group $rg `
+            --name $app `
+            --src $zipPath
+
+          Write-Host "config-zip command completed."
+
+          # Quick health check (staging)
+          Start-Sleep -Seconds 5
+          $health = "https://hope-ai-api-staging.azurewebsites.net/api/version"
+          $h = Invoke-WebRequest -Method GET -Uri $health -SkipHttpErrorCheck
+          Write-Host "Health: $($h.StatusCode) $health"
+          if ($h.StatusCode -ne 200) {
+            if ($h.Content) { Write-Host $h.Content }
+            throw "Post-deploy health check failed."
+          }
+
+
+

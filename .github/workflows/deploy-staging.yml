@@ -171,9 +171,29 @@ jobs:
 
           # Quick health check (staging) - retry (cold start + package mount can take time)
           # Optional: restart to force host reload after config-zip
-          az functionapp restart --resource-group $rg --name $app | Out-Null
+                    # 2b) Wait for Kudu to report the latest deployment is complete (best-effort)
+          # This reduces false 500s during package staging/mount.
+          $latestUri = "https://$scmHost/api/deployments/latest"
+          $deployDeadline = (Get-Date).AddMinutes(6)
+          for ($i = 1; $i -le 72; $i++) {
+            Start-Sleep -Seconds 5
+            $resp = Invoke-WebRequest -Method GET -Uri $latestUri -Headers $hdrs -SkipHttpErrorCheck
+            if ($resp.StatusCode -ne 200) {
+              Write-Host "Kudu deploy poll #$i: HTTP $($resp.StatusCode)"
+              continue
+            }
 
-          $health = "https://hope-ai-api-staging.azurewebsites.net/api/version"
+            try {
+              $j = $resp.Content | ConvertFrom-Json
+              Write-Host ("Kudu deploy poll #{0}: status={1} complete={2} end_time={3} message={4}" -f $i, $j.status, $j.complete, $j.end_time, $j.message)
+              if ($j.complete -eq $true) { break }
+            } catch {
+              Write-Host "Kudu deploy poll #$i: non-JSON payload"
+            }
+
+            if ((Get-Date) -ge $deployDeadline) { break }
+          }
+$health = "https://hope-ai-api-staging.azurewebsites.net/api/version"
           $ok = $false
           for ($i = 1; $i -le 24; $i++) {
             Start-Sleep -Seconds 5
@@ -185,6 +205,7 @@ jobs:
           if (-not $ok) {
             throw "Post-deploy health check failed after retries."
           }
+
 
 
 

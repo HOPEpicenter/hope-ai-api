@@ -82,3 +82,5 @@ azure-running*.zip
 # Local deploy staging folder
 .deploy/
 
+run-*-logs/
+run-*-logs.zip

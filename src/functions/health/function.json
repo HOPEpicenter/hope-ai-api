@@ -1,6 +1,6 @@
 {
-  "scriptFile": "../dist/functions/version/index.js",
-  "entryPoint": "version",
+  "scriptFile": "../dist/functions/health/index.js",
+  "entryPoint": "health",
   "bindings": [
     {
       "type": "httpTrigger",
@@ -8,7 +8,7 @@
       "authLevel": "anonymous",
       "name": "req",
       "methods": [ "get" ],
-      "route": "version"
+      "route": "health"
     },
     {
       "type": "http",

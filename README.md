@@ -36,3 +36,13 @@ Run (PowerShell):
 Notes:
 - If STORAGE_CONNECTION_STRING is not set, the stale EMAIL index repair regression in smoke will be skipped.
 
+
+## Azure Functions programming model (locked for stability)
+
+This repo is currently locked to the **classic** Azure Functions Node.js model:
+- unction.json per function
+- scriptFile points to dist/.../index.js
+- ntryPoint matches an exported function (e.g., xport async function version(...))
+
+We can consider upgrading to the newer pp.http(...) programming model **after the project is stable** and only if it makes sense.
+

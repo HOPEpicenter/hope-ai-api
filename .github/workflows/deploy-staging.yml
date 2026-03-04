@@ -178,13 +178,14 @@ jobs:
           for ($i = 1; $i -le 24; $i++) {
             Start-Sleep -Seconds 5
             $h = Invoke-WebRequest -Method GET -Uri $health -SkipHttpErrorCheck
-            Write-Host "Health try #$i: $($h.StatusCode) $health"
+            Write-Host "Health try #${i}: $($h.StatusCode) $health"
             if ($h.StatusCode -eq 200) { $ok = $true; break }
             if ($h.Content) { Write-Host $h.Content }
           }
           if (-not $ok) {
             throw "Post-deploy health check failed after retries."
           }
+
 
 
 

@@ -79,8 +79,13 @@ jobs:
           Compress-Archive -Path ".deploy/*" -DestinationPath $zipPath -Force
           Write-Host "Created $zipPath"
           Get-Item $zipPath | Format-List Name,Length,FullName
-
-      - name: Deploy via Kudu ZipDeploy (PowerShell)
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy via ARM config-zip (PowerShell)
         shell: pwsh
         env:
           PUBLISH_PROFILE: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_STAGING }}
@@ -149,17 +154,28 @@ jobs:
             throw "Kudu still does not report run-from-package as enabled (expected '1'). Aborting before ZipDeploy."
           }
 
-          # 2) Start ZipDeploy async
-          $zipDeployUri = "https://$scmHost/api/zipdeploy?isAsync=true"
-          Write-Host "Starting ZipDeploy -> $zipDeployUri"
+                    # 2) Deploy via ARM (config-zip)
+          $rg = "rg-hope-ai-api-staging"
+          $app = "hope-ai-api-staging"
 
-          $resp = Invoke-WebRequest -Method POST -Uri $zipDeployUri -Headers $hdrs -InFile $zipPath -ContentType "application/zip" -SkipHttpErrorCheck
-          Write-Host "ZipDeploy start status: $($resp.StatusCode)"
+          Write-Host "Deploying deploy.zip via az functionapp deployment source config-zip..."
+          Write-Host "RG=$rg APP=$app ZIP=$zipPath"
 
-          if ($resp.StatusCode -ge 400) {
-            Write-Host "ZipDeploy start failed response body:"
-            $resp.Content
-            throw "ZipDeploy start failed with HTTP $($resp.StatusCode)"
+          az functionapp deployment source config-zip `
+            --resource-group $rg `
+            --name $app `
+            --src $zipPath
+
+          Write-Host "config-zip command completed."
+
+          # Quick health check (staging)
+          Start-Sleep -Seconds 5
+          $health = "https://hope-ai-api-staging.azurewebsites.net/api/version"
+          $h = Invoke-WebRequest -Method GET -Uri $health -SkipHttpErrorCheck
+          Write-Host "Health: $($h.StatusCode) $health"
+          if ($h.StatusCode -ne 200) {
+            if ($h.Content) { Write-Host $h.Content }
+            throw "Post-deploy health check failed."
           }
 
           # 3) Poll status (Location header if present; else /api/deployments/latest)
@@ -199,3 +215,7 @@ jobs:
           if ((Get-Date) -ge $deadline) {
             throw "Timed out waiting for Kudu deployment to complete."
           }
+
+
+
+

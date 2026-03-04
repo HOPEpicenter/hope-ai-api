@@ -169,15 +169,23 @@ jobs:
 
           Write-Host "config-zip command completed."
 
-          # Quick health check (staging)
-          Start-Sleep -Seconds 5
+          # Quick health check (staging) - retry (cold start + package mount can take time)
+          # Optional: restart to force host reload after config-zip
+          az functionapp restart --resource-group $rg --name $app | Out-Null
+
           $health = "https://hope-ai-api-staging.azurewebsites.net/api/version"
-          $h = Invoke-WebRequest -Method GET -Uri $health -SkipHttpErrorCheck
-          Write-Host "Health: $($h.StatusCode) $health"
-          if ($h.StatusCode -ne 200) {
+          $ok = $false
+          for ($i = 1; $i -le 24; $i++) {
+            Start-Sleep -Seconds 5
+            $h = Invoke-WebRequest -Method GET -Uri $health -SkipHttpErrorCheck
+            Write-Host "Health try #$i: $($h.StatusCode) $health"
+            if ($h.StatusCode -eq 200) { $ok = $true; break }
             if ($h.Content) { Write-Host $h.Content }
-            throw "Post-deploy health check failed."
           }
+          if (-not $ok) {
+            throw "Post-deploy health check failed after retries."
+          }
+
 
 
 

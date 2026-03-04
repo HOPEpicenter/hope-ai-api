@@ -48,9 +48,14 @@ if ($hf -match '"entryPoint"\s*:') {
 }
 
 # Lock to classic programming model: forbid app.http(...) in src/functions
-$hits = & git grep -n 'app\.http\(' -- .\src\functions
+# Use fixed-string search so we don't fight grep regex quirks.
+$hits = & git grep -n --fixed-string "app.http(" -- .\src\functions
+if ($LASTEXITCODE -eq 2) {
+  throw "git grep failed while checking for app.http(...)."
+}
 if ($LASTEXITCODE -eq 0 -and $hits) {
   throw "Found app.http(...) usage in src/functions. Repo is locked to classic model for stability. Remove new-model functions."
 }
 
 Write-Host "OK: Functions layout looks valid (classic model locked)."
+

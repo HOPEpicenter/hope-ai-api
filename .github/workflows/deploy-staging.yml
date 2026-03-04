@@ -4,7 +4,9 @@ on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
-
+permissions:
+  id-token: write
+  contents: read
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -153,8 +155,7 @@ jobs:
           if (-not (($s.WEBSITE_RUN_FROM_PACKAGE -eq "1") -or ($s.APPSETTING_WEBSITE_RUN_FROM_PACKAGE -eq "1"))) {
             throw "Kudu still does not report run-from-package as enabled (expected '1'). Aborting before ZipDeploy."
           }
-
-                    # 2) Deploy via ARM (config-zip)
+          # 2) Deploy via ARM (config-zip)
           $rg = "rg-hope-ai-api-staging"
           $app = "hope-ai-api-staging"
 
@@ -177,45 +178,6 @@ jobs:
             if ($h.Content) { Write-Host $h.Content }
             throw "Post-deploy health check failed."
           }
-
-          # 3) Poll status (Location header if present; else /api/deployments/latest)
-          $pollUri = $resp.Headers.Location
-          if (-not $pollUri) { $pollUri = "https://$scmHost/api/deployments/latest" }
-          if ($pollUri -notmatch '^https?://') { $pollUri = "https://$scmHost$pollUri" }
-
-          $deadline = (Get-Date).AddMinutes(6)
-          do {
-            Start-Sleep -Seconds 5
-            $d = Invoke-WebRequest -Method GET -Uri $pollUri -Headers $hdrs -SkipHttpErrorCheck
-            Write-Host "Poll: $($d.StatusCode) $pollUri"
-
-            if ($d.StatusCode -eq 200 -and $d.Content) {
-              try {
-                $j = $d.Content | ConvertFrom-Json
-                Write-Host ("status={0} complete={1} message={2}" -f $j.status, $j.complete, $j.message)
-
-                # Kudu: status 4 is failed; complete true means terminal
-                if ($j.complete -eq $true -and $j.status -eq 4) {
-                  Write-Host "Deployment reported failure payload:"
-                  $d.Content
-                  throw "Kudu deployment failed."
-                }
-
-                if ($j.complete -eq $true -and $j.status -ne 4) {
-                  Write-Host "Deployment reported success."
-                  break
-                }
-              } catch {
-                Write-Host "Non-JSON poll response:"
-                Write-Host $d.Content
-              }
-            }
-          } while ((Get-Date) -lt $deadline)
-
-          if ((Get-Date) -ge $deadline) {
-            throw "Timed out waiting for Kudu deployment to complete."
-          }
-
 
 
 

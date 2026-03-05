@@ -1,18 +1,19 @@
 {
+  "scriptFile": "../dist/functions/createVisitor/index.js",
+  "entryPoint": "createVisitor",
   "bindings": [
     {
-      "authLevel": "anonymous",
       "type": "httpTrigger",
       "direction": "in",
+      "authLevel": "anonymous",
       "name": "req",
-      "methods": [ "get" ],
-      "route": "ops/followups"
+      "methods": [ "post" ],
+      "route": "visitors"
     },
     {
       "type": "http",
       "direction": "out",
       "name": "res"
     }
-  ],
-  "scriptFile": "../dist/functions/opsFollowups/index.js"
+  ]
 }

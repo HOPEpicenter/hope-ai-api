@@ -84,3 +84,4 @@ azure-running*.zip
 
 run-*-logs/
 run-*-logs.zip
+__blobstorage__/

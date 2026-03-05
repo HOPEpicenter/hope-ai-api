@@ -1,17 +1,10 @@
 import { randomUUID } from "crypto";
-import { TableClient } from "@azure/data-tables";
+import { ensureTable, getTableClient } from "../_shared/tableClient";
 
 type CreateVisitorBody = {
   name?: string;
   email?: string;
 };
-
-function getConn(): string {
-  // Prefer STORAGE_CONNECTION_STRING, fallback to AzureWebJobsStorage
-  return process.env.STORAGE_CONNECTION_STRING
-    ?? process.env.AzureWebJobsStorage
-    ?? "";
-}
 
 export async function createVisitor(context: any, req: any): Promise<void> {
   try {
@@ -28,19 +21,11 @@ export async function createVisitor(context: any, req: any): Promise<void> {
       return;
     }
 
-    const conn = getConn();
-    if (!conn) {
-      context.res = {
-        status: 500,
-        headers: { "content-type": "application/json; charset=utf-8" },
-        body: { ok: false, error: "storage is not configured" }
-      };
-      return;
-    }
-
     const visitorId = randomUUID();
+    const client = getTableClient("Visitors");
 
-    const client = TableClient.fromConnectionString(conn, "Visitors");
+    // Make sure table exists (Azure + local)
+    await ensureTable(client);
 
     await client.createEntity({
       partitionKey: "visitors",

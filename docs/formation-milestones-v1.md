@@ -74,3 +74,12 @@ Response:
 
 Deep paging test:
 - `scripts/assert-formation-pagination.ps1` with `HOPE_RUN_PHASE3_DEEP_PAGING=1` validates cursor progression + dedupe across pages.
+
+### Stage change metadata (v1 contract)
+When the derived snapshot's stage changes due to an input event, the snapshot MUST also include:
+- stageUpdatedAt (ISO timestamp) matching the effective stage change time
+- stageUpdatedBy (string) set to "system" for derived stage changes
+- stageReason (string) set to vent:<eventType> describing why the stage changed
+
+If stage does not change, these fields MAY be omitted (or remain unchanged if already present).
+

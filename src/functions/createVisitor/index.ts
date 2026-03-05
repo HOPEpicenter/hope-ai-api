@@ -24,7 +24,6 @@ export async function createVisitor(context: any, req: any): Promise<void> {
     const visitorId = randomUUID();
     const client = getTableClient("Visitors");
 
-    // Make sure table exists (Azure + local)
     await ensureTable(client);
 
     await client.createEntity({

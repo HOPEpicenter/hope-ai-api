@@ -52,6 +52,11 @@ jobs:
           if (Test-Path (Join-Path $repoRoot "package.json")) { Copy-Item -Force (Join-Path $repoRoot "package.json") (Join-Path $deployDir "package.json") }
           if (Test-Path (Join-Path $repoRoot "package-lock.json")) { Copy-Item -Force (Join-Path $repoRoot "package-lock.json") (Join-Path $deployDir "package-lock.json") }
 
+          # Install production deps into staged folder (no Oryx build on Azure)
+          Push-Location $deployDir
+          npm ci --omit=dev
+          Pop-Location
+
           # Compiled JS
           $distSrc = Join-Path $repoRoot "dist"
           if (-not (Test-Path $distSrc)) { throw "dist/ missing. Did npm run build run?" }
@@ -206,6 +211,7 @@ jobs:
           if (-not $ok) {
             throw "Post-deploy health check failed after retries."
           }
+
 
 
 

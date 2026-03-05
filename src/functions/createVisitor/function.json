@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/createVisitor/index.js",
+  "entryPoint": "createVisitor",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "post" ],
+      "route": "visitors"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

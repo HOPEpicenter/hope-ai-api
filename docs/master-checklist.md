@@ -27,10 +27,10 @@
 - [x] Visitor creation is idempotent by normalized email (trim + lowercase).
 
 ### Engineering / contracts
-- [x] Public create visitor: POST /api/visitors
+- [x] Public create visitor: POST /api/visitors (#199)
   - Returns 201 when created; 200 when reused (idempotent repeat).
   - Always returns { ok: true, visitorId } on success.
-- [x] Public get visitor: GET /api/visitors/:id
+- [x] Public get visitor: GET /api/visitors/:id (#200)
 - [x] Validation: missing email => 400; invalid email => 400.
 
 ### Storage invariants (Azure Table Storage)

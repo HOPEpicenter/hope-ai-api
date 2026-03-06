@@ -1,57 +1,68 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+export async function protectedPing(context: any, req: any): Promise<void> {
+  try {
+    const expectedApiKey =
+      process.env.HOPE_API_KEY ??
+      process.env.API_KEY ??
+      process.env.X_API_KEY;
 
-function getApiKey(req: HttpRequest): string | undefined {
-  return req.headers.get("x-api-key") ?? undefined;
-}
+    const providedApiKey =
+      req?.headers?.["x-api-key"] ??
+      req?.headers?.["X-Api-Key"] ??
+      req?.headers?.["X-API-KEY"] ??
+      req?.headers?.["x-api_key"] ??
+      req?.headers?.["X-Api_Key"];
 
-function unauthorized(message: string): HttpResponseInit {
-  return { status: 401, jsonBody: { ok: false, error: message } };
-}
-
-function badRequest(message: string): HttpResponseInit {
-  return { status: 400, jsonBody: { ok: false, error: message } };
-}
-
-export async function protectedPing(req: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-  const expectedApiKey =
-    process.env.HOPE_API_KEY ??
-    process.env.API_KEY ??
-    process.env.X_API_KEY;
-
-  const providedApiKey = getApiKey(req);
-
-  if (!providedApiKey) {
-    return unauthorized("Missing x-api-key");
-  }
-
-  if (!expectedApiKey) {
-    context.warn("protectedPing: no API key env var configured");
-    return unauthorized("API key auth is not configured");
-  }
-
-  if (providedApiKey !== expectedApiKey) {
-    return unauthorized("Invalid x-api-key");
-  }
-
-  const rawLimit = req.query.get("limit") ?? "1";
-  const limit = Number(rawLimit);
-
-  if (!Number.isInteger(limit) || limit <= 0) {
-    return badRequest("Invalid 'limit' (expected positive integer).");
-  }
-
-  return {
-    status: 200,
-    jsonBody: {
-      ok: true,
-      limit
+    if (!providedApiKey) {
+      context.res = {
+        status: 401,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: { ok: false, error: "Missing x-api-key" }
+      };
+      return;
     }
-  };
-}
 
-app.http("protectedPing", {
-  methods: ["GET"],
-  authLevel: "anonymous",
-  route: "_protected/ping",
-  handler: protectedPing
-});
+    if (!expectedApiKey) {
+      context.log?.warn?.("protectedPing: no API key env var configured");
+      context.res = {
+        status: 401,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: { ok: false, error: "API key auth is not configured" }
+      };
+      return;
+    }
+
+    if (String(providedApiKey) !== String(expectedApiKey)) {
+      context.res = {
+        status: 401,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: { ok: false, error: "Invalid x-api-key" }
+      };
+      return;
+    }
+
+    const rawLimit = (req?.query?.limit ?? "1").toString();
+    const limit = Number(rawLimit);
+
+    if (!Number.isInteger(limit) || limit <= 0) {
+      context.res = {
+        status: 400,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: { ok: false, error: "Invalid 'limit' (expected positive integer)." }
+      };
+      return;
+    }
+
+    context.res = {
+      status: 200,
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: { ok: true, limit }
+    };
+  } catch (err: any) {
+    context.log?.error?.(err?.message ?? err);
+    context.res = {
+      status: 500,
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: { ok: false, error: "internal error" }
+    };
+  }
+}

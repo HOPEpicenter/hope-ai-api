@@ -10,6 +10,9 @@ if ($env:HOPE_RUN_PHASE4_ASSERTS -ne "1") {
 
 $ErrorActionPreference = "Stop"
 
+function Has-Prop($obj, [string]$name) {
+  return ($null -ne $obj) -and ($obj.PSObject.Properties.Name -contains $name)
+}
 function Require-Env([string]$name) {
   $v = [Environment]::GetEnvironmentVariable($name)
   if ([string]::IsNullOrWhiteSpace($v)) { throw "Missing required env var: $name" }
@@ -50,9 +53,11 @@ if ($r.v -ne 1) { throw "Expected v=1" }
 if ($r.summary.needsFollowup -isnot [bool]) { throw "Expected summary.needsFollowup to be boolean" }
 
 # assignedTo is optional; if present, validate shape
-if ($null -ne $r.summary.assignedTo) {
-  if ($r.summary.assignedTo.ownerType -notin @("user","team")) { throw "Expected assignedTo.ownerType to be 'user' or 'team'" }
-  if ($r.summary.assignedTo.ownerId -isnot [string] -or [string]::IsNullOrWhiteSpace($r.summary.assignedTo.ownerId)) { throw "Expected assignedTo.ownerId to be non-empty string" }
+if (Has-Prop $r.summary "assignedTo") {
+  if ($null -ne $r.summary.assignedTo) {
+    if ($r.summary.assignedTo.ownerType -notin @("user","team")) { throw "Expected assignedTo.ownerType to be 'user' or 'team'" }
+    if ($r.summary.assignedTo.ownerId -isnot [string] -or [string]::IsNullOrWhiteSpace($r.summary.assignedTo.ownerId)) { throw "Expected assignedTo.ownerId to be non-empty string" }
+  }
 }
 
 if ($r.summary.needsFollowup -eq $true) {
@@ -65,4 +70,6 @@ if ($r.summary.sources.formation  -isnot [bool]) { throw "Expected summary.sourc
 
 
 Write-Host "OK: Integration summary assertions passed." -ForegroundColor Green
+
+
 

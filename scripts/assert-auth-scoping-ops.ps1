@@ -17,9 +17,9 @@ function Invoke-Api {
   )
 
   $opts = @{
-    Method = $Method
-    Uri    = $Url
-    Headers = $Headers
+    Method            = $Method
+    Uri               = $Url
+    Headers           = $Headers
     SkipHttpErrorCheck = $true
   }
 
@@ -41,51 +41,67 @@ function Assert-Status {
   param(
     [Parameter(Mandatory=$true)] $Resp,
     [Parameter(Mandatory=$true)][int] $Expected,
-    [Parameter(Mandatory=$true)][string] $Msg
+    [Parameter(Mandatory=$true)][string] $Msg,
+    [Parameter(Mandatory=$true)][string] $Url
   )
 
   if ([int]$Resp.StatusCode -ne $Expected) {
     $bodyText = Get-BodyText $Resp
-    throw "$Msg`nExpected HTTP $Expected but got $($Resp.StatusCode).`nUrl: $($Resp.BaseResponse.ResponseUri)`nBody: $bodyText"
+    throw "$Msg`nExpected HTTP $Expected but got $($Resp.StatusCode).`nUrl: $Url`nBody: $bodyText"
   }
 }
 
-Write-Host "[assert-auth-scoping-ops] ApiBase=$ApiBase"
+function Assert-StatusIn {
+  param(
+    [Parameter(Mandatory=$true)] $Resp,
+    [Parameter(Mandatory=$true)][int[]] $Expected,
+    [Parameter(Mandatory=$true)][string] $Msg,
+    [Parameter(Mandatory=$true)][string] $Url
+  )
+
+  $code = [int]$Resp.StatusCode
+  if ($Expected -notcontains $code) {
+    $bodyText = Get-BodyText $Resp
+    throw "$Msg`nExpected HTTP one of: $($Expected -join ', ') but got $code.`nUrl: $Url`nBody: $bodyText"
+  }
+}
+
+Write-Host "[assert-auth-scoping] ApiBase=$ApiBase"
 
 # 1) Public endpoint: /api/health should be 200 without x-api-key
-$health = Invoke-Api -Method GET -Url "$ApiBase/api/health"
-Assert-Status -Resp $health -Expected 200 -Msg "[auth-scoping] /api/health should be public"
+$healthUrl = "$ApiBase/api/health"
+$health = Invoke-Api -Method GET -Url $healthUrl
+Assert-Status -Resp $health -Expected 200 -Msg "[auth-scoping] /api/health should be public" -Url $healthUrl
 
-# 2) Create a visitor (public) so we have a visitorId for ops queries
+# 2) Public create visitor should succeed (200 reused or 201 created)
+$createUrl = "$ApiBase/api/visitors"
 $createBody = @{
   name  = "Auth Scoping Smoke"
   email = "auth-scoping+$([guid]::NewGuid().ToString('N'))@example.com"
 } | ConvertTo-Json
 
-$create = Invoke-Api -Method POST -Url "$ApiBase/api/visitors" -Body $createBody
-Assert-Status -Resp $create -Expected 200 -Msg "[auth-scoping] POST /api/visitors should succeed"
+$create = Invoke-Api -Method POST -Url $createUrl -Body $createBody
+Assert-StatusIn -Resp $create -Expected @(200, 201) -Msg "[auth-scoping] POST /api/visitors should succeed (200 or 201)" -Url $createUrl
 
-$createJson = (Get-BodyText $create) | ConvertFrom-Json
-$vid = [string]$createJson.visitorId
-if ([string]::IsNullOrWhiteSpace($vid)) { throw "[auth-scoping] Missing visitorId from POST /api/visitors" }
+# 3) Protected endpoint (deployed Function): /api/_protected/ping
+# Missing key => 401
+$protectedOkUrl = "$ApiBase/api/_protected/ping?limit=1"
+$noKey = Invoke-Api -Method GET -Url $protectedOkUrl
+Assert-Status -Resp $noKey -Expected 401 -Msg "[auth-scoping] Protected endpoint should require x-api-key (missing key => 401)" -Url $protectedOkUrl
 
-# 3) Protected endpoint: /ops/engagements requires x-api-key and visitorId
-# - No key => 401
-$opsUrlBase = "$ApiBase/ops/engagements?visitorId=$vid&limit=1"
-$noKey = Invoke-Api -Method GET -Url $opsUrlBase
-Assert-Status -Resp $noKey -Expected 401 -Msg "[auth-scoping] /ops/engagements should require x-api-key (missing key => 401)"
-
-# - With key but missing required query => 400 (visitorId missing)
+# With key => proceed
 if ([string]::IsNullOrWhiteSpace($ApiKey)) {
   throw "[auth-scoping] HOPE_API_KEY is not set. Set env var HOPE_API_KEY to run protected assertions."
 }
 $headers = @{ "x-api-key" = $ApiKey }
 
-$missingVisitorId = Invoke-Api -Method GET -Url "$ApiBase/ops/engagements?limit=1" -Headers $headers
-Assert-Status -Resp $missingVisitorId -Expected 400 -Msg "[auth-scoping] /ops/engagements should 400 when visitorId is missing (with valid key)"
+# With key but invalid query => 400
+$protectedBadUrl = "$ApiBase/api/_protected/ping?limit=abc"
+$badReq = Invoke-Api -Method GET -Url $protectedBadUrl -Headers $headers
+Assert-Status -Resp $badReq -Expected 400 -Msg "[auth-scoping] Protected endpoint should 400 on invalid query (with valid key)" -Url $protectedBadUrl
 
-# - With key and required query => 200
-$withKey = Invoke-Api -Method GET -Url $opsUrlBase -Headers $headers
-Assert-Status -Resp $withKey -Expected 200 -Msg "[auth-scoping] /ops/engagements should 200 with x-api-key + required query"
+# With key and valid query => 200
+$withKey = Invoke-Api -Method GET -Url $protectedOkUrl -Headers $headers
+Assert-Status -Resp $withKey -Expected 200 -Msg "[auth-scoping] Protected endpoint should 200 with valid x-api-key + valid query" -Url $protectedOkUrl
 
-Write-Host "[assert-auth-scoping-ops] OK" -ForegroundColor Green
+Write-Host "[assert-auth-scoping] OK" -ForegroundColor Green

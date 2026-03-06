@@ -198,10 +198,22 @@ $e2 = @{
 } | ConvertTo-Json -Depth 8
 
 $e1r = Invoke-JsonSafe -Method "POST" -Uri "$BaseUrl/engagements/events" -Headers $headers -Body $e1
-if (-not $e1r.ok) { Fail "POST /engagements/events (1) failed." }
+if (-not $e1r.ok) {
+  Write-Host ""
+  Write-Host "POST /engagements/events (1) failed (raw):" -ForegroundColor Yellow
+  if ($e1r.raw) { Write-Host $e1r.raw } else { Write-Host "(no body captured)" }
+  if ($e1r.error) { Write-Host $e1r.error.Exception.Message }
+  Fail "POST /engagements/events (1) failed."
+}
 
 $e2r = Invoke-JsonSafe -Method "POST" -Uri "$BaseUrl/engagements/events" -Headers $headers -Body $e2
-if (-not $e2r.ok) { Fail "POST /engagements/events (2) failed." }
+if (-not $e2r.ok) {
+  Write-Host ""
+  Write-Host "POST /engagements/events (2) failed (raw):" -ForegroundColor Yellow
+  if ($e2r.raw) { Write-Host $e2r.raw } else { Write-Host "(no body captured)" }
+  if ($e2r.error) { Write-Host $e2r.error.Exception.Message }
+  Fail "POST /engagements/events (2) failed."
+}
 
 Ok "Posted 2 engagements"
 

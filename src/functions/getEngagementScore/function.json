@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getEngagementScore/index.js",
+  "entryPoint": "getEngagementScore",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "engagements/score"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

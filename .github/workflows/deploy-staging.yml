@@ -131,6 +131,60 @@ jobs:
           $hdrs = @{ Authorization = "Basic $b64" }
 
           # 1) Force run-from-package and disable build flags (important for zipdeploy stability)
+          function Invoke-KuduJson {
+            param(
+              [Parameter(Mandatory=$true)][ValidateSet("GET","POST","PUT","DELETE")][string] $Method,
+              [Parameter(Mandatory=$true)][string] $Uri,
+              [Parameter(Mandatory=$true)][hashtable] $Headers,
+              [Parameter(Mandatory=$false)][string] $Body = $null,
+              [int] $MaxAttempts = 8,
+              [int] $InitialDelaySeconds = 2
+            )
+
+            $attempt = 0
+            $delay = $InitialDelaySeconds
+            while ($true) {
+              $attempt++
+              try {
+                $opts = @{
+                  Method = $Method
+                  Uri = $Uri
+                  Headers = $Headers
+                  SkipHttpErrorCheck = $true
+                }
+                if ($null -ne $Body) {
+                  $opts["ContentType"] = "application/json"
+                  $opts["Body"] = $Body
+                }
+
+                $resp = Invoke-WebRequest @opts
+
+                # Treat 502/503/504 as transient (Kudu/SCM flakiness)
+                if ($resp.StatusCode -in 502,503,504) {
+                  throw "Transient HTTP $($resp.StatusCode)"
+                }
+
+                if ($resp.StatusCode -ge 400) {
+                  $txt = [string]$resp.Content
+                  throw "HTTP $($resp.StatusCode) calling $Uri`n$txt"
+                }
+
+                if ($resp.Content) { return ($resp.Content | ConvertFrom-Json) }
+                return $null
+              }
+              catch {
+                $msg = $_.Exception.Message
+                if ($attempt -ge $MaxAttempts) {
+                  throw "Kudu call failed after $attempt attempts: $Method $Uri`nLast error: $msg"
+                }
+
+                Write-Host "Kudu call retry #$attempt/$MaxAttempts failed: $Method $Uri`n$msg"
+                Start-Sleep -Seconds $delay
+                $delay = [Math]::Min($delay * 2, 20)
+              }
+            }
+          }
+          
           $settingsUri = "https://$scmHost/api/settings"
           $settingsBody = @{
             WEBSITE_RUN_FROM_PACKAGE                  = "1"
@@ -140,14 +194,13 @@ jobs:
             SCM_DO_BUILD_DURING_DEPLOYMENT            = "false"
             ENABLE_ORYX_BUILD                         = "false"
           } | ConvertTo-Json
-
-          Invoke-RestMethod -Method POST -Uri $settingsUri -Headers $hdrs -Body $settingsBody -ContentType "application/json" | Out-Null
+            Invoke-KuduJson -Method POST -Uri $settingsUri -Headers $hdrs -Body $settingsBody | Out-Null
           Write-Host "Kudu settings updated."
 
           # 1b) Verify what Kudu thinks the settings are (and give it a moment to settle)
           $verifyUri = "https://$scmHost/api/settings"
           for ($i = 1; $i -le 6; $i++) {
-            $s = Invoke-RestMethod -Method GET -Uri $verifyUri -Headers $hdrs -SkipHttpErrorCheck
+              $s = Invoke-KuduJson -Method GET -Uri $verifyUri -Headers $hdrs
             $w = $s.WEBSITE_RUN_FROM_PACKAGE
             $a = $s.APPSETTING_WEBSITE_RUN_FROM_PACKAGE
 
@@ -211,6 +264,7 @@ jobs:
           if (-not $ok) {
             throw "Post-deploy health check failed after retries."
           }
+
 
 
 

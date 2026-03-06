@@ -1,15 +1,15 @@
 # scripts/run-smoke-remote.ps1
-# Runs the smoke suite against a REMOTE (or already-running) environment.
-# Requires: OPS_BASE_URL (root, e.g. https://staging.example.com) and HOPE_API_KEY.
-# Does NOT build or start the server.
+# Runs remote smoke checks against a deployed environment.
+# Requires: OPS_BASE_URL and HOPE_API_KEY.
+# Supports either:
+#   - ops host exposing /ops/*
+#   - Functions host exposing /api/*
 
 [CmdletBinding()]
 param(
-  # Root base URL, e.g. https://staging.example.com (NO trailing slash)
   [Parameter(Mandatory=$false)]
   [string]$BaseUrl = $env:OPS_BASE_URL,
 
-  # API key for /ops and protected /api endpoints
   [Parameter(Mandatory=$false)]
   [string]$ApiKey = $env:HOPE_API_KEY
 )
@@ -25,248 +25,104 @@ function Require-Value([string]$Name, [string]$Value) {
   return $Value
 }
 
-$BaseUrl = Require-Value "OPS_BASE_URL" $BaseUrl
-$ApiKey  = Require-Value "HOPE_API_KEY"  $ApiKey
+function Invoke-Probe {
+  param(
+    [Parameter(Mandatory=$true)][string]$Url,
+    [hashtable]$Headers = @{}
+  )
 
-$BaseUrl = $BaseUrl.Trim().TrimEnd("/")
-
-Write-Host ""
-Write-Host "== Remote smoke ==" -ForegroundColor Cyan
-Write-Host ("BaseUrl: {0}" -f $BaseUrl)
-Write-Host ("ApiKey : len={0} last4={1}" -f $ApiKey.Length, ($ApiKey.Substring([Math]::Max(0,$ApiKey.Length-4))))
-
-# Health probe with retries (handles cold start)
-$headers = @{ "x-api-key" = $ApiKey }
-$healthUrl = "$BaseUrl/ops/health"
-
-Write-Host ""
-Write-Host ("== Probe {0} ==" -f $healthUrl) -ForegroundColor Cyan
-
-$deadline = (Get-Date).AddSeconds(120)
-$lastErr = $null
-
-while ((Get-Date) -lt $deadline) {
   try {
-    $h = Invoke-RestMethod -Method Get -Uri $healthUrl -Headers $headers -TimeoutSec 15
-    Write-Host ("Health OK: {0}" -f ($h | ConvertTo-Json -Depth 10))
-    $lastErr = $null
-    break
-  } catch {
-    $lastErr = # scripts/run-smoke-remote.ps1
-# Runs the smoke suite against a REMOTE (or already-running) environment.
-# Requires: OPS_BASE_URL (root, e.g. https://staging.example.com) and HOPE_API_KEY.
-# Does NOT build or start the server.
-
-[CmdletBinding()]
-param(
-  # Root base URL, e.g. https://staging.example.com (NO trailing slash)
-  [Parameter(Mandatory=$false)]
-  [string]$BaseUrl = $env:OPS_BASE_URL,
-
-  # API key for /ops and protected /api endpoints
-  [Parameter(Mandatory=$false)]
-  [string]$ApiKey = $env:HOPE_API_KEY
-)
-
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-$ProgressPreference = "SilentlyContinue"
-
-function Require-Value([string]$Name, [string]$Value) {
-  if ([string]::IsNullOrWhiteSpace($Value)) {
-    throw "$Name is required. Set env:$Name or pass -$Name."
+    $resp = Invoke-WebRequest -Uri $Url -Headers $Headers -Method GET -TimeoutSec 20 -ErrorAction Stop
+    return [pscustomobject]@{
+      Status = [int]$resp.StatusCode
+      Body   = [string]$resp.Content
+      Url    = $Url
+    }
   }
-  return $Value
-}
+  catch {
+    $ex = $_.Exception
+    $status = 0
+    $body = if ($ex -and $ex.Message) { [string]$ex.Message } else { "Request failed" }
+    $resp = $null
 
-$BaseUrl = Require-Value "OPS_BASE_URL" $BaseUrl
-$ApiKey  = Require-Value "HOPE_API_KEY"  $ApiKey
-
-$BaseUrl = $BaseUrl.Trim().TrimEnd("/")
-
-Write-Host ""
-Write-Host "== Remote smoke ==" -ForegroundColor Cyan
-Write-Host ("BaseUrl: {0}" -f $BaseUrl)
-Write-Host ("ApiKey : len={0} last4={1}" -f $ApiKey.Length, ($ApiKey.Substring([Math]::Max(0,$ApiKey.Length-4))))
-
-# Quick health probe (fail fast)
-$headers = @{ "x-api-key" = $ApiKey }
-$healthUrl = "$BaseUrl/ops/health"
-
-Write-Host ""
-Write-Host ("== Probe {0} ==" -f $healthUrl) -ForegroundColor Cyan
-try {
-  $h = Invoke-RestMethod -Method Get -Uri $healthUrl -Headers $headers -TimeoutSec 15
-  Write-Host ("Health OK: {0}" -f ($h | ConvertTo-Json -Depth 10))
-} catch {
-  $msg = $_.Exception.Message
-  throw ("Health probe failed for {0}. Error: {1}" -f $healthUrl, $msg)
-}
-
-# Run smoke tests (already covers /ops + /api regressions)
-Write-Host ""
-Write-Host "== Run smoke-tests.ps1 ==" -ForegroundColor Cyan
-$smokePath = Join-Path $PSScriptRoot "smoke-tests.ps1"
-
-pwsh -NoProfile -ExecutionPolicy Bypass -File $smokePath -BaseUrl $BaseUrl -ApiKey $ApiKey
-if ($LASTEXITCODE -ne 0) {
-  throw "Remote smoke failed (exit=$LASTEXITCODE)."
-}
-
-Write-Host ""
-Write-Host "REMOTE SMOKE PASSED" -ForegroundColor Green
-
-
-    # Fail fast on auth errors (won't fix by waiting)
-    $resp = # scripts/run-smoke-remote.ps1
-# Runs the smoke suite against a REMOTE (or already-running) environment.
-# Requires: OPS_BASE_URL (root, e.g. https://staging.example.com) and HOPE_API_KEY.
-# Does NOT build or start the server.
-
-[CmdletBinding()]
-param(
-  # Root base URL, e.g. https://staging.example.com (NO trailing slash)
-  [Parameter(Mandatory=$false)]
-  [string]$BaseUrl = $env:OPS_BASE_URL,
-
-  # API key for /ops and protected /api endpoints
-  [Parameter(Mandatory=$false)]
-  [string]$ApiKey = $env:HOPE_API_KEY
-)
-
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-$ProgressPreference = "SilentlyContinue"
-
-function Require-Value([string]$Name, [string]$Value) {
-  if ([string]::IsNullOrWhiteSpace($Value)) {
-    throw "$Name is required. Set env:$Name or pass -$Name."
-  }
-  return $Value
-}
-
-$BaseUrl = Require-Value "OPS_BASE_URL" $BaseUrl
-$ApiKey  = Require-Value "HOPE_API_KEY"  $ApiKey
-
-$BaseUrl = $BaseUrl.Trim().TrimEnd("/")
-
-Write-Host ""
-Write-Host "== Remote smoke ==" -ForegroundColor Cyan
-Write-Host ("BaseUrl: {0}" -f $BaseUrl)
-Write-Host ("ApiKey : len={0} last4={1}" -f $ApiKey.Length, ($ApiKey.Substring([Math]::Max(0,$ApiKey.Length-4))))
-
-# Quick health probe (fail fast)
-$headers = @{ "x-api-key" = $ApiKey }
-$healthUrl = "$BaseUrl/ops/health"
-
-Write-Host ""
-Write-Host ("== Probe {0} ==" -f $healthUrl) -ForegroundColor Cyan
-try {
-  $h = Invoke-RestMethod -Method Get -Uri $healthUrl -Headers $headers -TimeoutSec 15
-  Write-Host ("Health OK: {0}" -f ($h | ConvertTo-Json -Depth 10))
-} catch {
-  $msg = $_.Exception.Message
-  throw ("Health probe failed for {0}. Error: {1}" -f $healthUrl, $msg)
-}
-
-# Run smoke tests (already covers /ops + /api regressions)
-Write-Host ""
-Write-Host "== Run smoke-tests.ps1 ==" -ForegroundColor Cyan
-$smokePath = Join-Path $PSScriptRoot "smoke-tests.ps1"
-
-pwsh -NoProfile -ExecutionPolicy Bypass -File $smokePath -BaseUrl $BaseUrl -ApiKey $ApiKey
-if ($LASTEXITCODE -ne 0) {
-  throw "Remote smoke failed (exit=$LASTEXITCODE)."
-}
-
-Write-Host ""
-Write-Host "REMOTE SMOKE PASSED" -ForegroundColor Green
-.Exception.Response
-    if ($resp -and ($resp.StatusCode.value__ -eq 401 -or $resp.StatusCode.value__ -eq 403)) {
-      throw ("Health probe got HTTP {0} (auth). Check HOPE_API_KEY." -f $resp.StatusCode.value__)
+    if ($ex) {
+      $p = $ex.PSObject.Properties.Match("Response")
+      if (@($p).Count -gt 0) { $resp = $ex.Response }
     }
 
-    Write-Host ("...still waiting for health ({0})" -f # scripts/run-smoke-remote.ps1
-# Runs the smoke suite against a REMOTE (or already-running) environment.
-# Requires: OPS_BASE_URL (root, e.g. https://staging.example.com) and HOPE_API_KEY.
-# Does NOT build or start the server.
+    if ($resp) {
+      try { $status = [int]$resp.StatusCode } catch { $status = 0 }
+      try {
+        $stream = $resp.GetResponseStream()
+        if ($stream) {
+          $reader = New-Object System.IO.StreamReader($stream)
+          $body = $reader.ReadToEnd()
+          $reader.Dispose()
+        }
+      } catch { }
+    }
 
-[CmdletBinding()]
-param(
-  # Root base URL, e.g. https://staging.example.com (NO trailing slash)
-  [Parameter(Mandatory=$false)]
-  [string]$BaseUrl = $env:OPS_BASE_URL,
-
-  # API key for /ops and protected /api endpoints
-  [Parameter(Mandatory=$false)]
-  [string]$ApiKey = $env:HOPE_API_KEY
-)
-
-Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
-$ProgressPreference = "SilentlyContinue"
-
-function Require-Value([string]$Name, [string]$Value) {
-  if ([string]::IsNullOrWhiteSpace($Value)) {
-    throw "$Name is required. Set env:$Name or pass -$Name."
+    return [pscustomobject]@{
+      Status = $status
+      Body   = $body
+      Url    = $Url
+    }
   }
-  return $Value
 }
 
-$BaseUrl = Require-Value "OPS_BASE_URL" $BaseUrl
-$ApiKey  = Require-Value "HOPE_API_KEY"  $ApiKey
-
-$BaseUrl = $BaseUrl.Trim().TrimEnd("/")
+$BaseUrl = (Require-Value "OPS_BASE_URL" $BaseUrl).Trim().TrimEnd("/")
+$ApiKey  = Require-Value "HOPE_API_KEY" $ApiKey
 
 Write-Host ""
 Write-Host "== Remote smoke ==" -ForegroundColor Cyan
 Write-Host ("BaseUrl: {0}" -f $BaseUrl)
 Write-Host ("ApiKey : len={0} last4={1}" -f $ApiKey.Length, ($ApiKey.Substring([Math]::Max(0,$ApiKey.Length-4))))
 
-# Quick health probe (fail fast)
 $headers = @{ "x-api-key" = $ApiKey }
-$healthUrl = "$BaseUrl/ops/health"
 
-Write-Host ""
-Write-Host ("== Probe {0} ==" -f $healthUrl) -ForegroundColor Cyan
-try {
-  $h = Invoke-RestMethod -Method Get -Uri $healthUrl -Headers $headers -TimeoutSec 15
-  Write-Host ("Health OK: {0}" -f ($h | ConvertTo-Json -Depth 10))
-} catch {
-  $msg = $_.Exception.Message
-  throw ("Health probe failed for {0}. Error: {1}" -f $healthUrl, $msg)
+$opsHealth = Invoke-Probe -Url "$BaseUrl/ops/health" -Headers $headers
+$apiHealth = $null
+
+if ($opsHealth.Status -eq 200) {
+  Write-Host ""
+  Write-Host "OPS host detected via /ops/health" -ForegroundColor Green
+
+  $smokePath = Join-Path $PSScriptRoot "smoke-tests.ps1"
+  & pwsh -NoProfile -ExecutionPolicy Bypass -File $smokePath -BaseUrl $BaseUrl -ApiKey $ApiKey
+  if ($LASTEXITCODE -ne 0) {
+    throw "Remote smoke failed (exit=$LASTEXITCODE)."
+  }
+
+  Write-Host ""
+  Write-Host "REMOTE SMOKE PASSED" -ForegroundColor Green
+  exit 0
 }
 
-# Run smoke tests (already covers /ops + /api regressions)
-Write-Host ""
-Write-Host "== Run smoke-tests.ps1 ==" -ForegroundColor Cyan
-$smokePath = Join-Path $PSScriptRoot "smoke-tests.ps1"
+if ($opsHealth.Status -eq 404) {
+  $apiHealth = Invoke-Probe -Url "$BaseUrl/api/health"
+  if ($apiHealth.Status -eq 200) {
+    Write-Host ""
+    Write-Host "API-only Functions host detected via /api/health" -ForegroundColor Yellow
 
-pwsh -NoProfile -ExecutionPolicy Bypass -File $smokePath -BaseUrl $BaseUrl -ApiKey $ApiKey
-if ($LASTEXITCODE -ne 0) {
-  throw "Remote smoke failed (exit=$LASTEXITCODE)."
-}
+    $protectedOk = Invoke-Probe -Url "$BaseUrl/api/_protected/ping?limit=1" -Headers $headers
+    if ($protectedOk.Status -ne 200) {
+      throw "Expected 200 from /api/_protected/ping?limit=1 with valid x-api-key."
+    }
 
-Write-Host ""
-Write-Host "REMOTE SMOKE PASSED" -ForegroundColor Green
-.Exception.Message) -ForegroundColor DarkYellow
-    Start-Sleep -Seconds 3
+    $protectedBad = Invoke-Probe -Url "$BaseUrl/api/_protected/ping?limit=abc" -Headers $headers
+    if ($protectedBad.Status -ne 400) {
+      throw "Expected 400 from /api/_protected/ping?limit=abc with valid x-api-key."
+    }
+
+    $protectedNoKey = Invoke-Probe -Url "$BaseUrl/api/_protected/ping?limit=1"
+    if ($protectedNoKey.Status -ne 401) {
+      throw "Expected 401 from /api/_protected/ping?limit=1 without x-api-key."
+    }
+
+    Write-Host ""
+    Write-Host "REMOTE API SMOKE PASSED (ops surface not present on this host)" -ForegroundColor Green
+    exit 0
   }
 }
 
-if ($lastErr) {
-  throw ("Health probe failed for {0} after retries. Last error: {1}" -f $healthUrl, $lastErr.Exception.Message)
-}
-
-# Run smoke tests (already covers /ops + /api regressions)
-Write-Host ""
-Write-Host "== Run smoke-tests.ps1 ==" -ForegroundColor Cyan
-$smokePath = Join-Path $PSScriptRoot "smoke-tests.ps1"
-
-pwsh -NoProfile -ExecutionPolicy Bypass -File $smokePath -BaseUrl $BaseUrl -ApiKey $ApiKey
-if ($LASTEXITCODE -ne 0) {
-  throw "Remote smoke failed (exit=$LASTEXITCODE)."
-}
-
-Write-Host ""
-Write-Host "REMOTE SMOKE PASSED" -ForegroundColor Green
+throw ("Unable to validate remote host. /ops/health => {0}; /api/health => {1}" -f $opsHealth.Status, $(if ($apiHealth) { $apiHealth.Status } else { "not checked" }))

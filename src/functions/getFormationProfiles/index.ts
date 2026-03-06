@@ -12,16 +12,15 @@ function parseLimit(val: unknown, fallback = 50): number {
   return Math.max(1, Math.min(Math.trunc(n), 200));
 }
 
-export async function getFormationProfiles(context: any, req: any): Promise<void> {
+export async function getFormationProfiles(context: any, req: any): Promise<any> {
   try {
     const auth = requireApiKeyForFunction(req);
     if (!auth.ok) {
-      context.res = {
+      return {
         status: auth.status,
         headers: { "content-type": "application/json; charset=utf-8" },
         body: auth.body
       };
-      return;
     }
 
     const limit = parseLimit(req?.query?.limit, 50);
@@ -55,18 +54,19 @@ export async function getFormationProfiles(context: any, req: any): Promise<void
       nextCursor = out.cursor ?? null;
     }
 
-    context.res = {
+    return {
       status: 200,
       headers: { "content-type": "application/json; charset=utf-8" },
       body: {
         ok: true,
         items,
-        cursor: nextCursor
+        cursor: nextCursor,
+        source: "function-formation-profiles-return-v1"
       }
     };
   } catch (err: any) {
     context.log.error(err?.message ?? err);
-    context.res = {
+    return {
       status: 400,
       headers: { "content-type": "application/json; charset=utf-8" },
       body: { ok: false, error: err?.message ?? "Bad Request" }

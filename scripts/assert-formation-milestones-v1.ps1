@@ -86,7 +86,9 @@ if ($p.profile.stageUpdatedBy -ne "system") {
 
 if (-not $p.profile.stageReason -or -not $p.profile.stageReason.StartsWith("event:")) {
   throw "stageReason must start with 'event:' when stage changes (got '$($p.profile.stageReason)')"
-}# Optional checks (only enforce if fields exist)
+}
+
+# Optional checks (only enforce if fields exist)
 if ($p.profile.PSObject.Properties.Name -contains "assignedTo" -and $null -ne $p.profile.assignedTo) {
   if ($p.profile.assignedTo -ne "ops-user-1") { throw "Expected assignedTo=ops-user-1, got $($p.profile.assignedTo)" }
 }

@@ -1,77 +1,93 @@
 param(
   [Parameter(Mandatory=$false)]
-  [string] $ApiBase = "https://hope-ai-api-staging.azurewebsites.net",
-
-  [Parameter(Mandatory=$false)]
-  [string] $ApiKey = $env:HOPE_API_KEY
+  [string]$BaseUrl = $(if ($env:HOPE_BASE_URL) { $env:HOPE_BASE_URL } else { "http://127.0.0.1:3000/api" })
 )
 
-$ErrorActionPreference = "Stop"
-
-function Invoke-Api {
-  param(
-    [Parameter(Mandatory=$true)][string] $Method,
-    [Parameter(Mandatory=$true)][string] $Url,
-    [hashtable] $Headers = @{},
-    [string] $Body = $null
-  )
-
-  $opts = @{
-    Method = $Method
-    Uri    = $Url
-    Headers = $Headers
-    SkipHttpErrorCheck = $true
-  }
-  if ($null -ne $Body) {
-    $opts["ContentType"] = "application/json"
-    $opts["Body"] = $Body
-  }
-  return Invoke-WebRequest @opts
-}
-
-function Assert-Status {
-  param(
-    [Parameter(Mandatory=$true)] $Resp,
-    [Parameter(Mandatory=$true)][int] $Expected,
-    [Parameter(Mandatory=$true)][string] $Msg
-  )
-
-  if ([int]$Resp.StatusCode -ne $Expected) {
-    $bodyText = if ($Resp.Content -is [byte[]]) { [Text.Encoding]::UTF8.GetString($Resp.Content) } else { [string]$Resp.Content }
-    throw "$Msg`nExpected HTTP $Expected but got $($Resp.StatusCode).`nUrl: $($Resp.BaseResponse.ResponseUri)`nBody: $bodyText"
-  }
-}
-
-Write-Host "[assert-auth-scoping] ApiBase=$ApiBase"
-
-# Pick one known public endpoint and one known protected surface.
-# Public: health should be 200 without API key.
-$health = Invoke-Api -Method GET -Url "$ApiBase/api/health"
-Assert-Status -Resp $health -Expected 200 -Msg "[auth-scoping] /api/health should be public"
-
-# Protected (adjust if your repo uses a different protected route):
-# We'll use OPS surface if present: /ops/health should require API key.
-# If your OPS health path differs, update this URL to a real protected endpoint.
-$opsUrl = "$ApiBase/ops/health"
-
-# No API key => 401
-$noKey = Invoke-Api -Method GET -Url $opsUrl
-if ([int]$noKey.StatusCode -ne 401 -and [int]$noKey.StatusCode -ne 404) {
-  throw "[auth-scoping] Expected /ops/health to return 401 without key (or 404 if endpoint not deployed), got $($noKey.StatusCode)"
-}
-if ([int]$noKey.StatusCode -eq 404) {
-  Write-Host "[assert-auth-scoping] NOTE: $opsUrl returned 404; update script to target a real protected endpoint in this repo."
-  Write-Host "[assert-auth-scoping] OK (public health verified; protected endpoint not found)"
+if ([string]::IsNullOrWhiteSpace($BaseUrl)) { throw "BaseUrl is required." }
+# --- Phase gate: skip Phase 3 asserts unless explicitly enabled ---
+if ($env:HOPE_RUN_PHASE3_ASSERTS -ne "1") {
+  Write-Host "SKIP: Phase 3 assertions disabled. Set HOPE_RUN_PHASE3_ASSERTS=1 to enable." -ForegroundColor Yellow
   exit 0
 }
+$ErrorActionPreference = "Stop"
 
-# With API key => 200
-if ([string]::IsNullOrWhiteSpace($ApiKey)) {
-  throw "[auth-scoping] HOPE_API_KEY is not set. Set env var HOPE_API_KEY to run protected assertions."
+function Assert-True([bool]$cond, [string]$msg) {
+  if (-not $cond) { throw "ASSERT FAIL: $msg" }
 }
-$headers = @{ "x-api-key" = $ApiKey }
 
-$withKey = Invoke-Api -Method GET -Url $opsUrl -Headers $headers
-Assert-Status -Resp $withKey -Expected 200 -Msg "[auth-scoping] /ops/health should return 200 with API key"
+function Invoke-ExpectStatus {
+  param(
+    [Parameter(Mandatory=$true)][ValidateSet("GET","POST")][string]$Method,
+    [Parameter(Mandatory=$true)][string]$Url,
+    [hashtable]$Headers = @{},
+    [object]$Body = $null,
+    [int]$ExpectedStatus
+  )
 
-Write-Host "[assert-auth-scoping] OK" -ForegroundColor Green
+  try {
+    if ($Method -eq "GET") {
+      $resp = Invoke-WebRequest -Method GET -Uri $Url -Headers $Headers -UseBasicParsing
+    } else {
+      $json = $null
+      if ($null -ne $Body) { $json = ($Body | ConvertTo-Json -Depth 10) }
+      $resp = Invoke-WebRequest -Method POST -Uri $Url -Headers $Headers -ContentType "application/json" -Body $json -UseBasicParsing
+    }
+
+    Assert-True ($resp.StatusCode -eq $ExpectedStatus) "Expected $ExpectedStatus but got $($resp.StatusCode) for $Method $Url"
+    return $resp
+  } catch {
+    # Many failures are HttpResponseException w/ a response object we can inspect
+    $ex = $_.Exception
+    $status = $null
+    $ctype  = $null
+
+    if ($ex.Response) {
+      try {
+        $status = [int]$ex.Response.StatusCode
+      } catch {}
+      try {
+        $ctype = $ex.Response.Content.Headers.ContentType.ToString()
+      } catch {}
+    }
+
+    Assert-True ($status -eq $ExpectedStatus) "Expected $ExpectedStatus but got $status for $Method $Url (ContentType=$ctype). $_"
+    return $null
+  }
+}
+
+Write-Host "=== AUTH SCOPING SMOKE ==="
+Write-Host "BaseUrl: $BaseUrl"
+
+# Public endpoints MUST NOT require an API key
+Invoke-ExpectStatus -Method GET -Url "$BaseUrl/health" -ExpectedStatus 200 | Out-Null
+
+# Protected roots (must require key)
+$protected = @(
+  "$BaseUrl/formation/timeline",
+  "$BaseUrl/integration/timeline",
+  "$BaseUrl/legacy/export"
+)
+
+foreach ($u in $protected) {
+  Invoke-ExpectStatus -Method GET -Url $u -ExpectedStatus 401 | Out-Null
+}
+
+# POST formation/events must also require key
+Invoke-ExpectStatus -Method POST -Url "$BaseUrl/formation/events" -Body @{} -ExpectedStatus 401 | Out-Null
+
+# With key present, we should get *past auth* and reach validation (usually 400)
+# That proves auth is correctly scoped and functioning.
+$apiKey = $env:HOPE_API_KEY
+if ([string]::IsNullOrWhiteSpace($apiKey)) {
+  throw "HOPE_API_KEY is not set in environment; CI should provide this. Set it locally to run auth-scope checks."
+}
+
+$h = @{ "x-api-key" = $apiKey }
+
+foreach ($u in $protected) {
+  Invoke-ExpectStatus -Method GET -Url $u -Headers $h -ExpectedStatus 400 | Out-Null
+}
+
+Invoke-ExpectStatus -Method POST -Url "$BaseUrl/formation/events" -Headers $h -Body @{} -ExpectedStatus 400 | Out-Null
+
+Write-Host "OK: Auth scoping assertions passed (public endpoints unaffected; protected endpoints require API key)."

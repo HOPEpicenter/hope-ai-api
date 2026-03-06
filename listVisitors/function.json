@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/listVisitors/index.js",
+  "entryPoint": "listVisitors",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "visitors"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

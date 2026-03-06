@@ -57,12 +57,43 @@ export async function getVisitorById(visitorId: string): Promise<FunctionVisitor
   } catch (err: any) {
     const code = String(err?.code ?? "");
     const status = Number(err?.statusCode ?? err?.status ?? 0);
-    
     if (code === "ResourceNotFound" || status === 404) {
       return null;
     }
     throw err;
   }
+}
+
+export async function listVisitorsRecords(input: { limit: number }): Promise<{ items: FunctionVisitor[]; count: number }> {
+  const table = getTableClient(TABLE);
+  const limit = Math.max(1, Math.min(input?.limit ?? 25, 200));
+  const scanCap = 500;
+
+  const all: FunctionVisitor[] = [];
+  const filter = "PartitionKey eq 'VISITOR'";
+
+  for await (const entity of table.listEntities<VisitorEntity>({ queryOptions: { filter } })) {
+    all.push(toVisitor(entity));
+    if (all.length >= scanCap) {
+      break;
+    }
+  }
+
+  all.sort((a, b) => {
+    const au = a.updatedAt || a.createdAt || "";
+    const bu = b.updatedAt || b.createdAt || "";
+    if (au < bu) return 1;
+    if (au > bu) return -1;
+
+    const ai = a.visitorId || "";
+    const bi = b.visitorId || "";
+    if (ai < bi) return -1;
+    if (ai > bi) return 1;
+    return 0;
+  });
+
+  const items = all.slice(0, limit);
+  return { items, count: items.length };
 }
 
 export async function createVisitorRecord(input: { name: string; email?: string }): Promise<FunctionCreateVisitorResult> {
@@ -184,4 +215,3 @@ export async function createVisitorRecord(input: { name: string; email?: string 
     created: true
   };
 }
-

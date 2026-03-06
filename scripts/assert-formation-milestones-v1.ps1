@@ -75,6 +75,19 @@ if ([string]::IsNullOrWhiteSpace([string]$p.profile.rowKey)) { throw "Profile ro
 # stage should be Connected after NEXT_STEP_SELECTED
 if ($p.profile.stage -ne "Connected") { throw "Expected stage=Connected, got $($p.profile.stage)" }
 
+# Contract: when stage changes, stageUpdated* must be present (v1)
+# (This assert script intentionally creates events that should transition stage -> Connected)
+if (-not $p.profile.stageUpdatedAt) { throw "stageUpdatedAt is required when stage changes" }
+try { [void][DateTimeOffset]::Parse($p.profile.stageUpdatedAt) } catch { throw "stageUpdatedAt must be ISO timestamp: $($p.profile.stageUpdatedAt)" }
+
+if ($p.profile.stageUpdatedBy -ne "system") {
+  throw "stageUpdatedBy must be 'system' when stage changes (got '$($p.profile.stageUpdatedBy)')"
+}
+
+if (-not $p.profile.stageReason -or -not $p.profile.stageReason.StartsWith("event:")) {
+  throw "stageReason must start with 'event:' when stage changes (got '$($p.profile.stageReason)')"
+}
+
 # Optional checks (only enforce if fields exist)
 if ($p.profile.PSObject.Properties.Name -contains "assignedTo" -and $null -ne $p.profile.assignedTo) {
   if ($p.profile.assignedTo -ne "ops-user-1") { throw "Expected assignedTo=ops-user-1, got $($p.profile.assignedTo)" }

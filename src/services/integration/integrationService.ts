@@ -255,7 +255,22 @@ const merged = mergeTimelines(
       // swallow: summary should still work even if profile table is missing
     }
 
-    const hasAssignee = !!(assignedTo && typeof (assignedTo as any).ownerId === "string" && String((assignedTo as any).ownerId).trim());
+    const hasAssignee =
+      !!(assignedTo &&
+      typeof (assignedTo as any).ownerId === "string" &&
+      String((assignedTo as any).ownerId).trim());
+
+    let needsFollowup = false;
+    let followupReason: string | undefined;
+
+    if (hasAssignee) {
+      needsFollowup = true;
+      followupReason = "FOLLOWUP_ASSIGNED";
+    } else if (!lastEngagementAt) {
+      needsFollowup = true;
+      followupReason = "no_engagement_yet";
+    }
+
     return {
       visitorId,
       lastEngagementAt,
@@ -265,14 +280,9 @@ const merged = mergeTimelines(
         engagement: !!lastEngagementAt,
         formation: !!lastFormationAt,
       },
-
-      // Phase 4 additive fields (v1 contract). No business logic yet.
-      // Minimal default: if no engagement has ever happened, treat as needs follow-up.
-      needsFollowup: !!hasAssignee || !lastEngagementAt,
-      followupReason: hasAssignee ? "FOLLOWUP_ASSIGNED" : !lastEngagementAt ? "no_engagement_yet" : undefined,
-      // Optional / unset until we model business rules + persistence/events:
+      needsFollowup,
+      followupReason,
       assignedTo,
-      // followupReason: undefined,
       // groups: undefined,
       // programs: undefined,
       // workflows: undefined,
@@ -280,6 +290,7 @@ const merged = mergeTimelines(
   }
 
 }
+
 
 
 

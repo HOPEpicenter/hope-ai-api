@@ -4,9 +4,11 @@ on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
+
 permissions:
   id-token: write
   contents: read
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -86,137 +88,38 @@ jobs:
           Compress-Archive -Path ".deploy/*" -DestinationPath $zipPath -Force
           Write-Host "Created $zipPath"
           Get-Item $zipPath | Format-List Name,Length,FullName
+
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - name: Deploy via ARM config-zip (PowerShell)
         shell: pwsh
-        env:
-          PUBLISH_PROFILE: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE_STAGING }}
         run: |
           $ErrorActionPreference = "Stop"
 
-          if (-not $env:PUBLISH_PROFILE) { throw "PUBLISH_PROFILE secret is empty." }
-
-          # Parse publish profile XML (supports MSDeploy, ZipDeploy, etc.)
-          $xml = [xml]$env:PUBLISH_PROFILE
-          $profiles = @($xml.publishData.publishProfile)
-          if (-not $profiles -or $profiles.Count -eq 0) { throw "No publishProfile entries found in secret." }
-
-          # Pick best available:
-          #  1) publishUrl contains '.scm.'
-          #  2) publishMethod ZipDeploy/MSDeploy
-          #  3) otherwise first with username/password
-          $p = ($profiles | Where-Object { $_.publishUrl -match "\.scm\." } | Select-Object -First 1)
-          if (-not $p) { $p = ($profiles | Where-Object { $_.publishMethod -match "ZipDeploy|MSDeploy" } | Select-Object -First 1) }
-          if (-not $p) { $p = ($profiles | Where-Object { $_.userName -and $_.userPWD } | Select-Object -First 1) }
-          if (-not $p) { throw "Could not find a usable publishProfile (no userName/userPWD)." }
-
-          $scmHost = [string]$p.publishUrl
-          $user    = [string]$p.userName
-          $pass    = [string]$p.userPWD
-
-          if (-not $scmHost -or -not $user -or -not $pass) {
-            throw "publishUrl/userName/userPWD missing in selected publishProfile."
-          }
-
-          $zipPath = Join-Path (Get-Location).Path "deploy.zip"
-          if (-not (Test-Path $zipPath)) { throw "deploy.zip missing." }
-
-          $pair = "{0}:{1}" -f $user, $pass
-          $b64  = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes($pair))
-          $hdrs = @{ Authorization = "Basic $b64" }
-
-          # 1) Force run-from-package and disable build flags (important for zipdeploy stability)
-          function Invoke-KuduJson {
-            param(
-              [Parameter(Mandatory=$true)][ValidateSet("GET","POST","PUT","DELETE")][string] $Method,
-              [Parameter(Mandatory=$true)][string] $Uri,
-              [Parameter(Mandatory=$true)][hashtable] $Headers,
-              [Parameter(Mandatory=$false)][string] $Body = $null,
-              [int] $MaxAttempts = 8,
-              [int] $InitialDelaySeconds = 2
-            )
-
-            $attempt = 0
-            $delay = $InitialDelaySeconds
-            while ($true) {
-              $attempt++
-              try {
-                $opts = @{
-                  Method = $Method
-                  Uri = $Uri
-                  Headers = $Headers
-                  SkipHttpErrorCheck = $true
-                }
-                if ($null -ne $Body) {
-                  $opts["ContentType"] = "application/json"
-                  $opts["Body"] = $Body
-                }
-
-                $resp = Invoke-WebRequest @opts
-
-                # Treat 502/503/504 as transient (Kudu/SCM flakiness)
-                if ($resp.StatusCode -in 502,503,504) {
-                  throw "Transient HTTP $($resp.StatusCode)"
-                }
-
-                if ($resp.StatusCode -ge 400) {
-                  $txt = [string]$resp.Content
-                  throw "HTTP $($resp.StatusCode) calling $Uri`n$txt"
-                }
-
-                if ($resp.Content) { return ($resp.Content | ConvertFrom-Json) }
-                return $null
-              }
-              catch {
-                $msg = $_.Exception.Message
-                if ($attempt -ge $MaxAttempts) {
-                  throw "Kudu call failed after $attempt attempts: $Method $Uri`nLast error: $msg"
-                }
-
-                Write-Host "Kudu call retry #$attempt/$MaxAttempts failed: $Method $Uri`n$msg"
-                Start-Sleep -Seconds $delay
-                $delay = [Math]::Min($delay * 2, 20)
-              }
-            }
-          }
-          
-          $settingsUri = "https://$scmHost/api/settings"
-          $settingsBody = @{
-            WEBSITE_RUN_FROM_PACKAGE                  = "1"
-            APPSETTING_WEBSITE_RUN_FROM_PACKAGE       = "1"
-            WEBSITES_ENABLE_APP_SERVICE_STORAGE       = "true"
-            APPSETTING_WEBSITES_ENABLE_APP_SERVICE_STORAGE = "true"
-            SCM_DO_BUILD_DURING_DEPLOYMENT            = "false"
-            ENABLE_ORYX_BUILD                         = "false"
-          } | ConvertTo-Json
-            Invoke-KuduJson -Method POST -Uri $settingsUri -Headers $hdrs -Body $settingsBody | Out-Null
-          Write-Host "Kudu settings updated."
-
-          # 1b) Verify what Kudu thinks the settings are (and give it a moment to settle)
-          $verifyUri = "https://$scmHost/api/settings"
-          for ($i = 1; $i -le 6; $i++) {
-              $s = Invoke-KuduJson -Method GET -Uri $verifyUri -Headers $hdrs
-            $w = $s.WEBSITE_RUN_FROM_PACKAGE
-            $a = $s.APPSETTING_WEBSITE_RUN_FROM_PACKAGE
-
-            Write-Host ("Kudu settings check #{0}: WEBSITE_RUN_FROM_PACKAGE={1} APPSETTING_WEBSITE_RUN_FROM_PACKAGE={2}" -f $i, $w, $a)
-
-            if ($w -eq "1" -or $a -eq "1") { break }
-            Start-Sleep -Seconds 2
-          }
-
-          if (-not (($s.WEBSITE_RUN_FROM_PACKAGE -eq "1") -or ($s.APPSETTING_WEBSITE_RUN_FROM_PACKAGE -eq "1"))) {
-            throw "Kudu still does not report run-from-package as enabled (expected '1'). Aborting before ZipDeploy."
-          }
-          # 2) Deploy via ARM (config-zip)
           $rg = "rg-hope-ai-api-staging"
           $app = "hope-ai-api-staging"
+          $zipPath = Join-Path (Get-Location).Path "deploy.zip"
 
+          if (-not (Test-Path $zipPath)) { throw "deploy.zip missing." }
+
+          # Configure app settings via Azure CLI / ARM (avoid flaky Kudu /api/settings)
+          az functionapp config appsettings set `
+            --resource-group $rg `
+            --name $app `
+            --settings `
+              WEBSITE_RUN_FROM_PACKAGE=1 `
+              WEBSITES_ENABLE_APP_SERVICE_STORAGE=true `
+              SCM_DO_BUILD_DURING_DEPLOYMENT=false `
+              ENABLE_ORYX_BUILD=false | Out-Null
+
+          Write-Host "App settings updated via Azure CLI."
+
+          # Deploy zip package
           Write-Host "Deploying deploy.zip via az functionapp deployment source config-zip..."
           Write-Host "RG=$rg APP=$app ZIP=$zipPath"
 
@@ -227,31 +130,7 @@ jobs:
 
           Write-Host "config-zip command completed."
 
-          # Quick health check (staging) - retry (cold start + package mount can take time)
-          # Optional: restart to force host reload after config-zip
-          # 2b) Wait for Kudu to report the latest deployment is complete (best-effort)
-          # This reduces false 500s during package staging/mount.
-          $latestUri = "https://$scmHost/api/deployments/latest"
-          $deployDeadline = (Get-Date).AddMinutes(6)
-          for ($i = 1; $i -le 72; $i++) {
-            Start-Sleep -Seconds 5
-            $resp = Invoke-WebRequest -Method GET -Uri $latestUri -Headers $hdrs -SkipHttpErrorCheck
-            if ($resp.StatusCode -ne 200) {
-              Write-Host "Kudu deploy poll #${i}: HTTP $($resp.StatusCode)"
-              continue
-            }
-
-            try {
-              $j = $resp.Content | ConvertFrom-Json
-              Write-Host ("Kudu deploy poll #{0}: status={1} complete={2} end_time={3} message={4}" -f $i, $j.status, $j.complete, $j.end_time, $j.message)
-              if ($j.complete -eq $true) { break }
-            } catch {
-              Write-Host "Kudu deploy poll #${i}: non-JSON payload"
-            }
-
-            if ((Get-Date) -ge $deployDeadline) { break }
-          }
-
+          # Post-deploy health check (cold-start safe)
           $health = "https://hope-ai-api-staging.azurewebsites.net/api/version"
           $ok = $false
           for ($i = 1; $i -le 24; $i++) {
@@ -261,17 +140,7 @@ jobs:
             if ($h.StatusCode -eq 200) { $ok = $true; break }
             if ($h.Content) { Write-Host $h.Content }
           }
+
           if (-not $ok) {
             throw "Post-deploy health check failed after retries."
           }
-
-
-
-
-
-
-
-
-
-
-

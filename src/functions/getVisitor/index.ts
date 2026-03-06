@@ -1,4 +1,4 @@
-import { ensureTable, getTableClient } from "../_shared/tableClient";
+import { getVisitorById } from "../_shared/visitorsRepository";
 
 export async function getVisitor(context: any, req: any): Promise<void> {
   try {
@@ -13,28 +13,9 @@ export async function getVisitor(context: any, req: any): Promise<void> {
       return;
     }
 
-    const client = getTableClient("Visitors");
-    await ensureTable(client);
+    const visitor = await getVisitorById(visitorId);
 
-    const entity = await client.getEntity("visitors", visitorId);
-
-    context.res = {
-      status: 200,
-      headers: { "content-type": "application/json; charset=utf-8" },
-      body: {
-        ok: true,
-        visitor: {
-          visitorId: entity.rowKey,
-          name: entity.name,
-          email: entity.email,
-          createdAt: entity.createdAt
-        }
-      }
-    };
-  } catch (err: any) {
-    // Azure Tables throws for 404; try to treat as Not Found
-    const code = err?.statusCode ?? err?.status;
-    if (code === 404) {
+    if (!visitor) {
       context.res = {
         status: 404,
         headers: { "content-type": "application/json; charset=utf-8" },
@@ -43,6 +24,15 @@ export async function getVisitor(context: any, req: any): Promise<void> {
       return;
     }
 
+    context.res = {
+      status: 200,
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: {
+        ok: true,
+        visitor
+      }
+    };
+  } catch (err: any) {
     context.log.error(err?.message ?? err);
     context.res = {
       status: 500,

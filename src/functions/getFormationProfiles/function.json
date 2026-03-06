@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getFormationProfiles/index.js",
+  "entryPoint": "getFormationProfiles",
+  "bindings": [
+    {
+      "authLevel": "anonymous",
+      "type": "httpTrigger",
+      "direction": "in",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "formation/profiles"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "$return"
+    }
+  ]
+}

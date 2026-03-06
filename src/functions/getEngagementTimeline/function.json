@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getEngagementTimeline/index.js",
+  "entryPoint": "getEngagementTimeline",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "engagements/timeline"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

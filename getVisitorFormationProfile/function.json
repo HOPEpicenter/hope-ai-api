@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getVisitorFormationProfile/index.js",
+  "entryPoint": "getVisitorFormationProfile",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "visitors/{id}/formation/profile"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

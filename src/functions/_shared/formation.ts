@@ -395,3 +395,139 @@ export async function recordFormationEventV1(body: unknown): Promise<{
 
 
 
+
+function parseMetadataJson(value: unknown): any {
+  if (typeof value !== "string" || value.trim() === "") {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+}
+
+function matchesProfileFilters(
+  profile: FunctionFormationProfileEntity,
+  filters?: {
+    stage?: string;
+    assignedTo?: string;
+    q?: string;
+  }
+): boolean {
+  const stage = String(filters?.stage ?? "").trim();
+  const assignedTo = String(filters?.assignedTo ?? "").trim();
+  const q = String(filters?.q ?? "").trim().toLowerCase();
+
+  if (stage && String(profile.stage ?? "").trim() !== stage) {
+    return false;
+  }
+
+  if (assignedTo && String(profile.assignedTo ?? "").trim() !== assignedTo) {
+    return false;
+  }
+
+  if (q) {
+    const haystack = [
+      profile.visitorId,
+      profile.stage,
+      profile.assignedTo,
+      profile.lastEventType,
+      profile.stageReason
+    ]
+      .map(v => String(v ?? ""))
+      .join(" ")
+      .toLowerCase();
+
+    if (!haystack.includes(q)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export async function listFormationProfiles(
+  table: TableClient,
+  input?: {
+    limit?: number;
+    cursor?: string;
+    stage?: string;
+    assignedTo?: string;
+    q?: string;
+  }
+): Promise<{
+  items: FunctionFormationProfileEntity[];
+  cursor: string | null;
+}> {
+  const limit = Math.max(1, Math.min(Number(input?.limit ?? 50), 200));
+  const cursor = input?.cursor ? String(input.cursor) : undefined;
+
+  const filter = cursor
+    ? `PartitionKey eq 'VISITOR' and RowKey gt '${escapeOData(cursor)}'`
+    : `PartitionKey eq 'VISITOR'`;
+
+  const select = [
+    "PartitionKey",
+    "RowKey",
+    "visitorId",
+    "stage",
+    "stageUpdatedAt",
+    "stageUpdatedBy",
+    "stageReason",
+    "assignedTo",
+    "lastEventType",
+    "lastEventAt",
+    "updatedAt",
+    "lastServiceAttendedAt",
+    "lastFollowupAssignedAt",
+    "lastFollowupContactedAt",
+    "lastFollowupOutcomeAt",
+    "lastNextStepAt",
+    "lastPrayerRequestedAt"
+  ];
+
+  const matched: FunctionFormationProfileEntity[] = [];
+
+  for await (const entity of table.listEntities<any>({
+    queryOptions: { filter, select }
+  })) {
+    const profile: FunctionFormationProfileEntity = {
+      partitionKey: "VISITOR",
+      rowKey: entity.rowKey ?? entity.RowKey,
+      visitorId: entity.visitorId ?? entity.rowKey ?? entity.RowKey,
+      stage: entity.stage,
+      stageUpdatedAt: entity.stageUpdatedAt,
+      stageUpdatedBy: entity.stageUpdatedBy,
+      stageReason: entity.stageReason,
+      assignedTo: entity.assignedTo,
+      lastEventType: entity.lastEventType,
+      lastEventAt: entity.lastEventAt,
+      updatedAt: entity.updatedAt,
+      lastServiceAttendedAt: entity.lastServiceAttendedAt,
+      lastFollowupAssignedAt: entity.lastFollowupAssignedAt,
+      lastFollowupContactedAt: entity.lastFollowupContactedAt,
+      lastFollowupOutcomeAt: entity.lastFollowupOutcomeAt,
+      lastNextStepAt: entity.lastNextStepAt,
+      lastPrayerRequestedAt: entity.lastPrayerRequestedAt
+    };
+
+    if (!matchesProfileFilters(profile, input)) {
+      continue;
+    }
+
+    matched.push(profile);
+
+    if (matched.length >= limit) {
+      break;
+    }
+  }
+
+  const nextCursor = matched.length > 0 ? matched[matched.length - 1].rowKey : null;
+
+  return {
+    items: matched,
+    cursor: nextCursor
+  };
+}

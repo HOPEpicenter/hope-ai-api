@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/postFormationEvent/index.js",
+  "entryPoint": "postFormationEvent",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "post" ],
+      "route": "formation/events"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

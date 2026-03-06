@@ -44,6 +44,140 @@ function escapeOData(value: string): string {
   return String(value ?? "").replace(/'/g, "''");
 }
 
+function normalizeIso(value: unknown, fieldName: string): string {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    throw new Error(fieldName + " is required");
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(fieldName + " must be a valid ISO timestamp");
+  }
+
+  return parsed.toISOString();
+}
+
+function asObject(value: unknown): Record<string, any> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, any>;
+}
+
+function requireNonEmptyString(value: unknown, fieldName: string): string {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    throw new Error(fieldName + " is required");
+  }
+  return text;
+}
+
+function validateFormationEventEnvelopeV1Strict(body: unknown): {
+  v: number;
+  eventId: string;
+  visitorId: string;
+  type: string;
+  occurredAt: string;
+  source: Record<string, any>;
+  data: Record<string, any>;
+} {
+  const obj = asObject(body);
+
+  const v = Number(obj.v);
+  if (v !== 1) {
+    throw new Error("v must be 1");
+  }
+
+  const eventId = requireNonEmptyString(obj.eventId, "eventId");
+  const visitorId = requireNonEmptyString(obj.visitorId, "visitorId");
+  const type = requireNonEmptyString(obj.type, "type");
+  const occurredAt = requireNonEmptyString(obj.occurredAt, "occurredAt");
+
+  const source = asObject(obj.source);
+  const sourceSystem = requireNonEmptyString(source.system, "source.system");
+
+  const data = asObject(obj.data);
+
+  if (type === "FOLLOWUP_ASSIGNED") {
+    requireNonEmptyString(data.assigneeId, "data.assigneeId");
+  }
+
+  if (type === "NEXT_STEP_SELECTED") {
+    requireNonEmptyString(data.nextStep, "data.nextStep");
+  }
+
+  return {
+    v,
+    eventId,
+    visitorId,
+    type,
+    occurredAt,
+    source: {
+      ...source,
+      system: sourceSystem
+    },
+    data
+  };
+}
+
+function buildEventRowKey(occurredAtIso: string, eventId: string): string {
+  return occurredAtIso + "__" + String(eventId).trim();
+}
+
+function eventAtOrMin(value: unknown): number {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
+  const ms = Date.parse(text);
+  return Number.isFinite(ms) ? ms : Number.NEGATIVE_INFINITY;
+}
+
+function shouldAdvanceLastEvent(
+  profile: FunctionFormationProfileEntity | null,
+  occurredAtIso: string
+): boolean {
+  const nextMs = eventAtOrMin(occurredAtIso);
+  const currentMs = eventAtOrMin(profile?.lastEventAt);
+  return nextMs >= currentMs;
+}
+
+function maybeSetStage(
+  profile: FunctionFormationProfileEntity,
+  stage: string,
+  occurredAtIso: string,
+  eventType: string
+): void {
+  if (profile.stage !== stage) {
+    profile.stage = stage;
+    profile.stageUpdatedAt = occurredAtIso;
+    profile.stageUpdatedBy = "system";
+    profile.stageReason = "event:" + eventType;
+  }
+}
+
+export function toFormationHttpError(error: any, fallbackStatus = 400): number {
+  const code = Number(error?.statusCode ?? error?.status ?? 0);
+  if (code > 0) {
+    return code;
+  }
+
+  const msg = String(error?.message ?? "");
+  if (msg.includes("EntityAlreadyExists")) {
+    return 409;
+  }
+  if (msg.includes("already exists")) {
+    return 409;
+  }
+  if (msg.includes("Missing STORAGE_CONNECTION_STRING")) {
+    return 500;
+  }
+
+  return fallbackStatus;
+}
+
 export function getFormationEventsTableClient(): TableClient {
   const conn = getConnString();
   if (!conn) {
@@ -70,6 +204,13 @@ export async function ensureTable(client: TableClient): Promise<void> {
     }
     throw err;
   }
+}
+
+export async function ensureFormationTables(): Promise<void> {
+  const eventsTable = getFormationEventsTableClient();
+  const profilesTable = getFormationProfilesTableClient();
+  await ensureTable(eventsTable);
+  await ensureTable(profilesTable);
 }
 
 export async function getFormationProfileByVisitorId(
@@ -149,3 +290,108 @@ export async function listFormationEventsByVisitorId(
 
   return results;
 }
+
+export async function recordFormationEventV1(body: unknown): Promise<{
+  accepted: boolean;
+  id: string;
+  visitorId: string;
+  type: string;
+  occurredAt: string;
+  rowKey: string;
+  profile: FunctionFormationProfileEntity;
+}> {
+  const envelope = validateFormationEventEnvelopeV1Strict(body);
+  const visitorId = String(envelope.visitorId).trim();
+  const eventId = String(envelope.eventId).trim();
+  const type = String(envelope.type).trim();
+  const occurredAt = normalizeIso(envelope.occurredAt, "occurredAt");
+  const source = asObject(envelope.source);
+  const data = asObject(envelope.data);
+
+  const eventsTable = getFormationEventsTableClient();
+  const profilesTable = getFormationProfilesTableClient();
+
+  const rowKey = buildEventRowKey(occurredAt, eventId);
+
+  let existingEvent: any = null;
+  try {
+    existingEvent = await eventsTable.getEntity<any>(visitorId, rowKey);
+  } catch (err: any) {
+    const code = Number(err?.statusCode ?? err?.status ?? 0);
+    if (code !== 404) {
+      throw err;
+    }
+  }
+
+  if (!existingEvent) {
+    const eventEntity: { partitionKey: string; rowKey: string } & Record<string, any> = {
+      partitionKey: visitorId,
+      rowKey,
+      visitorId,
+      type,
+      occurredAt,
+      recordedAt: new Date().toISOString(),
+      idempotencyKey: eventId,
+      metadata: JSON.stringify({
+        source,
+        data
+      }),
+      channel: "api",
+      summary: type
+    };
+
+    await eventsTable.createEntity(eventEntity);
+  }
+
+  const existingProfile = await getFormationProfileByVisitorId(profilesTable, visitorId);
+
+  const profile: FunctionFormationProfileEntity = {
+    ...(existingProfile ?? {}),
+    partitionKey: "VISITOR",
+    rowKey: visitorId,
+    visitorId
+  };
+
+  profile.updatedAt = new Date().toISOString();
+
+  if (shouldAdvanceLastEvent(existingProfile, occurredAt)) {
+    profile.lastEventType = type;
+    profile.lastEventAt = occurredAt;
+  }
+
+  if (type === "FOLLOWUP_ASSIGNED") {
+    const assigneeId = String(data.assigneeId ?? "").trim();
+    if (!assigneeId) {
+      throw new Error("FOLLOWUP_ASSIGNED requires data.assigneeId (string)");
+    }
+
+    profile.assignedTo = assigneeId;
+    profile.lastFollowupAssignedAt = occurredAt;
+    maybeSetStage(profile, "Connected", occurredAt, type);
+  }
+
+  if (type === "NEXT_STEP_SELECTED") {
+    const nextStep = String(data.nextStep ?? "").trim();
+    if (!nextStep) {
+      throw new Error("NEXT_STEP_SELECTED requires data.nextStep (string)");
+    }
+
+    profile.lastNextStepAt = occurredAt;
+    maybeSetStage(profile, "Connected", occurredAt, type);
+  }
+
+  await profilesTable.upsertEntity(profile as any, "Merge");
+
+  return {
+    accepted: true,
+    id: eventId,
+    visitorId,
+    type,
+    occurredAt,
+    rowKey,
+    profile
+  };
+}
+
+
+

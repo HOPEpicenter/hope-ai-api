@@ -1,9 +1,11 @@
 {
+  "scriptFile": "../dist/functions/protectedPing/index.js",
+  "entryPoint": "protectedPing",
   "bindings": [
     {
-      "authLevel": "anonymous",
       "type": "httpTrigger",
       "direction": "in",
+      "authLevel": "anonymous",
       "name": "req",
       "methods": [ "get" ],
       "route": "_protected/ping"

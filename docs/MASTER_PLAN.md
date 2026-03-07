@@ -1,5 +1,20 @@
 # HOPE AI — MASTER PLAN
 
+## 2026-03-06 Update
+
+**What landed**
+- ✅ Fixed classic Functions auth parity for `POST /api/formation/events` by changing the HTTP output binding from `"$return"` to `"res"` (PR #227).
+- ✅ Verified staging behavior: unauthenticated `POST /api/formation/events` now returns `401`.
+- ✅ `scripts/assert-auth-scoping.ps1` passes on staging.
+- ✅ `scripts/regression.ps1` passes end-to-end on staging.
+
+**Why this matters (master plan alignment)**
+- Keeps protected `/api/*` behavior contract-correct without broad refactors.
+- Removes a real deployment/runtime parity issue that would have caused false confidence from source/package parity while staging still behaved incorrectly.
+
+**Next**
+- Keep docs/checklists aligned with actual protected surface behavior.
+- Return focus to the next backend contract slice; do not reopen this area unless behavior regresses.
 ## Completed (2026-02-28)
 
 - Visitors: GET /api/visitors list endpoint shipped (#165)
@@ -86,7 +101,7 @@ Status: 🟡 ACTIVE
 
 Implemented:
 - [x] Formation stage model exists in contract (FormationStage + stage fields on profile snapshot)
-- [x] POST `/api/formation/events`
+- [x] POST `/api/formation/events` (protected via API key)
 - [x] GET `/api/visitors/:id/formation/events` (paging supported)
 - [x] GET `/api/visitors/:id/formation/profile` (derived snapshot)
 - [x] CI asserts formation pagination + idempotency + profile snapshot behavior
@@ -115,12 +130,14 @@ Implemented:
 - [x] GET `/api/formation/timeline` requires API key
 - [x] GET `/api/integration/timeline` requires API key
 - [x] GET `/api/legacy/export` requires API key
+- [x] POST `/api/formation/events` requires API key
 - [x] Without API key => 401
-- [x] With API key but missing required query => 400
+- [x] With API key but missing required query/invalid body => 400
 - [x] Auth scoping verified: public endpoints remain unaffected
+- [x] CI/local auth scoping assertions cover 401/400 expectations for scoped endpoints
 
 Remaining:
-- [ ] Ensure CI explicitly asserts 401/400 expectations for all scoped endpoints
+- [ ] Expand scoped endpoint coverage only when new protected surfaces are added
 
 ---
 
@@ -174,11 +191,12 @@ Planned:
 
 ## Next Focus (Priority Order)
 
-1. Lock Formation milestone model (small, safe PR-sized work).
-2. Implement Integration aggregation logic (incremental, contract-first).
-3. Add CI coverage for scoped auth expectations if not already fully asserted.
+1. Lock/expand Formation milestone model only in small, safe PR-sized slices.
+2. Expand Formation regression coverage for ordering/tie-breaks, repeated events, and profile invariants.
+3. Implement Integration business logic incrementally, contract-first.
 
 
 ## Deployment notes
 - Staging deploy packaging: Oryx/build is disabled; the staged .deploy zip must be self-contained and include production dependencies (npm ci --omit=dev inside .deploy). (PR #197)
+
 

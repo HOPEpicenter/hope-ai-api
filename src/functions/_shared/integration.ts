@@ -89,5 +89,8 @@ export async function readIntegrationSummaryByVisitorId(visitorId: string): Prom
     lastEngagementAt,
     lastFormationAt,
     assignedToUserId: assigneeId,
+    groups: (profile as any)?.groups,
+    programs: (profile as any)?.programs,
+    workflows: (profile as any)?.workflows,
   });
 }

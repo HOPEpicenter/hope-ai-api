@@ -5,6 +5,7 @@ import {
   getFormationProfilesTableClient,
   getFormationProfileByVisitorId
 } from "./formation";
+import { deriveIntegrationSummaryV1 } from "../../domain/integration/deriveIntegrationSummary.v1";
 
 const ENGAGEMENT_EVENTS_TABLE = "EngagementEvents";
 
@@ -81,41 +82,12 @@ export async function readIntegrationSummaryByVisitorId(visitorId: string): Prom
 
   const lastEngagementAt = String(latestEngagement?.occurredAt ?? "").trim() || null;
   const lastFormationAt = String(profile?.lastEventAt ?? "").trim() || null;
-  const lastIntegratedAt = maxIso(lastEngagementAt, lastFormationAt);
+  const assigneeId = String(profile?.assignedTo ?? "").trim() || null;
 
-  const assigneeId = String(profile?.assignedTo ?? "").trim();
-  const assignedTo =
-    assigneeId
-      ? {
-          ownerType: "user",
-          ownerId: assigneeId
-        }
-      : undefined;
-
-  const hasAssignee = !!assignedTo;
-
-  let needsFollowup = false;
-  let followupReason: string | undefined;
-
-  if (hasAssignee) {
-    needsFollowup = true;
-    followupReason = "FOLLOWUP_ASSIGNED";
-  } else if (!lastEngagementAt) {
-    needsFollowup = true;
-    followupReason = "no_engagement_yet";
-  }
-
-  return {
+  return deriveIntegrationSummaryV1({
     visitorId,
     lastEngagementAt,
     lastFormationAt,
-    lastIntegratedAt,
-    sources: {
-      engagement: !!lastEngagementAt,
-      formation: !!lastFormationAt
-    },
-    needsFollowup,
-    followupReason,
-    assignedTo
-  };
+    assignedToUserId: assigneeId,
+  });
 }

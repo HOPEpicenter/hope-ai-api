@@ -168,4 +168,19 @@ $profile3 = Get-FormationProfileEventually `
   } `
   -FailureMessage "same-timestamp tie-break should deterministically keep the lexically later eventId winner"
 
+# 6) Equal occurredAt tie-break should use lexicographically greater eventId
+$t3 = (Get-Date).ToUniversalTime().AddSeconds(-20).ToString("o")
+$evtTieLow  = "evt-formation-tie-a-" + [Guid]::NewGuid().ToString("N")
+$evtTieHigh = "evt-formation-tie-z-" + [Guid]::NewGuid().ToString("N")
+
+Post-FormationEventV1 -EventId $evtTieLow  -Type "FOLLOWUP_ASSIGNED"         -OccurredAt $t3 -Data @{ assigneeId = "ops-smoke-tie" } | Out-Null
+Post-FormationEventV1 -EventId $evtTieHigh -Type "FOLLOWUP_OUTCOME_RECORDED" -OccurredAt $t3 -Data @{ outcome = "reached" } | Out-Null
+
+$profile3 = Get-FormationProfile
+
+Assert-True ((To-UtcDto $profile3.lastEventAt).UtcDateTime -eq (To-UtcDto $t3).UtcDateTime) "lastEventAt should equal shared tie timestamp (t3)"
+Assert-True ($profile3.lastEventType -eq "FOLLOWUP_OUTCOME_RECORDED") "lastEventType should follow greater eventId on equal occurredAt"
+if ($profile3.PSObject.Properties.Name -contains "lastEventId") {
+  Assert-True ($profile3.lastEventId -eq $evtTieHigh) "lastEventId should be the lexicographically greater eventId on equal occurredAt"
+}
 Write-Host "[assert-formation-snapshot] OK: formation snapshot invariants passed." -ForegroundColor Green

@@ -12,23 +12,45 @@ Write-Host ""
 Write-Host "[0] Preflight: API reachable"
 
 function Test-ApiReachable {
-  param([Parameter(Mandatory=$true)][string]$BaseUrl)
+  param(
+    [Parameter(Mandatory=$true)][string]$BaseUrl,
+    [int]$MaxAttempts = 6,
+    [int]$DelaySeconds = 5,
+    [int]$TimeoutSec = 10
+  )
 
   $healthUrl = "$BaseUrl/health"
+  $probeUrls = @($healthUrl, $BaseUrl)
+  $lastErrors = @()
 
-  try {
-    # Try /health first (preferred if available)
-    $null = Invoke-WebRequest -Method GET -Uri $healthUrl -UseBasicParsing -TimeoutSec 5
-    return
-  } catch {
-    # If /health doesn't exist, still allow reachability check via BaseUrl root
-    try {
-      $null = Invoke-WebRequest -Method GET -Uri $BaseUrl -UseBasicParsing -TimeoutSec 5
-      return
-    } catch {
-      throw "API not reachable at BaseUrl=$BaseUrl (tried $healthUrl and $BaseUrl). Start the local server, then re-run regression."
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    Write-Host ("[preflight] Reachability attempt {0}/{1}" -f $attempt, $MaxAttempts)
+
+    foreach ($probeUrl in $probeUrls) {
+      try {
+        $resp = Invoke-WebRequest -Method GET -Uri $probeUrl -UseBasicParsing -TimeoutSec $TimeoutSec -ErrorAction Stop
+        $statusCode = [int]$resp.StatusCode
+        Write-Host ("[preflight] OK {0} -> HTTP {1}" -f $probeUrl, $statusCode) -ForegroundColor Green
+        return
+      } catch {
+        $msg = $_.Exception.Message
+        $lastErrors += ("attempt {0} :: {1} :: {2}" -f $attempt, $probeUrl, $msg)
+        Write-Host ("[preflight] miss {0} -> {1}" -f $probeUrl, $msg) -ForegroundColor Yellow
+      }
+    }
+
+    if ($attempt -lt $MaxAttempts) {
+      Write-Host ("[preflight] waiting {0}s before retry..." -f $DelaySeconds)
+      Start-Sleep -Seconds $DelaySeconds
     }
   }
+
+  $detail = $lastErrors | Select-Object -Last 4
+  throw ("API not reachable at BaseUrl={0} after {1} attempts. Tried {2}. Recent errors: {3}" -f `
+    $BaseUrl, `
+    $MaxAttempts, `
+    ($probeUrls -join ", "), `
+    ($detail -join " | "))
 }
 
 Test-ApiReachable -BaseUrl $BaseUrl

@@ -268,7 +268,7 @@ export async function recordFormationEvent(
   // ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Snapshot fields Ops dashboard should rely on (always set)
     /* Deterministic "last event" snapshot:
    * - Tolerates out-of-order arrivals
-   * - Advances only if (occurredAt, idempotencyKey) is newer than the current snapshot
+   * - Advances only if (occurredAt, eventId) is newer than the current snapshot
    * - If existing lastEventAt is present but un-parseable, DO NOT overwrite it (avoid regressions)
    */
   const existingRaw = (profile as any).lastEventAt;
@@ -280,7 +280,7 @@ export async function recordFormationEvent(
   const incomingAtMs = Date.parse(String(occurredAt ?? ""));
   const existingAtMs = Date.parse(String(existingRaw ?? ""));
 
-  const incomingEventId = String((input as any).idempotencyKey ?? "");
+  const incomingEventId = eventId;
   const existingEventId = String((profile as any).lastEventId ?? "");
 
   let advanceLast = false;
@@ -312,5 +312,3 @@ export async function recordFormationEvent(
 
   return { eventRowKey: rowKey, profile };
 }
-
-

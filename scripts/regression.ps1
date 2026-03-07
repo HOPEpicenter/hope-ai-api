@@ -413,6 +413,15 @@ if ($LASTEXITCODE -ne 0) { Fail "Integration summary followup consistency contra
   Write-Host "[regression] Skipping followup consistency contract (HOPE_API_KEY not set)."
 }
 
+# Add integration summary late/older event stability assertion (safe, standalone)
+if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+  Write-Host "[regression] Integration summary late/older events contract..."
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-integration-summary-late-older-events.ps1") -Base ($BaseUrl -replace "/api$","") -ApiKey $env:HOPE_API_KEY
+if ($LASTEXITCODE -ne 0) { Fail "Integration summary late/older events contract failed (exit=$LASTEXITCODE)" }
+} else {
+  Write-Host "[regression] Skipping integration summary late/older events contract (HOPE_API_KEY not set)."
+}
+
 
 Write-Host ""
 # Add formation milestones v1 contract assertion (safe, standalone)

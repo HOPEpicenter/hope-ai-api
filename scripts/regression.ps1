@@ -189,6 +189,11 @@ Push-Location $RepoRoot
 try {
   npm run build | ForEach-Object { $_ }
   Ok "npm run build succeeded."
+
+Write-Host "[2a] Integration summary derivation assertions"
+pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-integration-summary-derive.ps1")
+if ($LASTEXITCODE -ne 0) { Fail "Integration summary derivation assertions failed (exit=$LASTEXITCODE)" }
+Ok "Integration summary derivation assertions passed."
 }
 finally {
   Pop-Location

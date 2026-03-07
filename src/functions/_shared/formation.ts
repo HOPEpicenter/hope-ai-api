@@ -135,13 +135,35 @@ function eventAtOrMin(value: unknown): number {
   return Number.isFinite(ms) ? ms : Number.NEGATIVE_INFINITY;
 }
 
-function shouldAdvanceLastEvent(
+function compareEventOrder(
+  leftOccurredAtIso: unknown,
+  leftEventId: unknown,
+  rightOccurredAtIso: unknown,
+  rightEventId: unknown
+): number {
+  const leftMs = eventAtOrMin(leftOccurredAtIso);
+  const rightMs = eventAtOrMin(rightOccurredAtIso);
+
+  if (leftMs !== rightMs) {
+    return leftMs - rightMs;
+  }
+
+  const leftId = String(leftEventId ?? "").trim();
+  const rightId = String(rightEventId ?? "").trim();
+  return leftId.localeCompare(rightId);
+}
+
+function shouldAdvanceEventState(
   profile: FunctionFormationProfileEntity | null,
-  occurredAtIso: string
+  occurredAtIso: string,
+  eventId: string
 ): boolean {
-  const nextMs = eventAtOrMin(occurredAtIso);
-  const currentMs = eventAtOrMin(profile?.lastEventAt);
-  return nextMs >= currentMs;
+  return compareEventOrder(
+    occurredAtIso,
+    eventId,
+    profile?.lastEventAt,
+    (profile as any)?.lastEventId
+  ) >= 0;
 }
 
 function maybeSetStage(
@@ -354,9 +376,12 @@ export async function recordFormationEventV1(body: unknown): Promise<{
 
   profile.updatedAt = new Date().toISOString();
 
-  if (shouldAdvanceLastEvent(existingProfile, occurredAt)) {
+  const shouldAdvance = shouldAdvanceEventState(existingProfile, occurredAt, eventId);
+
+  if (shouldAdvance) {
     profile.lastEventType = type;
     profile.lastEventAt = occurredAt;
+    (profile as any).lastEventId = eventId;
   }
 
   if (type === "FOLLOWUP_ASSIGNED") {
@@ -365,9 +390,11 @@ export async function recordFormationEventV1(body: unknown): Promise<{
       throw new Error("FOLLOWUP_ASSIGNED requires data.assigneeId (string)");
     }
 
-    profile.assignedTo = assigneeId;
-    profile.lastFollowupAssignedAt = occurredAt;
-    maybeSetStage(profile, "Connected", occurredAt, type);
+    if (shouldAdvance) {
+      profile.assignedTo = assigneeId;
+      profile.lastFollowupAssignedAt = occurredAt;
+      maybeSetStage(profile, "Connected", occurredAt, type);
+    }
   }
 
   if (type === "NEXT_STEP_SELECTED") {
@@ -376,8 +403,10 @@ export async function recordFormationEventV1(body: unknown): Promise<{
       throw new Error("NEXT_STEP_SELECTED requires data.nextStep (string)");
     }
 
-    profile.lastNextStepAt = occurredAt;
-    maybeSetStage(profile, "Connected", occurredAt, type);
+    if (shouldAdvance) {
+      profile.lastNextStepAt = occurredAt;
+      maybeSetStage(profile, "Connected", occurredAt, type);
+    }
   }
 
   await profilesTable.upsertEntity(profile as any, "Merge");

@@ -135,7 +135,72 @@ if ($p.profile.PSObject.Properties.Name -contains "lastEventAt") {
   }
 }
 
-# 5) Verify profile list endpoints respond (shape/ok)
+# 5) Same-timestamp milestone tie-break should be deterministic by eventId for milestone-specific fields.
+$emailTie = "formation-milestones-tie+" + (Get-Date -Format "yyyyMMddHHmmss") + "@example.com"
+$visitorTie = PostJson "$ApiBase/visitors" $headers @{
+  firstName = "Formation"
+  lastName  = "MilestonesTie"
+  email     = $emailTie
+}
+
+$vidTie = $visitorTie.visitorId
+if ([string]::IsNullOrWhiteSpace($vidTie)) { $vidTie = $visitorTie.id }
+if ([string]::IsNullOrWhiteSpace($vidTie)) { throw "Tie-break visitor id missing (visitorId/id empty)." }
+
+$tieAtAssign = $now.AddSeconds(10)
+$tieAtStep   = $now.AddSeconds(11)
+
+$evtAssignLow = New-FormationEnvelope -visitorId $vidTie -type "FOLLOWUP_ASSIGNED" -occurredAt $tieAtAssign -data @{ assigneeId = "ops-user-a" } -sourceSystem "assert-formation-milestones-v1"
+$evtAssignHigh = New-FormationEnvelope -visitorId $vidTie -type "FOLLOWUP_ASSIGNED" -occurredAt $tieAtAssign -data @{ assigneeId = "ops-user-z" } -sourceSystem "assert-formation-milestones-v1"
+$evtAssignLow.eventId = "evt-followup-a-" + [Guid]::NewGuid().ToString("N")
+$evtAssignHigh.eventId = "evt-followup-z-" + [Guid]::NewGuid().ToString("N")
+
+PostJson "$ApiBase/formation/events" $headers $evtAssignLow | Out-Null
+PostJson "$ApiBase/formation/events" $headers $evtAssignHigh | Out-Null
+
+$evtStepLow = New-FormationEnvelope -visitorId $vidTie -type "NEXT_STEP_SELECTED" -occurredAt $tieAtStep -data @{ nextStep = "AlphaStep" } -sourceSystem "assert-formation-milestones-v1"
+$evtStepHigh = New-FormationEnvelope -visitorId $vidTie -type "NEXT_STEP_SELECTED" -occurredAt $tieAtStep -data @{ nextStep = "ZuluStep" } -sourceSystem "assert-formation-milestones-v1"
+$evtStepLow.eventId = "evt-nextstep-a-" + [Guid]::NewGuid().ToString("N")
+$evtStepHigh.eventId = "evt-nextstep-z-" + [Guid]::NewGuid().ToString("N")
+
+PostJson "$ApiBase/formation/events" $headers $evtStepLow | Out-Null
+PostJson "$ApiBase/formation/events" $headers $evtStepHigh | Out-Null
+
+$pTie = GetJson "$ApiBase/visitors/$vidTie/formation/profile" $headers
+if (-not $pTie.ok) { throw "Expected ok=true from tie-break profile endpoint." }
+if (-not $pTie.profile) { throw "Expected tie-break profile to exist after posting events." }
+
+if ($pTie.profile.stage -ne "Connected") { throw "Expected tie-break stage=Connected, got $($pTie.profile.stage)" }
+
+if ($pTie.profile.PSObject.Properties.Name -contains "assignedTo") {
+  if ($pTie.profile.assignedTo -ne "ops-user-z") { throw "Expected assignedTo=ops-user-z for same-timestamp FOLLOWUP_ASSIGNED tie-break, got $($pTie.profile.assignedTo)" }
+}
+
+if ($pTie.profile.PSObject.Properties.Name -contains "lastFollowupAssignedAt") {
+  if ((To-IsoMillis $pTie.profile.lastFollowupAssignedAt) -ne (To-IsoMillis $tieAtAssign)) {
+    throw "Expected lastFollowupAssignedAt to match same-timestamp FOLLOWUP_ASSIGNED tie timestamp."
+  }
+}
+
+if ($pTie.profile.PSObject.Properties.Name -contains "lastNextStepAt") {
+  if ((To-IsoMillis $pTie.profile.lastNextStepAt) -ne (To-IsoMillis $tieAtStep)) {
+    throw "Expected lastNextStepAt to match same-timestamp NEXT_STEP_SELECTED tie timestamp."
+  }
+}
+
+if ($pTie.profile.PSObject.Properties.Name -contains "lastEventType") {
+  if ($pTie.profile.lastEventType -ne "NEXT_STEP_SELECTED") {
+    throw "Expected tie-break lastEventType=NEXT_STEP_SELECTED, got $($pTie.profile.lastEventType)"
+  }
+}
+
+if ($pTie.profile.PSObject.Properties.Name -contains "lastEventAt") {
+  if ((To-IsoMillis $pTie.profile.lastEventAt) -ne (To-IsoMillis $tieAtStep)) {
+    throw "Expected tie-break lastEventAt to match same-timestamp NEXT_STEP_SELECTED tie timestamp."
+  }
+}
+
+# 6) Verify profile list endpoints respond (shape/ok)
 $outStage = GetJson "$ApiBase/formation/profiles?stage=Connected&limit=10" $headers
 if (-not $outStage.ok) { throw "stage filter ok=false" }
 

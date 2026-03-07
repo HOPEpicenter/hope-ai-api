@@ -12,6 +12,7 @@ import {
   type IntegrationAfterV1,
 } from "../../contracts/integrationTimelineCursor.v1";
 import { encodeCursorV1 } from "../../contracts/timeline.v1";
+import { deriveIntegrationSummaryV1 } from "../../domain/integration/deriveIntegrationSummary.v1";
 
 export type IntegratedTimelinePageV1 = {
   items: any[];
@@ -255,28 +256,17 @@ const merged = mergeTimelines(
       // swallow: summary should still work even if profile table is missing
     }
 
-    const hasAssignee = !!(assignedTo && typeof (assignedTo as any).ownerId === "string" && String((assignedTo as any).ownerId).trim());
-    return {
+    const assignedToUserId =
+      assignedTo && typeof (assignedTo as any).ownerId === "string"
+        ? String((assignedTo as any).ownerId).trim()
+        : null;
+
+    return deriveIntegrationSummaryV1({
       visitorId,
       lastEngagementAt,
       lastFormationAt,
-      lastIntegratedAt,
-      sources: {
-        engagement: !!lastEngagementAt,
-        formation: !!lastFormationAt,
-      },
-
-      // Phase 4 additive fields (v1 contract). No business logic yet.
-      // Minimal default: if no engagement has ever happened, treat as needs follow-up.
-      needsFollowup: !!hasAssignee || !lastEngagementAt,
-      followupReason: hasAssignee ? "FOLLOWUP_ASSIGNED" : !lastEngagementAt ? "no_engagement_yet" : undefined,
-      // Optional / unset until we model business rules + persistence/events:
-      assignedTo,
-      // followupReason: undefined,
-      // groups: undefined,
-      // programs: undefined,
-      // workflows: undefined,
-    };
+      assignedToUserId,
+    });
   }
 
 }

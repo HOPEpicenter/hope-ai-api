@@ -224,7 +224,3 @@ Assert-NewestFirst $items2 "page2"
 Assert-NoOverlap $items1 $items2 "page1-page2"
 
 Write-Host "[assert-formation-pagination] OK: formation pagination assertions passed." -ForegroundColor Green
-
-
-
-

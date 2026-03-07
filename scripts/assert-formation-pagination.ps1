@@ -52,6 +52,8 @@ $createCount = if ($deepPaging) {
 }
 Write-Host "[assert-formation-pagination] Creating $createCount formation events..."
 
+$replayEvt = $null
+
 1..$createCount | ForEach-Object {
   $n = $_
   $occurredAt = (Get-Date).ToUniversalTime().AddMilliseconds($n).ToString("o")
@@ -70,6 +72,10 @@ Write-Host "[assert-formation-pagination] Creating $createCount formation events
     }
   }
 
+  if ($n -eq 1) {
+    $replayEvt = $evt
+  }
+
   try {
     Invoke-RestMethod -Method Post -Uri "$ApiBase/formation/events" -Headers $headers -ContentType "application/json" -Body ($evt | ConvertTo-Json -Depth 10) | Out-Null
   } catch {
@@ -84,6 +90,13 @@ Write-Host "[assert-formation-pagination] Creating $createCount formation events
     throw
   }
 }
+
+if ($null -eq $replayEvt) {
+  throw "Replay seed event was not captured."
+}
+
+Write-Host "[assert-formation-pagination] Replaying one formation event with same eventId..."
+Invoke-RestMethod -Method Post -Uri "$ApiBase/formation/events" -Headers $headers -ContentType "application/json" -Body ($replayEvt | ConvertTo-Json -Depth 10) | Out-Null
 
 # --- List page 1 (newest-first)
 Write-Host "[assert-formation-pagination] Listing page1..."
@@ -204,6 +217,11 @@ if ($deepPaging) {
   }
 
   if ($allCount -lt ($Limit * 3)) { throw "Deep paging did not traverse enough items (count=$allCount)." }
+
+  $expectedUniqueCount = $createCount
+  if ($allCount -ne $expectedUniqueCount) {
+    throw "Expected unique traversed count=$expectedUniqueCount but got $allCount"
+  }
 
   Write-Host "[assert-formation-pagination] OK: formation pagination assertions passed." -ForegroundColor Green
   exit 0

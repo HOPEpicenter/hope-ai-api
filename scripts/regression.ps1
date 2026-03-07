@@ -339,11 +339,15 @@ if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
   Write-Host "[regression] Formation milestones v1 contract..."
   pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-formation-milestones-v1.ps1") -ApiBase $BaseUrl -ApiKey $env:HOPE_API_KEY
   if ($LASTEXITCODE -ne 0) { throw "Formation milestones v1 asserts failed ($LASTEXITCODE)" }
+
+  Write-Host "[regression] Formation snapshot invariants..."
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-formation-snapshot-invariants.ps1") -BaseUrl ($BaseUrl -replace "/api$","") -ApiKey $env:HOPE_API_KEY
+  if ($LASTEXITCODE -ne 0) { throw "Formation snapshot invariants failed ($LASTEXITCODE)" }
 } else {
   Write-Host "[regression] Skipping formation milestones v1 contract (HOPE_API_KEY not set)."
+  Write-Host "[regression] Skipping formation snapshot invariants (HOPE_API_KEY not set)."
 }
 Write-Host "[4] Auth scoping assertions (401/400 expectations)"
 $env:HOPE_RUN_PHASE3_ASSERTS = "1"
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-auth-scoping.ps1 -BaseUrl $BaseUrl
 if ($LASTEXITCODE -ne 0) { throw "Auth scoping asserts failed ($LASTEXITCODE)" }
-

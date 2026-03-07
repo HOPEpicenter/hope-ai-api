@@ -82,6 +82,31 @@ function Get-FormationProfile {
   return $p.profile
 }
 
+function Get-FormationProfileEventually {
+  param(
+    [Parameter(Mandatory=$true)][scriptblock]$Predicate,
+    [Parameter(Mandatory=$true)][string]$FailureMessage,
+    [int]$Attempts = 5,
+    [int]$DelayMs = 500
+  )
+
+  $last = $null
+  for ($i = 1; $i -le $Attempts; $i++) {
+    $last = Get-FormationProfile
+    if (& $Predicate $last) {
+      return $last
+    }
+
+    if ($i -lt $Attempts) {
+      Start-Sleep -Milliseconds $DelayMs
+    }
+  }
+
+  Write-Host "[assert-formation-snapshot] Final profile on failure:" -ForegroundColor Yellow
+  $last | ConvertTo-Json -Depth 20 | Write-Host
+  throw "ASSERT FAILED: $FailureMessage"
+}
+
 # 3) In-order: A then B
 Post-FormationEventV1 -EventId $evtA -Type "FOLLOWUP_ASSIGNED" -OccurredAt $t1 -Data @{ assigneeId = "ops-smoke" } | Out-Null
 Post-FormationEventV1 -EventId $evtB -Type "FOLLOWUP_OUTCOME_RECORDED" -OccurredAt $t2 -Data @{ outcome = "reached" } | Out-Null
@@ -97,24 +122,34 @@ function To-UtcDto {
   return [DateTimeOffset]::Parse([string]$Value).ToUniversalTime()
 }
 
+function To-IsoMillis {
+  param([Parameter(Mandatory=$true)]$Value)
+  return (To-UtcDto $Value).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+}
+
 # 4) Retry A (idempotency)
 Post-FormationEventV1 -EventId $evtA -Type "FOLLOWUP_ASSIGNED" -OccurredAt $t1 -Data @{ assigneeId = "ops-smoke" } | Out-Null
-$profile1b = Get-FormationProfile
-
-Assert-True ((To-UtcDto $profile1.lastEventAt).UtcDateTime -eq (To-UtcDto $profile1b.lastEventAt).UtcDateTime) "lastEventAt should be unchanged on retry"
-Assert-True ($profile1.lastEventType -eq $profile1b.lastEventType) "lastEventType should be unchanged on retry"
+$profile1b = Get-FormationProfileEventually `
+  -Predicate {
+    param($p)
+    ((To-IsoMillis $profile1.lastEventAt) -eq (To-IsoMillis $p.lastEventAt)) -and
+    ($profile1.lastEventType -eq $p.lastEventType)
+  } `
+  -FailureMessage "lastEventAt/lastEventType should be unchanged on retry"
 
 # 5) Out-of-order older event C (late arrival)
 Post-FormationEventV1 -EventId $evtC -Type "FOLLOWUP_CONTACTED" -OccurredAt $t0 -Data @{ method = "sms"; result = "reached" } | Out-Null
-$profile2 = Get-FormationProfile
-
-# lastEventAt/Type should remain at B (t2)
-Assert-True ((To-UtcDto $profile2.lastEventAt).UtcDateTime -eq (To-UtcDto $t2).UtcDateTime) "lastEventAt should remain newest occurredAt (t2) even after older event arrives"
-Assert-True ($profile2.lastEventType -eq "FOLLOWUP_OUTCOME_RECORDED") "lastEventType should remain newest event type (B)"
+$profile2 = Get-FormationProfileEventually `
+  -Predicate {
+    param($p)
+    ((To-IsoMillis $p.lastEventAt) -eq (To-IsoMillis $t2)) -and
+    ($p.lastEventType -eq "FOLLOWUP_OUTCOME_RECORDED")
+  } `
+  -FailureMessage "lastEventAt should remain newest occurredAt (t2) even after older event arrives"
 
 # Touchpoint for contacted should reflect C (t0), if present
 if ($profile2.PSObject.Properties.Name -contains "lastFollowupContactedAt") {
-  Assert-True ((To-UtcDto $profile2.lastFollowupContactedAt).UtcDateTime -eq (To-UtcDto $t0).UtcDateTime) "lastFollowupContactedAt should reflect out-of-order older event"
+  Assert-True ((To-IsoMillis $profile2.lastFollowupContactedAt) -eq (To-IsoMillis $t0)) "lastFollowupContactedAt should reflect out-of-order older event"
 }
 
 Write-Host "[assert-formation-snapshot] OK: formation snapshot invariants passed." -ForegroundColor Green

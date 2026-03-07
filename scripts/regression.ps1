@@ -81,6 +81,46 @@ function Invoke-JsonSafe {
   }
 }
 
+function Invoke-JsonWithRetry {
+  param(
+    [Parameter(Mandatory=$true)][string]$Label,
+    [Parameter(Mandatory=$true)][string]$Method,
+    [Parameter(Mandatory=$true)][string]$Uri,
+    [hashtable]$Headers,
+    [string]$Body,
+    [string]$ContentType = "application/json",
+    [int]$Attempts = 5,
+    [int]$DelaySeconds = 2
+  )
+
+  $last = $null
+
+  for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+    $last = Invoke-JsonSafe -Method $Method -Uri $Uri -Headers $Headers -Body $Body -ContentType $ContentType
+    if ($last.ok) {
+      return $last
+    }
+
+    $statusText = ""
+    if ($last.status) { $statusText = " status=$($last.status)" }
+
+    Write-Host ""
+    Write-Host ("{0} failed on attempt {1}/{2}:{3}" -f $Label, $attempt, $Attempts, $statusText) -ForegroundColor Yellow
+    Write-Host ("url: {0}" -f $Uri) -ForegroundColor Yellow
+    if ($last.raw) { Write-Host $last.raw } else { Write-Host "(no body captured)" }
+    if ($last.error) { Write-Host $last.error.Exception.Message }
+
+    if ($attempt -lt $Attempts) {
+      Start-Sleep -Seconds $DelaySeconds
+      continue
+    }
+
+    Fail ("{0} failed after retries." -f $Label)
+  }
+
+  Fail ("{0} failed after retries." -f $Label)
+}
+
 # -----------------------------
 # 1) Block ad-hoc TableClient creation
 # -----------------------------
@@ -197,23 +237,9 @@ $e2 = @{
   data       = @{ from = "open"; to = "in_progress"; channel = "api" }
 } | ConvertTo-Json -Depth 8
 
-$e1r = Invoke-JsonSafe -Method "POST" -Uri "$BaseUrl/engagements/events" -Headers $headers -Body $e1
-if (-not $e1r.ok) {
-  Write-Host ""
-  Write-Host "POST /engagements/events (1) failed (raw):" -ForegroundColor Yellow
-  if ($e1r.raw) { Write-Host $e1r.raw } else { Write-Host "(no body captured)" }
-  if ($e1r.error) { Write-Host $e1r.error.Exception.Message }
-  Fail "POST /engagements/events (1) failed."
-}
+$e1r = Invoke-JsonWithRetry -Label "POST /engagements/events (1)" -Method "POST" -Uri "$BaseUrl/engagements/events" -Headers $headers -Body $e1
 
-$e2r = Invoke-JsonSafe -Method "POST" -Uri "$BaseUrl/engagements/events" -Headers $headers -Body $e2
-if (-not $e2r.ok) {
-  Write-Host ""
-  Write-Host "POST /engagements/events (2) failed (raw):" -ForegroundColor Yellow
-  if ($e2r.raw) { Write-Host $e2r.raw } else { Write-Host "(no body captured)" }
-  if ($e2r.error) { Write-Host $e2r.error.Exception.Message }
-  Fail "POST /engagements/events (2) failed."
-}
+$e2r = Invoke-JsonWithRetry -Label "POST /engagements/events (2)" -Method "POST" -Uri "$BaseUrl/engagements/events" -Headers $headers -Body $e2
 
 Ok "Posted 2 engagements"
 
@@ -233,14 +259,7 @@ $f = @{
   }
 } | ConvertTo-Json -Depth 20
 
-$fr = Invoke-JsonSafe -Method "POST" -Uri "$BaseUrl/formation/events" -Headers $headers -Body $f
-if (-not $fr.ok) {
-  Write-Host ""
-  Write-Host "POST /formation/events failed (raw):" -ForegroundColor Yellow
-  if ($fr.raw) { Write-Host $fr.raw } else { Write-Host "(no body captured)" }
-  if ($fr.error) { Write-Host $fr.error.Exception.Message }
-  Fail "POST /formation/events failed."
-}
+$fr = Invoke-JsonWithRetry -Label "POST /formation/events" -Method "POST" -Uri "$BaseUrl/formation/events" -Headers $headers -Body $f
 
 if ($null -eq $fr.body -or $fr.body -eq "") {
   Write-Host "[regression] Formation POST accepted with empty body."

@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getIntegrationTimeline/index.js",
+  "entryPoint": "getIntegrationTimeline",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "integration/timeline"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

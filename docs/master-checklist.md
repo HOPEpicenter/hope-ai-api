@@ -1,5 +1,12 @@
 ## Session Closeout
 
+### 2026-03-07 (session closeout)
+
+- [x] Merged **#245**: integration summary follow-up invariants.
+- [x] Merged **#246**: assignment-only integration summary source-flag invariant.
+- [x] Merged **#247**: integration summary source transition invariant.
+- [x] Merged **#248**: formation snapshot tie-break invariant.
+- [x] Merged **#249**: formation idempotency assert wired into `scripts/regression.ps1`.
 
 ### 2026-03-06 (session closeout)
 
@@ -92,9 +99,9 @@
 - [x] Protected formation append works: POST /api/formation/events (x-api-key required)
 - [x] Public formation list works (paging): GET /api/visitors/:id/formation/events
 - [x] Public formation profile snapshot works: GET /api/visitors/:id/formation/profile
-- [x] CI asserts cover formation pagination + idempotency + profile snapshot
+- [x] Regression/assert coverage now includes formation milestones v1, snapshot invariants, tie-break behavior, and idempotency
 - [x] Define formation milestones/events and derivations (docs/formation-milestones-v1.md + assert script)
-- [ ] Track journey steps in an auditable way (prefer derive from events).
+- [ ] Track journey steps in an auditable way (prefer derive from events) — defer unless a real producer/blocker requires it.
 
 ## Cross-cutting — Auth scoping (COMPLETED)
 
@@ -124,6 +131,7 @@
 - [x] `/api/integration/summary` v1 exists (read-only derived view)
 - [x] Gated assert exists for integration summary (`scripts/assert-integration-summary.ps1`)
 - [x] Consistency hardening: integration timeline reads formation via storage repo (cursor decode + perStream+1 tail slice paging)
+- [x] Regression covers integration summary ownership/source invariants (follow-up consistency, assignment-only source flags, assignment→engagement transition, no-false-followup, late/older-event stability)
 
 Remaining (business logic expansion):
 - [x] Define cross-stream ordering contract (explicitly documented)

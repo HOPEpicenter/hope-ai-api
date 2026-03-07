@@ -259,22 +259,61 @@ if (-not $etlBody.items -or $etlBody.items.Count -lt 1) { Fail "engagements time
 # [Formation sanity] Formation events list (public surface)
 $fel = $null
 $felBody = $null
+$formationListUrl = "$BaseUrl/visitors/$vid/formation/events?limit=10"
 
 for ($attempt = 1; $attempt -le 5; $attempt++) {
-  $fel = Invoke-JsonSafe -Method "GET" -Uri "$BaseUrl/visitors/$vid/formation/events?limit=10" -Headers $headers -Body $null
+  $fel = Invoke-JsonSafe -Method "GET" -Uri $formationListUrl -Headers $headers -Body $null
 
   if (-not $fel.ok) {
+    $statusText = ""
+    if ($fel.status) { $statusText = " status=$($fel.status)" }
+
     Write-Host ""
-    Write-Host "GET formation events list failed (raw):" -ForegroundColor Yellow
+    Write-Host ("GET formation events list failed on attempt {0}/5:{1}" -f $attempt, $statusText) -ForegroundColor Yellow
+    Write-Host ("url: {0}" -f $formationListUrl) -ForegroundColor Yellow
     if ($fel.raw) { Write-Host $fel.raw } else { Write-Host "(no body captured)" }
     if ($fel.error) { Write-Host $fel.error.Exception.Message }
-    Fail "GET formation events list failed."
+
+    if ($attempt -lt 5) {
+      Start-Sleep -Seconds 2
+      continue
+    }
+
+    Fail "GET formation events list failed after retries."
   }
 
   $felBody = $fel.body
-  if (-not $felBody.ok) { Fail "formation events list: ok was false" }
 
-  if ($felBody.items -and $felBody.items.Count -ge 1) {
+  if ($null -eq $felBody) {
+    if ($attempt -lt 5) {
+      Write-Host "[regression] Formation list body was null; retrying..."
+      Start-Sleep -Seconds 2
+      continue
+    }
+    Fail "formation events list: response body was null"
+  }
+
+  if (-not $felBody.ok) {
+    Write-Host ""
+    Write-Host "formation events list body:" -ForegroundColor Yellow
+    $felBody | ConvertTo-Json -Depth 20 | ForEach-Object { Write-Host $_ }
+    Fail "formation events list: ok was false"
+  }
+
+  if ($null -eq $felBody.items) {
+    if ($attempt -lt 5) {
+      Write-Host "[regression] Formation list items missing on attempt $attempt/5; retrying..."
+      Start-Sleep -Seconds 2
+      continue
+    }
+
+    Write-Host ""
+    Write-Host "formation events list body:" -ForegroundColor Yellow
+    $felBody | ConvertTo-Json -Depth 20 | ForEach-Object { Write-Host $_ }
+    Fail "formation events list: items property missing"
+  }
+
+  if ($felBody.items.Count -ge 1) {
     break
   }
 
@@ -286,11 +325,12 @@ for ($attempt = 1; $attempt -le 5; $attempt++) {
 
 if (-not $felBody.items -or $felBody.items.Count -lt 1) {
   Write-Host ""
+  Write-Host ("formation events list final url: {0}" -f $formationListUrl) -ForegroundColor Yellow
   Write-Host "formation events list body:" -ForegroundColor Yellow
   $felBody | ConvertTo-Json -Depth 20 | ForEach-Object { Write-Host $_ }
   Write-Host "formation POST body:" -ForegroundColor Yellow
   if ($null -eq $fr.body -or $fr.body -eq "") { Write-Host "(empty)" } else { $fr.body | ConvertTo-Json -Depth 20 | ForEach-Object { Write-Host $_ } }
-  Fail "formation events list: items missing/empty"
+  Fail "formation events list: items missing/empty after retries"
 }
 
 foreach ($it in $r1.items) {

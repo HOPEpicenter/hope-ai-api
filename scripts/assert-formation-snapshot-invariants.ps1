@@ -152,4 +152,20 @@ if ($profile2.PSObject.Properties.Name -contains "lastFollowupContactedAt") {
   Assert-True ((To-IsoMillis $profile2.lastFollowupContactedAt) -eq (To-IsoMillis $t0)) "lastFollowupContactedAt should reflect out-of-order older event"
 }
 
+# 6) Same-timestamp tie-break should be deterministic by eventId
+$tieAt = $t2
+$evtTieLow = "evt-formation-tie-a-" + [Guid]::NewGuid().ToString("N")
+$evtTieHigh = "evt-formation-tie-z-" + [Guid]::NewGuid().ToString("N")
+
+Post-FormationEventV1 -EventId $evtTieLow -Type "FOLLOWUP_CONTACTED" -OccurredAt $tieAt -Data @{ method = "call"; result = "left_voicemail" } | Out-Null
+Post-FormationEventV1 -EventId $evtTieHigh -Type "FOLLOWUP_OUTCOME_RECORDED" -OccurredAt $tieAt -Data @{ outcome = "reached" } | Out-Null
+
+$profile3 = Get-FormationProfileEventually `
+  -Predicate {
+    param($p)
+    ((To-IsoMillis $p.lastEventAt) -eq (To-IsoMillis $tieAt)) -and
+    ($p.lastEventType -eq "FOLLOWUP_OUTCOME_RECORDED")
+  } `
+  -FailureMessage "same-timestamp tie-break should deterministically keep the lexically later eventId winner"
+
 Write-Host "[assert-formation-snapshot] OK: formation snapshot invariants passed." -ForegroundColor Green

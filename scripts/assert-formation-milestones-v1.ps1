@@ -54,29 +54,48 @@ if ([string]::IsNullOrWhiteSpace($vid)) { throw "Visitor id missing (visitorId/i
 
 Write-Host "[assert-formation-milestones-v1] visitorId=$vid"
 
-# 2) Post FOLLOWUP_ASSIGNED (data.assigneeId required)
+function To-UtcDto {
+  param([Parameter(Mandatory=$true)]$Value)
+  if ($Value -is [DateTimeOffset]) { return $Value.ToUniversalTime() }
+  if ($Value -is [DateTime]) { return ([DateTimeOffset]$Value).ToUniversalTime() }
+  return [DateTimeOffset]::Parse([string]$Value).ToUniversalTime()
+}
+
+function To-IsoMillis {
+  param([Parameter(Mandatory=$true)]$Value)
+  return (To-UtcDto $Value).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+}
+
+# 2) Post milestone events, then repeat them with later timestamps to verify deterministic overwrite behavior.
 $now = (Get-Date).ToUniversalTime()
-$evt1 = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_ASSIGNED" -occurredAt $now -data @{ assigneeId = "ops-user-1" } -sourceSystem "assert-formation-milestones-v1"
+
+$assign1At = $now
+$step1At   = $now.AddSeconds(1)
+$assign2At = $now.AddSeconds(2)
+$step2At   = $now.AddSeconds(3)
+
+$evt1 = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_ASSIGNED" -occurredAt $assign1At -data @{ assigneeId = "ops-user-1" } -sourceSystem "assert-formation-milestones-v1"
 PostJson "$ApiBase/formation/events" $headers $evt1 | Out-Null
 
-# 3) Post NEXT_STEP_SELECTED (data.nextStep required)
-$evt2 = New-FormationEnvelope -visitorId $vid -type "NEXT_STEP_SELECTED" -occurredAt $now.AddSeconds(1) -data @{ nextStep = "JoinGroup" } -sourceSystem "assert-formation-milestones-v1"
+$evt2 = New-FormationEnvelope -visitorId $vid -type "NEXT_STEP_SELECTED" -occurredAt $step1At -data @{ nextStep = "JoinGroup" } -sourceSystem "assert-formation-milestones-v1"
 PostJson "$ApiBase/formation/events" $headers $evt2 | Out-Null
 
-# 4) Verify profile snapshot (keep assertions minimal + stable)
+$evt3 = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_ASSIGNED" -occurredAt $assign2At -data @{ assigneeId = "ops-user-2" } -sourceSystem "assert-formation-milestones-v1"
+PostJson "$ApiBase/formation/events" $headers $evt3 | Out-Null
+
+$evt4 = New-FormationEnvelope -visitorId $vid -type "NEXT_STEP_SELECTED" -occurredAt $step2At -data @{ nextStep = "ServeTeam" } -sourceSystem "assert-formation-milestones-v1"
+PostJson "$ApiBase/formation/events" $headers $evt4 | Out-Null
+
+# 4) Verify profile snapshot (keep assertions minimal + deterministic)
 $p = GetJson "$ApiBase/visitors/$vid/formation/profile" $headers
 if (-not $p.ok) { throw "Expected ok=true from profile endpoint." }
 if (-not $p.profile) { throw "Expected profile to exist after posting events." }
 
-# required snapshot keys (see existing profile assert)
 if ([string]::IsNullOrWhiteSpace([string]$p.profile.partitionKey)) { throw "Profile partitionKey missing." }
 if ([string]::IsNullOrWhiteSpace([string]$p.profile.rowKey)) { throw "Profile rowKey missing." }
 
-# stage should be Connected after NEXT_STEP_SELECTED
 if ($p.profile.stage -ne "Connected") { throw "Expected stage=Connected, got $($p.profile.stage)" }
 
-# Contract: when stage changes, stageUpdated* must be present (v1)
-# (This assert script intentionally creates events that should transition stage -> Connected)
 if (-not $p.profile.stageUpdatedAt) { throw "stageUpdatedAt is required when stage changes" }
 try { [void][DateTimeOffset]::Parse($p.profile.stageUpdatedAt) } catch { throw "stageUpdatedAt must be ISO timestamp: $($p.profile.stageUpdatedAt)" }
 
@@ -88,9 +107,32 @@ if (-not $p.profile.stageReason -or -not $p.profile.stageReason.StartsWith("even
   throw "stageReason must start with 'event:' when stage changes (got '$($p.profile.stageReason)')"
 }
 
-# Optional checks (only enforce if fields exist)
-if ($p.profile.PSObject.Properties.Name -contains "assignedTo" -and $null -ne $p.profile.assignedTo) {
-  if ($p.profile.assignedTo -ne "ops-user-1") { throw "Expected assignedTo=ops-user-1, got $($p.profile.assignedTo)" }
+if ($p.profile.PSObject.Properties.Name -contains "assignedTo") {
+  if ($p.profile.assignedTo -ne "ops-user-2") { throw "Expected assignedTo=ops-user-2 after repeated FOLLOWUP_ASSIGNED, got $($p.profile.assignedTo)" }
+}
+
+if ($p.profile.PSObject.Properties.Name -contains "lastFollowupAssignedAt") {
+  if ((To-IsoMillis $p.profile.lastFollowupAssignedAt) -ne (To-IsoMillis $assign2At)) {
+    throw "Expected lastFollowupAssignedAt to match later FOLLOWUP_ASSIGNED timestamp."
+  }
+}
+
+if ($p.profile.PSObject.Properties.Name -contains "lastNextStepAt") {
+  if ((To-IsoMillis $p.profile.lastNextStepAt) -ne (To-IsoMillis $step2At)) {
+    throw "Expected lastNextStepAt to match later NEXT_STEP_SELECTED timestamp."
+  }
+}
+
+if ($p.profile.PSObject.Properties.Name -contains "lastEventType") {
+  if ($p.profile.lastEventType -ne "NEXT_STEP_SELECTED") {
+    throw "Expected lastEventType=NEXT_STEP_SELECTED after later repeated milestone event, got $($p.profile.lastEventType)"
+  }
+}
+
+if ($p.profile.PSObject.Properties.Name -contains "lastEventAt") {
+  if ((To-IsoMillis $p.profile.lastEventAt) -ne (To-IsoMillis $step2At)) {
+    throw "Expected lastEventAt to match later repeated NEXT_STEP_SELECTED timestamp."
+  }
 }
 
 # 5) Verify profile list endpoints respond (shape/ok)

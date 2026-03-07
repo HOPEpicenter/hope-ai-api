@@ -40,7 +40,7 @@
 **What landed**
 - ✅ **#139**: regression runner now asserts integration summary followupReason/assignedTo consistency (only when HOPE_API_KEY is set).
 - ✅ **#140**: CI uses HOPE_API_KEY secret with safe fallback so CI stays green until secrets are configured.
-- ✅ **#141**: eenensureTableExists made race-tolerant for Azurite/CI (already-exists treated as OK).
+- ✅ **#141**: ensureTableExists made race-tolerant for Azurite/CI (already-exists treated as OK).
 - 🧹 Closed stale/bundled CI PRs (#2–#5) to avoid merging risky YAML bundles.
 
 **Why this matters (master plan alignment)**
@@ -198,5 +198,6 @@ Planned:
 
 ## Deployment notes
 - Staging deploy packaging: Oryx/build is disabled; the staged .deploy zip must be self-contained and include production dependencies (npm ci --omit=dev inside .deploy). (PR #197)
+
 
 

@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getFormationTimeline/index.js",
+  "entryPoint": "getFormationTimeline",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "formation/timeline"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

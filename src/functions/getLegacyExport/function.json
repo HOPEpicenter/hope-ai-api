@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getLegacyExport/index.js",
+  "entryPoint": "getLegacyExport",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "legacy/export"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

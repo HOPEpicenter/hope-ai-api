@@ -1,5 +1,13 @@
 ## Session Closeout
 
+
+### 2026-03-06 (session closeout)
+
+- [x] Fixed staging auth parity for `POST /api/formation/events` by changing the Functions HTTP output binding from `"$return"` to `"res"` (merged in **#227**).
+- [x] Verified staging behavior: unauthenticated `POST /api/formation/events` => `401`.
+- [x] Verified `scripts/assert-auth-scoping.ps1` passes on staging.
+- [x] Verified `scripts/regression.ps1` passes end-to-end on staging.
+
 ### 2026-02-28 (Session Closeout)
 
 - Merged PR #165: GET /api/visitors list endpoint + CI smoke alignment
@@ -81,23 +89,29 @@
 ## Phase 3 — Formation (ACTIVE / PARTIALLY COMPLETE)
 - [x] Milestone derivation regression assert exists (scripts/assert-formation-milestones-v1.ps1)
 - [x] Formation stage model contract exists (FormationStage + stage fields on profile snapshot)
-- [x] Public formation append works: POST /api/formation/events
+- [x] Protected formation append works: POST /api/formation/events (x-api-key required)
 - [x] Public formation list works (paging): GET /api/visitors/:id/formation/events
 - [x] Public formation profile snapshot works: GET /api/visitors/:id/formation/profile
 - [x] CI asserts cover formation pagination + idempotency + profile snapshot
 - [x] Define formation milestones/events and derivations (docs/formation-milestones-v1.md + assert script)
 - [ ] Track journey steps in an auditable way (prefer derive from events).
-## Cross-cutting — Auth scoping (COMPLETED, stub surfaces only)
+
+## Cross-cutting — Auth scoping (COMPLETED)
 
 - Protected endpoints are enforced via API key middleware:
   - `/api/formation/timeline`
   - `/api/integration/timeline`
   - `/api/legacy/export`
-- Expected behavior (stubs only):
+  - `/api/formation/events`
+- Expected behavior:
   - No API key => 401
-  - With API key but missing required query => 400
+  - With API key but missing required query/invalid body => 400
+- Verification:
+  - `scripts/assert-auth-scoping.ps1` passes
+  - `scripts/regression.ps1` passes through auth scoping
+  - CI/local assertions cover current scoped endpoint expectations
 - Remaining:
-  - Add/verify CI assertions for 401/400 expectations for all scoped endpoints.
+  - Extend assertions only when new protected surfaces are added.
 
 ---
 
@@ -141,5 +155,3 @@ Remaining (business logic expansion):
 - [x] OPS followups: ensure formation profiles table exists before listing (fresh Azurite doesn't 500).
 - [x] OPS followups: include resolvedForAssignment in response items (queue consumer can filter resolved rows).
 - [x] Dev discipline maintained: OPS remains read/projection; writes stay in formation events (/api/formation/events).
-
-

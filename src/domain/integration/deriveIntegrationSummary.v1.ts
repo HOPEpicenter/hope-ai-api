@@ -93,7 +93,19 @@ export function deriveIntegrationSummaryV1(
   const lastIntegratedAt = maxIso(input.lastEngagementAt, input.lastFormationAt);
   const groups = normalizeGroupRefs(input.groups);
   const programs = normalizeProgramRefs(input.programs);
-  const workflows = normalizeWorkflowRefs(input.workflows);
+  const workflowRefs = normalizeWorkflowRefs(input.workflows);
+  const needsFollowup = !!hasAssignee || !input.lastEngagementAt;
+  const followupReason = hasAssignee
+    ? "FOLLOWUP_ASSIGNED"
+    : !input.lastEngagementAt
+      ? "no_engagement_yet"
+      : undefined;
+
+  const workflows =
+    workflowRefs ??
+    (needsFollowup
+      ? [{ workflowId: "followup", displayName: "Follow-up" }]
+      : undefined);
 
   return {
     visitorId: input.visitorId,
@@ -104,12 +116,8 @@ export function deriveIntegrationSummaryV1(
       engagement: !!input.lastEngagementAt,
       formation: !!input.lastFormationAt,
     },
-    needsFollowup: !!hasAssignee || !input.lastEngagementAt,
-    followupReason: hasAssignee
-      ? "FOLLOWUP_ASSIGNED"
-      : !input.lastEngagementAt
-        ? "no_engagement_yet"
-        : undefined,
+    needsFollowup,
+    followupReason,
     assignedTo,
     groups,
     programs,

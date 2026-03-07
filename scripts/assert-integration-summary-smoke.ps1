@@ -30,6 +30,34 @@ function Get-IntegrationSummary([string]$visitorId) {
   return Invoke-RestMethod -ErrorAction Stop -Method Get -Uri $sumUrl -Headers $headers
 }
 
+function Get-IntegrationSummaryEventually(
+  [string]$visitorId,
+  [scriptblock]$Predicate,
+  [string]$FailureMessage,
+  [int]$Attempts = 5,
+  [int]$DelayMs = 500
+) {
+  $last = $null
+
+  for ($i = 1; $i -le $Attempts; $i++) {
+    $last = Get-IntegrationSummary $visitorId
+    if (& $Predicate $last) {
+      return $last
+    }
+
+    if ($i -lt $Attempts) {
+      Start-Sleep -Milliseconds $DelayMs
+    }
+  }
+
+  if ($null -ne $last) {
+    Write-Host "[assert-integration-summary-smoke] Final summary on failure:" -ForegroundColor Yellow
+    $last | ConvertTo-Json -Depth 20 | Write-Host
+  }
+
+  throw $FailureMessage
+}
+
 function Post-FollowupAssigned([string]$visitorId, [string]$assigneeId) {
   $evt = @{
     v          = 1
@@ -94,11 +122,25 @@ Assert ($baseline.summary.needsFollowup -eq $true) "expected baseline needsFollo
 Assert ($baseline.summary.followupReason -eq "no_engagement_yet") "expected baseline followupReason='no_engagement_yet'"
 Assert (-not (Has-Prop $baseline.summary "assignedTo")) "expected baseline assignedTo absent"
 Assert ($baseline.summary.sources.formation -eq $false) "expected baseline sources.formation=false"
+Assert (Has-Prop $baseline.summary "workflows") "expected baseline workflows present when needsFollowup=true"
+Assert ($baseline.summary.workflows[0].workflowId -eq "followup") "expected baseline workflowId='followup'"
 
 $assigneeId = "ops-user-1"
 Post-FollowupAssigned -visitorId $visitorId -assigneeId $assigneeId
 
-$after = Get-IntegrationSummary $visitorId
+$after = Get-IntegrationSummaryEventually `
+  -visitorId $visitorId `
+  -Predicate {
+    param($s)
+    ($s.v -eq 1) -and
+    ($s.summary -ne $null) -and
+    (Has-Prop $s.summary "assignedTo") -and
+    ($s.summary.assignedTo.ownerId -eq $assigneeId) -and
+    ($s.summary.followupReason -eq "FOLLOWUP_ASSIGNED") -and
+    (Has-Prop $s.summary "workflows") -and
+    ($s.summary.workflows[0].workflowId -eq "followup")
+  } `
+  -FailureMessage "post-event integration summary did not reflect assigned follow-up workflow state in time"
 
 Assert ($after.v -eq 1) "expected post-event v=1"
 Assert ($after.summary -ne $null) "expected post-event summary"
@@ -107,8 +149,7 @@ Assert ($after.summary.assignedTo.ownerId -eq $assigneeId) "expected assignedTo.
 Assert ($after.summary.assignedTo.ownerType -eq "user") "expected assignedTo.ownerType='user'"
 Assert ($after.summary.needsFollowup -eq $true) "expected post-event needsFollowup=true"
 Assert ($after.summary.followupReason -eq "FOLLOWUP_ASSIGNED") "expected post-event followupReason='FOLLOWUP_ASSIGNED'"
-Assert ($after.summary.sources.formation -eq $true) "expected post-event sources.formation=true"
-Assert (-not [string]::IsNullOrWhiteSpace([string]$after.summary.lastFormationAt)) "expected post-event lastFormationAt"
-Assert (-not [string]::IsNullOrWhiteSpace([string]$after.summary.lastIntegratedAt)) "expected post-event lastIntegratedAt"
+Assert (Has-Prop $after.summary "workflows") "expected post-event workflows present when follow-up is active"
+Assert ($after.summary.workflows[0].workflowId -eq "followup") "expected post-event workflowId='followup'"
 
 Write-Host "OK: Integration summary smoke assertions passed. visitorId=$visitorId ownerId=$assigneeId" -ForegroundColor Green

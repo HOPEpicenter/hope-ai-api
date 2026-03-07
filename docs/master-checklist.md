@@ -7,6 +7,7 @@
 - [x] Verified staging behavior: unauthenticated `POST /api/formation/events` => `401`.
 - [x] Verified `scripts/assert-auth-scoping.ps1` passes on staging.
 - [x] Verified `scripts/regression.ps1` passes end-to-end on staging.
+
 ### 2026-02-28 (Session Closeout)
 
 - Merged PR #165: GET /api/visitors list endpoint + CI smoke alignment
@@ -94,6 +95,7 @@
 - [x] CI asserts cover formation pagination + idempotency + profile snapshot
 - [x] Define formation milestones/events and derivations (docs/formation-milestones-v1.md + assert script)
 - [ ] Track journey steps in an auditable way (prefer derive from events).
+
 ## Cross-cutting — Auth scoping (COMPLETED)
 
 - Protected endpoints are enforced via API key middleware:
@@ -153,4 +155,3 @@ Remaining (business logic expansion):
 - [x] OPS followups: ensure formation profiles table exists before listing (fresh Azurite doesn't 500).
 - [x] OPS followups: include resolvedForAssignment in response items (queue consumer can filter resolved rows).
 - [x] Dev discipline maintained: OPS remains read/projection; writes stay in formation events (/api/formation/events).
-

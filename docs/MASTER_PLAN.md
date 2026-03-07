@@ -15,6 +15,7 @@
 **Next**
 - Keep docs/checklists aligned with actual protected surface behavior.
 - Return focus to the next backend contract slice; do not reopen this area unless behavior regresses.
+
 ## Completed (2026-02-28)
 
 - Visitors: GET /api/visitors list endpoint shipped (#165)
@@ -35,6 +36,7 @@
 **Next**
 - Add/refresh a smoke/regression check that exercises /ops/followups against a fresh Azurite (empty tables) and after recording a followup assignment/outcome.
 - Stay focused on master plan milestones; avoid broad refactors unless blocked.
+
 ## 2026-02-25 Update
 
 **What landed**
@@ -198,4 +200,3 @@ Planned:
 
 ## Deployment notes
 - Staging deploy packaging: Oryx/build is disabled; the staged .deploy zip must be self-contained and include production dependencies (npm ci --omit=dev inside .deploy). (PR #197)
-

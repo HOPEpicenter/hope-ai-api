@@ -120,7 +120,29 @@ if (-not $itemA.assignedTo -or $itemA.assignedTo.ownerId -ne "ops-user-1") {
   throw ("Expected assignedTo.ownerId=ops-user-1. Got: {0}" -f ($itemA.assignedTo | ConvertTo-Json -Depth 6))
 }
 
-# 4) Record FOLLOWUP_OUTCOME_RECORDED then ensure it is resolved (no longer present)
+# 4) Record FOLLOWUP_CONTACTED then ensure it remains in /ops/followups
+Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_CONTACTED ..."
+$contactAt = $now.AddSeconds(2)
+$null = PostJson "$ApiBase/formation/events" @{
+  id         = [Guid]::NewGuid().ToString()
+  visitorId  = $visitorId
+  type       = "FOLLOWUP_CONTACTED"
+  occurredAt = $contactAt.ToString("o")
+  metadata   = @{ method = "sms"; result = "reached" }
+}
+
+Start-Sleep -Milliseconds 250
+
+Write-Host "[assert-ops-followups] GET /ops/followups (after contact) ..."
+$fuC = GetFollowups
+$itemC = @($fuC.items) | Where-Object { $_.visitorId -eq $visitorId } | Select-Object -First 1
+if (-not $itemC) { throw "Expected visitorId=$visitorId to remain in followups queue after FOLLOWUP_CONTACTED." }
+if ($itemC.resolvedForAssignment -eq $true) { throw "Expected resolvedForAssignment=false after contact." }
+if (-not $itemC.assignedTo -or $itemC.assignedTo.ownerId -ne "ops-user-1") {
+  throw ("Expected assignedTo.ownerId=ops-user-1 after contact. Got: {0}" -f ($itemC.assignedTo | ConvertTo-Json -Depth 6))
+}
+
+# 5) Record FOLLOWUP_OUTCOME_RECORDED then ensure it is resolved (no longer present)
 Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_OUTCOME_RECORDED ..."
 $outcomeAt = $now.AddSeconds(5)
 $null = PostJson "$ApiBase/formation/events" @{

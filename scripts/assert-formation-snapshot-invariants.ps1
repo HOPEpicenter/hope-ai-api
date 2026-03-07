@@ -153,9 +153,3 @@ if ($profile2.PSObject.Properties.Name -contains "lastFollowupContactedAt") {
 }
 
 Write-Host "[assert-formation-snapshot] OK: formation snapshot invariants passed." -ForegroundColor Green
-
-
-
-
-
-

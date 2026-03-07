@@ -9,10 +9,14 @@ export async function postFormationEvent(context: any, req: any): Promise<void> 
   try {
     const auth = requireApiKeyForFunction(req);
     if (!auth.ok) {
+      context.log.warn("postFormationEvent auth rejected");
       context.res = {
         status: auth.status,
         headers: { "content-type": "application/json; charset=utf-8" },
-        body: auth.body
+        body: {
+          ...auth.body,
+          authRejectedBy: "postFormationEvent"
+        }
       };
       return;
     }

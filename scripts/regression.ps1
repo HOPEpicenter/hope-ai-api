@@ -218,19 +218,33 @@ if (-not $e2r.ok) {
 Ok "Posted 2 engagements"
 
 # Seed one formation event so we have both kinds
+$formEventId = "evt-$([Guid]::NewGuid().ToString('N'))"
 $f = @{
-  visitorId = $vid
-  type = "FOLLOWUP_ASSIGNED"
+  v          = 1
+  eventId    = $formEventId
+  visitorId  = $vid
+  type       = "FOLLOWUP_ASSIGNED"
   occurredAt = (Get-Date).ToUniversalTime().ToString("o")
-  metadata = @{
+  source     = @{ system = "scripts/regression.ps1" }
+  data       = @{
     assigneeId = "ph6-regression"
-    channel = "api"
-    notes = "regression seed formation"
+    channel    = "api"
+    notes      = "regression seed formation"
   }
-} | ConvertTo-Json -Depth 8
+} | ConvertTo-Json -Depth 20
 
 $fr = Invoke-JsonSafe -Method "POST" -Uri "$BaseUrl/formation/events" -Headers $headers -Body $f
-if (-not $fr.ok) { Fail "POST /formation/events failed." }
+if (-not $fr.ok) {
+  Write-Host ""
+  Write-Host "POST /formation/events failed (raw):" -ForegroundColor Yellow
+  if ($fr.raw) { Write-Host $fr.raw } else { Write-Host "(no body captured)" }
+  if ($fr.error) { Write-Host $fr.error.Exception.Message }
+  Fail "POST /formation/events failed."
+}
+
+if ($null -eq $fr.body -or $fr.body -eq "") {
+  Write-Host "[regression] Formation POST accepted with empty body."
+}
 
 Ok "Posted formation event"
 
@@ -243,11 +257,41 @@ if (-not $etlBody.ok) { Fail "engagements timeline: ok was false" }
 if (-not $etlBody.items -or $etlBody.items.Count -lt 1) { Fail "engagements timeline: items missing/empty" }
 
 # [Formation sanity] Formation events list (public surface)
-$fel = Invoke-JsonSafe -Method "GET" -Uri "$BaseUrl/visitors/$vid/formation/events?limit=10" -Headers $headers -Body $null
-if (-not $fel.ok) { Fail "GET formation events list failed." }
-$felBody = $fel.body
-if (-not $felBody.ok) { Fail "formation events list: ok was false" }
-if (-not $felBody.items -or $felBody.items.Count -lt 1) { Fail "formation events list: items missing/empty" }
+$fel = $null
+$felBody = $null
+
+for ($attempt = 1; $attempt -le 5; $attempt++) {
+  $fel = Invoke-JsonSafe -Method "GET" -Uri "$BaseUrl/visitors/$vid/formation/events?limit=10" -Headers $headers -Body $null
+
+  if (-not $fel.ok) {
+    Write-Host ""
+    Write-Host "GET formation events list failed (raw):" -ForegroundColor Yellow
+    if ($fel.raw) { Write-Host $fel.raw } else { Write-Host "(no body captured)" }
+    if ($fel.error) { Write-Host $fel.error.Exception.Message }
+    Fail "GET formation events list failed."
+  }
+
+  $felBody = $fel.body
+  if (-not $felBody.ok) { Fail "formation events list: ok was false" }
+
+  if ($felBody.items -and $felBody.items.Count -ge 1) {
+    break
+  }
+
+  if ($attempt -lt 5) {
+    Write-Host "[regression] Formation list empty on attempt $attempt/5; retrying..."
+    Start-Sleep -Seconds 2
+  }
+}
+
+if (-not $felBody.items -or $felBody.items.Count -lt 1) {
+  Write-Host ""
+  Write-Host "formation events list body:" -ForegroundColor Yellow
+  $felBody | ConvertTo-Json -Depth 20 | ForEach-Object { Write-Host $_ }
+  Write-Host "formation POST body:" -ForegroundColor Yellow
+  if ($null -eq $fr.body -or $fr.body -eq "") { Write-Host "(empty)" } else { $fr.body | ConvertTo-Json -Depth 20 | ForEach-Object { Write-Host $_ } }
+  Fail "formation events list: items missing/empty"
+}
 
 foreach ($it in $r1.items) {
 if (-not $it.type -or [string]::IsNullOrWhiteSpace([string]$it.type)) {
@@ -274,7 +318,7 @@ Ok "Regression checks complete."
 # Add assignedTo integration summary assertion (safe, standalone)
 if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
   Write-Host "[regression] Integration summary assignedTo contract..."
-  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-integration-summary-assignedto.ps1")
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-integration-summary-assignedto.ps1") -Base ($BaseUrl -replace "/api$","") -ApiKey $env:HOPE_API_KEY
 if ($LASTEXITCODE -ne 0) { Fail "Integration summary assignedTo contract failed (exit=$LASTEXITCODE)" }
 } else {
   Write-Host "[regression] Skipping assignedTo contract (HOPE_API_KEY not set)."
@@ -282,7 +326,7 @@ if ($LASTEXITCODE -ne 0) { Fail "Integration summary assignedTo contract failed 
 # Add integration summary followupReason/assignedTo consistency assertion (safe, standalone)
 if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
   Write-Host "[regression] Integration summary followup consistency contract..."
-  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-integration-summary-followup-consistency.ps1")
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-integration-summary-followup-consistency.ps1") -Base ($BaseUrl -replace "/api$","") -ApiKey $env:HOPE_API_KEY
 if ($LASTEXITCODE -ne 0) { Fail "Integration summary followup consistency contract failed (exit=$LASTEXITCODE)" }
 } else {
   Write-Host "[regression] Skipping followup consistency contract (HOPE_API_KEY not set)."

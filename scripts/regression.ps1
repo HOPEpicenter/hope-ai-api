@@ -432,3 +432,28 @@ Write-Host "[4] Auth scoping assertions (401/400 expectations)"
 $env:HOPE_RUN_PHASE3_ASSERTS = "1"
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-auth-scoping.ps1 -BaseUrl $BaseUrl
 if ($LASTEXITCODE -ne 0) { throw "Auth scoping asserts failed ($LASTEXITCODE)" }
+
+if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+  $opsProbeUrl = (($BaseUrl -replace "/api$","") + "/ops/followups")
+  Write-Host "[5] OPS followups lifecycle assertions"
+
+  $opsAvailable = $false
+  try {
+    $null = Invoke-WebRequest -Method GET -Uri $opsProbeUrl -Headers @{ "x-api-key" = $env:HOPE_API_KEY } -UseBasicParsing -TimeoutSec 15 -ErrorAction Stop
+    $opsAvailable = $true
+  } catch {
+    $msg = $_.Exception.Message
+    if ($msg -match '404') {
+      Write-Host ("[5] Skipping OPS followups lifecycle assertions (endpoint not deployed at {0})." -f $opsProbeUrl) -ForegroundColor Yellow
+    } else {
+      throw ("OPS followups probe failed at {0}: {1}" -f $opsProbeUrl, $msg)
+    }
+  }
+
+  if ($opsAvailable) {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-ops-followups.ps1") -BaseUrl ($BaseUrl -replace "/api$","") -ApiKey $env:HOPE_API_KEY
+    if ($LASTEXITCODE -ne 0) { throw "OPS followups lifecycle assertions failed ($LASTEXITCODE)" }
+  }
+} else {
+  Write-Host "[5] Skipping OPS followups lifecycle assertions (HOPE_API_KEY not set)."
+}

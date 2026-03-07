@@ -418,6 +418,15 @@ if ($LASTEXITCODE -ne 0) { Fail "Integration summary followup consistency contra
   Write-Host "[regression] Skipping followup consistency contract (HOPE_API_KEY not set)."
 }
 
+# Integration summary source transition invariant
+if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+  Write-Host "[regression] Integration summary source transition contract..."
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-integration-summary-source-transition.ps1") -Base ($BaseUrl -replace "/api$","") -ApiKey $env:HOPE_API_KEY
+  if ($LASTEXITCODE -ne 0) { Fail "Integration summary source transition contract failed (exit=$LASTEXITCODE)" }
+} else {
+  Write-Host "[regression] Skipping integration summary source transition contract (HOPE_API_KEY not set)."
+}
+
 # Integration summary assignment-only source flag invariant
 if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
   Write-Host "[regression] Integration summary source flags contract..."

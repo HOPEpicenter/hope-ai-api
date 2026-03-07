@@ -418,6 +418,15 @@ if ($LASTEXITCODE -ne 0) { Fail "Integration summary followup consistency contra
   Write-Host "[regression] Skipping followup consistency contract (HOPE_API_KEY not set)."
 }
 
+# Integration summary should not synthesize follow-up ownership from unrelated activity
+if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+  Write-Host "[regression] Integration summary no-false-followup contract..."
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-integration-summary-no-false-followup.ps1") -Base ($BaseUrl -replace "/api$","") -ApiKey $env:HOPE_API_KEY
+  if ($LASTEXITCODE -ne 0) { Fail "Integration summary no-false-followup contract failed (exit=$LASTEXITCODE)" }
+} else {
+  Write-Host "[regression] Skipping integration summary no-false-followup contract (HOPE_API_KEY not set)."
+}
+
 # Add integration summary late/older event stability assertion (safe, standalone)
 if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
   Write-Host "[regression] Integration summary late/older events contract..."

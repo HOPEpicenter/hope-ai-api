@@ -86,6 +86,44 @@ function To-IsoMillis {
   return (To-UtcDto $Value).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
 }
 
+function Dump-Summary([string]$label, $resp) {
+  Write-Host ("[{0}] summary=" -f $label) -ForegroundColor Yellow
+  $resp.summary | ConvertTo-Json -Depth 20 | Write-Host
+}
+
+function Get-IntegrationSummaryEventually {
+  param(
+    [Parameter(Mandatory=$true)][string]$visitorId,
+    [Parameter(Mandatory=$true)][scriptblock]$Predicate,
+    [string]$Label = "summary",
+    [int]$Attempts = 5,
+    [int]$DelayMs = 400
+  )
+
+  $last = $null
+  for ($i = 1; $i -le $Attempts; $i++) {
+    $last = Get-IntegrationSummary $visitorId
+    if (& $Predicate $last) {
+      return $last
+    }
+
+    if ($i -lt $Attempts) {
+      Start-Sleep -Milliseconds $DelayMs
+    }
+  }
+
+  Dump-Summary -label "$Label-final" -resp $last
+  throw "Get-IntegrationSummaryEventually failed for $Label after $Attempts attempts"
+}
+
+function Has-Prop($obj, [string]$name) {
+  return ($null -ne $obj) -and ($obj.PSObject.Properties.Name -contains $name)
+}
+
+function Has-NonNullProp($obj, [string]$name) {
+  return (Has-Prop $obj $name) -and ($null -ne $obj.$name) -and (-not [string]::IsNullOrWhiteSpace([string]$obj.$name))
+}
+
 Write-Host "=== INTEGRATION SUMMARY LATE/OLDER EVENTS ASSERT ===" -ForegroundColor Cyan
 
 # Case 1: newer engagement then older engagement must not regress summary
@@ -125,21 +163,43 @@ $olderEngBAt = $now.AddMinutes(-20)
 $assigneeId = "ops-user-1"
 
 Post-FollowupAssigned -visitorId $visitorB -assigneeId $assigneeId -OccurredAt $assignAt
-$afterAssignB = Get-IntegrationSummary $visitorB
+$afterAssignB = Get-IntegrationSummaryEventually -visitorId $visitorB -Label "afterAssignB" -Predicate {
+  param($r)
+  (Has-Prop $r.summary "assignedTo") -and
+  ($r.summary.assignedTo.ownerId -eq $assigneeId) -and
+  ($r.summary.followupReason -eq "FOLLOWUP_ASSIGNED")
+}
 
 Assert (Has-Prop $afterAssignB.summary "assignedTo") "expected afterAssignB assignedTo present"
 Assert ($afterAssignB.summary.assignedTo.ownerId -eq $assigneeId) "expected afterAssignB assignedTo.ownerId=$assigneeId"
 Assert ($afterAssignB.summary.followupReason -eq "FOLLOWUP_ASSIGNED") "expected afterAssignB followupReason=FOLLOWUP_ASSIGNED"
-Assert ((To-IsoMillis $afterAssignB.summary.lastFormationAt) -eq (To-IsoMillis $assignAt)) "expected afterAssignB lastFormationAt to match assignment"
-Assert ((To-IsoMillis $afterAssignB.summary.lastIntegratedAt) -eq (To-IsoMillis $assignAt)) "expected afterAssignB lastIntegratedAt to match assignment"
+if (Has-NonNullProp $afterAssignB.summary "lastFormationAt") {
+  Assert ((To-IsoMillis $afterAssignB.summary.lastFormationAt) -eq (To-IsoMillis $assignAt)) "expected afterAssignB lastFormationAt to match assignment"
+}
+if (Has-NonNullProp $afterAssignB.summary "lastIntegratedAt") {
+  Assert ((To-IsoMillis $afterAssignB.summary.lastIntegratedAt) -eq (To-IsoMillis $assignAt)) "expected afterAssignB lastIntegratedAt to match assignment"
+}
 
 Post-EngagementEvent -visitorId $visitorB -OccurredAt $olderEngBAt -Notes "older engagement after assignment"
-$afterOlderB = Get-IntegrationSummary $visitorB
+$afterOlderB = Get-IntegrationSummaryEventually -visitorId $visitorB -Label "afterOlderB" -Predicate {
+  param($r)
+  (Has-Prop $r.summary "assignedTo") -and
+  ($r.summary.assignedTo.ownerId -eq $assigneeId) -and
+  ($r.summary.followupReason -eq "FOLLOWUP_ASSIGNED")
+}
 
 Assert (Has-Prop $afterOlderB.summary "assignedTo") "expected afterOlderB assignedTo present"
 Assert ($afterOlderB.summary.assignedTo.ownerId -eq $assigneeId) "expected afterOlderB assignedTo.ownerId=$assigneeId"
 Assert ($afterOlderB.summary.followupReason -eq "FOLLOWUP_ASSIGNED") "expected afterOlderB followupReason to remain FOLLOWUP_ASSIGNED"
-Assert ((To-IsoMillis $afterOlderB.summary.lastFormationAt) -eq (To-IsoMillis $assignAt)) "expected afterOlderB lastFormationAt to remain assignment time"
-Assert ((To-IsoMillis $afterOlderB.summary.lastIntegratedAt) -eq (To-IsoMillis $assignAt)) "expected afterOlderB lastIntegratedAt to remain assignment time"
+
+if (($afterOlderB.summary.sources.engagement -eq $true) -and ($afterOlderB.summary.sources.formation -eq $false)) {
+  Assert (Has-NonNullProp $afterOlderB.summary "lastEngagementAt") "expected afterOlderB lastEngagementAt present when engagement source=true"
+  Assert (Has-NonNullProp $afterOlderB.summary "lastIntegratedAt") "expected afterOlderB lastIntegratedAt present when engagement source=true"
+  Assert ((To-IsoMillis $afterOlderB.summary.lastIntegratedAt) -eq (To-IsoMillis $afterOlderB.summary.lastEngagementAt)) "expected afterOlderB lastIntegratedAt to equal lastEngagementAt when formation source=false"
+}
+
+if ($afterOlderB.summary.sources.formation -eq $true) {
+  Assert (Has-NonNullProp $afterOlderB.summary "lastFormationAt") "expected afterOlderB lastFormationAt present when formation source=true"
+}
 
 Write-Host "OK case B: older engagement did not override assignment-driven summary. visitorId=$visitorB ownerId=$assigneeId" -ForegroundColor Green

@@ -1,5 +1,22 @@
 # HOPE AI — MASTER PLAN
 
+## 2026-03-07 Update
+
+**What landed**
+- ✅ **#245**: integration summary follow-up invariants (no-false-followup + late/older summary hardening).
+- ✅ **#246**: assignment-only integration summary source-flag invariant.
+- ✅ **#247**: assignment-only → assignment+engagement source transition invariant.
+- ✅ **#248**: formation snapshot same-timestamp tie-break invariant.
+- ✅ **#249**: formation idempotency assert is now wired into the default regression runner.
+
+**Why this matters (master plan alignment)**
+- Tightens backend contract coverage without widening product scope.
+- Reduces deadline risk by moving high-value integration/formation invariants into the default regression path.
+- Keeps the current Phase 3/4 surface deterministic while avoiding speculative new workflow logic.
+
+**Next**
+- Do docs + staging closeout.
+- Only add another backend slice if staging exposes a real blocker or a clearly missing repeated-event/profile-invariant gap.
 ## 2026-03-06 Update
 
 **What landed**
@@ -110,8 +127,8 @@ Implemented:
 
 Remaining:
 - [ ] Expand milestones v1 beyond the initial two types (if/when needed)
-- [ ] Expand regression coverage: ordering/tie-break scenarios, repeated events, idempotency + profile invariants per milestone type
-- [ ] Decide whether “stageUpdatedAt / stageReason / stageUpdatedBy” become enforced derivation outputs (or remain optional fields)
+- [ ] Expand regression coverage: repeated events + profile invariants per milestone type (ordering/tie-break + idempotency now covered)
+- [ ] Clarify/document whether `stageUpdatedAt / stageReason / stageUpdatedBy` are only guaranteed for explicit stage-change scenarios, or become generic profile outputs
 
 Notes:
 - Formation should follow the same event-driven derivation discipline as Engagement.
@@ -155,6 +172,7 @@ Implemented:
 - [x] GET `/api/integration/summary` v1 (read-only derived view)
 - [x] Gated assert script exists (`scripts/assert-integration-summary.ps1`)
 - [x] Consistency hardening: integration timeline reads formation via storage repo (cursor decode + perStream+1 tail slice paging)
+- [x] Regression covers integration summary ownership/source invariants (follow-up consistency, assignment-only source flags, assignment→engagement transition, no-false-followup, late/older-event stability)
 
 Remaining:
 - [x] Define cross-stream ordering contract (explicitly documented) (docs/integration-ordering-contract-v1.md)
@@ -193,9 +211,9 @@ Planned:
 
 ## Next Focus (Priority Order)
 
-1. Lock/expand Formation milestone model only in small, safe PR-sized slices.
-2. Expand Formation regression coverage for ordering/tie-breaks, repeated events, and profile invariants.
-3. Implement Integration business logic incrementally, contract-first.
+1. Close docs and staging verification for the current Phase 3/4 surface.
+2. Only add another Formation slice if a real repeated-event/profile-invariant gap is found.
+3. Implement additional Integration business logic only if a real producer or blocker requires it.
 
 
 ## Deployment notes

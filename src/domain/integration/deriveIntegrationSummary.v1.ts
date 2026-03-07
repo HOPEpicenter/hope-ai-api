@@ -1,4 +1,9 @@
-import type { IntegrationSummaryV1 } from "../../contracts/integrationSummary.v1";
+import type {
+  GroupRefV1,
+  IntegrationSummaryV1,
+  ProgramRefV1,
+  WorkflowRefV1,
+} from "../../contracts/integrationSummary.v1";
 
 type OwnerRefV1 = {
   ownerType: "user" | "team";
@@ -11,6 +16,9 @@ export type DeriveIntegrationSummaryInput = {
   lastEngagementAt: string | null;
   lastFormationAt: string | null;
   assignedToUserId?: string | null;
+  groups?: unknown;
+  programs?: unknown;
+  workflows?: unknown;
 };
 
 function maxIso(a?: string | null, b?: string | null): string | null {
@@ -21,6 +29,51 @@ function maxIso(a?: string | null, b?: string | null): string | null {
   if (!bv) return av || null;
 
   return av >= bv ? av : bv;
+}
+
+function normalizeGroupRefs(value: unknown): GroupRefV1[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  const refs = value
+    .map((item: any) => {
+      const groupId = String(item?.groupId ?? "").trim();
+      const displayName = String(item?.displayName ?? "").trim();
+      if (!groupId) return null;
+      return displayName ? { groupId, displayName } : { groupId };
+    })
+    .filter(Boolean) as GroupRefV1[];
+
+  return refs.length ? refs : undefined;
+}
+
+function normalizeProgramRefs(value: unknown): ProgramRefV1[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  const refs = value
+    .map((item: any) => {
+      const programId = String(item?.programId ?? "").trim();
+      const displayName = String(item?.displayName ?? "").trim();
+      if (!programId) return null;
+      return displayName ? { programId, displayName } : { programId };
+    })
+    .filter(Boolean) as ProgramRefV1[];
+
+  return refs.length ? refs : undefined;
+}
+
+function normalizeWorkflowRefs(value: unknown): WorkflowRefV1[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+
+  const refs = value
+    .map((item: any) => {
+      const workflowId = String(item?.workflowId ?? "").trim();
+      const displayName = String(item?.displayName ?? "").trim();
+      if (!workflowId) return null;
+      return displayName ? { workflowId, displayName } : { workflowId };
+    })
+    .filter(Boolean) as WorkflowRefV1[];
+
+  return refs.length ? refs : undefined;
 }
 
 export function deriveIntegrationSummaryV1(
@@ -38,6 +91,9 @@ export function deriveIntegrationSummaryV1(
 
   const hasAssignee = !!assignedTo;
   const lastIntegratedAt = maxIso(input.lastEngagementAt, input.lastFormationAt);
+  const groups = normalizeGroupRefs(input.groups);
+  const programs = normalizeProgramRefs(input.programs);
+  const workflows = normalizeWorkflowRefs(input.workflows);
 
   return {
     visitorId: input.visitorId,
@@ -55,5 +111,8 @@ export function deriveIntegrationSummaryV1(
         ? "no_engagement_yet"
         : undefined,
     assignedTo,
+    groups,
+    programs,
+    workflows,
   };
 }

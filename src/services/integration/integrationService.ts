@@ -239,9 +239,13 @@ const merged = mergeTimelines(
         : (lastEngagementAt ?? lastFormationAt ?? null);
 
 
-    // Derive assignedTo from Formation Profile snapshot (read-only).
-    // Additive: only populate when we have a real assignee id.
+    // Derive assignedTo + optional snapshot refs from Formation Profile snapshot (read-only).
+    // Additive: only populate when we have real values.
     let assignedTo: { ownerType: "user" | "team"; ownerId: string; displayName?: string } | undefined;
+    let groups: unknown = undefined;
+    let programs: unknown = undefined;
+    let workflows: unknown = undefined;
+
     try {
       const cs = process.env.STORAGE_CONNECTION_STRING;
       if (cs) {
@@ -251,6 +255,10 @@ const merged = mergeTimelines(
         if (assigneeId) {
           assignedTo = { ownerType: "user", ownerId: assigneeId };
         }
+
+        groups = (profile as any)?.groups;
+        programs = (profile as any)?.programs;
+        workflows = (profile as any)?.workflows;
       }
     } catch {
       // swallow: summary should still work even if profile table is missing
@@ -266,6 +274,9 @@ const merged = mergeTimelines(
       lastEngagementAt,
       lastFormationAt,
       assignedToUserId,
+      groups,
+      programs,
+      workflows,
     });
   }
 

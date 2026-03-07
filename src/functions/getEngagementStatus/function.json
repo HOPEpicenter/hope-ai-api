@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getEngagementStatus/index.js",
+  "entryPoint": "getEngagementStatus",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "engagements/status"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

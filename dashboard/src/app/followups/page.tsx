@@ -1,33 +1,38 @@
+import { FollowupsTable } from "@/components/followups-table";
 import { getFollowups } from "@/lib/loaders/get-followups";
 
 export default async function FollowupsPage() {
   const data = await getFollowups();
 
   return (
-    <section>
-      <h1>Followups</h1>
-      <p>Mock-first view for the internal operator queue.</p>
+    <section style={{ display: "grid", gap: 16 }}>
+      <div>
+        <h1 style={{ marginBottom: 8 }}>Followups</h1>
+        <p style={{ marginTop: 0, color: "#4b5563" }}>
+          Mock-first operator queue for assigned followups that still need attention.
+        </p>
+      </div>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 16, background: "#fff" }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Visitor</th>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Reason</th>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Assigned</th>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Updated</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.items.map((item) => (
-            <tr key={item.visitorId}>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>{item.name}</td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>{item.followupReason ?? "-"}</td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>{item.assignedTo ?? "-"}</td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>{item.updatedAt}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 12, color: "#6b7280" }}>Open Items</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>{data.items.length}</div>
+        </div>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 12, color: "#6b7280" }}>Need Followup</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>
+            {data.items.filter((x) => x.needsFollowup).length}
+          </div>
+        </div>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 12, color: "#6b7280" }}>Up To Date</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>
+            {data.items.filter((x) => !x.needsFollowup).length}
+          </div>
+        </div>
+      </div>
+
+      <FollowupsTable items={data.items} />
     </section>
   );
 }

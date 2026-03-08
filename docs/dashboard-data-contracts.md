@@ -7,24 +7,13 @@ Purpose:
 - prevent UI assumptions from outrunning the API
 - define the minimum data shape needed for the first dashboard pages
 
-## Guardrails
+## Followups Page
 
-- prefer current backend surfaces over new API work
-- keep contracts additive
-- do not require new paid infrastructure
-- stay practical within the Azure grant budget
-- use mock data first, then wire real APIs
-
----
-
-## 1. Followups Page Contract
-
-Primary source:
-- `/ops/followups`
+Source:
+`/ops/followups`
 
 Minimum row shape:
 
-```ts
 type FollowupRow = {
   visitorId: string
   assignedTo?: {
@@ -37,161 +26,71 @@ type FollowupRow = {
   lastFollowupAssignedAt?: string | null
   lastFollowupContactedAt?: string | null
   lastFollowupOutcomeAt?: string | null
-}UI expectations:
+}
 
-show actionable assigned followups
+UI behavior:
+- assignment adds visitor
+- contact keeps visitor
+- outcome removes visitor
 
-contact does not remove a row
+---
 
-outcome resolves/removes a row
+## Visitor Detail Page
 
-frontend must tolerate missing optional fields
+Source composition:
 
-2. Visitor Detail Page Contract
+- visitor
+- formation profile
+- integration summary
+- timeline
 
-Recommended source composition:
-
-visitor basics endpoint
-
-formation profile
-
-integration summary
-
-integration timeline (recent slice)
-
-Minimum shape:
+Minimum model:
 
 type VisitorDetailViewModel = {
   visitorId: string
-
-  visitor?: {
-    name?: string | null
-    email?: string | null
-    phone?: string | null
-  }
-
-  formation?: {
-    stage?: string | null
-    assignedTo?: string | null
-    lastEventType?: string | null
-    lastEventAt?: string | null
-    stageUpdatedAt?: string | null
-    stageUpdatedBy?: string | null
-    stageReason?: string | null
-    lastFollowupAssignedAt?: string | null
-    lastFollowupContactedAt?: string | null
-    lastFollowupOutcomeAt?: string | null
-  }
-
-  integration?: {
-    needsFollowup?: boolean
-    followupReason?: string | null
-    assignedTo?: {
-      ownerType?: string
-      ownerId?: string
-    }
-    sources?: {
-      engagement?: boolean
-      formation?: boolean
-    }
-    lastEngagementAt?: string | null
-    lastFormationAt?: string | null
-    lastIntegratedAt?: string | null
-    workflows?: Array<{
-      workflowId?: string
-      displayName?: string
-    }>
-  }
-
-  timeline?: Array<{
-    stream?: string
-    type?: string
-    occurredAt?: string | null
-    summary?: string | null
-  }>
+  visitor?: any
+  formation?: any
+  integration?: any
+  timeline?: any[]
 }
 
-UI expectations:
+---
 
-this is the primary operator/leadership inspection page
+## Overview Page
 
-unknown fields must be ignored safely
-
-missing sections must degrade gracefully
-
-3. Overview Page Contract
-
-Overview should use simple derived cards and recent lists, not invented analytics.
-
-Suggested view model:
+Purpose:
+leadership snapshot.
 
 type DashboardOverviewViewModel = {
   kpis: {
     activeFollowups: number
     recentVisitors: number
-    recentIntegrationItems: number
   }
 
   recentFollowups: FollowupRow[]
-
-  recentVisitors: Array<{
-    visitorId: string
-    stage?: string | null
-    assignedTo?: string | null
-    needsFollowup?: boolean
-    lastActivityAt?: string | null
-  }>
-
-  recentTimeline: Array<{
-    visitorId?: string
-    stream?: string
-    type?: string
-    occurredAt?: string | null
-  }>
 }
 
-UI expectations:
+---
 
-keep counts simple
+## Timeline Page
 
-do not block v1 on advanced analytics
-
-prefer clarity over dense metrics
-
-4. Timeline Page Contract
-
-Primary source:
-
+Source:
 integration timeline
-
-Minimum item shape:
 
 type TimelineItem = {
   visitorId?: string
   stream?: string
   type?: string
-  occurredAt?: string | null
-  summary?: string | null
+  occurredAt?: string
 }
 
-UI expectations:
+---
 
-read-only in v1
+## Implementation rule
 
-simple filtering later if needed
+If a page needs data not defined here:
 
-no custom state machine in frontend
-
-5. Implementation rule
-
-If a page needs data not covered by these contracts, do this in order:
-
-simplify the page
-
-use mock data temporarily
-
-document the gap
-
-only then consider backend/API expansion
-
-Do not widen backend scope first unless a real dashboard blocker is identified.
+1. simplify the page
+2. use mock data
+3. document the gap
+4. only then expand the backend

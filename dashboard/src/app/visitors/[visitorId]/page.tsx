@@ -12,7 +12,7 @@ function TimestampValue({ value }: { value: string | null }) {
 
   return (
     <div>
-      <div style={{ fontWeight: 600 }}>{formatRelativeTime(value)}</div>
+      <div style={{ fontWeight: 600, color: "#111827" }}>{formatRelativeTime(value)}</div>
       <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
         {formatAbsoluteTime(value)}
       </div>
@@ -28,8 +28,17 @@ function DetailCard({
   children: ReactNode;
 }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
-      <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: 18 }}>{title}</h2>
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 12,
+        padding: 20,
+        display: "grid",
+        gap: 4
+      }}
+    >
+      <h2 style={{ marginTop: 0, marginBottom: 12, fontSize: 18, color: "#111827" }}>{title}</h2>
       {children}
     </div>
   );
@@ -37,9 +46,17 @@ function DetailCard({
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 12, padding: "8px 0" }}>
-      <div style={{ color: "#6b7280" }}>{label}</div>
-      <div>{value}</div>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "160px 1fr",
+        gap: 12,
+        padding: "10px 0",
+        borderTop: "1px solid #f3f4f6"
+      }}
+    >
+      <div style={{ color: "#6b7280", fontSize: 13, fontWeight: 600 }}>{label}</div>
+      <div style={{ color: "#111827", minWidth: 0 }}>{value}</div>
     </div>
   );
 }
@@ -52,14 +69,24 @@ export default async function VisitorDetailPage(
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
-      <div>
-        <Link href="/visitors" style={{ color: "#2563eb", textDecoration: "none" }}>
+      <div
+        style={{
+          background: "#fff",
+          border: "1px solid #e5e7eb",
+          borderRadius: 12,
+          padding: 20
+        }}
+      >
+        <Link href="/visitors" style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
           ← Back to Visitors
         </Link>
-        <h1 style={{ marginBottom: 8 }}>{data.visitor.name}</h1>
-        <p style={{ marginTop: 0, color: "#4b5563" }}>
-          Visitor detail aligned to the existing visitor and formation profile surfaces.
-        </p>
+
+        <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+          <h1 style={{ margin: 0, color: "#111827" }}>{data.visitor.name}</h1>
+          <div style={{ fontSize: 14, color: "#6b7280" }}>
+            Visitor detail aligned to the existing visitor and formation profile surfaces.
+          </div>
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 }}>
@@ -67,7 +94,7 @@ export default async function VisitorDetailPage(
           <DetailRow
             label="Visitor ID"
             value={
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontFamily: "monospace" }}>{data.visitor.visitorId}</span>
                 <CopyButton value={data.visitor.visitorId} label="Copy" />
               </div>
@@ -83,7 +110,10 @@ export default async function VisitorDetailPage(
           {data.formationProfile ? (
             <>
               <DetailRow label="Partition Key" value={data.formationProfile.partitionKey} />
-              <DetailRow label="Row Key" value={<span style={{ fontFamily: "monospace" }}>{data.formationProfile.rowKey}</span>} />
+              <DetailRow
+                label="Row Key"
+                value={<span style={{ fontFamily: "monospace" }}>{data.formationProfile.rowKey}</span>}
+              />
               <DetailRow label="Stage" value={<StageBadge stage={data.formationProfile.stage} />} />
               <DetailRow label="Last Event Type" value={data.formationProfile.lastEventType ?? "-"} />
               <DetailRow label="Last Event At" value={<TimestampValue value={data.formationProfile.lastEventAt} />} />

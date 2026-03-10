@@ -1,13 +1,7 @@
 import type { CSSProperties } from "react";
 import type { FollowupItem } from "@/lib/contracts/followups";
 import { PageState } from "@/components/page-state";
-
-function formatDate(value: string | null) {
-  if (!value) return "-";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString();
-}
+import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
 
 function Badge({ needsFollowup }: { needsFollowup: boolean }) {
   const style: CSSProperties = {
@@ -63,11 +57,17 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
               <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                 <Badge needsFollowup={item.needsFollowup} />
               </td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                {formatDate(item.lastFollowupAssignedAt)}
+              <td
+                style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
+                title={formatAbsoluteTime(item.lastFollowupAssignedAt)}
+              >
+                {formatRelativeTime(item.lastFollowupAssignedAt)}
               </td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                {formatDate(item.lastFollowupContactedAt)}
+              <td
+                style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
+                title={formatAbsoluteTime(item.lastFollowupContactedAt)}
+              >
+                {formatRelativeTime(item.lastFollowupContactedAt)}
               </td>
             </tr>
           ))}

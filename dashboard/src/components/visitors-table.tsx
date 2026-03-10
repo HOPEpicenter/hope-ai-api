@@ -2,12 +2,7 @@ import Link from "next/link";
 import type { VisitorListItem } from "@/lib/contracts/visitors";
 import { PageState } from "@/components/page-state";
 import { CopyButton } from "@/components/copy-button";
-
-function formatDate(value: string) {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString();
-}
+import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
 
 export function VisitorsTable({ items }: { items: VisitorListItem[] }) {
   if (items.length === 0) {
@@ -47,7 +42,12 @@ export function VisitorsTable({ items }: { items: VisitorListItem[] }) {
                   <CopyButton value={item.visitorId} label="Copy" />
                 </div>
               </td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>{formatDate(item.updatedAt)}</td>
+              <td
+                style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
+                title={formatAbsoluteTime(item.updatedAt)}
+              >
+                {formatRelativeTime(item.updatedAt)}
+              </td>
             </tr>
           ))}
         </tbody>

@@ -1,4 +1,7 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { CopyButton } from "@/components/copy-button";
+import { StageBadge } from "@/components/stage-badge";
 import { getVisitorDetail } from "@/lib/loaders/get-visitor-detail";
 
 function formatDate(value: string | null) {
@@ -13,7 +16,7 @@ function DetailCard({
   children
 }: {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
@@ -23,7 +26,7 @@ function DetailCard({
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 12, padding: "8px 0" }}>
       <div style={{ color: "#6b7280" }}>{label}</div>
@@ -46,13 +49,21 @@ export default async function VisitorDetailPage(
         </Link>
         <h1 style={{ marginBottom: 8 }}>{data.visitor.name}</h1>
         <p style={{ marginTop: 0, color: "#4b5563" }}>
-          Mock-first visitor detail page aligned to the existing visitor and formation profile surfaces.
+          Visitor detail aligned to the existing visitor and formation profile surfaces.
         </p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 }}>
         <DetailCard title="Visitor">
-          <DetailRow label="Visitor ID" value={<span style={{ fontFamily: "monospace" }}>{data.visitor.visitorId}</span>} />
+          <DetailRow
+            label="Visitor ID"
+            value={
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontFamily: "monospace" }}>{data.visitor.visitorId}</span>
+                <CopyButton value={data.visitor.visitorId} label="Copy" />
+              </div>
+            }
+          />
           <DetailRow label="Name" value={data.visitor.name} />
           <DetailRow label="Email" value={data.visitor.email ?? "-"} />
           <DetailRow label="Created" value={formatDate(data.visitor.createdAt)} />
@@ -64,7 +75,7 @@ export default async function VisitorDetailPage(
             <>
               <DetailRow label="Partition Key" value={data.formationProfile.partitionKey} />
               <DetailRow label="Row Key" value={<span style={{ fontFamily: "monospace" }}>{data.formationProfile.rowKey}</span>} />
-              <DetailRow label="Stage" value={data.formationProfile.stage ?? "-"} />
+              <DetailRow label="Stage" value={<StageBadge stage={data.formationProfile.stage} />} />
               <DetailRow label="Last Event Type" value={data.formationProfile.lastEventType ?? "-"} />
               <DetailRow label="Last Event At" value={formatDate(data.formationProfile.lastEventAt)} />
               <DetailRow label="Profile Updated" value={formatDate(data.formationProfile.updatedAt)} />

@@ -20,11 +20,20 @@ function StreamBadge({ stream }: { stream: TimelineItem["stream"] }) {
         fontSize: 12,
         fontWeight: 600,
         background,
-        color: "#111827"
+        color: "#111827",
+        textTransform: "capitalize"
       }}
     >
       {stream}
     </span>
+  );
+}
+
+function EventTypeLabel({ type }: { type: string }) {
+  return (
+    <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", lineHeight: 1.3 }}>
+      {type}
+    </div>
   );
 }
 
@@ -48,33 +57,54 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      {sortedItems.map((item) => (
-        <div
-          key={item.eventId}
-          style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <StreamBadge stream={item.stream} />
-              <strong>{item.type}</strong>
+      {sortedItems.map((item) => {
+        const accent = item.stream === "formation" ? "#93c5fd" : "#c4b5fd";
+
+        return (
+          <div
+            key={item.eventId}
+            style={{
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              borderLeft: `4px solid ${accent}`,
+              borderRadius: 12,
+              padding: 16,
+              display: "grid",
+              gap: 10
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+              <div style={{ display: "grid", gap: 8 }}>
+                <StreamBadge stream={item.stream} />
+                <EventTypeLabel type={item.type} />
+              </div>
+
+              <div
+                style={{ textAlign: "right", minWidth: 160 }}
+                title={formatAbsoluteTime(item.occurredAt)}
+              >
+                <div style={{ color: "#374151", fontSize: 14, fontWeight: 600 }}>
+                  {formatRelativeTime(item.occurredAt)}
+                </div>
+                <div style={{ color: "#6b7280", fontSize: 12, marginTop: 2 }}>
+                  {formatAbsoluteTime(item.occurredAt)}
+                </div>
+              </div>
             </div>
-            <div
-              style={{ color: "#6b7280", fontSize: 14 }}
-              title={formatAbsoluteTime(item.occurredAt)}
-            >
-              {formatRelativeTime(item.occurredAt)}
+
+            <div style={{ color: "#374151", lineHeight: 1.5 }}>
+              {item.summary ?? "No summary provided."}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+              <div style={{ fontSize: 12, color: "#6b7280" }}>Event ID</div>
+              <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "monospace" }}>
+                {item.eventId}
+              </div>
             </div>
           </div>
-
-          <p style={{ marginBottom: 8, color: "#374151" }}>
-            {item.summary ?? "No summary provided."}
-          </p>
-
-          <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "monospace" }}>
-            {item.eventId}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

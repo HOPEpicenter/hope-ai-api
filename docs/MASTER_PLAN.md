@@ -227,7 +227,17 @@ Dashboard foundation is now complete on main:
 - shell layout polish with sidebar navigation
 - shared loading / empty / error page states
 
+Dashboard usability follow-up slices also landed:
+- relative timestamps across visitors, visitor detail, followups, and timeline
+- freshness-oriented sorting for visitors, followups, and timeline
+- clearer empty-state messaging
+- dashboard copy and label polish across shell and table surfaces
+
+Formation docs clarification also landed:
+- `stageUpdatedAt / stageUpdatedBy / stageReason` are documented as stage-change metadata, not generic profile outputs
+
 Next planned slice:
 - UI-only dashboard usability improvements
 - do not reopen backend scope unless a real blocker appears
+
 

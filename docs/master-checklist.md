@@ -170,4 +170,10 @@ Remaining (business logic expansion):
 - [x] Merged **#266**: dashboard overview page wired to real dashboard loaders.
 - [x] Merged **#267**: dashboard shell layout polish with sidebar navigation.
 - [x] Merged **#268**: shared dashboard loading / empty / error page states.
+- [x] Merged **#271**: dashboard relative timestamps across visitors, detail, followups, and timeline.
+- [x] Merged **#272**: dashboard sort order polish for freshness and operator urgency.
+- [x] Merged **#273**: dashboard empty state messaging polish.
+- [x] Merged **#274**: dashboard copy and label polish.
+- [x] Merged **#275**: clarified Formation stage metadata docs contract.
+
 

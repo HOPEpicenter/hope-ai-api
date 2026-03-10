@@ -2,6 +2,12 @@ import { PageState } from "@/components/page-state";
 import type { TimelineItem } from "@/lib/contracts/timeline";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
 
+function toTimestamp(value: string | null | undefined) {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
 function StreamBadge({ stream }: { stream: TimelineItem["stream"] }) {
   const background = stream === "formation" ? "#dbeafe" : "#ede9fe";
 
@@ -34,9 +40,15 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
     );
   }
 
+  const sortedItems = [...items].sort((a, b) => {
+    const timeDiff = toTimestamp(b.occurredAt) - toTimestamp(a.occurredAt);
+    if (timeDiff !== 0) return timeDiff;
+    return a.eventId.localeCompare(b.eventId);
+  });
+
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      {items.map((item) => (
+      {sortedItems.map((item) => (
         <div
           key={item.eventId}
           style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}

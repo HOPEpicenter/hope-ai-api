@@ -3,6 +3,12 @@ import type { FollowupItem } from "@/lib/contracts/followups";
 import { PageState } from "@/components/page-state";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
 
+function toTimestamp(value: string | null | undefined, fallback = Number.MAX_SAFE_INTEGER) {
+  if (!value) return fallback;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? fallback : time;
+}
+
 function Badge({ needsFollowup }: { needsFollowup: boolean }) {
   const style: CSSProperties = {
     display: "inline-block",
@@ -29,6 +35,22 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
     );
   }
 
+  const sortedItems = [...items].sort((a, b) => {
+    if (a.needsFollowup !== b.needsFollowup) {
+      return a.needsFollowup ? -1 : 1;
+    }
+
+    const contactedDiff =
+      toTimestamp(a.lastFollowupContactedAt) - toTimestamp(b.lastFollowupContactedAt);
+    if (contactedDiff !== 0) return contactedDiff;
+
+    const assignedDiff =
+      toTimestamp(a.lastFollowupAssignedAt) - toTimestamp(b.lastFollowupAssignedAt);
+    if (assignedDiff !== 0) return assignedDiff;
+
+    return a.visitorId.localeCompare(b.visitorId);
+  });
+
   return (
     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -43,7 +65,7 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
           </tr>
         </thead>
         <tbody>
-          {items.map((item) => (
+          {sortedItems.map((item) => (
             <tr key={item.visitorId}>
               <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", fontFamily: "monospace" }}>
                 {item.visitorId}

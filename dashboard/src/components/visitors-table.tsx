@@ -4,6 +4,12 @@ import { PageState } from "@/components/page-state";
 import { CopyButton } from "@/components/copy-button";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
 
+function toTimestamp(value: string | null | undefined) {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
 export function VisitorsTable({ items }: { items: VisitorListItem[] }) {
   if (items.length === 0) {
     return (
@@ -15,6 +21,12 @@ export function VisitorsTable({ items }: { items: VisitorListItem[] }) {
       />
     );
   }
+
+  const sortedItems = [...items].sort((a, b) => {
+    const timeDiff = toTimestamp(b.updatedAt) - toTimestamp(a.updatedAt);
+    if (timeDiff !== 0) return timeDiff;
+    return a.visitorId.localeCompare(b.visitorId);
+  });
 
   return (
     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
@@ -28,7 +40,7 @@ export function VisitorsTable({ items }: { items: VisitorListItem[] }) {
           </tr>
         </thead>
         <tbody>
-          {items.map((item) => (
+          {sortedItems.map((item) => (
             <tr key={item.visitorId}>
               <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                 <Link href={`/visitors/${item.visitorId}`} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>

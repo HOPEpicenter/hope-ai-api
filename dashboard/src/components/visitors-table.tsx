@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { VisitorListItem } from "@/lib/contracts/visitors";
+import { PageState } from "@/components/page-state";
 
 function formatDate(value: string) {
   const d = new Date(value);
@@ -10,10 +11,12 @@ function formatDate(value: string) {
 export function VisitorsTable({ items }: { items: VisitorListItem[] }) {
   if (items.length === 0) {
     return (
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24 }}>
-        <h2 style={{ marginTop: 0 }}>No visitors yet</h2>
-        <p style={{ marginBottom: 0, color: "#4b5563" }}>Visitor records will appear here.</p>
-      </div>
+      <PageState
+        title="No visitors yet"
+        message="Visitor records will appear here."
+        actionHref="/overview"
+        actionLabel="Back to overview"
+      />
     );
   }
 

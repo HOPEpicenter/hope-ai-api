@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { TimelineItem } from "@/lib/contracts/timeline";
+import { PageState } from "@/components/page-state";
 
 function formatDate(value: string) {
   const d = new Date(value);
@@ -24,10 +25,12 @@ function StreamBadge({ stream }: { stream: TimelineItem["stream"] }) {
 export function TimelineList({ items }: { items: TimelineItem[] }) {
   if (items.length === 0) {
     return (
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24 }}>
-        <h2 style={{ marginTop: 0 }}>No timeline events</h2>
-        <p style={{ marginBottom: 0, color: "#4b5563" }}>Events will appear here once activity is recorded.</p>
-      </div>
+      <PageState
+        title="No timeline events"
+        message="Events will appear here once activity is recorded."
+        actionHref="/overview"
+        actionLabel="Back to overview"
+      />
     );
   }
 

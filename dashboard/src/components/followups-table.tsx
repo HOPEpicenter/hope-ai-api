@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { FollowupItem } from "@/lib/contracts/followups";
+import { PageState } from "@/components/page-state";
 
 function formatDate(value: string | null) {
   if (!value) return "-";
@@ -25,10 +26,12 @@ function Badge({ needsFollowup }: { needsFollowup: boolean }) {
 export function FollowupsTable({ items }: { items: FollowupItem[] }) {
   if (items.length === 0) {
     return (
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 24 }}>
-        <h2 style={{ marginTop: 0 }}>No open followups</h2>
-        <p style={{ marginBottom: 0, color: "#4b5563" }}>The queue is empty right now.</p>
-      </div>
+      <PageState
+        title="No open followups"
+        message="The queue is empty right now."
+        actionHref="/overview"
+        actionLabel="Back to overview"
+      />
     );
   }
 

@@ -15,7 +15,7 @@ export function VisitorsTable({ items }: { items: VisitorListItem[] }) {
     return (
       <PageState
         title="No visitors yet"
-        message="Visitor records will appear here."
+        message="Visitor records will appear here once someone interacts with the system."
         actionHref="/overview"
         actionLabel="Back to overview"
       />

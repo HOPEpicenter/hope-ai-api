@@ -3,12 +3,21 @@ import type { ReactNode } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { StageBadge } from "@/components/stage-badge";
 import { getVisitorDetail } from "@/lib/loaders/get-visitor-detail";
+import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
 
-function formatDate(value: string | null) {
-  if (!value) return "-";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString();
+function TimestampValue({ value }: { value: string | null }) {
+  if (!value) {
+    return <span>-</span>;
+  }
+
+  return (
+    <div>
+      <div style={{ fontWeight: 600 }}>{formatRelativeTime(value)}</div>
+      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+        {formatAbsoluteTime(value)}
+      </div>
+    </div>
+  );
 }
 
 function DetailCard({
@@ -66,8 +75,8 @@ export default async function VisitorDetailPage(
           />
           <DetailRow label="Name" value={data.visitor.name} />
           <DetailRow label="Email" value={data.visitor.email ?? "-"} />
-          <DetailRow label="Created" value={formatDate(data.visitor.createdAt)} />
-          <DetailRow label="Updated" value={formatDate(data.visitor.updatedAt)} />
+          <DetailRow label="Created" value={<TimestampValue value={data.visitor.createdAt} />} />
+          <DetailRow label="Updated" value={<TimestampValue value={data.visitor.updatedAt} />} />
         </DetailCard>
 
         <DetailCard title="Formation Profile">
@@ -77,8 +86,8 @@ export default async function VisitorDetailPage(
               <DetailRow label="Row Key" value={<span style={{ fontFamily: "monospace" }}>{data.formationProfile.rowKey}</span>} />
               <DetailRow label="Stage" value={<StageBadge stage={data.formationProfile.stage} />} />
               <DetailRow label="Last Event Type" value={data.formationProfile.lastEventType ?? "-"} />
-              <DetailRow label="Last Event At" value={formatDate(data.formationProfile.lastEventAt)} />
-              <DetailRow label="Profile Updated" value={formatDate(data.formationProfile.updatedAt)} />
+              <DetailRow label="Last Event At" value={<TimestampValue value={data.formationProfile.lastEventAt} />} />
+              <DetailRow label="Profile Updated" value={<TimestampValue value={data.formationProfile.updatedAt} />} />
             </>
           ) : (
             <p style={{ margin: 0, color: "#4b5563" }}>No formation profile yet.</p>

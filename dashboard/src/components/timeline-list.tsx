@@ -1,25 +1,25 @@
-import type { CSSProperties } from "react";
-import type { TimelineItem } from "@/lib/contracts/timeline";
 import { PageState } from "@/components/page-state";
-
-function formatDate(value: string) {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleString();
-}
+import type { TimelineItem } from "@/lib/contracts/timeline";
+import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
 
 function StreamBadge({ stream }: { stream: TimelineItem["stream"] }) {
-  const style: CSSProperties = {
-    display: "inline-block",
-    padding: "4px 8px",
-    borderRadius: 9999,
-    fontSize: 12,
-    fontWeight: 600,
-    background: stream === "formation" ? "#dbeafe" : "#ede9fe",
-    color: "#111827"
-  };
+  const background = stream === "formation" ? "#dbeafe" : "#ede9fe";
 
-  return <span style={style}>{stream}</span>;
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "4px 8px",
+        borderRadius: 9999,
+        fontSize: 12,
+        fontWeight: 600,
+        background,
+        color: "#111827"
+      }}
+    >
+      {stream}
+    </span>
+  );
 }
 
 export function TimelineList({ items }: { items: TimelineItem[] }) {
@@ -27,7 +27,7 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
     return (
       <PageState
         title="No timeline events"
-        message="Events will appear here once activity is recorded."
+        message="There is no recent activity to show yet."
         actionHref="/overview"
         actionLabel="Back to overview"
       />
@@ -46,10 +46,17 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
               <StreamBadge stream={item.stream} />
               <strong>{item.type}</strong>
             </div>
-            <div style={{ color: "#6b7280", fontSize: 14 }}>{formatDate(item.occurredAt)}</div>
+            <div
+              style={{ color: "#6b7280", fontSize: 14 }}
+              title={formatAbsoluteTime(item.occurredAt)}
+            >
+              {formatRelativeTime(item.occurredAt)}
+            </div>
           </div>
 
-          <p style={{ marginBottom: 8, color: "#374151" }}>{item.summary ?? "No summary provided."}</p>
+          <p style={{ marginBottom: 8, color: "#374151" }}>
+            {item.summary ?? "No summary provided."}
+          </p>
 
           <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "monospace" }}>
             {item.eventId}

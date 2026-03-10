@@ -1,5 +1,14 @@
 import type { VisitorsResponse } from "@/lib/contracts/visitors";
 
+type RawVisitorItem = {
+  visitorId?: unknown;
+  id?: unknown;
+  name?: unknown;
+  email?: unknown;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+};
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value || value.trim().length === 0) {
@@ -25,22 +34,25 @@ export async function getVisitors(): Promise<VisitorsResponse> {
     throw new Error(`GET /api/visitors failed with status ${response.status}`);
   }
 
-  const data = await response.json();
+  const data: unknown = await response.json();
 
-  const items = Array.isArray(data?.items)
-    ? data.items
-    : Array.isArray(data?.visitors)
-      ? data.visitors
-      : Array.isArray(data)
-        ? data
-        : [];
+  const candidate =
+    typeof data === "object" && data !== null && "items" in data
+      ? (data as { items?: unknown }).items
+      : typeof data === "object" && data !== null && "visitors" in data
+        ? (data as { visitors?: unknown }).visitors
+        : data;
+
+  const items: RawVisitorItem[] = Array.isArray(candidate)
+    ? candidate as RawVisitorItem[]
+    : [];
 
   return {
     ok: true,
-    items: items.map((item: any) => ({
+    items: items.map((item) => ({
       visitorId: String(item.visitorId ?? item.id ?? ""),
       name: String(item.name ?? ""),
-      email: item.email ?? null,
+      email: typeof item.email === "string" ? item.email : null,
       createdAt: String(item.createdAt ?? ""),
       updatedAt: String(item.updatedAt ?? item.createdAt ?? "")
     }))

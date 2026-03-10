@@ -43,4 +43,11 @@
 - Cleanup: removed orphan root function folder opsFollowups/ that caused Core Tools discovery errors (function.json without entrypoint). (PR #198)
 - Visitors: implemented POST /api/visitors (createVisitor) + GET /api/visitors/{visitorId} (getVisitor) using Azure Table Storage (Visitors table; PK=visitors, RK=visitorId). Shared table client helper + ensure table exists. (PRs #199, #200)
 - Verified staging: /api/health, /api/version, POST/GET visitors (read-after-write) on hope-ai-api-staging.azurewebsites.net.
+## 2026-03-10
+
+- ✅ Merged **#271**: dashboard relative timestamps across visitors, visitor detail, followups, and timeline.
+- ✅ Merged **#272**: dashboard sort order polish for freshness and operator urgency.
+- ✅ Merged **#273**: dashboard empty state messaging polish.
+- ✅ Merged **#274**: dashboard copy and label polish across dashboard shell and table surfaces.
+- ✅ Merged **#275**: clarified Formation stage metadata docs contract (`stageUpdatedAt / stageUpdatedBy / stageReason` are stage-change metadata, not generic profile outputs).
 

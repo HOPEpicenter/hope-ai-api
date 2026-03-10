@@ -28,7 +28,7 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
     return (
       <PageState
         title="No open followups"
-        message="The queue is empty right now."
+        message="All visitors are up to date. New followups will appear here when action is required."
         actionHref="/overview"
         actionLabel="Back to overview"
       />

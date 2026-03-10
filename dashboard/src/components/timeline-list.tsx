@@ -33,7 +33,7 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
     return (
       <PageState
         title="No timeline events"
-        message="There is no recent activity to show yet."
+        message="Activity events will appear here as visitors interact with the system."
         actionHref="/overview"
         actionLabel="Back to overview"
       />

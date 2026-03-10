@@ -163,3 +163,11 @@ Remaining (business logic expansion):
 - [x] OPS followups: ensure formation profiles table exists before listing (fresh Azurite doesn't 500).
 - [x] OPS followups: include resolvedForAssignment in response items (queue consumer can filter resolved rows).
 - [x] Dev discipline maintained: OPS remains read/projection; writes stay in formation events (/api/formation/events).
+### 2026-03-10 (session closeout)
+
+- [x] Merged **#264**: dashboard visitors page wired to real visitors endpoint.
+- [x] Merged **#265**: dashboard visitor detail page wired to real visitor endpoints.
+- [x] Merged **#266**: dashboard overview page wired to real dashboard loaders.
+- [x] Merged **#267**: dashboard shell layout polish with sidebar navigation.
+- [x] Merged **#268**: shared dashboard loading / empty / error page states.
+

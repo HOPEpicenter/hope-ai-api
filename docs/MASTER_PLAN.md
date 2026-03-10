@@ -218,3 +218,16 @@ Planned:
 
 ## Deployment notes
 - Staging deploy packaging: Oryx/build is disabled; the staged .deploy zip must be self-contained and include production dependencies (npm ci --omit=dev inside .deploy). (PR #197)
+## 2026-03-10 closeout
+
+Dashboard foundation is now complete on main:
+- visitors list wired to real API
+- visitor detail wired to real visitor endpoints
+- overview wired to real dashboard loaders
+- shell layout polish with sidebar navigation
+- shared loading / empty / error page states
+
+Next planned slice:
+- UI-only dashboard usability improvements
+- do not reopen backend scope unless a real blocker appears
+

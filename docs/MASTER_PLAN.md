@@ -128,7 +128,7 @@ Implemented:
 Remaining:
 - [ ] Expand milestones v1 beyond the initial two types (if/when needed)
 - [ ] Expand regression coverage: repeated events + profile invariants per milestone type (ordering/tie-break + idempotency now covered)
-- [ ] Clarify/document whether `stageUpdatedAt / stageReason / stageUpdatedBy` are only guaranteed for explicit stage-change scenarios, or become generic profile outputs
+- [x] Clarified/documented that `stageUpdatedAt / stageReason / stageUpdatedBy` are guaranteed for explicit stage-change scenarios, not generic profile outputs
 
 Notes:
 - Formation should follow the same event-driven derivation discipline as Engagement.

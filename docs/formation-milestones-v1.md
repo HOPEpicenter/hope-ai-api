@@ -79,7 +79,8 @@ Deep paging test:
 When the derived snapshot's stage changes due to an input event, the snapshot MUST also include:
 - stageUpdatedAt (ISO timestamp) matching the effective stage change time
 - stageUpdatedBy (string) set to "system" for derived stage changes
-- stageReason (string) set to vent:<eventType> describing why the stage changed
+- stageReason (string) set to vevent:<eventType> describing why the stage changed
 
-If stage does not change, these fields MAY be omitted (or remain unchanged if already present).
+If stage does not change, these fields are not newly required for that event and MAY be omitted (or remain unchanged if already present from a prior stage change).
+
 

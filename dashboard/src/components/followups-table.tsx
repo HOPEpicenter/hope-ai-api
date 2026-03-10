@@ -60,8 +60,8 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Assigned To</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Stage</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Status</th>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Assigned</th>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Contacted</th>
+            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Assigned</th>
+            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Contact</th>
           </tr>
         </thead>
         <tbody>

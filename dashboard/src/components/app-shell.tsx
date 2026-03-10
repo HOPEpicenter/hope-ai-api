@@ -28,7 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             <div style={{ fontSize: 22, fontWeight: 800, marginTop: 6 }}>Dashboard</div>
             <div style={{ fontSize: 14, color: "#6b7280", marginTop: 8 }}>
-              Operator workspace for followups, visitors, and snapshots.
+              Operator workspace for followups, visitors, and activity snapshots.
             </div>
           </div>
 
@@ -62,9 +62,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               color: "#4b5563"
             }}
           >
-            Mock-first shell is complete.
+            Dashboard shell is complete.
             <br />
-            Real data is now wired for overview, followups, visitors, and visitor detail.
+            Real data is wired for overview, followups, visitors, and visitor detail.
           </div>
         </aside>
 
@@ -79,7 +79,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div style={{ maxWidth: 1280, margin: "0 auto", padding: "18px 24px" }}>
               <div style={{ fontSize: 18, fontWeight: 700 }}>HOPE Dashboard</div>
               <div style={{ marginTop: 4, fontSize: 14, color: "#6b7280" }}>
-                Focused operator views built on existing hardened backend surfaces.
+                Focused operator views built on existing backend surfaces.
               </div>
             </div>
           </header>

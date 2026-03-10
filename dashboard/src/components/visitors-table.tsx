@@ -36,7 +36,7 @@ export function VisitorsTable({ items }: { items: VisitorListItem[] }) {
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Name</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Email</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Visitor ID</th>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Updated</th>
+            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Activity</th>
           </tr>
         </thead>
         <tbody>

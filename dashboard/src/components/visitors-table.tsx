@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { VisitorListItem } from "@/lib/contracts/visitors";
 import { PageState } from "@/components/page-state";
+import { CopyButton } from "@/components/copy-button";
 
 function formatDate(value: string) {
   const d = new Date(value);
@@ -40,7 +41,12 @@ export function VisitorsTable({ items }: { items: VisitorListItem[] }) {
                 </Link>
               </td>
               <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>{item.email ?? "-"}</td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", fontFamily: "monospace" }}>{item.visitorId}</td>
+              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontFamily: "monospace" }}>{item.visitorId}</span>
+                  <CopyButton value={item.visitorId} label="Copy" />
+                </div>
+              </td>
               <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>{formatDate(item.updatedAt)}</td>
             </tr>
           ))}

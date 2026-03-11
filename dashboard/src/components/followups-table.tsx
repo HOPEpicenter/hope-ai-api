@@ -114,27 +114,37 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   <Link
                     href={`/visitors/${item.visitorId}`}
-                    style={{ color: "inherit", textDecoration: "none", display: "inline-block" }}
+                    style={{
+                      color: "inherit",
+                      textDecoration: "none",
+                      display: "inline-block",
+                      cursor: "pointer"
+                    }}
                   >
                     <div style={{ fontWeight: 600 }}>{item.visitorId}</div>
                     <div style={{ fontSize: 12, color: "#6b7280" }}>Visitor ID</div>
                   </Link>
                 </td>
+
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   {item.assignedTo?.ownerId ?? "-"}
                 </td>
+
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   <StageBadge stage={item.stage} />
                 </td>
+
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   <Badge needsFollowup={item.needsFollowup} />
                 </td>
+
                 <td
                   style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
                   title={formatAbsoluteTime(item.lastFollowupAssignedAt)}
                 >
                   {renderTimeCell(item.lastFollowupAssignedAt, "Not assigned")}
                 </td>
+
                 <td
                   style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
                   title={formatAbsoluteTime(item.lastFollowupContactedAt)}

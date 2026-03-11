@@ -238,6 +238,14 @@ export default async function VisitorDetailPage({
                 label="Outcome At"
                 value={<TimestampValue value={data.formationProfile.lastFollowupOutcomeAt ?? null} />}
               />
+              <DetailRow
+                label="Outcome"
+                value={data.formationProfile.lastFollowupOutcome ?? "-"}
+              />
+              <DetailRow
+                label="Outcome Notes"
+                value={data.formationProfile.lastFollowupOutcomeNotes ?? "-"}
+              />
             </>
           ) : (
             <p style={{ margin: 0, color: "#4b5563" }}>No followup activity yet.</p>

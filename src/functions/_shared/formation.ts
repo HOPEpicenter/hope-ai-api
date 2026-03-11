@@ -32,6 +32,8 @@ export type FunctionFormationProfileEntity = {
   lastFollowupAssignedAt?: string;
   lastFollowupContactedAt?: string;
   lastFollowupOutcomeAt?: string;
+  lastFollowupOutcome?: string;
+  lastFollowupOutcomeNotes?: string;
   lastNextStepAt?: string;
   lastPrayerRequestedAt?: string;
   [k: string]: any;
@@ -397,6 +399,27 @@ export async function recordFormationEventV1(body: unknown): Promise<{
     }
   }
 
+  if (type === "FOLLOWUP_CONTACTED") {
+    if (shouldAdvance) {
+      profile.lastFollowupContactedAt = occurredAt;
+    }
+  }
+
+  if (type === "FOLLOWUP_OUTCOME_RECORDED") {
+    const outcome = String(data.outcome ?? "").trim();
+    if (!outcome) {
+      throw new Error("FOLLOWUP_OUTCOME_RECORDED requires data.outcome (string)");
+    }
+
+    if (shouldAdvance) {
+      profile.lastFollowupOutcomeAt = occurredAt;
+      profile.lastFollowupOutcome = outcome;
+      profile.lastFollowupOutcomeNotes =
+        typeof data.notes === "string" ? data.notes.trim() || undefined : undefined;
+      maybeSetStage(profile, "Connected", occurredAt, type);
+    }
+  }
+
   if (type === "NEXT_STEP_SELECTED") {
     const nextStep = String(data.nextStep ?? "").trim();
     if (!nextStep) {
@@ -513,6 +536,8 @@ export async function listFormationProfiles(
     "lastFollowupAssignedAt",
     "lastFollowupContactedAt",
     "lastFollowupOutcomeAt",
+    "lastFollowupOutcome",
+    "lastFollowupOutcomeNotes",
     "lastNextStepAt",
     "lastPrayerRequestedAt"
   ];
@@ -538,6 +563,8 @@ export async function listFormationProfiles(
       lastFollowupAssignedAt: entity.lastFollowupAssignedAt,
       lastFollowupContactedAt: entity.lastFollowupContactedAt,
       lastFollowupOutcomeAt: entity.lastFollowupOutcomeAt,
+      lastFollowupOutcome: entity.lastFollowupOutcome,
+      lastFollowupOutcomeNotes: entity.lastFollowupOutcomeNotes,
       lastNextStepAt: entity.lastNextStepAt,
       lastPrayerRequestedAt: entity.lastPrayerRequestedAt
     };
@@ -560,3 +587,4 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
+

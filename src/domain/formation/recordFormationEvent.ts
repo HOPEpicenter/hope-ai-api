@@ -157,6 +157,10 @@ function applyProfileTouchpoint(
     case FormationEventType.FOLLOWUP_OUTCOME_RECORDED:
       // needed so queue can tell an outcome was recorded
       (profile as any).lastFollowupOutcomeAt = occurredAt;
+      (profile as any).lastFollowupOutcome =
+        metadata && typeof metadata.outcome === "string" ? metadata.outcome : undefined;
+      (profile as any).lastFollowupOutcomeNotes =
+        metadata && typeof metadata.notes === "string" ? metadata.notes : undefined;
       break;
 
     case FormationEventType.NEXT_STEP_SELECTED:

@@ -54,6 +54,8 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
           lastFollowupAssignedAt: profileData.profile.lastFollowupAssignedAt ?? null,
           lastFollowupContactedAt: profileData.profile.lastFollowupContactedAt ?? null,
           lastFollowupOutcomeAt: profileData.profile.lastFollowupOutcomeAt ?? null,
+          lastFollowupOutcome: profileData.profile.lastFollowupOutcome ?? null,
+          lastFollowupOutcomeNotes: profileData.profile.lastFollowupOutcomeNotes ?? null,
           lastEventType: profileData.profile.lastEventType ?? null,
           lastEventAt: profileData.profile.lastEventAt ?? null,
           updatedAt: profileData.profile.updatedAt ?? null

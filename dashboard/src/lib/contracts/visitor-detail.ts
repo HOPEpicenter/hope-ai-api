@@ -19,6 +19,8 @@ export type VisitorFormationProfile = {
   lastFollowupAssignedAt: string | null;
   lastFollowupContactedAt: string | null;
   lastFollowupOutcomeAt: string | null;
+  lastFollowupOutcome: string | null;
+  lastFollowupOutcomeNotes: string | null;
   lastEventType: string | null;
   lastEventAt: string | null;
   updatedAt: string | null;
@@ -29,3 +31,4 @@ export type VisitorDetailResponse = {
   visitor: VisitorDetail;
   formationProfile: VisitorFormationProfile | null;
 };
+

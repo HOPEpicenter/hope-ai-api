@@ -49,7 +49,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: message }, { status: upstream.status });
     }
 
-    return NextResponse.json(data, { status: upstream.status });
+    const visitorId = typeof data?.visitorId === "string" ? data.visitorId : "";
+
+    return NextResponse.json(
+      {
+        ok: true,
+        visitorId,
+        created: upstream.status === 201,
+        existing: upstream.status === 200
+      },
+      { status: upstream.status }
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to create visitor.";

@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 type CreateVisitorResponse = {
   ok?: boolean;
   visitorId?: string;
+  created?: boolean;
+  existing?: boolean;
+  error?: string;
 };
 
 export function CreateVisitorForm() {
@@ -37,22 +40,10 @@ export function CreateVisitorForm() {
     setError(null);
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_HOPE_OPS_BASE_URL?.trim();
-      const apiKey = process.env.NEXT_PUBLIC_HOPE_API_KEY?.trim();
-
-      if (!baseUrl) {
-        throw new Error("Missing required env var: NEXT_PUBLIC_HOPE_OPS_BASE_URL");
-      }
-
-      if (!apiKey) {
-        throw new Error("Missing required env var: NEXT_PUBLIC_HOPE_API_KEY");
-      }
-
-      const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/api/visitors`, {
+      const response = await fetch("/api/dashboard/visitors", {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          "x-api-key": apiKey,
           accept: "application/json"
         },
         body: JSON.stringify({
@@ -61,18 +52,26 @@ export function CreateVisitorForm() {
         })
       });
 
+      const data = (await response.json()) as CreateVisitorResponse;
+
       if (!response.ok) {
-        throw new Error(`POST /api/visitors failed with status ${response.status}`);
+        throw new Error(data.error || `POST /api/visitors failed with status ${response.status}`);
       }
 
-      const data = (await response.json()) as CreateVisitorResponse;
       const visitorId = typeof data.visitorId === "string" ? data.visitorId : "";
 
       if (!visitorId) {
         throw new Error("POST /api/visitors returned no visitorId");
       }
 
-      router.push(`/visitors/${visitorId}`);
+      if (data.created) {
+        router.push(`/visitors/${visitorId}?created=1`);
+      } else if (data.existing) {
+        router.push(`/visitors/${visitorId}?existing=1`);
+      } else {
+        router.push(`/visitors/${visitorId}`);
+      }
+
       router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to create visitor.";

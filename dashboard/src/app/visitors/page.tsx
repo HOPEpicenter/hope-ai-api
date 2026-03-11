@@ -1,3 +1,4 @@
+import { CreateVisitorForm } from "@/components/create-visitor-form";
 import { VisitorsTable } from "@/components/visitors-table";
 import { getVisitors } from "@/lib/loaders/get-visitors";
 
@@ -9,9 +10,11 @@ export default async function VisitorsPage() {
       <div>
         <h1 style={{ marginBottom: 8 }}>Visitors</h1>
         <p style={{ marginTop: 0, color: "#4b5563" }}>
-          Mock-first visitor directory aligned to the existing visitors list surface.
+          Operator visitor directory aligned to the existing visitors list surface.
         </p>
       </div>
+
+      <CreateVisitorForm />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>

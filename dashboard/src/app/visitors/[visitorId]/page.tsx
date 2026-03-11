@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { AssignFollowupForm } from "@/components/assign-followup-form";
 import { CopyButton } from "@/components/copy-button";
 import { StageBadge } from "@/components/stage-badge";
 import { getVisitorDetail } from "@/lib/loaders/get-visitor-detail";
@@ -66,10 +67,10 @@ export default async function VisitorDetailPage({
   searchParams
 }: {
   params: Promise<{ visitorId: string }>;
-  searchParams: Promise<{ created?: string; existing?: string }>;
+  searchParams: Promise<{ created?: string; existing?: string; assigned?: string; assigneeId?: string }>;
 }) {
   const { visitorId } = await params;
-  const { created, existing } = await searchParams;
+  const { created, existing, assigned, assigneeId } = await searchParams;
   const data = await getVisitorDetail(visitorId);
 
   return (
@@ -104,6 +105,21 @@ export default async function VisitorDetailPage({
         </div>
       ) : null}
 
+      {assigned === "1" ? (
+        <div
+          style={{
+            background: "#ecfdf5",
+            border: "1px solid #a7f3d0",
+            color: "#065f46",
+            borderRadius: 12,
+            padding: 12,
+            fontWeight: 600
+          }}
+        >
+          Followup assigned{assigneeId ? ` to ${assigneeId}` : ""}.
+        </div>
+      ) : null}
+
       <div
         style={{
           background: "#fff",
@@ -123,6 +139,8 @@ export default async function VisitorDetailPage({
           </div>
         </div>
       </div>
+
+      <AssignFollowupForm visitorId={data.visitor.visitorId} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 }}>
         <DetailCard title="Visitor">

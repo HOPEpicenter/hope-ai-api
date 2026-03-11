@@ -1,0 +1,119 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+type AssignFollowupResponse = {
+  ok?: boolean;
+  visitorId?: string;
+  assigneeId?: string;
+  error?: string;
+};
+
+export function AssignFollowupForm({ visitorId }: { visitorId: string }) {
+  const router = useRouter();
+  const [assigneeId, setAssigneeId] = useState("ops-user-1");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/dashboard/followups/assign", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json"
+        },
+        body: JSON.stringify({
+          visitorId,
+          assigneeId
+        })
+      });
+
+      const data = (await response.json()) as AssignFollowupResponse;
+
+      if (!response.ok) {
+        throw new Error(data.error || `POST /api/dashboard/followups/assign failed with status ${response.status}`);
+      }
+
+      router.push(`/visitors/${visitorId}?assigned=1&assigneeId=${encodeURIComponent(assigneeId)}`);
+      router.refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to assign followup.";
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 20 }}>
+      <div style={{ marginBottom: 12 }}>
+        <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>Assign Followup</h2>
+        <p style={{ marginTop: 6, marginBottom: 0, color: "#6b7280", fontSize: 14 }}>
+          Add this visitor to the followups queue by assigning an operator.
+        </p>
+      </div>
+
+      <form onSubmit={onSubmit} style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "grid", gap: 6 }}>
+          <label htmlFor="assigneeId" style={{ fontWeight: 600 }}>
+            Assignee
+          </label>
+          <select
+            id="assigneeId"
+            value={assigneeId}
+            onChange={(event) => setAssigneeId(event.target.value)}
+            style={{
+              padding: 10,
+              border: "1px solid #d1d5db",
+              borderRadius: 8,
+              font: "inherit",
+              background: "#fff"
+            }}
+          >
+            <option value="ops-user-1">ops-user-1</option>
+            <option value="ops-user-2">ops-user-2</option>
+          </select>
+        </div>
+
+        {error ? (
+          <div
+            style={{
+              padding: 10,
+              borderRadius: 8,
+              background: "#fef2f2",
+              border: "1px solid #fecaca",
+              color: "#991b1b"
+            }}
+          >
+            {error}
+          </div>
+        ) : null}
+
+        <div style={{ display: "flex", justifyContent: "flex-start" }}>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              border: "1px solid #111827",
+              background: "#111827",
+              color: "#fff",
+              font: "inherit",
+              cursor: isSubmitting ? "default" : "pointer",
+              opacity: isSubmitting ? 0.7 : 1
+            }}
+          >
+            {isSubmitting ? "Assigning..." : "Assign Followup"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

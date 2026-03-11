@@ -99,7 +99,7 @@ function computeNextStage(
   switch (eventType) {
     case FormationEventType.FOLLOWUP_ASSIGNED:
       // When staff takes ownership, treat as an active Guest (no downgrade)
-      return maxStage(current, "Guest");
+      return maxStage(current, "Connected");
 
     case FormationEventType.NEXT_STEP_SELECTED:
       return maxStage(current, "Connected");
@@ -312,3 +312,4 @@ export async function recordFormationEvent(
 
   return { eventRowKey: rowKey, profile };
 }
+

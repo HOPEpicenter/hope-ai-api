@@ -20,7 +20,15 @@ function Badge({ needsFollowup }: { needsFollowup: boolean }) {
     color: "#111827"
   };
 
-  return <span style={style}>{needsFollowup ? "Needs followup" : "Up to date"}</span>;
+  return <span style={style}>{needsFollowup ? "Action needed" : "Contact made"}</span>;
+}
+
+function renderTimeCell(value: string | null | undefined, emptyLabel: string) {
+  if (!value) {
+    return <span style={{ color: "#6b7280" }}>{emptyLabel}</span>;
+  }
+
+  return formatRelativeTime(value);
 }
 
 export function FollowupsTable({ items }: { items: FollowupItem[] }) {
@@ -59,7 +67,7 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Visitor</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Assigned To</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Stage</th>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Status</th>
+            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Queue State</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Assigned</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Contact</th>
           </tr>
@@ -67,8 +75,9 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
         <tbody>
           {sortedItems.map((item) => (
             <tr key={item.visitorId}>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", fontFamily: "monospace" }}>
-                {item.visitorId}
+              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                <div style={{ fontWeight: 600 }}>{item.visitorId}</div>
+                <div style={{ fontSize: 12, color: "#6b7280" }}>Visitor ID</div>
               </td>
               <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                 {item.assignedTo?.ownerId ?? "-"}
@@ -83,13 +92,13 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
                 style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
                 title={formatAbsoluteTime(item.lastFollowupAssignedAt)}
               >
-                {formatRelativeTime(item.lastFollowupAssignedAt)}
+                {renderTimeCell(item.lastFollowupAssignedAt, "Not assigned")}
               </td>
               <td
                 style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
                 title={formatAbsoluteTime(item.lastFollowupContactedAt)}
               >
-                {formatRelativeTime(item.lastFollowupContactedAt)}
+                {renderTimeCell(item.lastFollowupContactedAt, "Never contacted")}
               </td>
             </tr>
           ))}

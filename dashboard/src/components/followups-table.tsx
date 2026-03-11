@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import type { FollowupItem } from "@/lib/contracts/followups";
+import { CopyButton } from "@/components/copy-button";
 import { PageState } from "@/components/page-state";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
 
@@ -112,39 +113,37 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
             return (
               <tr key={item.visitorId} style={rowStyle}>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  <Link
-                    href={`/visitors/${item.visitorId}`}
-                    style={{
-                      color: "inherit",
-                      textDecoration: "none",
-                      display: "inline-block",
-                      cursor: "pointer"
-                    }}
-                  >
-                    <div style={{ fontWeight: 600 }}>{item.visitorId}</div>
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>Visitor ID</div>
-                  </Link>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <Link
+                      href={`/visitors/${item.visitorId}`}
+                      style={{
+                        color: "inherit",
+                        textDecoration: "none",
+                        display: "inline-block",
+                        cursor: "pointer"
+                      }}
+                    >
+                      <div style={{ fontWeight: 600 }}>{item.visitorId}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>Visitor ID</div>
+                    </Link>
+                    <CopyButton value={item.visitorId} label="Copy" />
+                  </div>
                 </td>
-
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   {item.assignedTo?.ownerId ?? "-"}
                 </td>
-
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   <StageBadge stage={item.stage} />
                 </td>
-
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   <Badge needsFollowup={item.needsFollowup} />
                 </td>
-
                 <td
                   style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
                   title={formatAbsoluteTime(item.lastFollowupAssignedAt)}
                 >
                   {renderTimeCell(item.lastFollowupAssignedAt, "Not assigned")}
                 </td>
-
                 <td
                   style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
                   title={formatAbsoluteTime(item.lastFollowupContactedAt)}

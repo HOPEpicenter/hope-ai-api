@@ -41,11 +41,15 @@ export async function POST(request: NextRequest) {
     const apiKey = getRequiredEnv("HOPE_API_KEY");
 
     const payload = {
-      id: crypto.randomUUID(),
+      v: 1,
+      eventId: crypto.randomUUID(),
       visitorId,
       type: "FOLLOWUP_OUTCOME_RECORDED",
       occurredAt: new Date().toISOString(),
-      metadata: {
+      source: {
+        system: "dashboard"
+      },
+      data: {
         outcome: mappedOutcome,
         ...(note ? { notes: note } : {})
       }
@@ -100,5 +104,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
 

@@ -51,6 +51,8 @@ export interface FormationProfileSnapshot {
   lastFollowupAssignedAt?: string;
   lastFollowupContactedAt?: string;
   lastFollowupOutcomeAt?: string;
+  lastFollowupOutcome?: string;
+  lastFollowupOutcomeNotes?: string;
   lastNextStepAt?: string;
   lastPrayerRequestedAt?: string;
 
@@ -75,3 +77,4 @@ export interface FormationProfilesErrorResponse {
 export type FormationProfilesApiResponse =
   | FormationProfilesResponse
   | FormationProfilesErrorResponse;
+

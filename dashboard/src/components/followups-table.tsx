@@ -73,35 +73,41 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
           </tr>
         </thead>
         <tbody>
-          {sortedItems.map((item) => (
-            <tr key={item.visitorId}>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                <div style={{ fontWeight: 600 }}>{item.visitorId}</div>
-                <div style={{ fontSize: 12, color: "#6b7280" }}>Visitor ID</div>
-              </td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                {item.assignedTo?.ownerId ?? "-"}
-              </td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                {item.stage ?? "-"}
-              </td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                <Badge needsFollowup={item.needsFollowup} />
-              </td>
-              <td
-                style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
-                title={formatAbsoluteTime(item.lastFollowupAssignedAt)}
-              >
-                {renderTimeCell(item.lastFollowupAssignedAt, "Not assigned")}
-              </td>
-              <td
-                style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
-                title={formatAbsoluteTime(item.lastFollowupContactedAt)}
-              >
-                {renderTimeCell(item.lastFollowupContactedAt, "Never contacted")}
-              </td>
-            </tr>
-          ))}
+          {sortedItems.map((item) => {
+            const rowStyle: CSSProperties = item.needsFollowup
+              ? { background: "#fffbeb", boxShadow: "inset 4px 0 0 #f59e0b" }
+              : {};
+
+            return (
+              <tr key={item.visitorId} style={rowStyle}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <div style={{ fontWeight: 600 }}>{item.visitorId}</div>
+                  <div style={{ fontSize: 12, color: "#6b7280" }}>Visitor ID</div>
+                </td>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  {item.assignedTo?.ownerId ?? "-"}
+                </td>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  {item.stage ?? "-"}
+                </td>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <Badge needsFollowup={item.needsFollowup} />
+                </td>
+                <td
+                  style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
+                  title={formatAbsoluteTime(item.lastFollowupAssignedAt)}
+                >
+                  {renderTimeCell(item.lastFollowupAssignedAt, "Not assigned")}
+                </td>
+                <td
+                  style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
+                  title={formatAbsoluteTime(item.lastFollowupContactedAt)}
+                >
+                  {renderTimeCell(item.lastFollowupContactedAt, "Never contacted")}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

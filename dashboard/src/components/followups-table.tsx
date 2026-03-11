@@ -23,6 +23,36 @@ function Badge({ needsFollowup }: { needsFollowup: boolean }) {
   return <span style={style}>{needsFollowup ? "Action needed" : "Contact made"}</span>;
 }
 
+function StageBadge({ stage }: { stage: string | null | undefined }) {
+  const base: CSSProperties = {
+    display: "inline-block",
+    padding: "4px 8px",
+    borderRadius: 9999,
+    fontSize: 12,
+    fontWeight: 600
+  };
+
+  if (!stage) {
+    return <span style={{ ...base, background: "#f3f4f6", color: "#374151" }}>Unknown</span>;
+  }
+
+  const s = stage.toLowerCase();
+
+  if (s === "guest") {
+    return <span style={{ ...base, background: "#f3f4f6", color: "#374151" }}>Guest</span>;
+  }
+
+  if (s === "connected") {
+    return <span style={{ ...base, background: "#dbeafe", color: "#1e40af" }}>Connected</span>;
+  }
+
+  if (s === "member") {
+    return <span style={{ ...base, background: "#dcfce7", color: "#166534" }}>Member</span>;
+  }
+
+  return <span style={{ ...base, background: "#f3f4f6", color: "#374151" }}>{stage}</span>;
+}
+
 function renderTimeCell(value: string | null | undefined, emptyLabel: string) {
   if (!value) {
     return <span style={{ color: "#6b7280" }}>{emptyLabel}</span>;
@@ -88,7 +118,7 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
                   {item.assignedTo?.ownerId ?? "-"}
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  {item.stage ?? "-"}
+                  <StageBadge stage={item.stage} />
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   <Badge needsFollowup={item.needsFollowup} />

@@ -63,6 +63,30 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+function getFollowupStatus(profile: {
+  lastFollowupAssignedAt?: string | null;
+  lastFollowupContactedAt?: string | null;
+  lastFollowupOutcomeAt?: string | null;
+} | null): string {
+  if (!profile) {
+    return "No active followup";
+  }
+
+  if (profile.lastFollowupOutcomeAt) {
+    return "Resolved";
+  }
+
+  if (profile.lastFollowupContactedAt) {
+    return "Contacted";
+  }
+
+  if (profile.lastFollowupAssignedAt) {
+    return "Assigned";
+  }
+
+  return "No active followup";
+}
+
 export default async function VisitorDetailPage({
   params,
   searchParams
@@ -159,7 +183,7 @@ export default async function VisitorDetailPage({
       <AssignFollowupForm visitorId={data.visitor.visitorId} />
       <FollowupOutcomeForm visitorId={data.visitor.visitorId} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16 }}>
         <DetailCard title="Visitor">
           <DetailRow
             label="Visitor ID"
@@ -191,6 +215,32 @@ export default async function VisitorDetailPage({
             </>
           ) : (
             <p style={{ margin: 0, color: "#4b5563" }}>No formation profile yet.</p>
+          )}
+        </DetailCard>
+
+        <DetailCard title="Followup Status">
+          {data.formationProfile ? (
+            <>
+              <DetailRow label="Status" value={getFollowupStatus(data.formationProfile)} />
+              <DetailRow
+                label="Assigned To"
+                value={data.formationProfile.assignedTo?.ownerId ?? "-"}
+              />
+              <DetailRow
+                label="Assigned At"
+                value={<TimestampValue value={data.formationProfile.lastFollowupAssignedAt ?? null} />}
+              />
+              <DetailRow
+                label="Contacted At"
+                value={<TimestampValue value={data.formationProfile.lastFollowupContactedAt ?? null} />}
+              />
+              <DetailRow
+                label="Outcome At"
+                value={<TimestampValue value={data.formationProfile.lastFollowupOutcomeAt ?? null} />}
+              />
+            </>
+          ) : (
+            <p style={{ margin: 0, color: "#4b5563" }}>No followup activity yet.</p>
           )}
         </DetailCard>
       </div>

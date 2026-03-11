@@ -50,6 +50,10 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
           partitionKey: String(profileData.profile.partitionKey ?? "VISITOR"),
           rowKey: String(profileData.profile.rowKey ?? visitorId),
           stage: profileData.profile.stage ?? null,
+          assignedTo: profileData.profile.assignedTo ?? null,
+          lastFollowupAssignedAt: profileData.profile.lastFollowupAssignedAt ?? null,
+          lastFollowupContactedAt: profileData.profile.lastFollowupContactedAt ?? null,
+          lastFollowupOutcomeAt: profileData.profile.lastFollowupOutcomeAt ?? null,
           lastEventType: profileData.profile.lastEventType ?? null,
           lastEventAt: profileData.profile.lastEventAt ?? null,
           updatedAt: profileData.profile.updatedAt ?? null
@@ -57,3 +61,4 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
       : null
   };
 }
+

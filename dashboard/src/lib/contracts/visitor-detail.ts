@@ -6,10 +6,19 @@ export type VisitorDetail = {
   updatedAt: string;
 };
 
+export type VisitorFormationOwner = {
+  ownerType: string;
+  ownerId: string;
+};
+
 export type VisitorFormationProfile = {
   partitionKey: string;
   rowKey: string;
   stage: string | null;
+  assignedTo: VisitorFormationOwner | null;
+  lastFollowupAssignedAt: string | null;
+  lastFollowupContactedAt: string | null;
+  lastFollowupOutcomeAt: string | null;
   lastEventType: string | null;
   lastEventAt: string | null;
   updatedAt: string | null;

@@ -1,16 +1,37 @@
 import { CreateVisitorForm } from "@/components/create-visitor-form";
-import { VisitorsTable } from "@/components/visitors-table";
+import { VisitorsTable, type VisitorsTableItem } from "@/components/visitors-table";
+import { getFollowups } from "@/lib/loaders/get-followups";
 import { getVisitors } from "@/lib/loaders/get-visitors";
 
 export default async function VisitorsPage() {
-  const data = await getVisitors();
+  const [visitors, followups] = await Promise.all([
+    getVisitors(),
+    getFollowups()
+  ]);
+
+  const followupsByVisitorId = new Map(
+    followups.items.map((item) => [item.visitorId, item])
+  );
+
+  const items: VisitorsTableItem[] = visitors.items.map((visitor) => {
+    const followup = followupsByVisitorId.get(visitor.visitorId);
+
+    return {
+      ...visitor,
+      followupState: followup ? "Assigned" : "Waiting assignment",
+      assignedTo: followup?.assignedTo?.ownerId ?? null
+    };
+  });
+
+  const waitingAssignmentCount = items.filter((x) => !x.assignedTo).length;
+  const assignedCount = items.filter((x) => !!x.assignedTo).length;
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
       <div>
         <h1 style={{ marginBottom: 8 }}>Visitors</h1>
         <p style={{ marginTop: 0, color: "#4b5563" }}>
-          Operator visitor directory aligned to the existing visitors list surface.
+          Operator visitor directory aligned to the existing visitors and followups surfaces.
         </p>
       </div>
 
@@ -19,23 +40,19 @@ export default async function VisitorsPage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
           <div style={{ fontSize: 12, color: "#6b7280" }}>Total Visitors</div>
-          <div style={{ fontSize: 28, fontWeight: 700 }}>{data.items.length}</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>{items.length}</div>
         </div>
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
-          <div style={{ fontSize: 12, color: "#6b7280" }}>With Email</div>
-          <div style={{ fontSize: 28, fontWeight: 700 }}>
-            {data.items.filter((x) => !!x.email).length}
-          </div>
+          <div style={{ fontSize: 12, color: "#6b7280" }}>Waiting Assignment</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>{waitingAssignmentCount}</div>
         </div>
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
-          <div style={{ fontSize: 12, color: "#6b7280" }}>Without Email</div>
-          <div style={{ fontSize: 28, fontWeight: 700 }}>
-            {data.items.filter((x) => !x.email).length}
-          </div>
+          <div style={{ fontSize: 12, color: "#6b7280" }}>Assigned</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>{assignedCount}</div>
         </div>
       </div>
 
-      <VisitorsTable items={data.items} />
+      <VisitorsTable items={items} />
     </section>
   );
 }

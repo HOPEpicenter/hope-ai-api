@@ -1,8 +1,13 @@
 import Link from "next/link";
-import type { VisitorListItem } from "@/lib/contracts/visitors";
-import { PageState } from "@/components/page-state";
 import { CopyButton } from "@/components/copy-button";
+import { PageState } from "@/components/page-state";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
+import type { VisitorListItem } from "@/lib/contracts/visitors";
+
+export type VisitorsTableItem = VisitorListItem & {
+  followupState: "Assigned" | "Waiting assignment";
+  assignedTo: string | null;
+};
 
 function toTimestamp(value: string | null | undefined) {
   if (!value) return 0;
@@ -10,7 +15,27 @@ function toTimestamp(value: string | null | undefined) {
   return Number.isNaN(time) ? 0 : time;
 }
 
-export function VisitorsTable({ items }: { items: VisitorListItem[] }) {
+function FollowupStateBadge({ state }: { state: VisitorsTableItem["followupState"] }) {
+  const isAssigned = state === "Assigned";
+
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "4px 8px",
+        borderRadius: 9999,
+        fontSize: 12,
+        fontWeight: 600,
+        background: isAssigned ? "#dbeafe" : "#fef3c7",
+        color: "#111827"
+      }}
+    >
+      {state}
+    </span>
+  );
+}
+
+export function VisitorsTable({ items }: { items: VisitorsTableItem[] }) {
   if (items.length === 0) {
     return (
       <PageState
@@ -23,8 +48,13 @@ export function VisitorsTable({ items }: { items: VisitorListItem[] }) {
   }
 
   const sortedItems = [...items].sort((a, b) => {
+    if (a.assignedTo !== b.assignedTo) {
+      return a.assignedTo ? 1 : -1;
+    }
+
     const timeDiff = toTimestamp(b.updatedAt) - toTimestamp(a.updatedAt);
     if (timeDiff !== 0) return timeDiff;
+
     return a.visitorId.localeCompare(b.visitorId);
   });
 
@@ -35,6 +65,8 @@ export function VisitorsTable({ items }: { items: VisitorListItem[] }) {
           <tr>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Name</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Email</th>
+            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Followup State</th>
+            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Assigned To</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Visitor ID</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Activity</th>
           </tr>
@@ -48,6 +80,12 @@ export function VisitorsTable({ items }: { items: VisitorListItem[] }) {
                 </Link>
               </td>
               <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>{item.email ?? "-"}</td>
+              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                <FollowupStateBadge state={item.followupState} />
+              </td>
+              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                {item.assignedTo ?? "-"}
+              </td>
               <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontFamily: "monospace" }}>{item.visitorId}</span>

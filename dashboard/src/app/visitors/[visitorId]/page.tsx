@@ -61,14 +61,49 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-export default async function VisitorDetailPage(
-  { params }: { params: Promise<{ visitorId: string }> }
-) {
+export default async function VisitorDetailPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ visitorId: string }>;
+  searchParams: Promise<{ created?: string; existing?: string }>;
+}) {
   const { visitorId } = await params;
+  const { created, existing } = await searchParams;
   const data = await getVisitorDetail(visitorId);
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
+      {created === "1" ? (
+        <div
+          style={{
+            background: "#ecfdf5",
+            border: "1px solid #a7f3d0",
+            color: "#065f46",
+            borderRadius: 12,
+            padding: 12,
+            fontWeight: 600
+          }}
+        >
+          Visitor created successfully.
+        </div>
+      ) : null}
+
+      {existing === "1" ? (
+        <div
+          style={{
+            background: "#eff6ff",
+            border: "1px solid #bfdbfe",
+            color: "#1d4ed8",
+            borderRadius: 12,
+            padding: 12,
+            fontWeight: 600
+          }}
+        >
+          Visitor already existed. Opened existing record.
+        </div>
+      ) : null}
+
       <div
         style={{
           background: "#fff",

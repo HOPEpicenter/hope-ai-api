@@ -11,6 +11,7 @@ type Props = {
 
 type QueueFilter = "all" | "action-needed" | "contact-made";
 type AgeFilter = "all" | "24h+" | "48h+" | "72h+";
+type StageFilter = "all" | "guest" | "connected" | "member" | "unknown";
 type SortOption = "oldest-assigned" | "newest-assigned" | "last-contact";
 
 const MY_ASSIGNEE = (process.env.NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE ?? "").trim();
@@ -63,6 +64,15 @@ function matchesAgeFilter(item: FollowupItem, filter: AgeFilter) {
   if (filter === "48h+") return hours >= 48;
   if (filter === "24h+") return hours >= 24;
   return true;
+}
+
+function matchesStageFilter(item: FollowupItem, filter: StageFilter) {
+  if (filter === "all") return true;
+
+  const stage = (item.stage ?? "").trim().toLowerCase();
+  if (!stage) return filter === "unknown";
+
+  return stage === filter;
 }
 
 function matchesAssigneeFilter(item: FollowupItem, filter: string) {
@@ -153,12 +163,14 @@ export function FollowupsTableClient({ items }: Props) {
   const initialSearch = searchParams.get("q") ?? "";
   const initialQueueFilter = (searchParams.get("queue") as QueueFilter | null) ?? "all";
   const initialAgeFilter = (searchParams.get("age") as AgeFilter | null) ?? "all";
+  const initialStageFilter = (searchParams.get("stage") as StageFilter | null) ?? "all";
   const initialSort = (searchParams.get("sort") as SortOption | null) ?? "oldest-assigned";
   const initialAssigneeFilter = searchParams.get("assignee") ?? "all";
 
   const [search, setSearch] = useState(initialSearch);
   const [queueFilter, setQueueFilter] = useState<QueueFilter>(initialQueueFilter);
   const [ageFilter, setAgeFilter] = useState<AgeFilter>(initialAgeFilter);
+  const [stageFilter, setStageFilter] = useState<StageFilter>(initialStageFilter);
   const [sort, setSort] = useState<SortOption>(initialSort);
   const [assigneeFilter, setAssigneeFilter] = useState<string>(initialAssigneeFilter);
 
@@ -172,6 +184,7 @@ export function FollowupsTableClient({ items }: Props) {
     q?: string;
     queue?: QueueFilter;
     age?: AgeFilter;
+    stage?: StageFilter;
     sort?: SortOption;
     assignee?: string;
   }) {
@@ -180,6 +193,7 @@ export function FollowupsTableClient({ items }: Props) {
     const q = next.q ?? search;
     const queue = next.queue ?? queueFilter;
     const age = next.age ?? ageFilter;
+    const stage = next.stage ?? stageFilter;
     const sortValue = next.sort ?? sort;
     const assignee = next.assignee ?? assigneeFilter;
 
@@ -199,6 +213,12 @@ export function FollowupsTableClient({ items }: Props) {
       params.set("age", age);
     } else {
       params.delete("age");
+    }
+
+    if (stage !== "all") {
+      params.set("stage", stage);
+    } else {
+      params.delete("stage");
     }
 
     if (sortValue !== "oldest-assigned") {
@@ -223,12 +243,13 @@ export function FollowupsTableClient({ items }: Props) {
         matchesSearch(item, normalizedSearch) &&
         matchesQueueFilter(item, queueFilter) &&
         matchesAgeFilter(item, ageFilter) &&
+        matchesStageFilter(item, stageFilter) &&
         matchesAssigneeFilter(item, assigneeFilter)
       );
     });
 
     return sortItems(filtered, sort);
-  }, [items, normalizedSearch, queueFilter, ageFilter, assigneeFilter, sort]);
+  }, [items, normalizedSearch, queueFilter, ageFilter, stageFilter, assigneeFilter, sort]);
 
   const aged24Count = useMemo(() => countAgedItems(items, 24), [items]);
   const aged48Count = useMemo(() => countAgedItems(items, 48), [items]);
@@ -239,17 +260,20 @@ export function FollowupsTableClient({ items }: Props) {
     normalizedSearch.length > 0 ||
     queueFilter !== "all" ||
     ageFilter !== "all" ||
+    stageFilter !== "all" ||
     assigneeFilter !== "all" ||
     sort !== "oldest-assigned";
 
   function applyAllPreset() {
     setQueueFilter("all");
     setAgeFilter("all");
-    setSort("oldest-assigned");
+    setStageFilter("all");
+                  setSort("oldest-assigned");
     setAssigneeFilter("all");
     updateUrl({
       queue: "all",
       age: "all",
+      stage: "all",
       sort: "oldest-assigned",
       assignee: "all"
     });
@@ -259,11 +283,13 @@ export function FollowupsTableClient({ items }: Props) {
     if (!MY_ASSIGNEE) return;
     setQueueFilter("action-needed");
     setAgeFilter("all");
-    setSort("oldest-assigned");
+    setStageFilter("all");
+                  setSort("oldest-assigned");
     setAssigneeFilter(MY_ASSIGNEE);
     updateUrl({
       queue: "action-needed",
       age: "all",
+      stage: "all",
       sort: "oldest-assigned",
       assignee: MY_ASSIGNEE
     });
@@ -272,7 +298,8 @@ export function FollowupsTableClient({ items }: Props) {
   function applyStale48Preset() {
     setQueueFilter("action-needed");
     setAgeFilter("48h+");
-    setSort("oldest-assigned");
+    setStageFilter("all");
+                  setSort("oldest-assigned");
     updateUrl({
       queue: "action-needed",
       age: "48h+",
@@ -284,12 +311,14 @@ export function FollowupsTableClient({ items }: Props) {
     setSearch("");
     setQueueFilter("all");
     setAgeFilter("all");
-    setSort("oldest-assigned");
+    setStageFilter("all");
+                  setSort("oldest-assigned");
     setAssigneeFilter("all");
     updateUrl({
       q: "",
       queue: "all",
       age: "all",
+      stage: "all",
       sort: "oldest-assigned",
       assignee: "all"
     });
@@ -298,7 +327,8 @@ export function FollowupsTableClient({ items }: Props) {
   function applyAgeSummaryPreset(nextAge: AgeFilter) {
     setQueueFilter("action-needed");
     setAgeFilter(nextAge);
-    setSort("oldest-assigned");
+    setStageFilter("all");
+                  setSort("oldest-assigned");
     updateUrl({
       queue: "action-needed",
       age: nextAge,
@@ -456,6 +486,27 @@ export function FollowupsTableClient({ items }: Props) {
               </button>
             ) : null}
 
+            {stageFilter !== "all" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setStageFilter("all");
+                  updateUrl({ stage: "all" });
+                }}
+                style={{
+                  border: "1px solid #d1d5db",
+                  background: "#f9fafb",
+                  borderRadius: 999,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  color: "#111827",
+                  cursor: "pointer"
+                }}
+              >
+                Stage: {stageFilter} ×
+              </button>
+            ) : null}
+
             {assigneeFilter !== "all" ? (
               <button
                 type="button"
@@ -481,6 +532,7 @@ export function FollowupsTableClient({ items }: Props) {
               <button
                 type="button"
                 onClick={() => {
+                  setStageFilter("all");
                   setSort("oldest-assigned");
                   updateUrl({ sort: "oldest-assigned" });
                 }}
@@ -584,6 +636,34 @@ export function FollowupsTableClient({ items }: Props) {
           </div>
 
           <div style={{ display: "grid", gap: 6 }}>
+            <label htmlFor="followups-stage-filter" style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
+              Stage
+            </label>
+            <select
+              id="followups-stage-filter"
+              value={stageFilter}
+              onChange={(event) => {
+                const value = event.target.value as StageFilter;
+                setStageFilter(value);
+                updateUrl({ stage: value });
+              }}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: "1px solid #d1d5db",
+                background: "#fff",
+                color: "#111827"
+              }}
+            >
+              <option value="all">All</option>
+              <option value="guest">Guest</option>
+              <option value="connected">Connected</option>
+              <option value="member">Member</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </div>
+
+          <div style={{ display: "grid", gap: 6 }}>
             <label htmlFor="followups-assignee" style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
               Assignee
             </label>
@@ -655,7 +735,8 @@ export function FollowupsTableClient({ items }: Props) {
         onAgeSelect={(value) => {
           setQueueFilter("action-needed");
           setAgeFilter(value);
-          setSort("oldest-assigned");
+          setStageFilter("all");
+                  setSort("oldest-assigned");
           updateUrl({
             queue: "action-needed",
             age: value,
@@ -666,6 +747,17 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 

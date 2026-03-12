@@ -274,6 +274,7 @@ function LastAssignedButton({
 
   const nextSort = sort === "newest-assigned" ? "oldest-assigned" : "newest-assigned";
   const active = sort === "oldest-assigned" || sort === "newest-assigned";
+  const modeLabel = sort === "newest-assigned" ? "Newest first" : "Oldest first";
 
   return (
     <button
@@ -291,7 +292,7 @@ function LastAssignedButton({
         cursor: "pointer"
       }}
     >
-      {formatRelativeTime(value)}
+      {formatRelativeTime(value)} · {modeLabel}
     </button>
   );
 }
@@ -577,6 +578,7 @@ export function FollowupsTable({
     </div>
   );
 }
+
 
 
 

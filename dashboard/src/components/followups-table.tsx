@@ -241,6 +241,32 @@ function normalizeOutcomeValue(value: string | null | undefined) {
   return (value ?? "").trim().toLowerCase();
 }
 
+function getOutcomeBadgeColors(value: string | null | undefined) {
+  const normalized = normalizeOutcomeValue(value);
+
+  if (normalized === "connected") {
+    return { background: "#dcfce7", color: "#166534", border: "#bbf7d0" };
+  }
+
+  if (normalized === "left_message") {
+    return { background: "#dbeafe", color: "#1d4ed8", border: "#bfdbfe" };
+  }
+
+  if (normalized === "no_response") {
+    return { background: "#fee2e2", color: "#991b1b", border: "#fecaca" };
+  }
+
+  if (normalized === "closed") {
+    return { background: "#e5e7eb", color: "#374151", border: "#d1d5db" };
+  }
+
+  if (normalized === "needs_care") {
+    return { background: "#fef3c7", color: "#92400e", border: "#fde68a" };
+  }
+
+  return { background: "#f3f4f6", color: "#374151", border: "#d1d5db" };
+}
+
 function formatOutcomeLabel(value: string | null | undefined) {
   if (!value) {
     return <span style={{ color: "#6b7280" }}>No outcome</span>;
@@ -412,12 +438,16 @@ export function FollowupsTable({
                       type="button"
                       onClick={() => onOutcomeSelect(normalizeOutcomeValue(item.lastFollowupOutcome))}
                       style={{
-                        border: normalizeOutcomeValue(item.lastFollowupOutcome) === outcomeFilter ? "1px solid #111827" : "1px solid #d1d5db",
-                        background: "#fff",
-                        color: "#111827",
+                        border:
+                          normalizeOutcomeValue(item.lastFollowupOutcome) === outcomeFilter
+                            ? "1px solid #111827"
+                            : "1px solid " + getOutcomeBadgeColors(item.lastFollowupOutcome).border,
+                        background: getOutcomeBadgeColors(item.lastFollowupOutcome).background,
+                        color: getOutcomeBadgeColors(item.lastFollowupOutcome).color,
                         borderRadius: 999,
                         padding: "6px 10px",
                         fontSize: 12,
+                        fontWeight: 600,
                         cursor: "pointer"
                       }}
                     >
@@ -438,6 +468,7 @@ export function FollowupsTable({
     </div>
   );
 }
+
 
 
 

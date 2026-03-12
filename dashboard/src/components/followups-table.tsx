@@ -237,6 +237,43 @@ function renderTimeCell(value: string | null | undefined, emptyLabel: string) {
   return formatRelativeTime(value);
 }
 
+function LastAssignedButton({
+  value,
+  sort,
+  onSortSelect
+}: {
+  value: string | null | undefined;
+  sort: "oldest-assigned" | "newest-assigned" | "last-contact";
+  onSortSelect: (value: "oldest-assigned" | "newest-assigned" | "last-contact") => void;
+}) {
+  if (!value) {
+    return <span style={{ color: "#6b7280" }}>Not assigned</span>;
+  }
+
+  const nextSort = sort === "newest-assigned" ? "oldest-assigned" : "newest-assigned";
+  const active = sort === "oldest-assigned" || sort === "newest-assigned";
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSortSelect(nextSort)}
+      title={formatAbsoluteTime(value)}
+      style={{
+        border: active ? "1px solid #111827" : "1px solid #d1d5db",
+        background: active ? "#111827" : "#fff",
+        color: active ? "#fff" : "#111827",
+        borderRadius: 999,
+        padding: "6px 10px",
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: "pointer"
+      }}
+    >
+      {formatRelativeTime(value)}
+    </button>
+  );
+}
+
 function LastContactButton({
   value,
   sort,
@@ -458,11 +495,12 @@ export function FollowupsTable({
                     onAgeSelect={onAgeSelect}
                   />
                 </td>
-                <td
-                  style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
-                  title={formatAbsoluteTime(item.lastFollowupAssignedAt)}
-                >
-                  {renderTimeCell(item.lastFollowupAssignedAt, "Not assigned")}
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <LastAssignedButton
+                    value={item.lastFollowupAssignedAt}
+                    sort={sort}
+                    onSortSelect={onSortSelect}
+                  />
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   <LastContactButton
@@ -507,6 +545,7 @@ export function FollowupsTable({
     </div>
   );
 }
+
 
 
 

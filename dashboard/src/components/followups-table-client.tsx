@@ -12,6 +12,8 @@ type QueueFilter = "all" | "action-needed" | "contact-made";
 type AgeFilter = "all" | "24h+" | "48h+" | "72h+";
 type SortOption = "oldest-assigned" | "newest-assigned" | "last-contact";
 
+const MY_ASSIGNEE = (process.env.NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE ?? "").trim();
+
 function toTimestamp(value: string | null | undefined, fallback: number) {
   if (!value) return fallback;
   const time = new Date(value).getTime();
@@ -110,6 +112,38 @@ function countAgedItems(items: FollowupItem[], minimumHours: number) {
   }).length;
 }
 
+function PresetButton({
+  active,
+  disabled,
+  label,
+  onClick
+}: {
+  active: boolean;
+  disabled?: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: "8px 12px",
+        borderRadius: 10,
+        border: active ? "1px solid #111827" : "1px solid #d1d5db",
+        background: active ? "#111827" : "#fff",
+        color: active ? "#fff" : "#111827",
+        fontWeight: 600,
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.5 : 1
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 export function FollowupsTableClient({ items }: Props) {
   const [search, setSearch] = useState("");
   const [queueFilter, setQueueFilter] = useState<QueueFilter>("all");
@@ -120,9 +154,7 @@ export function FollowupsTableClient({ items }: Props) {
   const normalizedSearch = search.trim().toLowerCase();
 
   const assigneeOptions = useMemo(() => {
-    return Array.from(
-      new Set(items.map((item) => item.assignedTo?.ownerId).filter(Boolean))
-    ).sort();
+    return Array.from(new Set(items.map((item) => item.assignedTo?.ownerId).filter(Boolean))).sort();
   }, [items]);
 
   const filteredItems = useMemo(() => {
@@ -136,11 +168,34 @@ export function FollowupsTableClient({ items }: Props) {
     });
 
     return sortItems(filtered, sort);
-  }, [items, normalizedSearch, queueFilter, ageFilter, sort]);
+  }, [items, normalizedSearch, queueFilter, ageFilter, assigneeFilter, sort]);
 
   const aged24Count = useMemo(() => countAgedItems(items, 24), [items]);
   const aged48Count = useMemo(() => countAgedItems(items, 48), [items]);
   const aged72Count = useMemo(() => countAgedItems(items, 72), [items]);
+
+  const mineActive = assigneeFilter !== "all" && assigneeFilter === MY_ASSIGNEE;
+
+  function applyAllPreset() {
+    setQueueFilter("all");
+    setAgeFilter("all");
+    setSort("oldest-assigned");
+    setAssigneeFilter("all");
+  }
+
+  function applyMinePreset() {
+    if (!MY_ASSIGNEE) return;
+    setQueueFilter("action-needed");
+    setAgeFilter("all");
+    setSort("oldest-assigned");
+    setAssigneeFilter(MY_ASSIGNEE);
+  }
+
+  function applyStale48Preset() {
+    setQueueFilter("action-needed");
+    setAgeFilter("48h+");
+    setSort("oldest-assigned");
+  }
 
   return (
     <section style={{ display: "grid", gap: 12 }}>
@@ -169,6 +224,12 @@ export function FollowupsTableClient({ items }: Props) {
           gap: 12
         }}
       >
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <PresetButton active={!mineActive && queueFilter === "all" && ageFilter === "all" && assigneeFilter === "all"} label="All" onClick={applyAllPreset} />
+          <PresetButton active={mineActive && queueFilter === "action-needed"} label="My Followups" onClick={applyMinePreset} disabled={!MY_ASSIGNEE} />
+          <PresetButton active={queueFilter === "action-needed" && ageFilter === "48h+"} label="Stale 48h+" onClick={applyStale48Preset} />
+        </div>
+
         <div
           style={{
             display: "grid",
@@ -258,7 +319,9 @@ export function FollowupsTableClient({ items }: Props) {
             >
               <option value="all">All</option>
               {assigneeOptions.map((id) => (
-                <option key={id} value={id}>{id}</option>
+                <option key={id} value={id}>
+                  {id}
+                </option>
               ))}
             </select>
           </div>
@@ -295,6 +358,3 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
-
-
-

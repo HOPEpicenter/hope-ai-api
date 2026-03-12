@@ -314,6 +314,7 @@ export function FollowupsTable({
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Assigned</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Contact</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Outcome</th>
+            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -400,6 +401,9 @@ export function FollowupsTable({
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   {formatOutcomeLabel(item.lastFollowupOutcome)}
                 </td>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <CopyButton value={item.visitorId} label="Copy ID" />
+                </td>
               </tr>
             );
           })}
@@ -408,6 +412,8 @@ export function FollowupsTable({
     </div>
   );
 }
+
+
 
 
 

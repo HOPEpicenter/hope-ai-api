@@ -11,7 +11,17 @@ function toTimestamp(value: string | null | undefined, fallback = Number.MAX_SAF
   return Number.isNaN(time) ? fallback : time;
 }
 
-function Badge({ needsFollowup }: { needsFollowup: boolean }) {
+function Badge({
+  needsFollowup,
+  queueFilter,
+  onQueueSelect
+}: {
+  needsFollowup: boolean;
+  queueFilter: "all" | "action-needed" | "contact-made";
+  onQueueSelect: (value: "action-needed" | "contact-made") => void;
+}) {
+  const value = needsFollowup ? "action-needed" : "contact-made";
+
   const style: CSSProperties = {
     display: "inline-block",
     padding: "4px 8px",
@@ -19,10 +29,20 @@ function Badge({ needsFollowup }: { needsFollowup: boolean }) {
     fontSize: 12,
     fontWeight: 600,
     background: needsFollowup ? "#fef3c7" : "#dcfce7",
-    color: "#111827"
+    color: "#111827",
+    border: queueFilter === value ? "1px solid #111827" : "1px solid transparent",
+    cursor: "pointer"
   };
 
-  return <span style={style}>{needsFollowup ? "Action needed" : "Contact made"}</span>;
+  return (
+    <button
+      type="button"
+      onClick={() => onQueueSelect(value)}
+      style={style}
+    >
+      {needsFollowup ? "Action needed" : "Contact made"}
+    </button>
+  );
 }
 
 function getFollowupAgeHours(value: string | null | undefined): number | null {
@@ -235,17 +255,21 @@ function formatOutcomeLabel(value: string | null | undefined) {
 
 export function FollowupsTable({
   items,
+  queueFilter,
   assigneeFilter,
   ageFilter,
   stageFilter,
+  onQueueSelect,
   onAssigneeSelect,
   onAgeSelect,
   onStageSelect
 }: {
   items: FollowupItem[];
+  queueFilter: "all" | "action-needed" | "contact-made";
   assigneeFilter: string;
   ageFilter: string;
   stageFilter: string;
+  onQueueSelect: (value: "action-needed" | "contact-made") => void;
   onAssigneeSelect: (value: string) => void;
   onAgeSelect: (value: "24h+" | "48h+" | "72h+") => void;
   onStageSelect: (value: "guest" | "connected" | "member" | "unknown") => void;
@@ -347,7 +371,11 @@ export function FollowupsTable({
                   />
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  <Badge needsFollowup={item.needsFollowup} />
+                  <Badge
+                    needsFollowup={item.needsFollowup}
+                    queueFilter={queueFilter}
+                    onQueueSelect={onQueueSelect}
+                  />
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   <AgingBadge
@@ -380,6 +408,10 @@ export function FollowupsTable({
     </div>
   );
 }
+
+
+
+
 
 
 

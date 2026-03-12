@@ -384,13 +384,19 @@ export function FollowupsTable({
   onSortSelect: (value: "oldest-assigned" | "newest-assigned" | "last-contact") => void;
 }) {
   if (items.length === 0) {
+    const hasFilters =
+      queueFilter !== "all" ||
+      assigneeFilter !== "all" ||
+      ageFilter !== "all" ||
+      stageFilter !== "all" ||
+      outcomeFilter !== "all";
+
     return (
-      <PageState
-        title="No open followups"
-        message="All visitors are up to date. New followups will appear here when action is required."
-        actionHref="/overview"
-        actionLabel="Back to overview"
-      />
+      <div style={{ padding: 24, color: "#6b7280" }}>
+        {hasFilters
+          ? "No followups match the current filters."
+          : "No followups in this queue yet."}
+      </div>
     );
   }
 
@@ -545,6 +551,8 @@ export function FollowupsTable({
     </div>
   );
 }
+
+
 
 
 

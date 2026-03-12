@@ -9,6 +9,7 @@ export const mockFollowups: FollowupsResponse = {
       lastFollowupAssignedAt: "2026-03-07T16:30:00.000Z",
       lastFollowupContactedAt: null,
       lastFollowupOutcomeAt: null,
+      lastFollowupOutcome: null,
       resolvedForAssignment: false,
       stage: "CONNECTED",
       needsFollowup: true
@@ -19,9 +20,12 @@ export const mockFollowups: FollowupsResponse = {
       lastFollowupAssignedAt: "2026-03-07T15:10:00.000Z",
       lastFollowupContactedAt: "2026-03-07T15:45:00.000Z",
       lastFollowupOutcomeAt: null,
+      lastFollowupOutcome: null,
       resolvedForAssignment: false,
       stage: "NEW",
       needsFollowup: false
     }
   ]
 };
+
+

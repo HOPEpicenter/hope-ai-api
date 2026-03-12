@@ -36,7 +36,17 @@ function getFollowupAgeHours(value: string | null | undefined): number | null {
   return Math.floor(diffMs / (1000 * 60 * 60));
 }
 
-function AgingBadge({ assignedAt, needsFollowup }: { assignedAt: string | null | undefined; needsFollowup: boolean }) {
+function AgingBadge({
+  assignedAt,
+  needsFollowup,
+  ageFilter,
+  onAgeSelect
+}: {
+  assignedAt: string | null | undefined;
+  needsFollowup: boolean;
+  ageFilter: string;
+  onAgeSelect: (value: "24h+" | "48h+" | "72h+") => void;
+}) {
   if (!needsFollowup) {
     return null;
   }
@@ -71,10 +81,24 @@ function AgingBadge({ assignedAt, needsFollowup }: { assignedAt: string | null |
     fontSize: 12,
     fontWeight: 600,
     background,
-    color
+    color,
+    border: label === ageFilter ? "1px solid #111827" : "1px solid transparent",
+    cursor: label === "New" ? "default" : "pointer"
   };
 
-  return <span style={style}>{label}</span>;
+  if (label === "New") {
+    return <span style={style}>{label}</span>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onAgeSelect(label as "24h+" | "48h+" | "72h+")}
+      style={style}
+    >
+      {label}
+    </button>
+  );
 }
 
 function StageBadge({ stage }: { stage: string | null | undefined }) {
@@ -134,11 +158,15 @@ function formatOutcomeLabel(value: string | null | undefined) {
 export function FollowupsTable({
   items,
   assigneeFilter,
-  onAssigneeSelect
+  ageFilter,
+  onAssigneeSelect,
+  onAgeSelect
 }: {
   items: FollowupItem[];
   assigneeFilter: string;
+  ageFilter: string;
   onAssigneeSelect: (value: string) => void;
+  onAgeSelect: (value: "24h+" | "48h+" | "72h+") => void;
 }) {
   if (items.length === 0) {
     return (
@@ -236,7 +264,12 @@ export function FollowupsTable({
                   <Badge needsFollowup={item.needsFollowup} />
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  <AgingBadge assignedAt={item.lastFollowupAssignedAt} needsFollowup={item.needsFollowup} />
+                  <AgingBadge
+                    assignedAt={item.lastFollowupAssignedAt}
+                    needsFollowup={item.needsFollowup}
+                    ageFilter={ageFilter}
+                    onAgeSelect={onAgeSelect}
+                  />
                 </td>
                 <td
                   style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
@@ -261,5 +294,9 @@ export function FollowupsTable({
     </div>
   );
 }
+
+
+
+
 
 

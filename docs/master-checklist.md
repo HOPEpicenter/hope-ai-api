@@ -1,5 +1,12 @@
 ## Session Closeout
 
+### 2026-03-12 (Session Closeout)
+
+- [x] Merged PR #300: followups active filter chips + clear-all control
+- [x] Merged PR #301: clickable 24h+/48h+/72h+ aging summary cards
+- [x] Verified CI passed after both merges
+- [x] Verified staging deploy passed after both merges
+
 ### 2026-03-07 (session closeout)
 
 - [x] Merged **#245**: integration summary follow-up invariants.
@@ -175,5 +182,4 @@ Remaining (business logic expansion):
 - [x] Merged **#273**: dashboard empty state messaging polish.
 - [x] Merged **#274**: dashboard copy and label polish.
 - [x] Merged **#275**: clarified Formation stage metadata docs contract.
-
 

@@ -1,5 +1,18 @@
 # HOPE AI — MASTER PLAN
 
+## 2026-03-12 Update
+
+**What landed**
+- ✅ **#300**: Followups dashboard now shows active filter chips and a clear-all control.
+- ✅ **#301**: Followups aging summary cards (24h+/48h+/72h+) are now clickable presets.
+
+**Why this matters (master plan alignment)**
+- Improves operator speed and queue visibility without widening backend/API scope.
+- Keeps this work on the OPS/dashboard usability side while preserving `/api/*` as the product surface.
+
+**Next**
+- Continue small followups dashboard usability slices only if they stay production-safe and clearly improve operator workflow.
+- Do not reopen backend scope here unless a real workflow blocker appears.
 ## 2026-03-07 Update
 
 **What landed**
@@ -239,5 +252,4 @@ Formation docs clarification also landed:
 Next planned slice:
 - UI-only dashboard usability improvements
 - do not reopen backend scope unless a real blocker appears
-
 

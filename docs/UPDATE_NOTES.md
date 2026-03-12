@@ -1,5 +1,11 @@
 # UPDATE_NOTES.md
 
+## 2026-03-12
+
+- ✅ Merged **#300**: followups dashboard active filter chips + clear-all control.
+- ✅ Merged **#301**: followups aging summary cards are now clickable presets.
+- ✅ Verified CI green after both merges.
+- ✅ Verified staging deploy green after both merges.
 ## 2026-02-28
 
 - Merged: #165 feat(api): list visitors (GET /api/visitors) + CI smoke/auth-scoping alignment

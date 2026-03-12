@@ -295,21 +295,65 @@ export function FollowupsTableClient({ items }: Props) {
     });
   }
 
+  function applyAgeSummaryPreset(nextAge: AgeFilter) {
+    setQueueFilter("action-needed");
+    setAgeFilter(nextAge);
+    setSort("oldest-assigned");
+    updateUrl({
+      queue: "action-needed",
+      age: nextAge,
+      sort: "oldest-assigned"
+    });
+  }
+
   return (
     <section style={{ display: "grid", gap: 12 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+        <button
+          type="button"
+          onClick={() => applyAgeSummaryPreset("24h+")}
+          style={{
+            background: "#fff",
+            border: queueFilter === "action-needed" && ageFilter === "24h+" ? "2px solid #2563eb" : "1px solid #e5e7eb",
+            borderRadius: 12,
+            padding: 16,
+            textAlign: "left",
+            cursor: "pointer"
+          }}
+        >
           <div style={{ fontSize: 12, color: "#6b7280" }}>24h+ Action Needed</div>
           <div style={{ fontSize: 28, fontWeight: 700 }}>{aged24Count}</div>
-        </div>
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+        </button>
+        <button
+          type="button"
+          onClick={() => applyAgeSummaryPreset("48h+")}
+          style={{
+            background: "#fff",
+            border: queueFilter === "action-needed" && ageFilter === "48h+" ? "2px solid #2563eb" : "1px solid #e5e7eb",
+            borderRadius: 12,
+            padding: 16,
+            textAlign: "left",
+            cursor: "pointer"
+          }}
+        >
           <div style={{ fontSize: 12, color: "#6b7280" }}>48h+ Action Needed</div>
           <div style={{ fontSize: 28, fontWeight: 700 }}>{aged48Count}</div>
-        </div>
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+        </button>
+        <button
+          type="button"
+          onClick={() => applyAgeSummaryPreset("72h+")}
+          style={{
+            background: "#fff",
+            border: queueFilter === "action-needed" && ageFilter === "72h+" ? "2px solid #2563eb" : "1px solid #e5e7eb",
+            borderRadius: 12,
+            padding: 16,
+            textAlign: "left",
+            cursor: "pointer"
+          }}
+        >
           <div style={{ fontSize: 12, color: "#6b7280" }}>72h+ Action Needed</div>
           <div style={{ fontSize: 28, fontWeight: 700 }}>{aged72Count}</div>
-        </div>
+        </button>
       </div>
 
       <div

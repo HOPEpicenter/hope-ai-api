@@ -25,6 +25,58 @@ function Badge({ needsFollowup }: { needsFollowup: boolean }) {
   return <span style={style}>{needsFollowup ? "Action needed" : "Contact made"}</span>;
 }
 
+function getFollowupAgeHours(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const assignedMs = new Date(value).getTime();
+  if (Number.isNaN(assignedMs)) return null;
+
+  const diffMs = Date.now() - assignedMs;
+  if (diffMs < 0) return 0;
+
+  return Math.floor(diffMs / (1000 * 60 * 60));
+}
+
+function AgingBadge({ assignedAt, needsFollowup }: { assignedAt: string | null | undefined; needsFollowup: boolean }) {
+  if (!needsFollowup) {
+    return null;
+  }
+
+  const hours = getFollowupAgeHours(assignedAt);
+  if (hours === null) {
+    return null;
+  }
+
+  let label = "New";
+  let background = "#e5e7eb";
+  let color = "#374151";
+
+  if (hours >= 72) {
+    label = "72h+";
+    background = "#fee2e2";
+    color = "#991b1b";
+  } else if (hours >= 48) {
+    label = "48h+";
+    background = "#ffedd5";
+    color = "#9a3412";
+  } else if (hours >= 24) {
+    label = "24h+";
+    background = "#fef3c7";
+    color = "#92400e";
+  }
+
+  const style: CSSProperties = {
+    display: "inline-block",
+    padding: "4px 8px",
+    borderRadius: 9999,
+    fontSize: 12,
+    fontWeight: 600,
+    background,
+    color
+  };
+
+  return <span style={style}>{label}</span>;
+}
+
 function StageBadge({ stage }: { stage: string | null | undefined }) {
   const base: CSSProperties = {
     display: "inline-block",
@@ -116,6 +168,7 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Assigned To</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Stage</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Queue State</th>
+            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Age</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Assigned</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Contact</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Outcome</th>
@@ -154,6 +207,9 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   <Badge needsFollowup={item.needsFollowup} />
+                </td>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <AgingBadge assignedAt={item.lastFollowupAssignedAt} needsFollowup={item.needsFollowup} />
                 </td>
                 <td
                   style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}

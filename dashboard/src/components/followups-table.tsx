@@ -63,6 +63,22 @@ function renderTimeCell(value: string | null | undefined, emptyLabel: string) {
   return formatRelativeTime(value);
 }
 
+function formatOutcomeLabel(value: string | null | undefined) {
+  if (!value) {
+    return <span style={{ color: "#6b7280" }}>No outcome</span>;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "connected") return "Connected";
+  if (normalized === "left_message") return "Left message";
+  if (normalized === "no_response") return "No response";
+  if (normalized === "closed") return "Closed";
+  if (normalized === "needs_care") return "Needs care";
+
+  return value;
+}
+
 export function FollowupsTable({ items }: { items: FollowupItem[] }) {
   if (items.length === 0) {
     return (
@@ -102,6 +118,7 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Queue State</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Assigned</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Contact</th>
+            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Outcome</th>
           </tr>
         </thead>
         <tbody>
@@ -150,6 +167,9 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
                 >
                   {renderTimeCell(item.lastFollowupContactedAt, "Never contacted")}
                 </td>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  {formatOutcomeLabel(item.lastFollowupOutcome)}
+                </td>
               </tr>
             );
           })}
@@ -158,3 +178,4 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
     </div>
   );
 }
+

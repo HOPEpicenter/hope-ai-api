@@ -55,6 +55,7 @@ export default async function (context: any, req: any): Promise<void> {
       const assignedAt = p.lastFollowupAssignedAt ?? null;
       const contactedAt = p.lastFollowupContactedAt ?? null;
       const outcomeAt = p.lastFollowupOutcomeAt ?? null;
+      const outcome = p.lastFollowupOutcome ?? null;
 
       const assignedAtMs = toMs(assignedAt);
       const contactedAtMs = toMs(contactedAt);
@@ -76,6 +77,7 @@ export default async function (context: any, req: any): Promise<void> {
         lastFollowupAssignedAt: assignedAt,
         lastFollowupContactedAt: contactedAt,
         lastFollowupOutcomeAt: outcomeAt,
+        lastFollowupOutcome: outcome,
         resolvedForAssignment,
         stage: p.stage ?? null,
         needsFollowup
@@ -114,4 +116,5 @@ async function ensureTableExists(table: TableClient) {
     throw e;
   }
 }
+
 

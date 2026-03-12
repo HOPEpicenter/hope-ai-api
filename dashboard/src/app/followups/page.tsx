@@ -1,4 +1,4 @@
-import { FollowupsTable } from "@/components/followups-table";
+import { FollowupsTableClient } from "@/components/followups-table-client";
 import { getFollowups } from "@/lib/loaders/get-followups";
 
 export default async function FollowupsPage() {
@@ -35,7 +35,8 @@ export default async function FollowupsPage() {
         </div>
       </div>
 
-      <FollowupsTable items={data.items} />
+      <FollowupsTableClient items={data.items} />
     </section>
   );
 }
+

@@ -101,7 +101,15 @@ function AgingBadge({
   );
 }
 
-function StageBadge({ stage }: { stage: string | null | undefined }) {
+function StageBadge({
+  stage,
+  stageFilter,
+  onStageSelect
+}: {
+  stage: string | null | undefined;
+  stageFilter: string;
+  onStageSelect: (value: "guest" | "connected" | "member" | "unknown") => void;
+}) {
   const base: CSSProperties = {
     display: "inline-block",
     padding: "4px 8px",
@@ -111,24 +119,94 @@ function StageBadge({ stage }: { stage: string | null | undefined }) {
   };
 
   if (!stage) {
-    return <span style={{ ...base, background: "#f3f4f6", color: "#374151" }}>Unknown</span>;
+    return (
+      <button
+        type="button"
+        onClick={() => onStageSelect("unknown")}
+        style={{
+          ...base,
+          background: "#f3f4f6",
+          color: "#374151",
+          border: stageFilter === "unknown" ? "1px solid #111827" : "1px solid transparent",
+          cursor: "pointer"
+        }}
+      >
+        Unknown
+      </button>
+    );
   }
 
   const s = stage.toLowerCase();
 
   if (s === "guest") {
-    return <span style={{ ...base, background: "#f3f4f6", color: "#374151" }}>Guest</span>;
+    return (
+      <button
+        type="button"
+        onClick={() => onStageSelect("guest")}
+        style={{
+          ...base,
+          background: "#f3f4f6",
+          color: "#374151",
+          border: stageFilter === "guest" ? "1px solid #111827" : "1px solid transparent",
+          cursor: "pointer"
+        }}
+      >
+        Guest
+      </button>
+    );
   }
 
   if (s === "connected") {
-    return <span style={{ ...base, background: "#dbeafe", color: "#1e40af" }}>Connected</span>;
+    return (
+      <button
+        type="button"
+        onClick={() => onStageSelect("connected")}
+        style={{
+          ...base,
+          background: "#dbeafe",
+          color: "#1e40af",
+          border: stageFilter === "connected" ? "1px solid #111827" : "1px solid transparent",
+          cursor: "pointer"
+        }}
+      >
+        Connected
+      </button>
+    );
   }
 
   if (s === "member") {
-    return <span style={{ ...base, background: "#dcfce7", color: "#166534" }}>Member</span>;
+    return (
+      <button
+        type="button"
+        onClick={() => onStageSelect("member")}
+        style={{
+          ...base,
+          background: "#dcfce7",
+          color: "#166534",
+          border: stageFilter === "member" ? "1px solid #111827" : "1px solid transparent",
+          cursor: "pointer"
+        }}
+      >
+        Member
+      </button>
+    );
   }
 
-  return <span style={{ ...base, background: "#f3f4f6", color: "#374151" }}>{stage}</span>;
+  return (
+    <button
+      type="button"
+      onClick={() => onStageSelect("unknown")}
+      style={{
+        ...base,
+        background: "#f3f4f6",
+        color: "#374151",
+        border: stageFilter === "unknown" ? "1px solid #111827" : "1px solid transparent",
+        cursor: "pointer"
+      }}
+    >
+      {stage}
+    </button>
+  );
 }
 
 function renderTimeCell(value: string | null | undefined, emptyLabel: string) {
@@ -159,14 +237,18 @@ export function FollowupsTable({
   items,
   assigneeFilter,
   ageFilter,
+  stageFilter,
   onAssigneeSelect,
-  onAgeSelect
+  onAgeSelect,
+  onStageSelect
 }: {
   items: FollowupItem[];
   assigneeFilter: string;
   ageFilter: string;
+  stageFilter: string;
   onAssigneeSelect: (value: string) => void;
   onAgeSelect: (value: "24h+" | "48h+" | "72h+") => void;
+  onStageSelect: (value: "guest" | "connected" | "member" | "unknown") => void;
 }) {
   if (items.length === 0) {
     return (
@@ -258,7 +340,11 @@ export function FollowupsTable({
                   )}
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  <StageBadge stage={item.stage} />
+                  <StageBadge
+                    stage={item.stage}
+                    stageFilter={stageFilter}
+                    onStageSelect={onStageSelect}
+                  />
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   <Badge needsFollowup={item.needsFollowup} />
@@ -294,6 +380,10 @@ export function FollowupsTable({
     </div>
   );
 }
+
+
+
+
 
 
 

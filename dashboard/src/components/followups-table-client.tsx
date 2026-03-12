@@ -62,6 +62,11 @@ function matchesAgeFilter(item: FollowupItem, filter: AgeFilter) {
   return true;
 }
 
+function matchesAssigneeFilter(item: FollowupItem, filter: string) {
+  if (filter === "all") return true;
+  return (item.assignedTo?.ownerId ?? "") === filter;
+}
+
 function sortItems(items: FollowupItem[], sort: SortOption) {
   const sorted = [...items];
 
@@ -110,15 +115,23 @@ export function FollowupsTableClient({ items }: Props) {
   const [queueFilter, setQueueFilter] = useState<QueueFilter>("all");
   const [ageFilter, setAgeFilter] = useState<AgeFilter>("all");
   const [sort, setSort] = useState<SortOption>("oldest-assigned");
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
 
   const normalizedSearch = search.trim().toLowerCase();
+
+  const assigneeOptions = useMemo(() => {
+    return Array.from(
+      new Set(items.map((item) => item.assignedTo?.ownerId).filter(Boolean))
+    ).sort();
+  }, [items]);
 
   const filteredItems = useMemo(() => {
     const filtered = items.filter((item) => {
       return (
         matchesSearch(item, normalizedSearch) &&
         matchesQueueFilter(item, queueFilter) &&
-        matchesAgeFilter(item, ageFilter)
+        matchesAgeFilter(item, ageFilter) &&
+        matchesAssigneeFilter(item, assigneeFilter)
       );
     });
 
@@ -159,7 +172,7 @@ export function FollowupsTableClient({ items }: Props) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "minmax(0, 2fr) repeat(3, minmax(0, 1fr))",
+            gridTemplateColumns: "minmax(0, 2fr) repeat(4, minmax(0, 1fr))",
             gap: 12
           }}
         >
@@ -228,6 +241,29 @@ export function FollowupsTableClient({ items }: Props) {
           </div>
 
           <div style={{ display: "grid", gap: 6 }}>
+            <label htmlFor="followups-assignee" style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
+              Assignee
+            </label>
+            <select
+              id="followups-assignee"
+              value={assigneeFilter}
+              onChange={(event) => setAssigneeFilter(event.target.value)}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: "1px solid #d1d5db",
+                background: "#fff",
+                color: "#111827"
+              }}
+            >
+              <option value="all">All</option>
+              {assigneeOptions.map((id) => (
+                <option key={id} value={id}>{id}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: "grid", gap: 6 }}>
             <label htmlFor="followups-sort" style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
               Sort
             </label>
@@ -259,5 +295,6 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
+
 
 

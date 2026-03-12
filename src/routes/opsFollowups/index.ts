@@ -25,6 +25,7 @@ opsFollowupsRouter.get("/", async (_req, res) => {
     const assignedAt = (p as any).lastFollowupAssignedAt ?? null;
     const contactedAt = (p as any).lastFollowupContactedAt ?? null;
     const outcomeAt = (p as any).lastFollowupOutcomeAt ?? null;
+    const outcome = (p as any).lastFollowupOutcome ?? null;
 
     const assignedAtMs = toMs(assignedAt);
     const contactedAtMs = toMs(contactedAt);
@@ -46,6 +47,7 @@ opsFollowupsRouter.get("/", async (_req, res) => {
       lastFollowupAssignedAt: assignedAt,
       lastFollowupContactedAt: contactedAt,
       lastFollowupOutcomeAt: outcomeAt,
+      lastFollowupOutcome: outcome,
       resolvedForAssignment: resolvedForAssignment,
       stage: (p as any).stage ?? null,
       needsFollowup,
@@ -54,4 +56,5 @@ opsFollowupsRouter.get("/", async (_req, res) => {
 
   return res.json({ ok: true, items });
 });
+
 

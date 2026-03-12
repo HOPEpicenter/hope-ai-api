@@ -97,6 +97,14 @@ function sortItems(items: FollowupItem[], sort: SortOption) {
   return sorted;
 }
 
+function countAgedItems(items: FollowupItem[], minimumHours: number) {
+  return items.filter((item) => {
+    if (!item.needsFollowup) return false;
+    const hours = getFollowupAgeHours(item.lastFollowupAssignedAt);
+    return hours !== null && hours >= minimumHours;
+  }).length;
+}
+
 export function FollowupsTableClient({ items }: Props) {
   const [search, setSearch] = useState("");
   const [queueFilter, setQueueFilter] = useState<QueueFilter>("all");
@@ -117,8 +125,27 @@ export function FollowupsTableClient({ items }: Props) {
     return sortItems(filtered, sort);
   }, [items, normalizedSearch, queueFilter, ageFilter, sort]);
 
+  const aged24Count = useMemo(() => countAgedItems(items, 24), [items]);
+  const aged48Count = useMemo(() => countAgedItems(items, 48), [items]);
+  const aged72Count = useMemo(() => countAgedItems(items, 72), [items]);
+
   return (
     <section style={{ display: "grid", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 12, color: "#6b7280" }}>24h+ Action Needed</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>{aged24Count}</div>
+        </div>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 12, color: "#6b7280" }}>48h+ Action Needed</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>{aged48Count}</div>
+        </div>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 12, color: "#6b7280" }}>72h+ Action Needed</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>{aged72Count}</div>
+        </div>
+      </div>
+
       <div
         style={{
           background: "#fff",
@@ -232,4 +259,5 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
+
 

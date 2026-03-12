@@ -237,6 +237,40 @@ function renderTimeCell(value: string | null | undefined, emptyLabel: string) {
   return formatRelativeTime(value);
 }
 
+function LastContactButton({
+  value,
+  sort,
+  onSortSelect
+}: {
+  value: string | null | undefined;
+  sort: "oldest-assigned" | "newest-assigned" | "last-contact";
+  onSortSelect: (value: "oldest-assigned" | "newest-assigned" | "last-contact") => void;
+}) {
+  if (!value) {
+    return <span style={{ color: "#6b7280" }}>Never contacted</span>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSortSelect("last-contact")}
+      title={formatAbsoluteTime(value)}
+      style={{
+        border: sort === "last-contact" ? "1px solid #111827" : "1px solid #d1d5db",
+        background: sort === "last-contact" ? "#111827" : "#fff",
+        color: sort === "last-contact" ? "#fff" : "#111827",
+        borderRadius: 999,
+        padding: "6px 10px",
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: "pointer"
+      }}
+    >
+      {formatRelativeTime(value)}
+    </button>
+  );
+}
+
 function normalizeOutcomeValue(value: string | null | undefined) {
   return (value ?? "").trim().toLowerCase();
 }
@@ -290,11 +324,13 @@ export function FollowupsTable({
   ageFilter,
   stageFilter,
   outcomeFilter,
+  sort,
   onQueueSelect,
   onAssigneeSelect,
   onAgeSelect,
   onStageSelect,
-  onOutcomeSelect
+  onOutcomeSelect,
+  onSortSelect
 }: {
   items: FollowupItem[];
   queueFilter: "all" | "action-needed" | "contact-made";
@@ -302,11 +338,13 @@ export function FollowupsTable({
   ageFilter: string;
   stageFilter: string;
   outcomeFilter: string;
+  sort: "oldest-assigned" | "newest-assigned" | "last-contact";
   onQueueSelect: (value: "action-needed" | "contact-made") => void;
   onAssigneeSelect: (value: string) => void;
   onAgeSelect: (value: "24h+" | "48h+" | "72h+") => void;
   onStageSelect: (value: "guest" | "connected" | "member" | "unknown") => void;
   onOutcomeSelect: (value: string) => void;
+  onSortSelect: (value: "oldest-assigned" | "newest-assigned" | "last-contact") => void;
 }) {
   if (items.length === 0) {
     return (
@@ -426,11 +464,12 @@ export function FollowupsTable({
                 >
                   {renderTimeCell(item.lastFollowupAssignedAt, "Not assigned")}
                 </td>
-                <td
-                  style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
-                  title={formatAbsoluteTime(item.lastFollowupContactedAt)}
-                >
-                  {renderTimeCell(item.lastFollowupContactedAt, "Never contacted")}
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <LastContactButton
+                    value={item.lastFollowupContactedAt}
+                    sort={sort}
+                    onSortSelect={onSortSelect}
+                  />
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   {item.lastFollowupOutcome ? (
@@ -468,6 +507,7 @@ export function FollowupsTable({
     </div>
   );
 }
+
 
 
 

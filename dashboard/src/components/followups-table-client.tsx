@@ -647,13 +647,25 @@ export function FollowupsTableClient({ items }: Props) {
       <FollowupsTable
         items={filteredItems}
         assigneeFilter={assigneeFilter}
+        ageFilter={ageFilter}
         onAssigneeSelect={(value) => {
           setAssigneeFilter(value);
           updateUrl({ assignee: value });
+        }}
+        onAgeSelect={(value) => {
+          setQueueFilter("action-needed");
+          setAgeFilter(value);
+          setSort("oldest-assigned");
+          updateUrl({
+            queue: "action-needed",
+            age: value,
+            sort: "oldest-assigned"
+          });
         }}
       />
     </section>
   );
 }
+
 
 

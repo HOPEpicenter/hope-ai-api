@@ -75,6 +75,12 @@ function matchesStageFilter(item: FollowupItem, filter: StageFilter) {
   return stage === filter;
 }
 
+function matchesOutcomeFilter(item: FollowupItem, filter: string) {
+  if (filter === "all") return true;
+  return (item.lastFollowupOutcome ?? "").trim().toLowerCase() === filter;
+}
+
+
 function matchesAssigneeFilter(item: FollowupItem, filter: string) {
   if (filter === "all") return true;
   return (item.assignedTo?.ownerId ?? "") === filter;
@@ -185,6 +191,7 @@ export function FollowupsTableClient({ items }: Props) {
     queue?: QueueFilter;
     age?: AgeFilter;
     stage?: StageFilter;
+    outcome?: string;
     sort?: SortOption;
     assignee?: string;
   }) {
@@ -194,6 +201,7 @@ export function FollowupsTableClient({ items }: Props) {
     const queue = next.queue ?? queueFilter;
     const age = next.age ?? ageFilter;
     const stage = next.stage ?? stageFilter;
+    const outcome = next.outcome ?? outcomeFilter;
     const sortValue = next.sort ?? sort;
     const assignee = next.assignee ?? assigneeFilter;
 
@@ -221,6 +229,12 @@ export function FollowupsTableClient({ items }: Props) {
       params.delete("stage");
     }
 
+    if (outcome !== "all") {
+      params.set("outcome", outcome);
+    } else {
+      params.delete("outcome");
+    }
+
     if (sortValue !== "oldest-assigned") {
       params.set("sort", sortValue);
     } else {
@@ -244,12 +258,13 @@ export function FollowupsTableClient({ items }: Props) {
         matchesQueueFilter(item, queueFilter) &&
         matchesAgeFilter(item, ageFilter) &&
         matchesStageFilter(item, stageFilter) &&
+        matchesOutcomeFilter(item, outcomeFilter) &&
         matchesAssigneeFilter(item, assigneeFilter)
       );
     });
 
     return sortItems(filtered, sort);
-  }, [items, normalizedSearch, queueFilter, ageFilter, stageFilter, assigneeFilter, sort]);
+  }, [items, normalizedSearch, queueFilter, ageFilter, stageFilter, outcomeFilter, assigneeFilter, sort]);
 
   const aged24Count = useMemo(() => countAgedItems(items, 24), [items]);
   const aged48Count = useMemo(() => countAgedItems(items, 48), [items]);
@@ -261,6 +276,7 @@ export function FollowupsTableClient({ items }: Props) {
     queueFilter !== "all" ||
     ageFilter !== "all" ||
     stageFilter !== "all" ||
+    outcomeFilter !== "all" ||
     assigneeFilter !== "all" ||
     sort !== "oldest-assigned";
 
@@ -269,12 +285,14 @@ export function FollowupsTableClient({ items }: Props) {
     setAgeFilter("all");
     setStageFilter("all");
                   setSort("oldest-assigned");
+    setOutcomeFilter("all");
     setAssigneeFilter("all");
     updateUrl({
       queue: "all",
       age: "all",
       stage: "all",
       sort: "oldest-assigned",
+      outcome: "all",
       assignee: "all"
     });
   }
@@ -285,12 +303,14 @@ export function FollowupsTableClient({ items }: Props) {
     setAgeFilter("all");
     setStageFilter("all");
                   setSort("oldest-assigned");
+    setOutcomeFilter("all");
     setAssigneeFilter(MY_ASSIGNEE);
     updateUrl({
       queue: "action-needed",
       age: "all",
       stage: "all",
       sort: "oldest-assigned",
+      outcome: "all",
       assignee: MY_ASSIGNEE
     });
   }
@@ -300,6 +320,7 @@ export function FollowupsTableClient({ items }: Props) {
     setAgeFilter("48h+");
     setStageFilter("all");
                   setSort("oldest-assigned");
+    setOutcomeFilter("all");
     updateUrl({
       queue: "action-needed",
       age: "48h+",
@@ -313,6 +334,7 @@ export function FollowupsTableClient({ items }: Props) {
     setAgeFilter("all");
     setStageFilter("all");
                   setSort("oldest-assigned");
+    setOutcomeFilter("all");
     setAssigneeFilter("all");
     updateUrl({
       q: "",
@@ -320,6 +342,7 @@ export function FollowupsTableClient({ items }: Props) {
       age: "all",
       stage: "all",
       sort: "oldest-assigned",
+      outcome: "all",
       assignee: "all"
     });
   }
@@ -329,6 +352,7 @@ export function FollowupsTableClient({ items }: Props) {
     setAgeFilter(nextAge);
     setStageFilter("all");
                   setSort("oldest-assigned");
+    setOutcomeFilter("all");
     updateUrl({
       queue: "action-needed",
       age: nextAge,
@@ -507,6 +531,27 @@ export function FollowupsTableClient({ items }: Props) {
               </button>
             ) : null}
 
+            {outcomeFilter !== "all" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setOutcomeFilter("all");
+                  updateUrl({ outcome: "all" });
+                }}
+                style={{
+                  border: "1px solid #d1d5db",
+                  background: "#f9fafb",
+                  borderRadius: 999,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  color: "#111827",
+                  cursor: "pointer"
+                }}
+              >
+                Outcome: {outcomeFilter} ×
+              </button>
+            ) : null}
+
             {assigneeFilter !== "all" ? (
               <button
                 type="button"
@@ -534,6 +579,7 @@ export function FollowupsTableClient({ items }: Props) {
                 onClick={() => {
                   setStageFilter("all");
                   setSort("oldest-assigned");
+    setOutcomeFilter("all");
                   updateUrl({ sort: "oldest-assigned" });
                 }}
                 style={{
@@ -737,6 +783,7 @@ export function FollowupsTableClient({ items }: Props) {
           setAgeFilter(value);
           setStageFilter("all");
                   setSort("oldest-assigned");
+    setOutcomeFilter("all");
           updateUrl({
             queue: "action-needed",
             age: value,
@@ -747,6 +794,14 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
+
+
+
+
+
+
+
+
 
 
 

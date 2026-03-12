@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FollowupsTable } from "@/components/followups-table";
 import type { FollowupItem } from "@/lib/contracts/followups";
 
@@ -145,17 +146,76 @@ function PresetButton({
 }
 
 export function FollowupsTableClient({ items }: Props) {
-  const [search, setSearch] = useState("");
-  const [queueFilter, setQueueFilter] = useState<QueueFilter>("all");
-  const [ageFilter, setAgeFilter] = useState<AgeFilter>("all");
-  const [sort, setSort] = useState<SortOption>("oldest-assigned");
-  const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const initialSearch = searchParams.get("q") ?? "";
+  const initialQueueFilter = (searchParams.get("queue") as QueueFilter | null) ?? "all";
+  const initialAgeFilter = (searchParams.get("age") as AgeFilter | null) ?? "all";
+  const initialSort = (searchParams.get("sort") as SortOption | null) ?? "oldest-assigned";
+  const initialAssigneeFilter = searchParams.get("assignee") ?? "all";
+
+  const [search, setSearch] = useState(initialSearch);
+  const [queueFilter, setQueueFilter] = useState<QueueFilter>(initialQueueFilter);
+  const [ageFilter, setAgeFilter] = useState<AgeFilter>(initialAgeFilter);
+  const [sort, setSort] = useState<SortOption>(initialSort);
+  const [assigneeFilter, setAssigneeFilter] = useState<string>(initialAssigneeFilter);
 
   const normalizedSearch = search.trim().toLowerCase();
 
   const assigneeOptions = useMemo(() => {
     return Array.from(new Set(items.map((item) => item.assignedTo?.ownerId).filter(Boolean))).sort();
   }, [items]);
+
+  function updateUrl(next: {
+    q?: string;
+    queue?: QueueFilter;
+    age?: AgeFilter;
+    sort?: SortOption;
+    assignee?: string;
+  }) {
+    const params = new URLSearchParams(searchParams.toString());
+
+    const q = next.q ?? search;
+    const queue = next.queue ?? queueFilter;
+    const age = next.age ?? ageFilter;
+    const sortValue = next.sort ?? sort;
+    const assignee = next.assignee ?? assigneeFilter;
+
+    if (q && q.trim()) {
+      params.set("q", q.trim());
+    } else {
+      params.delete("q");
+    }
+
+    if (queue !== "all") {
+      params.set("queue", queue);
+    } else {
+      params.delete("queue");
+    }
+
+    if (age !== "all") {
+      params.set("age", age);
+    } else {
+      params.delete("age");
+    }
+
+    if (sortValue !== "oldest-assigned") {
+      params.set("sort", sortValue);
+    } else {
+      params.delete("sort");
+    }
+
+    if (assignee !== "all") {
+      params.set("assignee", assignee);
+    } else {
+      params.delete("assignee");
+    }
+
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
 
   const filteredItems = useMemo(() => {
     const filtered = items.filter((item) => {
@@ -181,6 +241,12 @@ export function FollowupsTableClient({ items }: Props) {
     setAgeFilter("all");
     setSort("oldest-assigned");
     setAssigneeFilter("all");
+    updateUrl({
+      queue: "all",
+      age: "all",
+      sort: "oldest-assigned",
+      assignee: "all"
+    });
   }
 
   function applyMinePreset() {
@@ -189,12 +255,23 @@ export function FollowupsTableClient({ items }: Props) {
     setAgeFilter("all");
     setSort("oldest-assigned");
     setAssigneeFilter(MY_ASSIGNEE);
+    updateUrl({
+      queue: "action-needed",
+      age: "all",
+      sort: "oldest-assigned",
+      assignee: MY_ASSIGNEE
+    });
   }
 
   function applyStale48Preset() {
     setQueueFilter("action-needed");
     setAgeFilter("48h+");
     setSort("oldest-assigned");
+    updateUrl({
+      queue: "action-needed",
+      age: "48h+",
+      sort: "oldest-assigned"
+    });
   }
 
   return (
@@ -244,7 +321,11 @@ export function FollowupsTableClient({ items }: Props) {
             <input
               id="followups-search"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                const value = event.target.value;
+                setSearch(value);
+                updateUrl({ q: value });
+              }}
               placeholder="Search visitor ID, assignee, stage, outcome"
               style={{
                 padding: "10px 12px",
@@ -263,7 +344,11 @@ export function FollowupsTableClient({ items }: Props) {
             <select
               id="followups-queue-filter"
               value={queueFilter}
-              onChange={(event) => setQueueFilter(event.target.value as QueueFilter)}
+              onChange={(event) => {
+                const value = event.target.value as QueueFilter;
+                setQueueFilter(value);
+                updateUrl({ queue: value });
+              }}
               style={{
                 padding: "10px 12px",
                 borderRadius: 8,
@@ -285,7 +370,11 @@ export function FollowupsTableClient({ items }: Props) {
             <select
               id="followups-age-filter"
               value={ageFilter}
-              onChange={(event) => setAgeFilter(event.target.value as AgeFilter)}
+              onChange={(event) => {
+                const value = event.target.value as AgeFilter;
+                setAgeFilter(value);
+                updateUrl({ age: value });
+              }}
               style={{
                 padding: "10px 12px",
                 borderRadius: 8,
@@ -308,7 +397,11 @@ export function FollowupsTableClient({ items }: Props) {
             <select
               id="followups-assignee"
               value={assigneeFilter}
-              onChange={(event) => setAssigneeFilter(event.target.value)}
+              onChange={(event) => {
+                const value = event.target.value;
+                setAssigneeFilter(value);
+                updateUrl({ assignee: value });
+              }}
               style={{
                 padding: "10px 12px",
                 borderRadius: 8,
@@ -333,7 +426,11 @@ export function FollowupsTableClient({ items }: Props) {
             <select
               id="followups-sort"
               value={sort}
-              onChange={(event) => setSort(event.target.value as SortOption)}
+              onChange={(event) => {
+                const value = event.target.value as SortOption;
+                setSort(value);
+                updateUrl({ sort: value });
+              }}
               style={{
                 padding: "10px 12px",
                 borderRadius: 8,
@@ -358,3 +455,4 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
+

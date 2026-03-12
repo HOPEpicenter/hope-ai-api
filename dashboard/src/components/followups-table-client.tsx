@@ -644,8 +644,16 @@ export function FollowupsTableClient({ items }: Props) {
         </div>
       </div>
 
-      <FollowupsTable items={filteredItems} />
+      <FollowupsTable
+        items={filteredItems}
+        assigneeFilter={assigneeFilter}
+        onAssigneeSelect={(value) => {
+          setAssigneeFilter(value);
+          updateUrl({ assignee: value });
+        }}
+      />
     </section>
   );
 }
+
 

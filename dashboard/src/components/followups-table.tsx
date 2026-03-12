@@ -131,7 +131,15 @@ function formatOutcomeLabel(value: string | null | undefined) {
   return value;
 }
 
-export function FollowupsTable({ items }: { items: FollowupItem[] }) {
+export function FollowupsTable({
+  items,
+  assigneeFilter,
+  onAssigneeSelect
+}: {
+  items: FollowupItem[];
+  assigneeFilter: string;
+  onAssigneeSelect: (value: string) => void;
+}) {
   if (items.length === 0) {
     return (
       <PageState
@@ -200,7 +208,26 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
                   </div>
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  {item.assignedTo?.ownerId ?? "-"}
+                  {item.assignedTo?.ownerId ? (
+                    <button
+                      type="button"
+                      onClick={() => onAssigneeSelect(item.assignedTo?.ownerId ?? "all")}
+                      style={{
+                        border: item.assignedTo.ownerId === assigneeFilter ? "1px solid #111827" : "1px solid #d1d5db",
+                        background: item.assignedTo.ownerId === assigneeFilter ? "#111827" : "#fff",
+                        color: item.assignedTo.ownerId === assigneeFilter ? "#fff" : "#111827",
+                        borderRadius: 999,
+                        padding: "6px 10px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: "pointer"
+                      }}
+                    >
+                      {item.assignedTo.ownerId}
+                    </button>
+                  ) : (
+                    "-"
+                  )}
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   <StageBadge stage={item.stage} />
@@ -234,4 +261,5 @@ export function FollowupsTable({ items }: { items: FollowupItem[] }) {
     </div>
   );
 }
+
 

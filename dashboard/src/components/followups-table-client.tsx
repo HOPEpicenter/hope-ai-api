@@ -177,6 +177,7 @@ export function FollowupsTableClient({ items }: Props) {
   const [queueFilter, setQueueFilter] = useState<QueueFilter>(initialQueueFilter);
   const [ageFilter, setAgeFilter] = useState<AgeFilter>(initialAgeFilter);
   const [stageFilter, setStageFilter] = useState<StageFilter>(initialStageFilter);
+  const [outcomeFilter, setOutcomeFilter] = useState<string>(searchParams.get("outcome") ?? "all");
   const [sort, setSort] = useState<SortOption>(initialSort);
   const [assigneeFilter, setAssigneeFilter] = useState<string>(initialAssigneeFilter);
 
@@ -234,6 +235,7 @@ export function FollowupsTableClient({ items }: Props) {
     } else {
       params.delete("outcome");
     }
+
 
     if (sortValue !== "oldest-assigned") {
       params.set("sort", sortValue);
@@ -772,8 +774,16 @@ export function FollowupsTableClient({ items }: Props) {
 
       <FollowupsTable
         items={filteredItems}
+        queueFilter={queueFilter}
         assigneeFilter={assigneeFilter}
         ageFilter={ageFilter}
+        stageFilter={stageFilter}
+        outcomeFilter={outcomeFilter}
+        sort={sort}
+        onQueueSelect={(value) => {
+          setQueueFilter(value);
+          updateUrl({ queue: value });
+        }}
         onAssigneeSelect={(value) => {
           setAssigneeFilter(value);
           updateUrl({ assignee: value });
@@ -782,18 +792,40 @@ export function FollowupsTableClient({ items }: Props) {
           setQueueFilter("action-needed");
           setAgeFilter(value);
           setStageFilter("all");
-                  setSort("oldest-assigned");
-    setOutcomeFilter("all");
+          setSort("oldest-assigned");
+          setOutcomeFilter("all");
           updateUrl({
             queue: "action-needed",
             age: value,
+            stage: "all",
+            outcome: "all",
             sort: "oldest-assigned"
           });
+        }}
+        onStageSelect={(value) => {
+          setStageFilter(value);
+          updateUrl({ stage: value });
+        }}
+        onOutcomeSelect={(value) => {
+          setOutcomeFilter(value);
+          updateUrl({ outcome: value });
+        }}
+        onSortSelect={(value) => {
+          setSort(value);
+          updateUrl({ sort: value });
         }}
       />
     </section>
   );
 }
+
+
+
+
+
+
+
+
 
 
 

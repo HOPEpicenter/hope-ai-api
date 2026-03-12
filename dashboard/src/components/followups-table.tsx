@@ -2,7 +2,29 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import type { FollowupItem } from "@/lib/contracts/followups";
 import { CopyButton } from "@/components/copy-button";
-import { PageState } from "@/components/page-state";
+function EmptyStatePanel({
+  title,
+  message
+}: {
+  title: string;
+  message: string;
+}) {
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 12,
+        padding: 24,
+        display: "grid",
+        gap: 6
+      }}
+    >
+      <div style={{ fontSize: 16, fontWeight: 600, color: "#111827" }}>{title}</div>
+      <div style={{ fontSize: 14, color: "#6b7280" }}>{message}</div>
+    </div>
+  );
+}
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
 
 function toTimestamp(value: string | null | undefined, fallback = Number.MAX_SAFE_INTEGER) {
@@ -391,12 +413,16 @@ export function FollowupsTable({
       stageFilter !== "all" ||
       outcomeFilter !== "all";
 
-    return (
-      <div style={{ padding: 24, color: "#6b7280" }}>
-        {hasFilters
-          ? "No followups match the current filters."
-          : "No followups in this queue yet."}
-      </div>
+    return hasFilters ? (
+      <EmptyStatePanel
+        title="No matching followups"
+        message="Try clearing or adjusting the current filters to see more results."
+      />
+    ) : (
+      <EmptyStatePanel
+        title="No followups yet"
+        message="New followups will appear here when action is required."
+      />
     );
   }
 
@@ -551,6 +577,9 @@ export function FollowupsTable({
     </div>
   );
 }
+
+
+
 
 
 

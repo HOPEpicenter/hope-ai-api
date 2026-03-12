@@ -235,6 +235,12 @@ export function FollowupsTableClient({ items }: Props) {
   const aged72Count = useMemo(() => countAgedItems(items, 72), [items]);
 
   const mineActive = assigneeFilter !== "all" && assigneeFilter === MY_ASSIGNEE;
+  const hasActiveFilters =
+    normalizedSearch.length > 0 ||
+    queueFilter !== "all" ||
+    ageFilter !== "all" ||
+    assigneeFilter !== "all" ||
+    sort !== "oldest-assigned";
 
   function applyAllPreset() {
     setQueueFilter("all");
@@ -274,6 +280,21 @@ export function FollowupsTableClient({ items }: Props) {
     });
   }
 
+  function clearAllFilters() {
+    setSearch("");
+    setQueueFilter("all");
+    setAgeFilter("all");
+    setSort("oldest-assigned");
+    setAssigneeFilter("all");
+    updateUrl({
+      q: "",
+      queue: "all",
+      age: "all",
+      sort: "oldest-assigned",
+      assignee: "all"
+    });
+  }
+
   return (
     <section style={{ display: "grid", gap: 12 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
@@ -301,11 +322,139 @@ export function FollowupsTableClient({ items }: Props) {
           gap: 12
         }}
       >
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <PresetButton active={!mineActive && queueFilter === "all" && ageFilter === "all" && assigneeFilter === "all"} label="All" onClick={applyAllPreset} />
-          <PresetButton active={mineActive && queueFilter === "action-needed"} label="My Followups" onClick={applyMinePreset} disabled={!MY_ASSIGNEE} />
-          <PresetButton active={queueFilter === "action-needed" && ageFilter === "48h+"} label="Stale 48h+" onClick={applyStale48Preset} />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <PresetButton active={!mineActive && queueFilter === "all" && ageFilter === "all" && assigneeFilter === "all"} label="All" onClick={applyAllPreset} />
+            <PresetButton active={mineActive && queueFilter === "action-needed"} label="My Followups" onClick={applyMinePreset} disabled={!MY_ASSIGNEE} />
+            <PresetButton active={queueFilter === "action-needed" && ageFilter === "48h+"} label="Stale 48h+" onClick={applyStale48Preset} />
+          </div>
+
+          {hasActiveFilters ? (
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "#1d4ed8",
+                fontWeight: 600,
+                cursor: "pointer",
+                padding: 0
+              }}
+            >
+              Clear all
+            </button>
+          ) : null}
         </div>
+
+        {hasActiveFilters ? (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            {normalizedSearch ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  updateUrl({ q: "" });
+                }}
+                style={{
+                  border: "1px solid #d1d5db",
+                  background: "#f9fafb",
+                  borderRadius: 999,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  color: "#111827",
+                  cursor: "pointer"
+                }}
+              >
+                Search: {search.trim()} ×
+              </button>
+            ) : null}
+
+            {queueFilter !== "all" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setQueueFilter("all");
+                  updateUrl({ queue: "all" });
+                }}
+                style={{
+                  border: "1px solid #d1d5db",
+                  background: "#f9fafb",
+                  borderRadius: 999,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  color: "#111827",
+                  cursor: "pointer"
+                }}
+              >
+                Queue: {queueFilter === "action-needed" ? "Action needed" : "Contact made"} ×
+              </button>
+            ) : null}
+
+            {ageFilter !== "all" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setAgeFilter("all");
+                  updateUrl({ age: "all" });
+                }}
+                style={{
+                  border: "1px solid #d1d5db",
+                  background: "#f9fafb",
+                  borderRadius: 999,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  color: "#111827",
+                  cursor: "pointer"
+                }}
+              >
+                Age: {ageFilter} ×
+              </button>
+            ) : null}
+
+            {assigneeFilter !== "all" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setAssigneeFilter("all");
+                  updateUrl({ assignee: "all" });
+                }}
+                style={{
+                  border: "1px solid #d1d5db",
+                  background: "#f9fafb",
+                  borderRadius: 999,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  color: "#111827",
+                  cursor: "pointer"
+                }}
+              >
+                Assignee: {assigneeFilter} ×
+              </button>
+            ) : null}
+
+            {sort !== "oldest-assigned" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSort("oldest-assigned");
+                  updateUrl({ sort: "oldest-assigned" });
+                }}
+                style={{
+                  border: "1px solid #d1d5db",
+                  background: "#f9fafb",
+                  borderRadius: 999,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  color: "#111827",
+                  cursor: "pointer"
+                }}
+              >
+                Sort: {sort === "newest-assigned" ? "Newest assigned" : "Last contact"} ×
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         <div
           style={{

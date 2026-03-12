@@ -237,6 +237,10 @@ function renderTimeCell(value: string | null | undefined, emptyLabel: string) {
   return formatRelativeTime(value);
 }
 
+function normalizeOutcomeValue(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
+}
+
 function formatOutcomeLabel(value: string | null | undefined) {
   if (!value) {
     return <span style={{ color: "#6b7280" }}>No outcome</span>;
@@ -259,20 +263,24 @@ export function FollowupsTable({
   assigneeFilter,
   ageFilter,
   stageFilter,
+  outcomeFilter,
   onQueueSelect,
   onAssigneeSelect,
   onAgeSelect,
-  onStageSelect
+  onStageSelect,
+  onOutcomeSelect
 }: {
   items: FollowupItem[];
   queueFilter: "all" | "action-needed" | "contact-made";
   assigneeFilter: string;
   ageFilter: string;
   stageFilter: string;
+  outcomeFilter: string;
   onQueueSelect: (value: "action-needed" | "contact-made") => void;
   onAssigneeSelect: (value: string) => void;
   onAgeSelect: (value: "24h+" | "48h+" | "72h+") => void;
   onStageSelect: (value: "guest" | "connected" | "member" | "unknown") => void;
+  onOutcomeSelect: (value: string) => void;
 }) {
   if (items.length === 0) {
     return (
@@ -399,7 +407,25 @@ export function FollowupsTable({
                   {renderTimeCell(item.lastFollowupContactedAt, "Never contacted")}
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  {formatOutcomeLabel(item.lastFollowupOutcome)}
+                  {item.lastFollowupOutcome ? (
+                    <button
+                      type="button"
+                      onClick={() => onOutcomeSelect(normalizeOutcomeValue(item.lastFollowupOutcome))}
+                      style={{
+                        border: normalizeOutcomeValue(item.lastFollowupOutcome) === outcomeFilter ? "1px solid #111827" : "1px solid #d1d5db",
+                        background: "#fff",
+                        color: "#111827",
+                        borderRadius: 999,
+                        padding: "6px 10px",
+                        fontSize: 12,
+                        cursor: "pointer"
+                      }}
+                    >
+                      {formatOutcomeLabel(item.lastFollowupOutcome)}
+                    </button>
+                  ) : (
+                    formatOutcomeLabel(item.lastFollowupOutcome)
+                  )}
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   <CopyButton value={item.visitorId} label="Copy ID" />
@@ -412,6 +438,9 @@ export function FollowupsTable({
     </div>
   );
 }
+
+
+
 
 
 

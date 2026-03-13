@@ -148,6 +148,10 @@ jobs:
             --name $app `
             --src $zipPath
 
+          if ($LASTEXITCODE -ne 0) {
+            throw "config-zip deployment failed."
+          }
+
           Write-Host "config-zip command completed."
 
           # Post-deploy health check (cold-start safe)

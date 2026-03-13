@@ -91,6 +91,24 @@ jobs:
           Write-Host "Created $zipPath"
           Get-Item $zipPath | Format-List Name,Length,FullName
 
+      - name: Validate Azure OIDC inputs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          if ([string]::IsNullOrWhiteSpace("${{ secrets.AZURE_CLIENT_ID }}")) {
+            throw "AZURE_CLIENT_ID is missing or empty."
+          }
+
+          if ([string]::IsNullOrWhiteSpace("${{ secrets.AZURE_TENANT_ID }}")) {
+            throw "AZURE_TENANT_ID is missing or empty."
+          }
+
+          if ([string]::IsNullOrWhiteSpace("${{ secrets.AZURE_SUBSCRIPTION_ID }}")) {
+            throw "AZURE_SUBSCRIPTION_ID is missing or empty."
+          }
+
+          Write-Host "Azure OIDC secret presence check passed."
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
@@ -146,3 +164,4 @@ jobs:
           if (-not $ok) {
             throw "Post-deploy health check failed after retries."
           }
+

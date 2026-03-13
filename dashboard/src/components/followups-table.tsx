@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FollowupAssignButton } from "@/components/followup-assign-button";
 import { FollowupContactButton } from "@/components/followup-contact-button";
 import type { CSSProperties } from "react";
 import type { FollowupItem } from "@/lib/contracts/followups";
@@ -697,7 +698,13 @@ export function FollowupsTable({
                   )}
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
+                    <FollowupAssignButton
+                      visitorId={item.visitorId}
+                      assignedToOwnerId={item.assignedTo?.ownerId ?? null}
+                      needsFollowup={item.needsFollowup}
+                    />
+                    <FollowupContactButton visitorId={item.visitorId} needsFollowup={item.needsFollowup} />
                     {!item.lastFollowupOutcome ? (
                       <button
                         type="button"
@@ -727,4 +734,8 @@ export function FollowupsTable({
     </div>
   );
 }
+
+
+
+
 

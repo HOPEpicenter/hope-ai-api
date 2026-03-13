@@ -2,6 +2,7 @@ import Link from "next/link";
 import { FollowupAssignButton } from "@/components/followup-assign-button";
 import { FollowupUnassignButton } from "@/components/followup-unassign-button";
 import { FollowupContactButton } from "@/components/followup-contact-button";
+import { FollowupRowActionGroup } from "@/components/followup-row-action-ui";
 import type { CSSProperties } from "react";
 import type { FollowupItem } from "@/lib/contracts/followups";
 import { CopyButton } from "@/components/copy-button";
@@ -699,13 +700,18 @@ export function FollowupsTable({
                   )}
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
-                    <FollowupAssignButton
-                      visitorId={item.visitorId}
-                      assignedToOwnerId={item.assignedTo?.ownerId ?? null}
-                      needsFollowup={item.needsFollowup}
-                    />
-                    <FollowupContactButton visitorId={item.visitorId} needsFollowup={item.needsFollowup} />
+                  <FollowupRowActionGroup>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
+                      <FollowupAssignButton
+                        visitorId={item.visitorId}
+                        assignedToOwnerId={item.assignedTo?.ownerId ?? null}
+                        needsFollowup={item.needsFollowup}
+                      />
+                      <FollowupUnassignButton
+                        visitorId={item.visitorId}
+                        assignedToOwnerId={item.assignedTo?.ownerId ?? null}
+                      />
+                      <FollowupContactButton visitorId={item.visitorId} needsFollowup={item.needsFollowup} />
                     {!item.lastFollowupOutcome ? (
                       <button
                         type="button"
@@ -724,8 +730,9 @@ export function FollowupsTable({
                         Record outcome
                       </button>
                     ) : null}
-                    <CopyButton value={item.visitorId} label="Copy ID" />
-                  </div>
+                      <CopyButton value={item.visitorId} label="Copy ID" />
+                    </div>
+                  </FollowupRowActionGroup>
                 </td>
               </tr>
             );
@@ -735,9 +742,4 @@ export function FollowupsTable({
     </div>
   );
 }
-
-
-
-
-
 

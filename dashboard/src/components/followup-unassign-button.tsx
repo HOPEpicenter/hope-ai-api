@@ -6,8 +6,11 @@ import {
   FollowupRowActionButton,
   FollowupRowActionError,
   FollowupRowActionStack,
-  FollowupRowActionSuccess
+  FollowupRowActionSuccess,
+  useFollowupRowActionGroup
 } from "@/components/followup-row-action-ui";
+
+const ACTION_ID = "unassign";
 
 type Props = {
   visitorId: string;
@@ -19,15 +22,20 @@ export function FollowupUnassignButton({
   assignedToOwnerId
 }: Props) {
   const router = useRouter();
+  const actionGroup = useFollowupRowActionGroup();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isAnotherActionSubmitting =
+    !!actionGroup?.activeActionId && actionGroup.activeActionId !== ACTION_ID;
 
   if (!assignedToOwnerId) {
     return null;
   }
 
   async function onClick() {
+    actionGroup?.setActiveActionId(ACTION_ID);
     setIsSubmitting(true);
     setIsSuccess(false);
     setError(null);
@@ -57,6 +65,7 @@ export function FollowupUnassignButton({
       setError(err instanceof Error ? err.message : "Failed to unassign followup.");
     } finally {
       setIsSubmitting(false);
+      actionGroup?.setActiveActionId(null);
     }
   }
 
@@ -68,6 +77,7 @@ export function FollowupUnassignButton({
         successLabel="Unassigned"
         isSubmitting={isSubmitting}
         isSuccess={isSuccess}
+        isDisabled={isAnotherActionSubmitting}
         onClick={onClick}
       />
       {error ? <FollowupRowActionError message={error} /> : null}

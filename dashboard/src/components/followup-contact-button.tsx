@@ -6,8 +6,11 @@ import {
   FollowupRowActionButton,
   FollowupRowActionError,
   FollowupRowActionStack,
-  FollowupRowActionSuccess
+  FollowupRowActionSuccess,
+  useFollowupRowActionGroup
 } from "@/components/followup-row-action-ui";
+
+const ACTION_ID = "contact";
 
 type Props = {
   visitorId: string;
@@ -16,15 +19,20 @@ type Props = {
 
 export function FollowupContactButton({ visitorId, needsFollowup = true }: Props) {
   const router = useRouter();
+  const actionGroup = useFollowupRowActionGroup();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isAnotherActionSubmitting =
+    !!actionGroup?.activeActionId && actionGroup.activeActionId !== ACTION_ID;
 
   if (!needsFollowup) {
     return null;
   }
 
   async function onClick() {
+    actionGroup?.setActiveActionId(ACTION_ID);
     setIsSubmitting(true);
     setIsSuccess(false);
     setError(null);
@@ -52,6 +60,7 @@ export function FollowupContactButton({ visitorId, needsFollowup = true }: Props
       setError(err instanceof Error ? err.message : "Failed to mark followup as contacted.");
     } finally {
       setIsSubmitting(false);
+      actionGroup?.setActiveActionId(null);
     }
   }
 
@@ -63,6 +72,7 @@ export function FollowupContactButton({ visitorId, needsFollowup = true }: Props
         successLabel="Saved"
         isSubmitting={isSubmitting}
         isSuccess={isSuccess}
+        isDisabled={isAnotherActionSubmitting}
         onClick={onClick}
       />
       {error ? <FollowupRowActionError message={error} /> : null}
@@ -70,3 +80,4 @@ export function FollowupContactButton({ visitorId, needsFollowup = true }: Props
     </FollowupRowActionStack>
   );
 }
+

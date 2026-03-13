@@ -6,10 +6,12 @@ import {
   FollowupRowActionButton,
   FollowupRowActionError,
   FollowupRowActionStack,
-  FollowupRowActionSuccess
+  FollowupRowActionSuccess,
+  useFollowupRowActionGroup
 } from "@/components/followup-row-action-ui";
 
 const MY_ASSIGNEE = (process.env.NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE ?? "").trim();
+const ACTION_ID = "assign";
 
 type Props = {
   visitorId: string;
@@ -23,15 +25,20 @@ export function FollowupAssignButton({
   needsFollowup
 }: Props) {
   const router = useRouter();
+  const actionGroup = useFollowupRowActionGroup();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isAnotherActionSubmitting =
+    !!actionGroup?.activeActionId && actionGroup.activeActionId !== ACTION_ID;
 
   if (!needsFollowup || !MY_ASSIGNEE || assignedToOwnerId === MY_ASSIGNEE) {
     return null;
   }
 
   async function onClick() {
+    actionGroup?.setActiveActionId(ACTION_ID);
     setIsSubmitting(true);
     setIsSuccess(false);
     setError(null);
@@ -62,6 +69,7 @@ export function FollowupAssignButton({
       setError(err instanceof Error ? err.message : "Failed to assign followup.");
     } finally {
       setIsSubmitting(false);
+      actionGroup?.setActiveActionId(null);
     }
   }
 
@@ -73,6 +81,7 @@ export function FollowupAssignButton({
         successLabel="Assigned"
         isSubmitting={isSubmitting}
         isSuccess={isSuccess}
+        isDisabled={isAnotherActionSubmitting}
         onClick={onClick}
       />
       {error ? <FollowupRowActionError message={error} /> : null}
@@ -80,3 +89,4 @@ export function FollowupAssignButton({
     </FollowupRowActionStack>
   );
 }
+

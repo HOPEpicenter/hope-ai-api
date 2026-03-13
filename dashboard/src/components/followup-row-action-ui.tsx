@@ -1,6 +1,13 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode
+} from "react";
 
 const buttonStyle: CSSProperties = {
   border: "1px solid #d1d5db",
@@ -32,12 +39,42 @@ const successStyle: CSSProperties = {
   fontWeight: 600
 };
 
+type FollowupRowActionGroupContextValue = {
+  activeActionId: string | null;
+  setActiveActionId: (value: string | null) => void;
+};
+
+const FollowupRowActionGroupContext = createContext<FollowupRowActionGroupContextValue | null>(null);
+
+export function FollowupRowActionGroup({ children }: { children: ReactNode }) {
+  const [activeActionId, setActiveActionId] = useState<string | null>(null);
+
+  const value = useMemo(
+    () => ({
+      activeActionId,
+      setActiveActionId
+    }),
+    [activeActionId]
+  );
+
+  return (
+    <FollowupRowActionGroupContext.Provider value={value}>
+      {children}
+    </FollowupRowActionGroupContext.Provider>
+  );
+}
+
+export function useFollowupRowActionGroup() {
+  return useContext(FollowupRowActionGroupContext);
+}
+
 type FollowupRowActionButtonProps = {
   label: string;
   busyLabel: string;
   successLabel?: string;
   isSubmitting: boolean;
   isSuccess?: boolean;
+  isDisabled?: boolean;
   onClick: () => void;
 };
 
@@ -47,9 +84,10 @@ export function FollowupRowActionButton({
   successLabel,
   isSubmitting,
   isSuccess = false,
+  isDisabled = false,
   onClick
 }: FollowupRowActionButtonProps) {
-  const disabled = isSubmitting || isSuccess;
+  const disabled = isSubmitting || isSuccess || isDisabled;
   const text = isSubmitting ? busyLabel : isSuccess ? (successLabel ?? label) : label;
 
   return (

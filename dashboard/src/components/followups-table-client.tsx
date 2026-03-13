@@ -184,6 +184,7 @@ export function FollowupsTableClient({ items }: Props) {
   const [editingOutcome, setEditingOutcome] = useState<string>("CONNECTED");
   const [editingNote, setEditingNote] = useState<string>("");
   const [isSavingOutcome, setIsSavingOutcome] = useState(false);
+  const [isOutcomeSuccess, setIsOutcomeSuccess] = useState(false);
   const [outcomeError, setOutcomeError] = useState<string | null>(null);
 
   const normalizedSearch = search.trim().toLowerCase();
@@ -371,6 +372,7 @@ export function FollowupsTableClient({ items }: Props) {
     setEditingVisitorId(visitorId);
     setEditingOutcome("CONNECTED");
     setEditingNote("");
+    setIsOutcomeSuccess(false);
     setOutcomeError(null);
   }
 
@@ -378,6 +380,7 @@ export function FollowupsTableClient({ items }: Props) {
     setEditingVisitorId(null);
     setEditingOutcome("CONNECTED");
     setEditingNote("");
+    setIsOutcomeSuccess(false);
     setOutcomeError(null);
   }
 
@@ -405,6 +408,8 @@ export function FollowupsTableClient({ items }: Props) {
         throw new Error(data.error || `POST /api/dashboard/followups/outcome failed with status ${response.status}`);
       }
 
+      setIsOutcomeSuccess(true);
+      await new Promise((resolve) => setTimeout(resolve, 650));
       cancelOutcomeEdit();
       router.refresh();
     } catch (error) {
@@ -880,39 +885,4 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

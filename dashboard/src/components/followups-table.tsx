@@ -591,8 +591,12 @@ export function FollowupsTable({
                       {formatOutcomeLabel(item.lastFollowupOutcome)}
                     </button>
                   ) : (
+                    <div style={{ color: "#6b7280" }}>No outcome</div>
+                  )}
+                </td>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                  <FollowupRowActionGroup>
                     <div style={{ display: "grid", gap: 8 }}>
-                      <div>{formatOutcomeLabel(item.lastFollowupOutcome)}</div>
                       {isEditing ? (
                         <div
                           style={{
@@ -696,41 +700,38 @@ export function FollowupsTable({
                           </div>
                         </div>
                       ) : null}
-                    </div>
-                  )}
-                </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
-                  <FollowupRowActionGroup>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
-                      <FollowupAssignButton
-                        visitorId={item.visitorId}
-                        assignedToOwnerId={item.assignedTo?.ownerId ?? null}
-                        needsFollowup={item.needsFollowup}
-                      />
-                      <FollowupUnassignButton
-                        visitorId={item.visitorId}
-                        assignedToOwnerId={item.assignedTo?.ownerId ?? null}
-                      />
-                      <FollowupContactButton visitorId={item.visitorId} needsFollowup={item.needsFollowup} />
-                    {!item.lastFollowupOutcome ? (
-                      <button
-                        type="button"
-                        onClick={() => onStartOutcomeEdit(item.visitorId)}
-                        style={{
-                          background: "#fff",
-                          color: "#111827",
-                          border: "1px solid #d1d5db",
-                          borderRadius: 8,
-                          padding: "8px 12px",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: "pointer"
-                        }}
-                      >
-                        Record outcome
-                      </button>
-                    ) : null}
-                      <CopyButton value={item.visitorId} label="Copy ID" />
+
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
+                        <FollowupAssignButton
+                          visitorId={item.visitorId}
+                          assignedToOwnerId={item.assignedTo?.ownerId ?? null}
+                          needsFollowup={item.needsFollowup}
+                        />
+                        <FollowupUnassignButton
+                          visitorId={item.visitorId}
+                          assignedToOwnerId={item.assignedTo?.ownerId ?? null}
+                        />
+                        <FollowupContactButton visitorId={item.visitorId} needsFollowup={item.needsFollowup} />
+                        {!item.lastFollowupOutcome && !isEditing ? (
+                          <button
+                            type="button"
+                            onClick={() => onStartOutcomeEdit(item.visitorId)}
+                            style={{
+                              background: "#fff",
+                              color: "#111827",
+                              border: "1px solid #d1d5db",
+                              borderRadius: 8,
+                              padding: "8px 12px",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              cursor: "pointer"
+                            }}
+                          >
+                            Record outcome
+                          </button>
+                        ) : null}
+                        <CopyButton value={item.visitorId} label="Copy ID" />
+                      </div>
                     </div>
                   </FollowupRowActionGroup>
                 </td>

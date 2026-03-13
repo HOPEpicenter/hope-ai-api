@@ -399,6 +399,13 @@ export async function recordFormationEventV1(body: unknown): Promise<{
     }
   }
 
+  if (type === "FOLLOWUP_UNASSIGNED") {
+    if (shouldAdvance) {
+      profile.assignedTo = null;
+      maybeSetStage(profile, "Connected", occurredAt, type);
+    }
+  }
+
   if (type === "FOLLOWUP_CONTACTED") {
     if (shouldAdvance) {
       profile.lastFollowupContactedAt = occurredAt;
@@ -587,4 +594,5 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
+
 

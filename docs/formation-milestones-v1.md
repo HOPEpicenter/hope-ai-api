@@ -84,3 +84,4 @@ When the derived snapshot's stage changes due to an input event, the snapshot MU
 If stage does not change, these fields are not newly required for that event and MAY be omitted (or remain unchanged if already present from a prior stage change).
 
 
+

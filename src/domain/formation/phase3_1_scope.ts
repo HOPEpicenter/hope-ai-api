@@ -51,6 +51,7 @@ export function isFormationSensitivity(value: unknown): value is FormationSensit
 export const FormationEventType = {
   SERVICE_ATTENDED: "SERVICE_ATTENDED",
   FOLLOWUP_ASSIGNED: "FOLLOWUP_ASSIGNED",
+  FOLLOWUP_UNASSIGNED: "FOLLOWUP_UNASSIGNED",
   FOLLOWUP_CONTACTED: "FOLLOWUP_CONTACTED",
   FOLLOWUP_OUTCOME_RECORDED: "FOLLOWUP_OUTCOME_RECORDED",
   NEXT_STEP_SELECTED: "NEXT_STEP_SELECTED",
@@ -88,6 +89,11 @@ export type FollowupAssignedMetadata = {
   assigneeName?: string;
   reason?: "new_guest" | "prayer_request" | "info_request" | "other";
   dueAt?: string; // ISO
+};
+
+export type FollowupUnassignedMetadata = {
+  reason?: "rebalanced" | "completed" | "duplicate" | "other";
+  notes?: string;
 };
 
 export type FollowupContactedMetadata = {
@@ -144,6 +150,7 @@ export type PrayerRequestedMetadata = {
 export type FormationEventMetadataByType = {
   SERVICE_ATTENDED: ServiceAttendedMetadata;
   FOLLOWUP_ASSIGNED: FollowupAssignedMetadata;
+  FOLLOWUP_UNASSIGNED: FollowupUnassignedMetadata;
   FOLLOWUP_CONTACTED: FollowupContactedMetadata;
   FOLLOWUP_OUTCOME_RECORDED: FollowupOutcomeRecordedMetadata;
   NEXT_STEP_SELECTED: NextStepSelectedMetadata;
@@ -154,6 +161,7 @@ export type FormationEventMetadataByType = {
 export type FormationEventMetadata =
   | ServiceAttendedMetadata
   | FollowupAssignedMetadata
+  | FollowupUnassignedMetadata
   | FollowupContactedMetadata
   | FollowupOutcomeRecordedMetadata
   | NextStepSelectedMetadata
@@ -230,6 +238,10 @@ export function validateFormationEvent(input: FormationEventInput): ValidationRe
       }
       break;
 
+    case FormationEventType.FOLLOWUP_UNASSIGNED:
+      // no required metadata
+      break;
+
     case FormationEventType.FOLLOWUP_CONTACTED:
       if (!md.method) return { ok: false, error: "metadata.method required for FOLLOWUP_CONTACTED" };
       if (!md.result) return { ok: false, error: "metadata.result required for FOLLOWUP_CONTACTED" };
@@ -283,3 +295,7 @@ export function applyFormationDefaults(input: FormationEventInput): Required<Pic
     channel: input.channel ?? "unknown",
   };
 }
+
+
+
+

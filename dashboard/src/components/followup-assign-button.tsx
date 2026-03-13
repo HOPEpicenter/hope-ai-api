@@ -3,17 +3,24 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+const MY_ASSIGNEE = (process.env.NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE ?? "").trim();
+
 type Props = {
   visitorId: string;
-  needsFollowup?: boolean;
+  assignedToOwnerId?: string | null;
+  needsFollowup: boolean;
 };
 
-export function FollowupContactButton({ visitorId, needsFollowup = true }: Props) {
+export function FollowupAssignButton({
+  visitorId,
+  assignedToOwnerId,
+  needsFollowup
+}: Props) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!needsFollowup) {
+  if (!needsFollowup || !MY_ASSIGNEE || assignedToOwnerId === MY_ASSIGNEE) {
     return null;
   }
 
@@ -22,24 +29,27 @@ export function FollowupContactButton({ visitorId, needsFollowup = true }: Props
     setError(null);
 
     try {
-      const response = await fetch("/api/dashboard/followups/contact", {
+      const response = await fetch("/api/dashboard/followups/assign", {
         method: "POST",
         headers: {
           "content-type": "application/json",
           accept: "application/json"
         },
-        body: JSON.stringify({ visitorId })
+        body: JSON.stringify({
+          visitorId,
+          assigneeId: MY_ASSIGNEE
+        })
       });
 
       const data = (await response.json()) as { error?: string };
 
       if (!response.ok) {
-        throw new Error(data.error || `POST /api/dashboard/followups/contact failed with status ${response.status}`);
+        throw new Error(data.error || `POST /api/dashboard/followups/assign failed with status ${response.status}`);
       }
 
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to mark followup as contacted.");
+      setError(err instanceof Error ? err.message : "Failed to assign followup.");
     } finally {
       setIsSubmitting(false);
     }
@@ -56,14 +66,14 @@ export function FollowupContactButton({ visitorId, needsFollowup = true }: Props
           background: "#fff",
           color: "#111827",
           borderRadius: 8,
-          padding: "8px 10px",
+          padding: "8px 12px",
           fontSize: 12,
           fontWeight: 600,
           cursor: isSubmitting ? "not-allowed" : "pointer",
           opacity: isSubmitting ? 0.7 : 1
         }}
       >
-        {isSubmitting ? "Saving..." : "Mark contacted"}
+        {isSubmitting ? "Assigning..." : "Assign to me"}
       </button>
 
       {error ? (

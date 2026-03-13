@@ -146,7 +146,7 @@ jobs:
           Write-Host "Deploying via Azure Functions Core Tools publish..."
           Write-Host "APP=$app"
 
-          func azure functionapp publish $app --no-build
+          func azure functionapp publish $app --no-build --javascript
 
           if ($LASTEXITCODE -ne 0) {
             throw "func publish deployment failed."

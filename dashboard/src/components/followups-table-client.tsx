@@ -180,6 +180,11 @@ export function FollowupsTableClient({ items }: Props) {
   const [outcomeFilter, setOutcomeFilter] = useState<string>(searchParams.get("outcome") ?? "all");
   const [sort, setSort] = useState<SortOption>(initialSort);
   const [assigneeFilter, setAssigneeFilter] = useState<string>(initialAssigneeFilter);
+  const [editingVisitorId, setEditingVisitorId] = useState<string | null>(null);
+  const [editingOutcome, setEditingOutcome] = useState<string>("CONNECTED");
+  const [editingNote, setEditingNote] = useState<string>("");
+  const [isSavingOutcome, setIsSavingOutcome] = useState(false);
+  const [outcomeError, setOutcomeError] = useState<string | null>(null);
 
   const normalizedSearch = search.trim().toLowerCase();
 
@@ -360,6 +365,53 @@ export function FollowupsTableClient({ items }: Props) {
       age: nextAge,
       sort: "oldest-assigned"
     });
+  }
+
+  function startOutcomeEdit(visitorId: string) {
+    setEditingVisitorId(visitorId);
+    setEditingOutcome("CONNECTED");
+    setEditingNote("");
+    setOutcomeError(null);
+  }
+
+  function cancelOutcomeEdit() {
+    setEditingVisitorId(null);
+    setEditingOutcome("CONNECTED");
+    setEditingNote("");
+    setOutcomeError(null);
+  }
+
+  async function saveOutcome(visitorId: string) {
+    setIsSavingOutcome(true);
+    setOutcomeError(null);
+
+    try {
+      const response = await fetch("/api/dashboard/followups/outcome", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json"
+        },
+        body: JSON.stringify({
+          visitorId,
+          outcome: editingOutcome,
+          note: editingNote
+        })
+      });
+
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error || `POST /api/dashboard/followups/outcome failed with status ${response.status}`);
+      }
+
+      cancelOutcomeEdit();
+      router.refresh();
+    } catch (error) {
+      setOutcomeError(error instanceof Error ? error.message : "Failed to record followup outcome.");
+    } finally {
+      setIsSavingOutcome(false);
+    }
   }
 
   return (
@@ -780,6 +832,11 @@ export function FollowupsTableClient({ items }: Props) {
         stageFilter={stageFilter}
         outcomeFilter={outcomeFilter}
         sort={sort}
+        editingVisitorId={editingVisitorId}
+        editingOutcome={editingOutcome}
+        editingNote={editingNote}
+        isSavingOutcome={isSavingOutcome}
+        outcomeError={outcomeError}
         onQueueSelect={(value) => {
           setQueueFilter(value);
           updateUrl({ queue: value });
@@ -814,10 +871,18 @@ export function FollowupsTableClient({ items }: Props) {
           setSort(value);
           updateUrl({ sort: value });
         }}
+        onStartOutcomeEdit={startOutcomeEdit}
+        onCancelOutcomeEdit={cancelOutcomeEdit}
+        onEditingOutcomeChange={setEditingOutcome}
+        onEditingNoteChange={setEditingNote}
+        onSaveOutcome={saveOutcome}
       />
     </section>
   );
 }
+
+
+
 
 
 

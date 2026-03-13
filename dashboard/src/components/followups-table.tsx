@@ -2,6 +2,16 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import type { FollowupItem } from "@/lib/contracts/followups";
 import { CopyButton } from "@/components/copy-button";
+import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
+
+const ROW_OUTCOME_OPTIONS = [
+  { value: "CONNECTED", label: "Connected" },
+  { value: "LEFT_VOICEMAIL", label: "Left voicemail" },
+  { value: "NO_ANSWER", label: "No answer" },
+  { value: "NOT_INTERESTED", label: "Not interested" },
+  { value: "FOLLOW_UP_LATER", label: "Follow up later" }
+] as const;
+
 function EmptyStatePanel({
   title,
   message
@@ -25,7 +35,6 @@ function EmptyStatePanel({
     </div>
   );
 }
-import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
 
 function toTimestamp(value: string | null | undefined, fallback = Number.MAX_SAFE_INTEGER) {
   if (!value) return fallback;
@@ -251,14 +260,6 @@ function StageBadge({
   );
 }
 
-function renderTimeCell(value: string | null | undefined, emptyLabel: string) {
-  if (!value) {
-    return <span style={{ color: "#6b7280" }}>{emptyLabel}</span>;
-  }
-
-  return formatRelativeTime(value);
-}
-
 function LastAssignedButton({
   value,
   sort,
@@ -385,12 +386,22 @@ export function FollowupsTable({
   stageFilter,
   outcomeFilter,
   sort,
+  editingVisitorId,
+  editingOutcome,
+  editingNote,
+  isSavingOutcome,
+  outcomeError,
   onQueueSelect,
   onAssigneeSelect,
   onAgeSelect,
   onStageSelect,
   onOutcomeSelect,
-  onSortSelect
+  onSortSelect,
+  onStartOutcomeEdit,
+  onCancelOutcomeEdit,
+  onEditingOutcomeChange,
+  onEditingNoteChange,
+  onSaveOutcome
 }: {
   items: FollowupItem[];
   queueFilter: "all" | "action-needed" | "contact-made";
@@ -399,12 +410,22 @@ export function FollowupsTable({
   stageFilter: string;
   outcomeFilter: string;
   sort: "oldest-assigned" | "newest-assigned" | "last-contact";
+  editingVisitorId: string | null;
+  editingOutcome: string;
+  editingNote: string;
+  isSavingOutcome: boolean;
+  outcomeError: string | null;
   onQueueSelect: (value: "action-needed" | "contact-made") => void;
   onAssigneeSelect: (value: string) => void;
   onAgeSelect: (value: "24h+" | "48h+" | "72h+") => void;
   onStageSelect: (value: "guest" | "connected" | "member" | "unknown") => void;
   onOutcomeSelect: (value: string) => void;
   onSortSelect: (value: "oldest-assigned" | "newest-assigned" | "last-contact") => void;
+  onStartOutcomeEdit: (visitorId: string) => void;
+  onCancelOutcomeEdit: () => void;
+  onEditingOutcomeChange: (value: string) => void;
+  onEditingNoteChange: (value: string) => void;
+  onSaveOutcome: (visitorId: string) => Promise<void>;
 }) {
   if (items.length === 0) {
     const hasFilters =
@@ -465,9 +486,11 @@ export function FollowupsTable({
               ? { background: "#fffbeb", boxShadow: "inset 4px 0 0 #f59e0b" }
               : {};
 
+            const isEditing = editingVisitorId === item.visitorId;
+
             return (
               <tr key={item.visitorId} style={rowStyle}>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Link
                       href={`/visitors/${item.visitorId}`}
@@ -484,7 +507,7 @@ export function FollowupsTable({
                     <CopyButton value={item.visitorId} label="Copy" />
                   </div>
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                   {item.assignedTo?.ownerId ? (
                     <button
                       type="button"
@@ -506,21 +529,21 @@ export function FollowupsTable({
                     "-"
                   )}
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                   <StageBadge
                     stage={item.stage}
                     stageFilter={stageFilter}
                     onStageSelect={onStageSelect}
                   />
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                   <Badge
                     needsFollowup={item.needsFollowup}
                     queueFilter={queueFilter}
                     onQueueSelect={onQueueSelect}
                   />
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                   <AgingBadge
                     assignedAt={item.lastFollowupAssignedAt}
                     needsFollowup={item.needsFollowup}
@@ -528,21 +551,21 @@ export function FollowupsTable({
                     onAgeSelect={onAgeSelect}
                   />
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                   <LastAssignedButton
                     value={item.lastFollowupAssignedAt}
                     sort={sort}
                     onSortSelect={onSortSelect}
                   />
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                   <LastContactButton
                     value={item.lastFollowupContactedAt}
                     sort={sort}
                     onSortSelect={onSortSelect}
                   />
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                   {item.lastFollowupOutcome ? (
                     <button
                       type="button"
@@ -564,11 +587,136 @@ export function FollowupsTable({
                       {formatOutcomeLabel(item.lastFollowupOutcome)}
                     </button>
                   ) : (
-                    formatOutcomeLabel(item.lastFollowupOutcome)
+                    <div style={{ display: "grid", gap: 8 }}>
+                      <div>{formatOutcomeLabel(item.lastFollowupOutcome)}</div>
+                      {isEditing ? (
+                        <div
+                          style={{
+                            display: "grid",
+                            gap: 8,
+                            minWidth: 240,
+                            padding: 12,
+                            border: "1px solid #e5e7eb",
+                            borderRadius: 10,
+                            background: "#f9fafb"
+                          }}
+                        >
+                          <select
+                            value={editingOutcome}
+                            onChange={(event) => onEditingOutcomeChange(event.target.value)}
+                            disabled={isSavingOutcome}
+                            style={{
+                              padding: "8px 10px",
+                              borderRadius: 8,
+                              border: "1px solid #d1d5db",
+                              background: "#fff",
+                              color: "#111827"
+                            }}
+                          >
+                            {ROW_OUTCOME_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+
+                          <textarea
+                            value={editingNote}
+                            onChange={(event) => onEditingNoteChange(event.target.value)}
+                            disabled={isSavingOutcome}
+                            rows={2}
+                            placeholder="Optional note"
+                            style={{
+                              padding: "8px 10px",
+                              borderRadius: 8,
+                              border: "1px solid #d1d5db",
+                              background: "#fff",
+                              color: "#111827",
+                              resize: "vertical"
+                            }}
+                          />
+
+                          {outcomeError ? (
+                            <div
+                              style={{
+                                background: "#fef2f2",
+                                border: "1px solid #fecaca",
+                                color: "#991b1b",
+                                borderRadius: 8,
+                                padding: 8,
+                                fontSize: 12,
+                                fontWeight: 600
+                              }}
+                            >
+                              {outcomeError}
+                            </div>
+                          ) : null}
+
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button
+                              type="button"
+                              onClick={() => void onSaveOutcome(item.visitorId)}
+                              disabled={isSavingOutcome}
+                              style={{
+                                background: "#111827",
+                                color: "#fff",
+                                border: "1px solid #111827",
+                                borderRadius: 8,
+                                padding: "8px 12px",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: isSavingOutcome ? "not-allowed" : "pointer",
+                                opacity: isSavingOutcome ? 0.7 : 1
+                              }}
+                            >
+                              {isSavingOutcome ? "Saving..." : "Save"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={onCancelOutcomeEdit}
+                              disabled={isSavingOutcome}
+                              style={{
+                                background: "#fff",
+                                color: "#111827",
+                                border: "1px solid #d1d5db",
+                                borderRadius: 8,
+                                padding: "8px 12px",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: isSavingOutcome ? "not-allowed" : "pointer"
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   )}
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  <CopyButton value={item.visitorId} label="Copy ID" />
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {!item.lastFollowupOutcome ? (
+                      <button
+                        type="button"
+                        onClick={() => onStartOutcomeEdit(item.visitorId)}
+                        style={{
+                          background: "#fff",
+                          color: "#111827",
+                          border: "1px solid #d1d5db",
+                          borderRadius: 8,
+                          padding: "8px 12px",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer"
+                        }}
+                      >
+                        Record outcome
+                      </button>
+                    ) : null}
+                    <CopyButton value={item.visitorId} label="Copy ID" />
+                  </div>
                 </td>
               </tr>
             );
@@ -578,31 +726,3 @@ export function FollowupsTable({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

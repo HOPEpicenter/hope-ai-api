@@ -20,7 +20,6 @@ opsFollowupsRouter.get("/", async (_req, res) => {
 
   for await (const p of table.listEntities<any>({})) {
     const assignedTo = String((p as any).assignedTo ?? "").trim();
-    if (!assignedTo) continue;
 
     const assignedAt = (p as any).lastFollowupAssignedAt ?? null;
     const contactedAt = (p as any).lastFollowupContactedAt ?? null;
@@ -31,19 +30,21 @@ opsFollowupsRouter.get("/", async (_req, res) => {
     const contactedAtMs = toMs(contactedAt);
     const outcomeAtMs = toMs(outcomeAt);
 
+    if (assignedAtMs === null) continue;
+
     // Only consider the followup "resolved" if the outcome is for the current assignment.
     const resolvedForAssignment =
-      assignedAtMs !== null && outcomeAtMs !== null && outcomeAtMs >= assignedAtMs;
+      outcomeAtMs !== null && outcomeAtMs >= assignedAtMs;
 
     if (resolvedForAssignment) continue;
 
     const needsFollowup =
       contactedAtMs === null ||
-      (assignedAtMs !== null && contactedAtMs !== null && assignedAtMs > contactedAtMs);
+      (contactedAtMs !== null && assignedAtMs > contactedAtMs);
 
     items.push({
       visitorId: String((p as any).rowKey ?? (p as any).RowKey ?? ""),
-      assignedTo: { ownerType: "user", ownerId: assignedTo },
+      assignedTo: assignedTo ? { ownerType: "user", ownerId: assignedTo } : null,
       lastFollowupAssignedAt: assignedAt,
       lastFollowupContactedAt: contactedAt,
       lastFollowupOutcomeAt: outcomeAt,
@@ -56,5 +57,6 @@ opsFollowupsRouter.get("/", async (_req, res) => {
 
   return res.json({ ok: true, items });
 });
+
 
 

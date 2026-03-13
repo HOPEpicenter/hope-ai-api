@@ -63,6 +63,10 @@ export async function projectFormationProfileFromEvent(input: FormationEventInpu
     lastFollowupAssignedAt = occurredAt;
   }
 
+  if (input.type === "FOLLOWUP_UNASSIGNED") {
+    assignedTo = null;
+  }
+
   const entity: FormationProfileEntity = {
     partitionKey: FORMATION_PROFILES_PARTITION_KEY,
     rowKey: visitorId,
@@ -83,5 +87,6 @@ export async function projectFormationProfileFromEvent(input: FormationEventInpu
   // Return the merged view (entity already includes important fields)
   return entity;
 }
+
 
 

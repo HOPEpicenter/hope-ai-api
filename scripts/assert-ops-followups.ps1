@@ -120,9 +120,53 @@ if (-not $itemA.assignedTo -or $itemA.assignedTo.ownerId -ne "ops-user-1") {
   throw ("Expected assignedTo.ownerId=ops-user-1. Got: {0}" -f ($itemA.assignedTo | ConvertTo-Json -Depth 6))
 }
 
-# 4) Record FOLLOWUP_CONTACTED then ensure it remains in /ops/followups
+# 4) Record FOLLOWUP_UNASSIGNED then ensure it remains in /ops/followups with no assignee
+Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_UNASSIGNED ..."
+$unassignAt = $now.AddSeconds(1)
+$null = PostJson "$ApiBase/formation/events" @{
+  id         = [Guid]::NewGuid().ToString()
+  visitorId  = $visitorId
+  type       = "FOLLOWUP_UNASSIGNED"
+  occurredAt = $unassignAt.ToString("o")
+  metadata   = @{}
+}
+
+Start-Sleep -Milliseconds 250
+
+Write-Host "[assert-ops-followups] GET /ops/followups (after unassign) ..."
+$fuU = GetFollowups
+$itemU = @($fuU.items) | Where-Object { $_.visitorId -eq $visitorId } | Select-Object -First 1
+if (-not $itemU) { throw "Expected visitorId=$visitorId to remain in followups queue after FOLLOWUP_UNASSIGNED." }
+if ($itemU.resolvedForAssignment -eq $true) { throw "Expected resolvedForAssignment=false after unassign." }
+if ($itemU.assignedTo) {
+  throw ("Expected assignedTo to be cleared after unassign. Got: {0}" -f ($itemU.assignedTo | ConvertTo-Json -Depth 6))
+}
+
+# 5) Record FOLLOWUP_ASSIGNED again then ensure it is reassigned
+Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_ASSIGNED (reassign) ..."
+$reassignAt = $now.AddSeconds(2)
+$null = PostJson "$ApiBase/formation/events" @{
+  id         = [Guid]::NewGuid().ToString()
+  visitorId  = $visitorId
+  type       = "FOLLOWUP_ASSIGNED"
+  occurredAt = $reassignAt.ToString("o")
+  metadata   = @{ assigneeId = "ops-user-1" }
+}
+
+Start-Sleep -Milliseconds 250
+
+Write-Host "[assert-ops-followups] GET /ops/followups (after reassign) ..."
+$fuR = GetFollowups
+$itemR = @($fuR.items) | Where-Object { $_.visitorId -eq $visitorId } | Select-Object -First 1
+if (-not $itemR) { throw "Expected visitorId=$visitorId to remain in followups queue after reassignment." }
+if ($itemR.resolvedForAssignment -eq $true) { throw "Expected resolvedForAssignment=false after reassignment." }
+if (-not $itemR.assignedTo -or $itemR.assignedTo.ownerId -ne "ops-user-1") {
+  throw ("Expected assignedTo.ownerId=ops-user-1 after reassignment. Got: {0}" -f ($itemR.assignedTo | ConvertTo-Json -Depth 6))
+}
+
+# 6) Record FOLLOWUP_CONTACTED then ensure it remains in /ops/followups
 Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_CONTACTED ..."
-$contactAt = $now.AddSeconds(2)
+$contactAt = $now.AddSeconds(3)
 $null = PostJson "$ApiBase/formation/events" @{
   id         = [Guid]::NewGuid().ToString()
   visitorId  = $visitorId
@@ -142,7 +186,7 @@ if (-not $itemC.assignedTo -or $itemC.assignedTo.ownerId -ne "ops-user-1") {
   throw ("Expected assignedTo.ownerId=ops-user-1 after contact. Got: {0}" -f ($itemC.assignedTo | ConvertTo-Json -Depth 6))
 }
 
-# 5) Record FOLLOWUP_OUTCOME_RECORDED then ensure it is resolved (no longer present)
+# 7) Record FOLLOWUP_OUTCOME_RECORDED then ensure it is resolved (no longer present)
 Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_OUTCOME_RECORDED ..."
 $outcomeAt = $now.AddSeconds(5)
 $null = PostJson "$ApiBase/formation/events" @{
@@ -161,4 +205,5 @@ $itemO = @($fuO.items) | Where-Object { $_.visitorId -eq $visitorId } | Select-O
 if ($itemO) { throw "Expected visitorId=$visitorId to be resolved and not present after outcome." }
 
 Write-Host "[assert-ops-followups] OK: followups lifecycle regression passed." -ForegroundColor Green
+
 

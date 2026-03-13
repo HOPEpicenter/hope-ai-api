@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import {
   FollowupRowActionButton,
   FollowupRowActionError,
-  FollowupRowActionStack
+  FollowupRowActionStack,
+  FollowupRowActionSuccess
 } from "@/components/followup-row-action-ui";
 
 const MY_ASSIGNEE = (process.env.NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE ?? "").trim();
@@ -23,6 +24,7 @@ export function FollowupAssignButton({
 }: Props) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!needsFollowup || !MY_ASSIGNEE || assignedToOwnerId === MY_ASSIGNEE) {
@@ -31,6 +33,7 @@ export function FollowupAssignButton({
 
   async function onClick() {
     setIsSubmitting(true);
+    setIsSuccess(false);
     setError(null);
 
     try {
@@ -52,6 +55,8 @@ export function FollowupAssignButton({
         throw new Error(data.error || `POST /api/dashboard/followups/assign failed with status ${response.status}`);
       }
 
+      setIsSuccess(true);
+      await new Promise((resolve) => setTimeout(resolve, 700));
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to assign followup.");
@@ -65,10 +70,13 @@ export function FollowupAssignButton({
       <FollowupRowActionButton
         label="Assign to me"
         busyLabel="Assigning..."
+        successLabel="Assigned"
         isSubmitting={isSubmitting}
+        isSuccess={isSuccess}
         onClick={onClick}
       />
       {error ? <FollowupRowActionError message={error} /> : null}
+      {isSuccess ? <FollowupRowActionSuccess message="Followup assigned." /> : null}
     </FollowupRowActionStack>
   );
 }

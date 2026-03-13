@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  FollowupRowActionButton,
+  FollowupRowActionError,
+  FollowupRowActionStack
+} from "@/components/followup-row-action-ui";
 
 type Props = {
   visitorId: string;
@@ -46,41 +51,14 @@ export function FollowupContactButton({ visitorId, needsFollowup = true }: Props
   }
 
   return (
-    <div style={{ display: "grid", gap: 6 }}>
-      <button
-        type="button"
+    <FollowupRowActionStack>
+      <FollowupRowActionButton
+        label="Mark contacted"
+        busyLabel="Saving..."
+        isSubmitting={isSubmitting}
         onClick={onClick}
-        disabled={isSubmitting}
-        style={{
-          border: "1px solid #d1d5db",
-          background: "#fff",
-          color: "#111827",
-          borderRadius: 8,
-          padding: "8px 10px",
-          fontSize: 12,
-          fontWeight: 600,
-          cursor: isSubmitting ? "not-allowed" : "pointer",
-          opacity: isSubmitting ? 0.7 : 1
-        }}
-      >
-        {isSubmitting ? "Saving..." : "Mark contacted"}
-      </button>
-
-      {error ? (
-        <div
-          style={{
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            color: "#991b1b",
-            borderRadius: 8,
-            padding: 8,
-            fontSize: 12,
-            fontWeight: 600
-          }}
-        >
-          {error}
-        </div>
-      ) : null}
-    </div>
+      />
+      {error ? <FollowupRowActionError message={error} /> : null}
+    </FollowupRowActionStack>
   );
 }

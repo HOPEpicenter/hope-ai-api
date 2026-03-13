@@ -25,6 +25,12 @@ jobs:
           node-version: "20"
           cache: "npm"
 
+      - name: Install Azure Functions Core Tools
+        shell: pwsh
+        run: |
+          npm install -g azure-functions-core-tools@4 --unsafe-perm true
+          func --version
+
       - name: Install dependencies
         run: npm ci
 

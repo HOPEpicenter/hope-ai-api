@@ -150,6 +150,10 @@ function applyProfileTouchpoint(
     }
       break;
 
+    case FormationEventType.FOLLOWUP_UNASSIGNED:
+      (profile as any).assignedTo = null;
+      break;
+
     case FormationEventType.FOLLOWUP_CONTACTED:
       (profile as any).lastFollowupContactedAt = occurredAt;
       break;
@@ -316,6 +320,7 @@ export async function recordFormationEvent(
 
   return { eventRowKey: rowKey, profile };
 }
+
 
 
 

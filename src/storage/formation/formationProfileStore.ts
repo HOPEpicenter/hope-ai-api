@@ -53,5 +53,6 @@ export async function upsertFormationProfileEntity(
   await ensureTableExists(table);
 
   // merge keeps any fields you don't set
-  await table.upsertEntity(entity as any, "Merge");
+  await table.upsertEntity(entity as any, "Replace");
 }
+

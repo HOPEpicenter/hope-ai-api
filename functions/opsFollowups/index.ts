@@ -42,15 +42,10 @@ export default async function (context: any, req: any): Promise<void> {
 
     const items: any[] = [];
 
-    // Pull only entities that have an assignee (filter server-side where possible).
-    // (assignedTo ne '') should work for string props. If it errors, we can fall back to a full scan.
-    const entities = table.listEntities<any>({
-      queryOptions: { filter: "assignedTo ne ''" }
-    });
+    const entities = table.listEntities<any>({});
 
     for await (const p of entities) {
       const assignedTo = String(p.assignedTo ?? "").trim();
-      if (!assignedTo) continue;
 
       const assignedAt = p.lastFollowupAssignedAt ?? null;
       const contactedAt = p.lastFollowupContactedAt ?? null;
@@ -61,19 +56,21 @@ export default async function (context: any, req: any): Promise<void> {
       const contactedAtMs = toMs(contactedAt);
       const outcomeAtMs = toMs(outcomeAt);
 
+      if (assignedAtMs === null) continue;
+
       const resolvedForAssignment =
-        assignedAtMs !== null && outcomeAtMs !== null && outcomeAtMs >= assignedAtMs;
+        outcomeAtMs !== null && outcomeAtMs >= assignedAtMs;
 
       // Match ops route: omit resolved rows from queue view
       if (resolvedForAssignment) continue;
 
       const needsFollowup =
         contactedAtMs === null ||
-        (assignedAtMs !== null && contactedAtMs !== null && assignedAtMs > contactedAtMs);
+        (contactedAtMs !== null && assignedAtMs > contactedAtMs);
 
       items.push({
         visitorId: String(p.rowKey ?? ""),
-        assignedTo: { ownerType: "user", ownerId: assignedTo },
+        assignedTo: assignedTo ? { ownerType: "user", ownerId: assignedTo } : null,
         lastFollowupAssignedAt: assignedAt,
         lastFollowupContactedAt: contactedAt,
         lastFollowupOutcomeAt: outcomeAt,
@@ -116,5 +113,6 @@ async function ensureTableExists(table: TableClient) {
     throw e;
   }
 }
+
 
 

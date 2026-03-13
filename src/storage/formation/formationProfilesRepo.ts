@@ -84,7 +84,7 @@ export async function getFormationProfile(
 }
 
 export async function upsertFormationProfile(table: TableClient, entity: FormationProfileEntity): Promise<void> {
-  await table.upsertEntity(entity as any, "Merge");
+  await table.upsertEntity(entity as any, "Replace");
 }
 
 export type FormationProfilesPage = {

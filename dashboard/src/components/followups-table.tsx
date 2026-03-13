@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FollowupAssignButton } from "@/components/followup-assign-button";
+import { FollowupUnassignButton } from "@/components/followup-unassign-button";
 import { FollowupContactButton } from "@/components/followup-contact-button";
 import type { CSSProperties } from "react";
 import type { FollowupItem } from "@/lib/contracts/followups";
@@ -734,6 +735,7 @@ export function FollowupsTable({
     </div>
   );
 }
+
 
 
 

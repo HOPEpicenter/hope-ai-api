@@ -123,9 +123,6 @@ jobs:
 
           $rg = "rg-hope-ai-api-staging"
           $app = "hope-ai-api-staging"
-          $zipPath = Join-Path (Get-Location).Path "deploy.zip"
-
-          if (-not (Test-Path $zipPath)) { throw "deploy.zip missing." }
 
           # Configure app settings via Azure CLI / ARM (avoid flaky Kudu /api/settings)
           az functionapp config appsettings set `
@@ -139,20 +136,17 @@ jobs:
 
           Write-Host "App settings updated via Azure CLI."
 
-          # Deploy zip package
-          Write-Host "Deploying deploy.zip via az functionapp deployment source config-zip..."
-          Write-Host "RG=$rg APP=$app ZIP=$zipPath"
+          # Deploy with the same path used by repair-staging.ps1
+          Write-Host "Deploying via Azure Functions Core Tools publish..."
+          Write-Host "APP=$app"
 
-          az functionapp deployment source config-zip `
-            --resource-group $rg `
-            --name $app `
-            --src $zipPath
+          func azure functionapp publish $app --no-build
 
           if ($LASTEXITCODE -ne 0) {
-            throw "config-zip deployment failed."
+            throw "func publish deployment failed."
           }
 
-          Write-Host "config-zip command completed."
+          Write-Host "func publish command completed."
 
           # Post-deploy health check (cold-start safe)
           $health = "https://hope-ai-api-staging.azurewebsites.net/api/version"

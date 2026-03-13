@@ -52,6 +52,10 @@ export function validateFormationEventEnvelopeV1Strict(body: unknown): Formation
     (d as any).assigneeId = assigneeId;
   }
 
+  if (t === "FOLLOWUP_UNASSIGNED") {
+    // no additional required data for v1
+  }
+
   if (t === "NEXT_STEP_SELECTED") {
     if (!isNonEmptyString(d.nextStep)) {
       throw new Error("NEXT_STEP_SELECTED requires data.nextStep (string)");

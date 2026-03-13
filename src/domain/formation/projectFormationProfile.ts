@@ -83,3 +83,5 @@ export async function projectFormationProfileFromEvent(input: FormationEventInpu
   // Return the merged view (entity already includes important fields)
   return entity;
 }
+
+

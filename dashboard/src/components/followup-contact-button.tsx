@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import {
   FollowupRowActionButton,
   FollowupRowActionError,
-  FollowupRowActionStack
+  FollowupRowActionStack,
+  FollowupRowActionSuccess
 } from "@/components/followup-row-action-ui";
 
 type Props = {
@@ -16,6 +17,7 @@ type Props = {
 export function FollowupContactButton({ visitorId, needsFollowup = true }: Props) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!needsFollowup) {
@@ -24,6 +26,7 @@ export function FollowupContactButton({ visitorId, needsFollowup = true }: Props
 
   async function onClick() {
     setIsSubmitting(true);
+    setIsSuccess(false);
     setError(null);
 
     try {
@@ -42,6 +45,8 @@ export function FollowupContactButton({ visitorId, needsFollowup = true }: Props
         throw new Error(data.error || `POST /api/dashboard/followups/contact failed with status ${response.status}`);
       }
 
+      setIsSuccess(true);
+      await new Promise((resolve) => setTimeout(resolve, 700));
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to mark followup as contacted.");
@@ -55,10 +60,13 @@ export function FollowupContactButton({ visitorId, needsFollowup = true }: Props
       <FollowupRowActionButton
         label="Mark contacted"
         busyLabel="Saving..."
+        successLabel="Saved"
         isSubmitting={isSubmitting}
+        isSuccess={isSuccess}
         onClick={onClick}
       />
       {error ? <FollowupRowActionError message={error} /> : null}
+      {isSuccess ? <FollowupRowActionSuccess message="Followup marked as contacted." /> : null}
     </FollowupRowActionStack>
   );
 }

@@ -8,11 +8,18 @@
 - ✅ **#334**: followups dashboard moved the inline outcome editor into the actions column and preserved short save-success feedback.
 - ✅ **#335**: integration summary follow-up derivation was tightened so `needsFollowup` / `followupReason` remain aligned with `deriveIntegrationSummaryV1`.
 - ✅ **#336**: followups dashboard actions scanability improved with a “Needs attention” indicator and clearer grouping for rows that still need action.
+- ✅ **#338**: followups dashboard added a URL-backed `Needs attention` quick filter with chip + clear-all integration.
+- ✅ **#339**: followups preset buttons now reflect the full effective filter state.
+- ✅ **#340**: followups 24h+/48h+/72h+ age summary cards now reflect the full effective filter state.
+- ✅ **#341**: the `Needs attention` preset active state now reflects the full effective filter state.
+- ✅ **#342**: followups age card presets now clear assignee so preset behavior matches the tightened active-state rules.
+- ✅ **#343**: the `Needs attention` preset now applies a full clean preset state when clicked.
 
 **Why this matters (master plan alignment)**
 - Finishes the immediate staging deploy hardening loop and aligns CI/staging with the proven recovery path.
 - Continues dashboard followups usability improvements without widening backend scope.
 - Tightens integration summary business logic without changing the public surface shape.
+- Makes the followups filter/preset surface more truthful and predictable for operators using the dashboard.
 
 **Next**
 - Update docs/checklists in the same PR whenever dashboard followups or staging workflow behavior changes.

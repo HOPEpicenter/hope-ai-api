@@ -512,7 +512,7 @@ export function FollowupsTableClient({ items }: Props) {
             <PresetButton active={mineActive && queueFilter === "action-needed" && ageFilter === "all" && stageFilter === "all" && outcomeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="My Followups" onClick={applyMinePreset} disabled={!MY_ASSIGNEE} />
             <PresetButton active={queueFilter === "action-needed" && ageFilter === "48h+" && stageFilter === "all" && outcomeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="Stale 48h+" onClick={applyStale48Preset} />
             <PresetButton
-              active={attentionFilter === "needs-attention"}
+              active={attentionFilter === "needs-attention" && queueFilter === "all" && ageFilter === "all" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && sort === "oldest-assigned"}
               label="Needs attention"
               onClick={() => {
                 const next = attentionFilter === "needs-attention" ? "all" : "needs-attention";

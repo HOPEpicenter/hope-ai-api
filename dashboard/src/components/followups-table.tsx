@@ -597,6 +597,36 @@ export function FollowupsTable({
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                   <FollowupRowActionGroup>
                     <div style={{ display: "grid", gap: 8 }}>
+                      {item.needsFollowup ? (
+                        <div
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            width: "fit-content",
+                            padding: "4px 8px",
+                            borderRadius: 999,
+                            background: "#fef3c7",
+                            color: "#92400e",
+                            border: "1px solid #fcd34d",
+                            fontSize: 12,
+                            fontWeight: 700
+                          }}
+                        >
+                          <span
+                            aria-hidden="true"
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 999,
+                              background: "#f59e0b",
+                              display: "inline-block"
+                            }}
+                          />
+                          Needs attention
+                        </div>
+                      ) : null}
+
                       {isEditing ? (
                         <div
                           style={{
@@ -701,7 +731,18 @@ export function FollowupsTable({
                         </div>
                       ) : null}
 
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          flexWrap: "wrap",
+                          alignItems: "flex-start",
+                          padding: item.needsFollowup ? 10 : 0,
+                          borderRadius: item.needsFollowup ? 10 : 0,
+                          background: item.needsFollowup ? "#fff7ed" : "transparent",
+                          border: item.needsFollowup ? "1px solid #fed7aa" : "none"
+                        }}
+                      >
                         <FollowupAssignButton
                           visitorId={item.visitorId}
                           assignedToOwnerId={item.assignedTo?.ownerId ?? null}

@@ -386,11 +386,13 @@ export function FollowupsTableClient({ items }: Props) {
     setStageFilter("all");
     setSort("oldest-assigned");
     setOutcomeFilter("all");
+    setAssigneeFilter("all");
     setAttentionFilter("all");
     updateUrl({
       queue: "action-needed",
       age: nextAge,
       sort: "oldest-assigned",
+      assignee: "all",
       attention: "all"
     });
   }

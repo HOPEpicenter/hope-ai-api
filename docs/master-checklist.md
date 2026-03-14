@@ -9,6 +9,12 @@
 - [x] Merged **#334**: inline followup outcome editor moved into the actions column.
 - [x] Merged **#335**: integration summary followup logic tightened and aligned with `deriveIntegrationSummaryV1`.
 - [x] Merged **#336**: followups actions scanability improved with a needs-attention indicator and grouped row actions.
+- [x] Merged **#338**: followups dashboard added a URL-backed needs-attention quick filter.
+- [x] Merged **#339**: followups preset active states now reflect the full effective filter state.
+- [x] Merged **#340**: followups age summary card active states now reflect the full effective filter state.
+- [x] Merged **#341**: the needs-attention preset active state now reflects the full effective filter state.
+- [x] Merged **#342**: followups age card presets now clear assignee.
+- [x] Merged **#343**: the needs-attention preset now applies a clean preset state.
 - [x] Verified CI passed after merged slices.
 - [x] Verified staging deploy passed and `/api/version` returned 200.
 

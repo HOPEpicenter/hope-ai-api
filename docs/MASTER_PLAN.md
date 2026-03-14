@@ -1,3 +1,24 @@
+## 2026-03-14 Update
+
+**What landed**
+- ✅ **#330**: staging deploy switched from config-zip to Azure Functions Core Tools `func publish --no-build`.
+- ✅ **#331**: staging workflow now installs Azure Functions Core Tools on the runner.
+- ✅ **#332**: staging `func publish` now passes `--javascript` explicitly for stable runtime detection.
+- ✅ **#333**: removed dead `.deploy` / `deploy.zip` packaging from the staging workflow after the deploy-path change.
+- ✅ **#334**: followups dashboard moved the inline outcome editor into the actions column and preserved short save-success feedback.
+- ✅ **#335**: integration summary follow-up derivation was tightened so `needsFollowup` / `followupReason` remain aligned with `deriveIntegrationSummaryV1`.
+- ✅ **#336**: followups dashboard actions scanability improved with a “Needs attention” indicator and clearer grouping for rows that still need action.
+
+**Why this matters (master plan alignment)**
+- Finishes the immediate staging deploy hardening loop and aligns CI/staging with the proven recovery path.
+- Continues dashboard followups usability improvements without widening backend scope.
+- Tightens integration summary business logic without changing the public surface shape.
+
+**Next**
+- Update docs/checklists in the same PR whenever dashboard followups or staging workflow behavior changes.
+- Continue small dashboard usability slices only if they are production-safe and clearly improve operator workflow.
+- Keep backend scope focused on real contract or workflow blockers only.
+
 # HOPE AI — MASTER PLAN
 
 ## 2026-03-12 Update

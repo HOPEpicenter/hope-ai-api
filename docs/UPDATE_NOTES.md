@@ -1,3 +1,18 @@
+## 2026-03-14
+
+- ✅ Merged **#330**: staging deploy switched from config-zip to `func azure functionapp publish --no-build`.
+- ✅ Merged **#331**: staging workflow now installs Azure Functions Core Tools on the runner.
+- ✅ Merged **#332**: staging `func publish` now passes `--javascript` explicitly so runtime detection is stable.
+- ✅ Merged **#333**: removed unused `.deploy` / `deploy.zip` packaging from staging workflow after switching to `func publish`.
+
+- ✅ Merged **#334**: moved the inline followup outcome editor into the actions column and preserved the short success state before refresh.
+- ✅ Merged **#335**: tightened integration summary followup derivation so `needsFollowup` / `followupReason` stay aligned with `deriveIntegrationSummaryV1` while preserving additive summary fields.
+- ✅ Merged **#336**: improved followups actions scanability with a “Needs attention” pill and clearer grouping for rows that still need followup.
+
+- ✅ Verified CI green after the merged slices.
+- ✅ Verified staging deploy green after staging workflow fixes.
+- ✅ Verified staging `/api/version` returned 200 after deploy.
+
 # UPDATE_NOTES.md
 
 ## 2026-03-12

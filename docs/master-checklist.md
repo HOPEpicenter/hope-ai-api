@@ -1,5 +1,16 @@
 ## Session Closeout
 
+### 2026-03-14 (Session Closeout)
+
+- [x] Merged **#330**: staging deploy now uses unc publish --no-build.
+- [x] Merged **#331**: staging workflow installs Azure Functions Core Tools.
+- [x] Merged **#332**: staging unc publish runtime is explicitly set to JavaScript.
+- [x] Merged **#333**: removed dead staging zip packaging steps after the deploy-path switch.
+- [x] Merged **#334**: inline followup outcome editor moved into the actions column.
+- [x] Merged **#335**: integration summary followup logic tightened and aligned with deriveIntegrationSummaryV1.
+- [x] Merged **#336**: followups actions scanability improved with a needs-attention indicator and grouped row actions.
+- [x] Verified CI passed after merged slices.
+- [x] Verified staging deploy passed and /api/version returned 200.
 ### 2026-03-12 (Session Closeout)
 
 - [x] Merged PR #300: followups active filter chips + clear-all control

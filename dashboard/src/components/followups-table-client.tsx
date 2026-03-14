@@ -518,8 +518,24 @@ export function FollowupsTableClient({ items }: Props) {
               label="Needs attention"
               onClick={() => {
                 const next = attentionFilter === "needs-attention" ? "all" : "needs-attention";
+
+                setQueueFilter("all");
+                setAgeFilter("all");
+                setStageFilter("all");
+                setOutcomeFilter("all");
+                setAssigneeFilter("all");
+                setSort("oldest-assigned");
                 setAttentionFilter(next);
-                updateUrl({ attention: next });
+
+                updateUrl({
+                  queue: "all",
+                  age: "all",
+                  stage: "all",
+                  outcome: "all",
+                  assignee: "all",
+                  sort: "oldest-assigned",
+                  attention: next
+                });
               }}
             />
           </div>

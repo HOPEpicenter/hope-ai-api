@@ -454,7 +454,7 @@ export function FollowupsTableClient({ items }: Props) {
           onClick={() => applyAgeSummaryPreset("24h+")}
           style={{
             background: "#fff",
-            border: queueFilter === "action-needed" && ageFilter === "24h+" ? "2px solid #2563eb" : "1px solid #e5e7eb",
+            border: queueFilter === "action-needed" && ageFilter === "24h+" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned" ? "2px solid #2563eb" : "1px solid #e5e7eb",
             borderRadius: 12,
             padding: 16,
             textAlign: "left",
@@ -469,7 +469,7 @@ export function FollowupsTableClient({ items }: Props) {
           onClick={() => applyAgeSummaryPreset("48h+")}
           style={{
             background: "#fff",
-            border: queueFilter === "action-needed" && ageFilter === "48h+" ? "2px solid #2563eb" : "1px solid #e5e7eb",
+            border: queueFilter === "action-needed" && ageFilter === "48h+" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned" ? "2px solid #2563eb" : "1px solid #e5e7eb",
             borderRadius: 12,
             padding: 16,
             textAlign: "left",
@@ -484,7 +484,7 @@ export function FollowupsTableClient({ items }: Props) {
           onClick={() => applyAgeSummaryPreset("72h+")}
           style={{
             background: "#fff",
-            border: queueFilter === "action-needed" && ageFilter === "72h+" ? "2px solid #2563eb" : "1px solid #e5e7eb",
+            border: queueFilter === "action-needed" && ageFilter === "72h+" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned" ? "2px solid #2563eb" : "1px solid #e5e7eb",
             borderRadius: 12,
             padding: 16,
             textAlign: "left",

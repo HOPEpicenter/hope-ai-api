@@ -282,6 +282,3 @@ const merged = mergeTimelines(
 
 }
 
-
-
-

@@ -508,9 +508,9 @@ export function FollowupsTableClient({ items }: Props) {
       >
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <PresetButton active={!mineActive && queueFilter === "all" && ageFilter === "all" && assigneeFilter === "all" && attentionFilter === "all"} label="All" onClick={applyAllPreset} />
-            <PresetButton active={mineActive && queueFilter === "action-needed" && attentionFilter === "all"} label="My Followups" onClick={applyMinePreset} disabled={!MY_ASSIGNEE} />
-            <PresetButton active={queueFilter === "action-needed" && ageFilter === "48h+" && attentionFilter === "all"} label="Stale 48h+" onClick={applyStale48Preset} />
+            <PresetButton active={!mineActive && queueFilter === "all" && ageFilter === "all" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="All" onClick={applyAllPreset} />
+            <PresetButton active={mineActive && queueFilter === "action-needed" && ageFilter === "all" && stageFilter === "all" && outcomeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="My Followups" onClick={applyMinePreset} disabled={!MY_ASSIGNEE} />
+            <PresetButton active={queueFilter === "action-needed" && ageFilter === "48h+" && stageFilter === "all" && outcomeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="Stale 48h+" onClick={applyStale48Preset} />
             <PresetButton
               active={attentionFilter === "needs-attention"}
               label="Needs attention"

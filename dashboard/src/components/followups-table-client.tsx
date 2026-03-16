@@ -306,6 +306,7 @@ export function FollowupsTableClient({ items }: Props) {
     sort !== "oldest-assigned";
 
   function applyAllPreset() {
+    setSearch("");
     setQueueFilter("all");
     setAgeFilter("all");
     setStageFilter("all");
@@ -314,6 +315,7 @@ export function FollowupsTableClient({ items }: Props) {
     setAssigneeFilter("all");
     setAttentionFilter("all");
     updateUrl({
+      q: "",
       queue: "all",
       age: "all",
       stage: "all",
@@ -326,6 +328,7 @@ export function FollowupsTableClient({ items }: Props) {
 
   function applyMinePreset() {
     if (!MY_ASSIGNEE) return;
+    setSearch("");
     setQueueFilter("action-needed");
     setAgeFilter("all");
     setStageFilter("all");
@@ -334,6 +337,7 @@ export function FollowupsTableClient({ items }: Props) {
     setAssigneeFilter(MY_ASSIGNEE);
     setAttentionFilter("all");
     updateUrl({
+      q: "",
       queue: "action-needed",
       age: "all",
       stage: "all",
@@ -345,6 +349,7 @@ export function FollowupsTableClient({ items }: Props) {
   }
 
   function applyStale48Preset() {
+    setSearch("");
     setQueueFilter("action-needed");
     setAgeFilter("48h+");
     setStageFilter("all");
@@ -352,6 +357,7 @@ export function FollowupsTableClient({ items }: Props) {
     setOutcomeFilter("all");
     setAttentionFilter("all");
     updateUrl({
+      q: "",
       queue: "action-needed",
       age: "48h+",
       sort: "oldest-assigned",
@@ -381,6 +387,7 @@ export function FollowupsTableClient({ items }: Props) {
   }
 
   function applyAgeSummaryPreset(nextAge: AgeFilter) {
+    setSearch("");
     setQueueFilter("action-needed");
     setAgeFilter(nextAge);
     setStageFilter("all");
@@ -389,6 +396,7 @@ export function FollowupsTableClient({ items }: Props) {
     setAssigneeFilter("all");
     setAttentionFilter("all");
     updateUrl({
+      q: "",
       queue: "action-needed",
       age: nextAge,
       sort: "oldest-assigned",
@@ -456,7 +464,7 @@ export function FollowupsTableClient({ items }: Props) {
           onClick={() => applyAgeSummaryPreset("24h+")}
           style={{
             background: "#fff",
-            border: queueFilter === "action-needed" && ageFilter === "24h+" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned" ? "2px solid #2563eb" : "1px solid #e5e7eb",
+            border: normalizedSearch.length === 0 && queueFilter === "action-needed" && ageFilter === "24h+" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned" ? "2px solid #2563eb" : "1px solid #e5e7eb",
             borderRadius: 12,
             padding: 16,
             textAlign: "left",
@@ -471,7 +479,7 @@ export function FollowupsTableClient({ items }: Props) {
           onClick={() => applyAgeSummaryPreset("48h+")}
           style={{
             background: "#fff",
-            border: queueFilter === "action-needed" && ageFilter === "48h+" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned" ? "2px solid #2563eb" : "1px solid #e5e7eb",
+            border: normalizedSearch.length === 0 && queueFilter === "action-needed" && ageFilter === "48h+" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned" ? "2px solid #2563eb" : "1px solid #e5e7eb",
             borderRadius: 12,
             padding: 16,
             textAlign: "left",
@@ -486,7 +494,7 @@ export function FollowupsTableClient({ items }: Props) {
           onClick={() => applyAgeSummaryPreset("72h+")}
           style={{
             background: "#fff",
-            border: queueFilter === "action-needed" && ageFilter === "72h+" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned" ? "2px solid #2563eb" : "1px solid #e5e7eb",
+            border: normalizedSearch.length === 0 && queueFilter === "action-needed" && ageFilter === "72h+" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned" ? "2px solid #2563eb" : "1px solid #e5e7eb",
             borderRadius: 12,
             padding: 16,
             textAlign: "left",
@@ -510,15 +518,16 @@ export function FollowupsTableClient({ items }: Props) {
       >
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <PresetButton active={!mineActive && queueFilter === "all" && ageFilter === "all" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="All" onClick={applyAllPreset} />
-            <PresetButton active={mineActive && queueFilter === "action-needed" && ageFilter === "all" && stageFilter === "all" && outcomeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="My Followups" onClick={applyMinePreset} disabled={!MY_ASSIGNEE} />
-            <PresetButton active={queueFilter === "action-needed" && ageFilter === "48h+" && stageFilter === "all" && outcomeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="Stale 48h+" onClick={applyStale48Preset} />
+            <PresetButton active={normalizedSearch.length === 0 && !mineActive && queueFilter === "all" && ageFilter === "all" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="All" onClick={applyAllPreset} />
+            <PresetButton active={normalizedSearch.length === 0 && mineActive && queueFilter === "action-needed" && ageFilter === "all" && stageFilter === "all" && outcomeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="My Followups" onClick={applyMinePreset} disabled={!MY_ASSIGNEE} />
+            <PresetButton active={normalizedSearch.length === 0 && queueFilter === "action-needed" && ageFilter === "48h+" && stageFilter === "all" && outcomeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="Stale 48h+" onClick={applyStale48Preset} />
             <PresetButton
-              active={attentionFilter === "needs-attention" && queueFilter === "all" && ageFilter === "all" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && sort === "oldest-assigned"}
+              active={normalizedSearch.length === 0 && attentionFilter === "needs-attention" && queueFilter === "all" && ageFilter === "all" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && sort === "oldest-assigned"}
               label="Needs attention"
               onClick={() => {
                 const next = attentionFilter === "needs-attention" ? "all" : "needs-attention";
 
+                setSearch("");
                 setQueueFilter("all");
                 setAgeFilter("all");
                 setStageFilter("all");
@@ -528,6 +537,7 @@ export function FollowupsTableClient({ items }: Props) {
                 setAttentionFilter(next);
 
                 updateUrl({
+                  q: "",
                   queue: "all",
                   age: "all",
                   stage: "all",

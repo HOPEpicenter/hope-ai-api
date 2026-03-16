@@ -934,16 +934,22 @@ export function FollowupsTableClient({ items }: Props) {
           updateUrl({ assignee: value });
         }}
         onAgeSelect={(value) => {
+          setSearch("");
           setQueueFilter("action-needed");
           setAgeFilter(value);
           setStageFilter("all");
           setSort("oldest-assigned");
           setOutcomeFilter("all");
+          setAssigneeFilter("all");
+          setAttentionFilter("all");
           updateUrl({
+            q: "",
             queue: "action-needed",
             age: value,
             stage: "all",
             outcome: "all",
+            assignee: "all",
+            attention: "all",
             sort: "oldest-assigned"
           });
         }}

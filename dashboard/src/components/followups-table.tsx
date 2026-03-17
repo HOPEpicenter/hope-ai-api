@@ -2,7 +2,7 @@ import Link from "next/link";
 import { FollowupAssignButton } from "@/components/followup-assign-button";
 import { FollowupUnassignButton } from "@/components/followup-unassign-button";
 import { FollowupContactButton } from "@/components/followup-contact-button";
-import { FollowupRowActionGroup } from "@/components/followup-row-action-ui";
+import { FollowupRowActionGroup, FollowupRowActionSurface } from "@/components/followup-row-action-ui";
 import { FollowupOutcomeRowActions } from "@/components/followup-outcome-row-actions";
 import type { CSSProperties } from "react";
 import type { FollowupItem } from "@/lib/contracts/followups";
@@ -632,18 +632,7 @@ export function FollowupsTable({
                         </div>
                       ) : null}
 
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 8,
-                          flexWrap: "wrap",
-                          alignItems: "flex-start",
-                          padding: item.needsFollowup ? 10 : 0,
-                          borderRadius: item.needsFollowup ? 10 : 0,
-                          background: item.needsFollowup ? "#fff7ed" : "transparent",
-                          border: item.needsFollowup ? "1px solid #fed7aa" : "none"
-                        }}
-                      >
+                      <FollowupRowActionSurface needsAttention={item.needsFollowup}>
                         <FollowupAssignButton
                           visitorId={item.visitorId}
                           assignedToOwnerId={item.assignedTo?.ownerId ?? null}
@@ -671,7 +660,7 @@ export function FollowupsTable({
                           onQuickOutcome={onQuickOutcome}
                         />
                         <CopyButton value={item.visitorId} label="Copy ID" />
-                      </div>
+                      </FollowupRowActionSurface>
                     </div>
                   </FollowupRowActionGroup>
                 </td>
@@ -683,5 +672,4 @@ export function FollowupsTable({
     </div>
   );
 }
-
 

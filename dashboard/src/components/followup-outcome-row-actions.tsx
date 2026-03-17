@@ -164,6 +164,10 @@ export function FollowupOutcomeRowActions({
                 isSubmitting={isSavingOutcome}
                 isSuccess={isOutcomeSuccess}
                 onClick={() => {
+                  if (isSavingOutcome || isOutcomeSuccess || isAnotherActionSubmitting) {
+                    return;
+                  }
+
                   beginOutcomeAction();
                   void onSaveOutcome(visitorId);
                 }}
@@ -214,6 +218,10 @@ export function FollowupOutcomeRowActions({
                   isSuccess={isOutcomeSuccess}
                   isDisabled={isAnotherActionSubmitting}
                   onClick={() => {
+                    if (isSavingOutcome || isOutcomeSuccess || isAnotherActionSubmitting) {
+                      return;
+                    }
+
                     beginOutcomeAction();
                     onQuickOutcome(visitorId, "CONNECTED");
                   }}
@@ -227,6 +235,10 @@ export function FollowupOutcomeRowActions({
                   isSuccess={isOutcomeSuccess}
                   isDisabled={isAnotherActionSubmitting}
                   onClick={() => {
+                    if (isSavingOutcome || isOutcomeSuccess || isAnotherActionSubmitting) {
+                      return;
+                    }
+
                     beginOutcomeAction();
                     onQuickOutcome(visitorId, "NO_ANSWER");
                   }}
@@ -236,7 +248,13 @@ export function FollowupOutcomeRowActions({
 
             <button
               type="button"
-              onClick={() => onStartOutcomeEdit(visitorId)}
+              onClick={() => {
+                if (isSavingOutcome || isOutcomeSuccess || isAnotherActionSubmitting) {
+                  return;
+                }
+
+                onStartOutcomeEdit(visitorId);
+              }}
               disabled={disableMoreButton}
               style={{
                 background: "#fff",

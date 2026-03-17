@@ -73,12 +73,20 @@ export function FollowupOutcomeRowActions({
   }, [isEditing]);
 
   function beginOutcomeAction() {
+    if (isSavingOutcome || isOutcomeSuccess || isAnotherActionSubmitting) {
+      return;
+    }
+
     actionGroup?.setActiveActionId(ACTION_ID);
   }
 
   function handleOutcomeEditorKeyDown(
     event: ReactKeyboardEvent<HTMLSelectElement | HTMLTextAreaElement>
   ) {
+    if (isSavingOutcome || isOutcomeSuccess || isAnotherActionSubmitting) {
+      return;
+    }
+
     if (event.key === "Escape") {
       event.preventDefault();
       onCancelOutcomeEdit();
@@ -163,7 +171,13 @@ export function FollowupOutcomeRowActions({
 
               <button
                 type="button"
-                onClick={onCancelOutcomeEdit}
+                onClick={() => {
+                  if (isSavingOutcome) {
+                    return;
+                  }
+
+                  onCancelOutcomeEdit();
+                }}
                 disabled={isSavingOutcome || isOutcomeSuccess}
                 style={{
                   background: "#fff",

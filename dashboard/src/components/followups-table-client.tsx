@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FollowupsTable } from "@/components/followups-table";
 import type { FollowupItem } from "@/lib/contracts/followups";
@@ -195,6 +195,33 @@ export function FollowupsTableClient({ items }: Props) {
   const [outcomeError, setOutcomeError] = useState<string | null>(null);
 
   const normalizedSearch = search.trim().toLowerCase();
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "/") return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+
+      if (
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select" ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const assigneeOptions = useMemo(() => {
     return Array.from(new Set(items.map((item) => item.assignedTo?.ownerId).filter(Boolean))).sort();
@@ -789,6 +816,7 @@ export function FollowupsTableClient({ items }: Props) {
             </label>
             <input
               id="followups-search"
+              ref={searchInputRef}
               value={search}
               onChange={(event) => {
                 const value = event.target.value;
@@ -804,6 +832,7 @@ export function FollowupsTableClient({ items }: Props) {
                 color: "#111827"
               }}
             />
+            <span style={{ fontSize: 12, color: "#6b7280" }}>Press / to focus search</span>
           </div>
 
           <div style={{ display: "grid", gap: 6 }}>
@@ -949,6 +978,68 @@ export function FollowupsTableClient({ items }: Props) {
             : `Showing ${filteredItems.length} of ${items.length} followups.`}
         </div>
       </div>
+
+      {filteredItems.length === 0 && items.length > 0 ? (
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 12,
+            padding: 16,
+            display: "grid",
+            gap: 10
+          }}
+        >
+          <div style={{ display: "grid", gap: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>No followups match the current filters.</div>
+            <div style={{ fontSize: 13, color: "#6b7280" }}>
+              Try clearing search, removing a filter chip, or reset back to the All preset.
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={applyAllPreset}
+              style={{
+                border: "1px solid #d1d5db",
+                background: "#fff",
+                color: "#111827",
+                borderRadius: 8,
+                padding: "8px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer"
+              }}
+            >
+              Reset to All
+            </button>
+
+            {normalizedSearch ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  updateUrl({ q: "" });
+                  searchInputRef.current?.focus();
+                }}
+                style={{
+                  border: "1px solid #d1d5db",
+                  background: "#f9fafb",
+                  color: "#111827",
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer"
+                }}
+              >
+                Clear search
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <FollowupsTable
         items={filteredItems}

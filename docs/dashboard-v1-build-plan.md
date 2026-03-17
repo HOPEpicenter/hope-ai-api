@@ -313,3 +313,18 @@ use the backend that already exists
 stay inside Azure-grant-conscious architecture decisions
 
 only expand backend/API scope when a real dashboard blocker appears
+## 2026-03-17 — Closeout status
+
+Dashboard v1 build plan status: COMPLETE / RELEASE-READY
+
+Completed shipped surfaces:
+- Overview
+- Follow-Ups
+- Visitors
+- Visitor Detail
+- Timeline
+
+Closeout note:
+- v1 was completed using the existing hardened backend surfaces
+- deferred items remain deferred
+- future work should be treated as post-v1 scope unless a real blocker appears

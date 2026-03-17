@@ -221,3 +221,20 @@ Current state:
 - [x] row-action keyboard affordances shipped
 - [x] row-action re-entry guards shipped
 - [x] outcome action guard parity shipped
+
+## Dashboard v1 release closeout — 2026-03-17
+
+- [x] Overview shipped
+- [x] Follow-Ups shipped
+- [x] Visitors shipped
+- [x] Visitor Detail shipped
+- [x] Timeline shipped
+- [x] Dashboard foundation complete on main
+- [x] Followups dashboard closeout synced
+- [x] CI green on main
+- [x] Staging deploy green on main
+- [x] Dashboard v1 marked release-ready
+
+Post-v1 rule:
+- [x] Defer workflow automation / reminders / journey-step expansion unless a real blocker requires them
+- [x] Treat additional dashboard work as new explicitly scoped slices

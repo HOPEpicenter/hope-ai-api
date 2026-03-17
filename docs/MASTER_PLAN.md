@@ -306,3 +306,35 @@ Net result:
 Planning note:
 - followups dashboard operator-speed / stability slices above are complete
 - remaining future work should be treated as new scoped dashboard slices, not part of the original closeout set
+
+## 2026-03-17 — Dashboard v1 release closeout
+
+Dashboard v1 is now release-ready on main.
+
+Shipped v1 surfaces:
+- Overview
+- Follow-Ups
+- Visitors
+- Visitor Detail
+- Timeline
+
+Release-ready summary:
+- dashboard foundation is complete on real API-backed surfaces
+- followups operator workflow closeout is complete
+- CI is green
+- staging deploy is green
+- staging health verification has passed on the current mainline slices
+
+Delivery rule going forward:
+- treat Dashboard v1 as complete
+- only reopen dashboard code for:
+  - a real staging/production blocker
+  - a contract bug
+  - a narrowly scoped v1.1 improvement with explicit justification
+
+Still deferred / not part of v1:
+- workflow automation
+- reminders / escalations
+- journey-step engine
+- attendance / teams / scheduling expansion
+- broad new backend scope without a real consumer blocker

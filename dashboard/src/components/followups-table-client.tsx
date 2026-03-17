@@ -413,12 +413,16 @@ export function FollowupsTableClient({ items }: Props) {
     setOutcomeError(null);
   }
 
-  function cancelOutcomeEdit() {
+  function closeOutcomeEditor() {
     setEditingVisitorId(null);
     setEditingOutcome("CONNECTED");
     setEditingNote("");
-    setIsOutcomeSuccess(false);
     setOutcomeError(null);
+  }
+
+  function cancelOutcomeEdit() {
+    closeOutcomeEditor();
+    setIsOutcomeSuccess(false);
   }
 
   async function saveOutcome(visitorId: string, options?: { outcome?: string; note?: string }) {
@@ -447,7 +451,7 @@ export function FollowupsTableClient({ items }: Props) {
 
       setIsOutcomeSuccess(true);
       await new Promise((resolve) => setTimeout(resolve, 650));
-      cancelOutcomeEdit();
+      closeOutcomeEditor();
       router.refresh();
     } catch (error) {
       setOutcomeError(error instanceof Error ? error.message : "Failed to record followup outcome.");
@@ -1040,5 +1044,4 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
-
 

@@ -120,3 +120,36 @@ export function FollowupRowActionSuccess({ message }: { message: string }) {
 export function FollowupRowActionStack({ children }: { children: ReactNode }) {
   return <div style={{ display: "grid", gap: 6 }}>{children}</div>;
 }
+
+export function FollowupRowActionSurface({
+  children,
+  needsAttention = false
+}: {
+  children: ReactNode;
+  needsAttention?: boolean;
+}) {
+  const actionGroup = useFollowupRowActionGroup();
+  const isLocked = !!actionGroup?.activeActionId;
+
+  return (
+    <div
+      aria-disabled={isLocked}
+      style={{
+        display: "flex",
+        gap: 8,
+        flexWrap: "wrap",
+        alignItems: "flex-start",
+        padding: needsAttention ? 10 : 0,
+        borderRadius: needsAttention ? 10 : 0,
+        background: needsAttention ? "#fff7ed" : "transparent",
+        border: needsAttention ? "1px solid #fed7aa" : "none",
+        opacity: isLocked ? 0.72 : 1,
+        pointerEvents: isLocked ? "none" : "auto",
+        transition: "opacity 120ms ease"
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+

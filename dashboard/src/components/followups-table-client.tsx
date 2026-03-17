@@ -926,8 +926,24 @@ export function FollowupsTableClient({ items }: Props) {
         isSavingOutcome={isSavingOutcome}
         outcomeError={outcomeError}
         onQueueSelect={(value) => {
+          setSearch("");
           setQueueFilter(value);
-          updateUrl({ queue: value });
+          setAgeFilter("all");
+          setStageFilter("all");
+          setOutcomeFilter("all");
+          setAssigneeFilter("all");
+          setAttentionFilter("all");
+          setSort("oldest-assigned");
+          updateUrl({
+            q: "",
+            queue: value,
+            age: "all",
+            stage: "all",
+            outcome: "all",
+            assignee: "all",
+            attention: "all",
+            sort: "oldest-assigned"
+          });
         }}
         onAssigneeSelect={(value) => {
           setAssigneeFilter(value);

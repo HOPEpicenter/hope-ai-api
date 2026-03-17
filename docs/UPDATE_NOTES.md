@@ -122,3 +122,21 @@ Post-closeout rule:
   - blocker-driven
   - contract-fix driven
   - explicitly scoped as post-v1 work
+
+## 2026-03-17 — Phase 3/4 closeout sync
+
+Closed out docs and staging verification for the current Phase 3/4 surface.
+
+Formation status:
+- formation profile snapshot surface remains in place
+- formation milestones v1 contract/assert coverage remains in place
+
+Integration status:
+- integration summary/timeline surface remains in place
+- integration summary invariant/assert coverage remains in place
+
+Verification:
+- CI green on main
+- staging deploy green on main
+- no new Formation or Integration code added in this closeout
+- future work should be blocker-driven, not speculative expansion

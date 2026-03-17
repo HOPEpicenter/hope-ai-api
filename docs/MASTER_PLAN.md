@@ -338,3 +338,29 @@ Still deferred / not part of v1:
 - journey-step engine
 - attendance / teams / scheduling expansion
 - broad new backend scope without a real consumer blocker
+
+## 2026-03-17 — Phase 3/4 closeout sync
+
+Current Phase 3/4 surface is closed out on main.
+
+Phase 3 — Formation:
+- formation profile snapshot surface is implemented
+- formation milestones v1 contract doc exists
+- formation milestones v1 regression assert exists
+- regression runner includes the current formation milestone/profile invariant coverage
+
+Phase 4 — Integration:
+- integration summary and timeline surfaces are implemented
+- integration summary ownership/source/followup invariants are asserted
+- regression runner includes the current integration summary contract coverage
+
+Verification status:
+- docs synced to current Phase 3/4 implementation state
+- CI is green on main
+- staging deploy is green on main
+- current Phase 3/4 surface is treated as verified unless staging exposes a real blocker
+
+Planning rule going forward:
+- only add another Formation slice if a real repeated-event/profile-invariant gap is found
+- only add another Integration slice if a real consumer/blocker requires it
+- otherwise treat the current Phase 3/4 surface as closed for now

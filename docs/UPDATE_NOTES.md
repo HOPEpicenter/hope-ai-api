@@ -83,3 +83,19 @@
 - ✅ Merged **#274**: dashboard copy and label polish across dashboard shell and table surfaces.
 - ✅ Merged **#275**: clarified Formation stage metadata docs contract (`stageUpdatedAt / stageUpdatedBy / stageReason` are stage-change metadata, not generic profile outputs).
 
+
+## 2026-03-17 — Followups dashboard sync (#353–#363)
+
+Merged followups dashboard work after the prior docs sync:
+
+- #353 — unified followup outcome row actions into the row-action surface
+- #358 — polished followup row visuals
+- #361 — added keyboard outcome entry shortcuts
+- #362 — added row action re-entry guards
+- #363 — completed outcome action guard parity
+
+Outcome:
+- followups operator flow is now more consistent on a single action surface
+- keyboard save/cancel support is in place for outcome entry
+- row actions now have tighter guard coverage against accidental re-entry
+- CI and staging deploy completed successfully for each merged slice

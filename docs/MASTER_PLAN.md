@@ -286,3 +286,23 @@ Next planned slice:
 - UI-only dashboard usability improvements
 - do not reopen backend scope unless a real blocker appears
 
+
+## 2026-03-17 — Followups dashboard closeout sync (#353–#363)
+
+Followups dashboard work completed after the earlier #334–#349 doc sync:
+
+- #353 — unify followup outcome row actions
+- #358 — polish followup row visuals
+- #361 — add keyboard outcome entry shortcuts
+- #362 — harden followup row action re-entry guards
+- #363 — harden followup outcome action guard parity
+
+Net result:
+- outcome entry now lives on the row-action surface
+- keyboard-first outcome entry is supported
+- row-action locking / re-entry handling is more deterministic
+- followups table/operator flow is tighter without backend scope expansion
+
+Planning note:
+- followups dashboard operator-speed / stability slices above are complete
+- remaining future work should be treated as new scoped dashboard slices, not part of the original closeout set

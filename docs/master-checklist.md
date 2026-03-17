@@ -206,3 +206,18 @@ Remaining (business logic expansion):
 - [x] Merged **#274**: dashboard copy and label polish.
 - [x] Merged **#275**: clarified Formation stage metadata docs contract.
 
+
+## Followups dashboard closeout — synced 2026-03-17
+
+Completed after prior followups doc sync:
+- [x] #353 unify followup outcome row actions
+- [x] #358 polish followup row visuals
+- [x] #361 add keyboard outcome entry shortcuts
+- [x] #362 harden followup row action re-entry guards
+- [x] #363 harden followup outcome action guard parity
+
+Current state:
+- [x] row-action outcome workflow unified
+- [x] row-action keyboard affordances shipped
+- [x] row-action re-entry guards shipped
+- [x] outcome action guard parity shipped

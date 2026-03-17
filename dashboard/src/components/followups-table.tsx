@@ -405,7 +405,8 @@ export function FollowupsTable({
   onCancelOutcomeEdit,
   onEditingOutcomeChange,
   onEditingNoteChange,
-  onSaveOutcome
+  onSaveOutcome,
+  onQuickOutcome
 }: {
   items: FollowupItem[];
   queueFilter: "all" | "action-needed" | "contact-made";
@@ -430,6 +431,7 @@ export function FollowupsTable({
   onEditingOutcomeChange: (value: string) => void;
   onEditingNoteChange: (value: string) => void;
   onSaveOutcome: (visitorId: string) => Promise<void>;
+  onQuickOutcome: (visitorId: string, outcome: string) => void;
 }) {
   if (items.length === 0) {
     const hasFilters =
@@ -753,23 +755,59 @@ export function FollowupsTable({
                           assignedToOwnerId={item.assignedTo?.ownerId ?? null}
                         />
                         <FollowupContactButton visitorId={item.visitorId} needsFollowup={item.needsFollowup} />
-                        {!item.lastFollowupOutcome && !isEditing ? (
-                          <button
-                            type="button"
-                            onClick={() => onStartOutcomeEdit(item.visitorId)}
-                            style={{
-                              background: "#fff",
-                              color: "#111827",
-                              border: "1px solid #d1d5db",
-                              borderRadius: 8,
-                              padding: "8px 12px",
-                              fontSize: 12,
-                              fontWeight: 600,
-                              cursor: "pointer"
-                            }}
-                          >
-                            Record outcome
-                          </button>
+                        {!isEditing ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => onQuickOutcome(item.visitorId, "CONNECTED")}
+                              style={{
+                                background: "#ecfdf5",
+                                color: "#166534",
+                                border: "1px solid #bbf7d0",
+                                borderRadius: 8,
+                                padding: "8px 12px",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: "pointer"
+                              }}
+                            >
+                              Connected
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => onQuickOutcome(item.visitorId, "NO_ANSWER")}
+                              style={{
+                                background: "#fef2f2",
+                                color: "#991b1b",
+                                border: "1px solid #fecaca",
+                                borderRadius: 8,
+                                padding: "8px 12px",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: "pointer"
+                              }}
+                            >
+                              No answer
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => onStartOutcomeEdit(item.visitorId)}
+                              style={{
+                                background: "#fff",
+                                color: "#111827",
+                                border: "1px solid #d1d5db",
+                                borderRadius: 8,
+                                padding: "8px 12px",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: "pointer"
+                              }}
+                            >
+                              More…
+                            </button>
+                          </>
                         ) : null}
                         <CopyButton value={item.visitorId} label="Copy ID" />
                       </div>

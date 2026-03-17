@@ -421,7 +421,7 @@ export function FollowupsTableClient({ items }: Props) {
     setOutcomeError(null);
   }
 
-  async function saveOutcome(visitorId: string) {
+  async function saveOutcome(visitorId: string, options?: { outcome?: string; note?: string }) {
     setIsSavingOutcome(true);
     setOutcomeError(null);
 
@@ -434,8 +434,8 @@ export function FollowupsTableClient({ items }: Props) {
         },
         body: JSON.stringify({
           visitorId,
-          outcome: editingOutcome,
-          note: editingNote
+          outcome: options?.outcome ?? editingOutcome,
+          note: options?.note ?? editingNote
         })
       });
 
@@ -1034,6 +1034,7 @@ export function FollowupsTableClient({ items }: Props) {
         onEditingOutcomeChange={setEditingOutcome}
         onEditingNoteChange={setEditingNote}
         onSaveOutcome={saveOutcome}
+        onQuickOutcome={(visitorId, outcome) => void saveOutcome(visitorId, { outcome, note: "" })}
       />
     </section>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   FollowupRowActionButton,
   FollowupRowActionError,
@@ -53,6 +53,7 @@ export function FollowupOutcomeRowActions({
   onQuickOutcome
 }: Props) {
   const actionGroup = useFollowupRowActionGroup();
+  const outcomeSelectRef = useRef<HTMLSelectElement | null>(null);
   const showQuickOutcomeButtons = !hasRecordedOutcome;
   const isAnotherActionSubmitting =
     !!actionGroup?.activeActionId && actionGroup.activeActionId !== ACTION_ID;
@@ -66,8 +67,29 @@ export function FollowupOutcomeRowActions({
     }
   }, [actionGroup, isSavingOutcome]);
 
+  useEffect(() => {
+    if (!isEditing) return;
+    outcomeSelectRef.current?.focus();
+  }, [isEditing]);
+
   function beginOutcomeAction() {
     actionGroup?.setActiveActionId(ACTION_ID);
+  }
+
+  function handleOutcomeEditorKeyDown(
+    event: ReactKeyboardEvent<HTMLSelectElement | HTMLTextAreaElement>
+  ) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onCancelOutcomeEdit();
+      return;
+    }
+
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      beginOutcomeAction();
+      void onSaveOutcome(visitorId);
+    }
   }
 
   return (
@@ -85,9 +107,14 @@ export function FollowupOutcomeRowActions({
               background: "#f9fafb"
             }}
           >
+            <div style={{ fontSize: 12, color: "#6b7280" }}>
+              Esc to cancel • Ctrl+Enter / Cmd+Enter to save
+            </div>
             <select
+              ref={outcomeSelectRef}
               value={editingOutcome}
               onChange={(event) => onEditingOutcomeChange(event.target.value)}
+              onKeyDown={handleOutcomeEditorKeyDown}
               disabled={isSavingOutcome || isOutcomeSuccess}
               style={{
                 padding: "8px 10px",
@@ -107,6 +134,7 @@ export function FollowupOutcomeRowActions({
             <textarea
               value={editingNote}
               onChange={(event) => onEditingNoteChange(event.target.value)}
+              onKeyDown={handleOutcomeEditorKeyDown}
               disabled={isSavingOutcome || isOutcomeSuccess}
               rows={2}
               placeholder="Optional note"

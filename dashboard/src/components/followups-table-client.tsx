@@ -295,6 +295,25 @@ export function FollowupsTableClient({ items }: Props) {
   const aged72Count = useMemo(() => countAgedItems(items, 72), [items]);
 
   const mineActive = assigneeFilter !== "all" && assigneeFilter === MY_ASSIGNEE;
+
+  const activePresetLabel =
+    normalizedSearch.length === 0 &&
+    !mineActive &&
+    queueFilter === "all" &&
+    ageFilter === "all" &&
+    stageFilter === "all" &&
+    outcomeFilter === "all" &&
+    assigneeFilter === "all" &&
+    attentionFilter === "all"
+      ? "All"
+      : normalizedSearch.length === 0 && mineActive && queueFilter === "action-needed"
+        ? "My Followups"
+        : normalizedSearch.length === 0 && queueFilter === "action-needed" && ageFilter === "48h+"
+          ? "Stale 48h+"
+          : normalizedSearch.length === 0 && attentionFilter === "needs-attention"
+            ? "Needs attention"
+            : null;
+
   const hasActiveFilters =
     normalizedSearch.length > 0 ||
     queueFilter !== "all" ||
@@ -305,6 +324,7 @@ export function FollowupsTableClient({ items }: Props) {
     attentionFilter !== "all" ||
     sort !== "oldest-assigned";
 
+  const hasCustomFilters = hasActiveFilters && activePresetLabel === null;
   function applyAllPreset() {
     setSearch("");
     setQueueFilter("all");
@@ -567,9 +587,21 @@ export function FollowupsTableClient({ items }: Props) {
                 padding: 0
               }}
             >
-              Clear all
+              Reset to All
             </button>
           ) : null}
+        </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", fontSize: 13 }}>
+          {activePresetLabel ? (
+            <span style={{ color: "#374151" }}>
+              Preset: <span style={{ fontWeight: 700 }}>{activePresetLabel}</span>
+            </span>
+          ) : hasCustomFilters ? (
+            <span style={{ color: "#92400e", fontWeight: 600 }}>Custom filters active</span>
+          ) : (
+            <span style={{ color: "#6b7280" }}>No filters applied</span>
+          )}
         </div>
 
         {hasActiveFilters ? (
@@ -912,7 +944,9 @@ export function FollowupsTableClient({ items }: Props) {
         </div>
 
         <div style={{ fontSize: 13, color: "#6b7280" }}>
-          Showing {filteredItems.length} of {items.length} followups.
+          {filteredItems.length === items.length
+            ? `Showing all ${items.length} followups.`
+            : `Showing ${filteredItems.length} of ${items.length} followups.`}
         </div>
       </div>
 

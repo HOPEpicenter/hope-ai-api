@@ -6,6 +6,7 @@ import type { VisitorListItem } from "@/lib/contracts/visitors";
 
 export type VisitorsTableItem = VisitorListItem & {
   followupState: "Assigned" | "Waiting assignment" | "Contacted";
+  attentionState: "Needs attention" | "Contact made" | null;
   assignedTo: string | null;
 };
 
@@ -13,6 +14,17 @@ function toTimestamp(value: string | null | undefined) {
   if (!value) return 0;
   const time = new Date(value).getTime();
   return Number.isNaN(time) ? 0 : time;
+}
+
+function getAttentionRank(attentionState: VisitorsTableItem["attentionState"]) {
+  switch (attentionState) {
+    case "Needs attention":
+      return 0;
+    case "Contact made":
+      return 1;
+    default:
+      return 2;
+  }
 }
 
 function getFollowupStateRank(state: VisitorsTableItem["followupState"]) {
@@ -53,6 +65,31 @@ function FollowupStateBadge({ state }: { state: VisitorsTableItem["followupState
   );
 }
 
+function AttentionBadge({ state }: { state: VisitorsTableItem["attentionState"] }) {
+  if (!state) {
+    return <span style={{ color: "#9ca3af" }}>-</span>;
+  }
+
+  const background = state === "Needs attention" ? "#fee2e2" : "#e0f2fe";
+  const color = state === "Needs attention" ? "#991b1b" : "#0c4a6e";
+
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "4px 8px",
+        borderRadius: 9999,
+        fontSize: 12,
+        fontWeight: 600,
+        background,
+        color
+      }}
+    >
+      {state}
+    </span>
+  );
+}
+
 export function VisitorsTable({ items }: { items: VisitorsTableItem[] }) {
   if (items.length === 0) {
     return (
@@ -66,6 +103,11 @@ export function VisitorsTable({ items }: { items: VisitorsTableItem[] }) {
   }
 
   const sortedItems = [...items].sort((a, b) => {
+    const attentionRankDiff = getAttentionRank(a.attentionState) - getAttentionRank(b.attentionState);
+    if (attentionRankDiff !== 0) {
+      return attentionRankDiff;
+    }
+
     const stateRankDiff = getFollowupStateRank(a.followupState) - getFollowupStateRank(b.followupState);
     if (stateRankDiff !== 0) {
       return stateRankDiff;
@@ -85,6 +127,7 @@ export function VisitorsTable({ items }: { items: VisitorsTableItem[] }) {
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Name</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Email</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Followup State</th>
+            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Attention</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Assigned To</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Visitor ID</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Activity</th>
@@ -101,6 +144,9 @@ export function VisitorsTable({ items }: { items: VisitorsTableItem[] }) {
               <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>{item.email ?? "-"}</td>
               <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                 <FollowupStateBadge state={item.followupState} />
+              </td>
+              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                <AttentionBadge state={item.attentionState} />
               </td>
               <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                 {item.assignedTo ?? "-"}

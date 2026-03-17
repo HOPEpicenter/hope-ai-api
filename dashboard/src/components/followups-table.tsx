@@ -388,15 +388,20 @@ function renderOutcomeCell(
   outcomeAt: string | null | undefined
 ) {
   if (!outcome) {
-    return <span style={{ color: "#6b7280" }}>No outcome yet</span>;
+    return <span style={{ color: "#6b7280" }}>No recorded outcome</span>;
   }
 
   return (
     <span style={{ display: "inline-flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
       <span style={{ color: "#111827", fontWeight: 600 }}>{formatOutcomeLabel(outcome)}</span>
-      <span style={{ color: "#6b7280", fontSize: 12 }}>
-        {outcomeAt ? formatRelativeTime(outcomeAt) : "Time unavailable"}
-      </span>
+      {outcomeAt ? (
+        <span
+          title={formatAbsoluteTime(outcomeAt)}
+          style={{ color: "#6b7280", fontSize: 12 }}
+        >
+          {formatRelativeTime(outcomeAt)}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -608,6 +613,7 @@ export function FollowupsTable({
                         padding: "6px 10px",
                         fontSize: 12,
                         fontWeight: 600,
+                        textAlign: "left",
                         cursor: "pointer"
                       }}
                     >

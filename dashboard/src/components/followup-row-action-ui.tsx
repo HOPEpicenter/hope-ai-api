@@ -141,11 +141,18 @@ export function FollowupRowActionSurface({
         alignItems: "flex-start",
         padding: needsAttention ? 10 : 0,
         borderRadius: needsAttention ? 10 : 0,
-        background: needsAttention ? "#fff7ed" : "transparent",
-        border: needsAttention ? "1px solid #fed7aa" : "none",
-        opacity: isLocked ? 0.72 : 1,
+        background: isLocked
+          ? needsAttention
+            ? "#ffedd5"
+            : "#f9fafb"
+          : needsAttention
+            ? "#fff7ed"
+            : "transparent",
+        border: needsAttention ? "1px solid #fed7aa" : isLocked ? "1px solid #e5e7eb" : "none",
+        boxShadow: isLocked ? "inset 0 0 0 1px rgba(17, 24, 39, 0.04)" : "none",
+        opacity: isLocked ? 0.82 : 1,
         pointerEvents: isLocked ? "none" : "auto",
-        transition: "opacity 120ms ease"
+        transition: "opacity 120ms ease, background 120ms ease, box-shadow 120ms ease"
       }}
     >
       {children}

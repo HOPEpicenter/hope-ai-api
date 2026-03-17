@@ -369,7 +369,7 @@ function getOutcomeBadgeColors(value: string | null | undefined) {
 
 function formatOutcomeLabel(value: string | null | undefined) {
   if (!value) {
-    return <span style={{ color: "#6b7280" }}>No outcome</span>;
+    return "No outcome";
   }
 
   const normalized = value.trim().toLowerCase();
@@ -381,6 +381,24 @@ function formatOutcomeLabel(value: string | null | undefined) {
   if (normalized === "needs_care") return "Needs care";
 
   return value;
+}
+
+function renderOutcomeCell(
+  outcome: string | null | undefined,
+  outcomeAt: string | null | undefined
+) {
+  if (!outcome) {
+    return <span style={{ color: "#6b7280" }}>No outcome yet</span>;
+  }
+
+  return (
+    <span style={{ display: "inline-flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+      <span style={{ color: "#111827", fontWeight: 600 }}>{formatOutcomeLabel(outcome)}</span>
+      <span style={{ color: "#6b7280", fontSize: 12 }}>
+        {outcomeAt ? formatRelativeTime(outcomeAt) : "Time unavailable"}
+      </span>
+    </span>
+  );
 }
 
 export function FollowupsTable({
@@ -593,7 +611,7 @@ export function FollowupsTable({
                         cursor: "pointer"
                       }}
                     >
-                      {formatOutcomeLabel(item.lastFollowupOutcome)}
+                      {renderOutcomeCell(item.lastFollowupOutcome, item.lastFollowupOutcomeAt)}
                     </button>
                   ) : (
                     <div style={{ color: "#6b7280" }}>No outcome</div>
@@ -659,8 +677,8 @@ export function FollowupsTable({
                           onSaveOutcome={onSaveOutcome}
                           onQuickOutcome={onQuickOutcome}
                         />
-                        <CopyButton value={item.visitorId} label="Copy ID" />
                       </FollowupRowActionSurface>
+                      <CopyButton value={item.visitorId} label="Copy ID" />
                     </div>
                   </FollowupRowActionGroup>
                 </td>

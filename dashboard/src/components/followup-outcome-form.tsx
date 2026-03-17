@@ -13,17 +13,26 @@ const OUTCOME_OPTIONS = [
 
 type Props = {
   visitorId: string;
+  lastFollowupOutcomeAt: string | null;
 };
 
-export function FollowupOutcomeForm({ visitorId }: Props) {
+export function FollowupOutcomeForm({ visitorId, lastFollowupOutcomeAt }: Props) {
   const router = useRouter();
   const [outcome, setOutcome] = useState<string>(OUTCOME_OPTIONS[0].value);
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isResolved = lastFollowupOutcomeAt !== null;
+  const isDisabled = isResolved || isSubmitting;
+
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (isDisabled) {
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -83,12 +92,12 @@ export function FollowupOutcomeForm({ visitorId }: Props) {
             id="followup-outcome"
             value={outcome}
             onChange={(event) => setOutcome(event.target.value)}
-            disabled={isSubmitting}
+            disabled={isDisabled}
             style={{
               padding: "10px 12px",
               borderRadius: 8,
               border: "1px solid #d1d5db",
-              background: "#fff",
+              background: isDisabled ? "#f3f4f6" : "#fff",
               color: "#111827"
             }}
           >
@@ -108,19 +117,34 @@ export function FollowupOutcomeForm({ visitorId }: Props) {
             id="followup-note"
             value={note}
             onChange={(event) => setNote(event.target.value)}
-            disabled={isSubmitting}
+            disabled={isDisabled}
             rows={3}
             placeholder="Optional operator note"
             style={{
               padding: "10px 12px",
               borderRadius: 8,
               border: "1px solid #d1d5db",
-              background: "#fff",
+              background: isDisabled ? "#f3f4f6" : "#fff",
               color: "#111827",
               resize: "vertical"
             }}
           />
         </div>
+
+        {isResolved ? (
+          <div
+            style={{
+              background: "#f9fafb",
+              border: "1px solid #e5e7eb",
+              color: "#4b5563",
+              borderRadius: 10,
+              padding: 12,
+              fontWeight: 600
+            }}
+          >
+            Outcome already recorded. This followup is resolved.
+          </div>
+        ) : null}
 
         {error ? (
           <div
@@ -140,19 +164,19 @@ export function FollowupOutcomeForm({ visitorId }: Props) {
         <div>
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isDisabled}
             style={{
-              background: "#111827",
-              color: "#fff",
+              background: isDisabled ? "#e5e7eb" : "#111827",
+              color: isDisabled ? "#374151" : "#fff",
               border: "1px solid #111827",
               borderRadius: 10,
               padding: "10px 14px",
               fontWeight: 600,
-              cursor: isSubmitting ? "not-allowed" : "pointer",
+              cursor: isDisabled ? "not-allowed" : "pointer",
               opacity: isSubmitting ? 0.7 : 1
             }}
           >
-            {isSubmitting ? "Recording..." : "Record outcome"}
+            {isResolved ? "Outcome recorded" : isSubmitting ? "Recording..." : "Record outcome"}
           </button>
         </div>
       </form>

@@ -6,11 +6,13 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 type MarkContactedFormProps = {
   visitorId: string;
   lastFollowupContactedAt: string | null;
+  lastFollowupOutcomeAt: string | null;
 };
 
 export function MarkContactedForm({
   visitorId,
-  lastFollowupContactedAt
+  lastFollowupContactedAt,
+  lastFollowupOutcomeAt
 }: MarkContactedFormProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -19,11 +21,13 @@ export function MarkContactedForm({
   const [error, setError] = useState<string | null>(null);
 
   const alreadyContacted = lastFollowupContactedAt !== null;
+  const isResolved = lastFollowupOutcomeAt !== null;
+  const isDisabled = alreadyContacted || isResolved || isSubmitting;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (alreadyContacted || isSubmitting) {
+    if (isDisabled) {
       return;
     }
 
@@ -83,22 +87,26 @@ export function MarkContactedForm({
       <form onSubmit={handleSubmit} style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <button
           type="submit"
-          disabled={alreadyContacted || isSubmitting}
+          disabled={isDisabled}
           style={{
             border: "1px solid #111827",
-            background: alreadyContacted ? "#e5e7eb" : "#111827",
-            color: alreadyContacted ? "#374151" : "#ffffff",
+            background: isDisabled ? "#e5e7eb" : "#111827",
+            color: isDisabled ? "#374151" : "#ffffff",
             borderRadius: 10,
             padding: "10px 14px",
             fontWeight: 600,
-            cursor: alreadyContacted || isSubmitting ? "not-allowed" : "pointer",
+            cursor: isDisabled ? "not-allowed" : "pointer",
             opacity: isSubmitting ? 0.7 : 1
           }}
         >
-          {alreadyContacted ? "Already contacted" : isSubmitting ? "Saving..." : "Mark contacted"}
+          {isResolved ? "Followup resolved" : alreadyContacted ? "Already contacted" : isSubmitting ? "Saving..." : "Mark contacted"}
         </button>
 
-        {lastFollowupContactedAt ? (
+        {isResolved ? (
+          <span style={{ color: "#4b5563", fontSize: 14 }}>
+            Contact updates are locked because an outcome has already been recorded.
+          </span>
+        ) : lastFollowupContactedAt ? (
           <span style={{ color: "#4b5563", fontSize: 14 }}>
             Contact already recorded.
           </span>

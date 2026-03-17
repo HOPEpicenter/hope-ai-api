@@ -15,6 +15,11 @@
 - [x] Merged **#341**: the needs-attention preset active state now reflects the full effective filter state.
 - [x] Merged **#342**: followups age card presets now clear assignee.
 - [x] Merged **#343**: the needs-attention preset now applies a clean preset state.
+- [x] Merged **#345**: followups presets and age cards now clear search, and active-state truthfulness now includes search.
+- [x] Merged **#346**: row-level age filters now apply a clean state.
+- [x] Merged **#347**: row-level queue filters now apply a clean state.
+- [x] Merged **#348**: row-level stage filters now apply a clean state.
+- [x] Merged **#349**: row-level outcome and assignee filters now apply a clean state.
 - [x] Verified CI passed after merged slices.
 - [x] Verified staging deploy passed and `/api/version` returned 200.
 

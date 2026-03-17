@@ -3,6 +3,7 @@ import { FollowupAssignButton } from "@/components/followup-assign-button";
 import { FollowupUnassignButton } from "@/components/followup-unassign-button";
 import { FollowupContactButton } from "@/components/followup-contact-button";
 import { FollowupRowActionGroup } from "@/components/followup-row-action-ui";
+import { FollowupOutcomeRowActions } from "@/components/followup-outcome-row-actions";
 import type { CSSProperties } from "react";
 import type { FollowupItem } from "@/lib/contracts/followups";
 import { CopyButton } from "@/components/copy-button";
@@ -493,9 +494,6 @@ export function FollowupsTable({
               : {};
 
             const isEditing = editingVisitorId === item.visitorId;
-            const hasRecordedOutcome = Boolean(item.lastFollowupOutcome);
-            const showQuickOutcomeButtons = !hasRecordedOutcome;
-            const disableQuickOutcomeButtons = isSavingOutcome;
 
             return (
               <tr key={item.visitorId} style={rowStyle}>
@@ -632,110 +630,6 @@ export function FollowupsTable({
                         </div>
                       ) : null}
 
-                      {isEditing ? (
-                        <div
-                          style={{
-                            display: "grid",
-                            gap: 8,
-                            minWidth: 240,
-                            padding: 12,
-                            border: "1px solid #e5e7eb",
-                            borderRadius: 10,
-                            background: "#f9fafb"
-                          }}
-                        >
-                          <select
-                            value={editingOutcome}
-                            onChange={(event) => onEditingOutcomeChange(event.target.value)}
-                            disabled={isSavingOutcome}
-                            style={{
-                              padding: "8px 10px",
-                              borderRadius: 8,
-                              border: "1px solid #d1d5db",
-                              background: "#fff",
-                              color: "#111827"
-                            }}
-                          >
-                            {ROW_OUTCOME_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-
-                          <textarea
-                            value={editingNote}
-                            onChange={(event) => onEditingNoteChange(event.target.value)}
-                            disabled={isSavingOutcome}
-                            rows={2}
-                            placeholder="Optional note"
-                            style={{
-                              padding: "8px 10px",
-                              borderRadius: 8,
-                              border: "1px solid #d1d5db",
-                              background: "#fff",
-                              color: "#111827",
-                              resize: "vertical"
-                            }}
-                          />
-
-                          {outcomeError ? (
-                            <div
-                              style={{
-                                background: "#fef2f2",
-                                border: "1px solid #fecaca",
-                                color: "#991b1b",
-                                borderRadius: 8,
-                                padding: 8,
-                                fontSize: 12,
-                                fontWeight: 600
-                              }}
-                            >
-                              {outcomeError}
-                            </div>
-                          ) : null}
-
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            <button
-                              type="button"
-                              onClick={() => void onSaveOutcome(item.visitorId)}
-                              disabled={isSavingOutcome}
-                              style={{
-                                background: "#111827",
-                                color: "#fff",
-                                border: "1px solid #111827",
-                                borderRadius: 8,
-                                padding: "8px 12px",
-                                fontSize: 12,
-                                fontWeight: 600,
-                                cursor: isSavingOutcome ? "not-allowed" : "pointer",
-                                opacity: isSavingOutcome ? 0.7 : 1
-                              }}
-                            >
-                              {isSavingOutcome ? "Saving..." : "Save"}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={onCancelOutcomeEdit}
-                              disabled={isSavingOutcome}
-                              style={{
-                                background: "#fff",
-                                color: "#111827",
-                                border: "1px solid #d1d5db",
-                                borderRadius: 8,
-                                padding: "8px 12px",
-                                fontSize: 12,
-                                fontWeight: 600,
-                                cursor: isSavingOutcome ? "not-allowed" : "pointer"
-                              }}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-
                       <div
                         style={{
                           display: "flex",
@@ -758,68 +652,21 @@ export function FollowupsTable({
                           assignedToOwnerId={item.assignedTo?.ownerId ?? null}
                         />
                         <FollowupContactButton visitorId={item.visitorId} needsFollowup={item.needsFollowup} />
-                        {!isEditing ? (
-                          <>
-                            {showQuickOutcomeButtons ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => onQuickOutcome(item.visitorId, "CONNECTED")}
-                                  disabled={disableQuickOutcomeButtons}
-                                  style={{
-                                    background: "#ecfdf5",
-                                    color: "#166534",
-                                    border: "1px solid #bbf7d0",
-                                    borderRadius: 8,
-                                    padding: "8px 12px",
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    cursor: disableQuickOutcomeButtons ? "not-allowed" : "pointer",
-                                    opacity: disableQuickOutcomeButtons ? 0.7 : 1
-                                  }}
-                                >
-                                  Connected
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => onQuickOutcome(item.visitorId, "NO_ANSWER")}
-                                  disabled={disableQuickOutcomeButtons}
-                                  style={{
-                                    background: "#fef2f2",
-                                    color: "#991b1b",
-                                    border: "1px solid #fecaca",
-                                    borderRadius: 8,
-                                    padding: "8px 12px",
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    cursor: disableQuickOutcomeButtons ? "not-allowed" : "pointer",
-                                    opacity: disableQuickOutcomeButtons ? 0.7 : 1
-                                  }}
-                                >
-                                  No answer
-                                </button>
-                              </>
-                            ) : null}
-
-                            <button
-                              type="button"
-                              onClick={() => onStartOutcomeEdit(item.visitorId)}
-                              style={{
-                                background: "#fff",
-                                color: "#111827",
-                                border: "1px solid #d1d5db",
-                                borderRadius: 8,
-                                padding: "8px 12px",
-                                fontSize: 12,
-                                fontWeight: 600,
-                                cursor: "pointer"
-                              }}
-                            >
-                              More…
-                            </button>
-                          </>
-                        ) : null}
+                        <FollowupOutcomeRowActions
+                          visitorId={item.visitorId}
+                          isEditing={isEditing}
+                          hasRecordedOutcome={Boolean(item.lastFollowupOutcome)}
+                          editingOutcome={editingOutcome}
+                          editingNote={editingNote}
+                          isSavingOutcome={isSavingOutcome}
+                          outcomeError={outcomeError}
+                          onStartOutcomeEdit={onStartOutcomeEdit}
+                          onCancelOutcomeEdit={onCancelOutcomeEdit}
+                          onEditingOutcomeChange={onEditingOutcomeChange}
+                          onEditingNoteChange={onEditingNoteChange}
+                          onSaveOutcome={onSaveOutcome}
+                          onQuickOutcome={onQuickOutcome}
+                        />
                         <CopyButton value={item.visitorId} label="Copy ID" />
                       </div>
                     </div>

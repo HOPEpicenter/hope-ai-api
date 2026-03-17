@@ -545,7 +545,7 @@ export function FollowupsTable({
 
             return (
               <tr key={item.visitorId} style={rowStyle}>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Link
                       href={`/visitors/${item.visitorId}`}
@@ -562,7 +562,7 @@ export function FollowupsTable({
                     <CopyButton value={item.visitorId} label="Copy" />
                   </div>
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   {item.assignedTo?.ownerId ? (
                     <button
                       type="button"
@@ -584,21 +584,21 @@ export function FollowupsTable({
                     "-"
                   )}
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   <StageBadge
                     stage={item.stage}
                     stageFilter={stageFilter}
                     onStageSelect={onStageSelect}
                   />
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   <Badge
                     needsFollowup={item.needsFollowup}
                     queueFilter={queueFilter}
                     onQueueSelect={onQueueSelect}
                   />
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   <AgingBadge
                     assignedAt={item.lastFollowupAssignedAt}
                     needsFollowup={item.needsFollowup}
@@ -606,21 +606,21 @@ export function FollowupsTable({
                     onAgeSelect={onAgeSelect}
                   />
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   <LastAssignedButton
                     value={item.lastFollowupAssignedAt}
                     sort={sort}
                     onSortSelect={onSortSelect}
                   />
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   <LastContactButton
                     value={item.lastFollowupContactedAt}
                     sort={sort}
                     onSortSelect={onSortSelect}
                   />
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   {item.lastFollowupOutcome ? (
                     <button
                       type="button"
@@ -646,7 +646,7 @@ export function FollowupsTable({
                     <div style={{ color: "#6b7280" }}>No outcome</div>
                   )}
                 </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   <FollowupRowActionGroup>
                     <div style={{ display: "grid", gap: 8 }}>
                       {item.needsFollowup ? (

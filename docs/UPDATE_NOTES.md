@@ -14,6 +14,11 @@
 - ✅ Merged **#341**: tightened the `Needs attention` preset active state so highlighting reflects the full effective filter state.
 - ✅ Merged **#342**: made age summary card presets clear assignee so preset behavior matches the tightened active-state rules.
 - ✅ Merged **#343**: made the `Needs attention` preset apply a clean preset state when clicked.
+- ✅ Merged **#345**: made followups presets and age cards clear search, and included search in active-state truthfulness.
+- ✅ Merged **#346**: made row-level age filters apply a clean state.
+- ✅ Merged **#347**: made row-level queue filters apply a clean state.
+- ✅ Merged **#348**: made row-level stage filters apply a clean state.
+- ✅ Merged **#349**: made row-level outcome and assignee filters apply a clean state.
 
 - ✅ Verified CI green after the merged slices.
 - ✅ Verified staging deploy green after staging workflow fixes and followups dashboard slices.

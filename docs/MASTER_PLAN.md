@@ -14,6 +14,11 @@
 - ✅ **#341**: the `Needs attention` preset active state now reflects the full effective filter state.
 - ✅ **#342**: followups age card presets now clear assignee so preset behavior matches the tightened active-state rules.
 - ✅ **#343**: the `Needs attention` preset now applies a full clean preset state when clicked.
+- ✅ **#345**: followups presets and age cards now clear search, and active-state truthfulness now includes search.
+- ✅ **#346**: row-level age filters now apply a clean state.
+- ✅ **#347**: row-level queue filters now apply a clean state.
+- ✅ **#348**: row-level stage filters now apply a clean state.
+- ✅ **#349**: row-level outcome and assignee filters now apply a clean state.
 
 **Why this matters (master plan alignment)**
 - Finishes the immediate staging deploy hardening loop and aligns CI/staging with the proven recovery path.

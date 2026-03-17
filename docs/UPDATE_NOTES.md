@@ -99,3 +99,26 @@ Outcome:
 - keyboard save/cancel support is in place for outcome entry
 - row actions now have tighter guard coverage against accidental re-entry
 - CI and staging deploy completed successfully for each merged slice
+
+## 2026-03-17 — Dashboard v1 release closeout
+
+Marked Dashboard v1 release-ready after:
+- dashboard foundation completion
+- followups closeout sync
+- final followups row alignment polish
+- green CI
+- successful staging deploy verification
+
+V1 shipped surfaces:
+- Overview
+- Follow-Ups
+- Visitors
+- Visitor Detail
+- Timeline
+
+Post-closeout rule:
+- no additional dashboard feature expansion by default
+- new work should be either:
+  - blocker-driven
+  - contract-fix driven
+  - explicitly scoped as post-v1 work

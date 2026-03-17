@@ -395,6 +395,7 @@ export function FollowupsTable({
   editingOutcome,
   editingNote,
   isSavingOutcome,
+  isOutcomeSuccess,
   outcomeError,
   onQueueSelect,
   onAssigneeSelect,
@@ -420,6 +421,7 @@ export function FollowupsTable({
   editingOutcome: string;
   editingNote: string;
   isSavingOutcome: boolean;
+  isOutcomeSuccess: boolean;
   outcomeError: string | null;
   onQueueSelect: (value: "action-needed" | "contact-made") => void;
   onAssigneeSelect: (value: string) => void;
@@ -659,6 +661,7 @@ export function FollowupsTable({
                           editingOutcome={editingOutcome}
                           editingNote={editingNote}
                           isSavingOutcome={isSavingOutcome}
+                          isOutcomeSuccess={isOutcomeSuccess}
                           outcomeError={outcomeError}
                           onStartOutcomeEdit={onStartOutcomeEdit}
                           onCancelOutcomeEdit={onCancelOutcomeEdit}
@@ -680,4 +683,5 @@ export function FollowupsTable({
     </div>
   );
 }
+
 

@@ -924,6 +924,7 @@ export function FollowupsTableClient({ items }: Props) {
         editingOutcome={editingOutcome}
         editingNote={editingNote}
         isSavingOutcome={isSavingOutcome}
+        isOutcomeSuccess={isOutcomeSuccess}
         outcomeError={outcomeError}
         onQueueSelect={(value) => {
           setSearch("");
@@ -1039,4 +1040,5 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
+
 

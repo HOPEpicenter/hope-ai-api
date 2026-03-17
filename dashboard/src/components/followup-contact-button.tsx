@@ -32,6 +32,10 @@ export function FollowupContactButton({ visitorId, needsFollowup = true }: Props
   }
 
   async function onClick() {
+    if (isSubmitting || isSuccess || isAnotherActionSubmitting) {
+      return;
+    }
+
     actionGroup?.setActiveActionId(ACTION_ID);
     setIsSubmitting(true);
     setIsSuccess(false);

@@ -38,6 +38,10 @@ export function FollowupAssignButton({
   }
 
   async function onClick() {
+    if (isSubmitting || isSuccess || isAnotherActionSubmitting) {
+      return;
+    }
+
     actionGroup?.setActiveActionId(ACTION_ID);
     setIsSubmitting(true);
     setIsSuccess(false);

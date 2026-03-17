@@ -238,3 +238,16 @@ Current state:
 Post-v1 rule:
 - [x] Defer workflow automation / reminders / journey-step expansion unless a real blocker requires them
 - [x] Treat additional dashboard work as new explicitly scoped slices
+
+## Phase 3/4 closeout sync — 2026-03-17
+
+- [x] Phase 3 Formation surface implemented
+- [x] Phase 3 formation milestones v1 doc/assert present
+- [x] Phase 3 regression coverage wired
+- [x] Phase 4 Integration surface implemented
+- [x] Phase 4 integration summary invariants asserted
+- [x] Phase 4 regression coverage wired
+- [x] Docs synced to current Phase 3/4 surface
+- [x] CI green on main
+- [x] Staging deploy green on main
+- [x] Current Phase 3/4 surface treated as closed unless a real blocker appears

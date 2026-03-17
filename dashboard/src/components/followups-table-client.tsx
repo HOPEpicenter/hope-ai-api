@@ -970,8 +970,24 @@ export function FollowupsTableClient({ items }: Props) {
           });
         }}
         onStageSelect={(value) => {
+          setSearch("");
+          setQueueFilter("all");
+          setAgeFilter("all");
           setStageFilter(value);
-          updateUrl({ stage: value });
+          setOutcomeFilter("all");
+          setAssigneeFilter("all");
+          setAttentionFilter("all");
+          setSort("oldest-assigned");
+          updateUrl({
+            q: "",
+            queue: "all",
+            age: "all",
+            stage: value,
+            outcome: "all",
+            assignee: "all",
+            attention: "all",
+            sort: "oldest-assigned"
+          });
         }}
         onOutcomeSelect={(value) => {
           setOutcomeFilter(value);

@@ -200,8 +200,12 @@ export default async function VisitorDetailPage({
       <MarkContactedForm
         visitorId={data.visitor.visitorId}
         lastFollowupContactedAt={data.formationProfile.lastFollowupContactedAt ?? null}
+        lastFollowupOutcomeAt={data.formationProfile.lastFollowupOutcomeAt ?? null}
       />
-      <FollowupOutcomeForm visitorId={data.visitor.visitorId} />
+      <FollowupOutcomeForm
+        visitorId={data.visitor.visitorId}
+        lastFollowupOutcomeAt={data.formationProfile.lastFollowupOutcomeAt ?? null}
+      />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16 }}>
         <DetailCard title="Visitor">

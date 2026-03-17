@@ -16,15 +16,26 @@ export default async function VisitorsPage() {
   const items: VisitorsTableItem[] = visitors.items.map((visitor) => {
     const followup = followupsByVisitorId.get(visitor.visitorId);
 
+    let followupState: VisitorsTableItem["followupState"] = "Waiting assignment";
+
+    if (followup?.lastOutcomeAt) {
+      followupState = "Contacted";
+    } else if (followup?.lastContactedAt) {
+      followupState = "Contacted";
+    } else if (followup?.assignedTo?.ownerId) {
+      followupState = "Assigned";
+    }
+
     return {
       ...visitor,
-      followupState: followup ? "Assigned" : "Waiting assignment",
+      followupState,
       assignedTo: followup?.assignedTo?.ownerId ?? null
     };
   });
 
-  const waitingAssignmentCount = items.filter((x) => !x.assignedTo).length;
-  const assignedCount = items.filter((x) => !!x.assignedTo).length;
+  const waitingAssignmentCount = items.filter((x) => x.followupState === "Waiting assignment").length;
+  const assignedCount = items.filter((x) => x.followupState === "Assigned").length;
+  const contactedCount = items.filter((x) => x.followupState === "Contacted").length;
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -37,7 +48,7 @@ export default async function VisitorsPage() {
 
       <CreateVisitorForm />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
           <div style={{ fontSize: 12, color: "#6b7280" }}>Total Visitors</div>
           <div style={{ fontSize: 28, fontWeight: 700 }}>{items.length}</div>
@@ -49,6 +60,10 @@ export default async function VisitorsPage() {
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
           <div style={{ fontSize: 12, color: "#6b7280" }}>Assigned</div>
           <div style={{ fontSize: 28, fontWeight: 700 }}>{assignedCount}</div>
+        </div>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 12, color: "#6b7280" }}>Contacted</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>{contactedCount}</div>
         </div>
       </div>
 

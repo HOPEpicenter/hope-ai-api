@@ -180,7 +180,7 @@ export default async function VisitorDetailPage({
         </div>
       </div>
 
-      <AssignFollowupForm visitorId={data.visitor.visitorId} />
+      <AssignFollowupForm visitorId={data.visitor.visitorId} assignedToOwnerId={data.formationProfile.assignedTo?.ownerId ?? null} />
       <FollowupOutcomeForm visitorId={data.visitor.visitorId} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16 }}>
@@ -255,4 +255,5 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 

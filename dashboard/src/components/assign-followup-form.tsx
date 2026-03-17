@@ -10,10 +10,17 @@ type AssignFollowupResponse = {
   error?: string;
 };
 
-export function AssignFollowupForm({ visitorId }: { visitorId: string }) {
+export function AssignFollowupForm({
+  visitorId,
+  assignedToOwnerId
+}: {
+  visitorId: string;
+  assignedToOwnerId?: string | null;
+}) {
   const router = useRouter();
   const [assigneeId, setAssigneeId] = useState("ops-user-1");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUnassigning, setIsUnassigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -50,6 +57,42 @@ export function AssignFollowupForm({ visitorId }: { visitorId: string }) {
     }
   }
 
+  async function onUnassign() {
+    if (!assignedToOwnerId || isSubmitting || isUnassigning) {
+      return;
+    }
+
+    setIsUnassigning(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/dashboard/followups/unassign", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json"
+        },
+        body: JSON.stringify({
+          visitorId
+        })
+      });
+
+      const data = (await response.json()) as { error?: string };
+
+      if (!response.ok) {
+        throw new Error(data.error || `POST /api/dashboard/followups/unassign failed with status ${response.status}`);
+      }
+
+      router.push(`/visitors/${visitorId}?assigned=1&assigneeId=`);
+      router.refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to unassign followup.";
+      setError(message);
+    } finally {
+      setIsUnassigning(false);
+    }
+  }
+
   return (
     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 20 }}>
       <div style={{ marginBottom: 12 }}>
@@ -59,10 +102,49 @@ export function AssignFollowupForm({ visitorId }: { visitorId: string }) {
         </p>
       </div>
 
+      {assignedToOwnerId ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            padding: 12,
+            border: "1px solid #e5e7eb",
+            borderRadius: 10,
+            background: "#f9fafb",
+            marginBottom: 12
+          }}
+        >
+          <div style={{ display: "grid", gap: 2 }}>
+            <div style={{ fontSize: 12, color: "#6b7280" }}>Current assignee</div>
+            <div style={{ fontWeight: 600, color: "#111827" }}>{assignedToOwnerId}</div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void onUnassign()}
+            disabled={isSubmitting || isUnassigning}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 8,
+              border: "1px solid #d1d5db",
+              background: "#fff",
+              color: "#111827",
+              font: "inherit",
+              cursor: isSubmitting || isUnassigning ? "default" : "pointer",
+              opacity: isSubmitting || isUnassigning ? 0.7 : 1
+            }}
+          >
+            {isUnassigning ? "Unassigning..." : "Unassign Followup"}
+          </button>
+        </div>
+      ) : null}
+
       <form onSubmit={onSubmit} style={{ display: "grid", gap: 12 }}>
         <div style={{ display: "grid", gap: 6 }}>
           <label htmlFor="assigneeId" style={{ fontWeight: 600 }}>
-            Assignee
+            {assignedToOwnerId ? "Reassign to" : "Assignee"}
           </label>
           <select
             id="assigneeId"
@@ -98,7 +180,7 @@ export function AssignFollowupForm({ visitorId }: { visitorId: string }) {
         <div style={{ display: "flex", justifyContent: "flex-start" }}>
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isUnassigning}
             style={{
               padding: "10px 14px",
               borderRadius: 8,
@@ -106,11 +188,11 @@ export function AssignFollowupForm({ visitorId }: { visitorId: string }) {
               background: "#111827",
               color: "#fff",
               font: "inherit",
-              cursor: isSubmitting ? "default" : "pointer",
-              opacity: isSubmitting ? 0.7 : 1
+              cursor: isSubmitting || isUnassigning ? "default" : "pointer",
+              opacity: isSubmitting || isUnassigning ? 0.7 : 1
             }}
           >
-            {isSubmitting ? "Assigning..." : "Assign Followup"}
+            {isSubmitting ? "Saving..." : assignedToOwnerId ? "Reassign Followup" : "Assign Followup"}
           </button>
         </div>
       </form>

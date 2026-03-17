@@ -134,37 +134,44 @@ export function VisitorsTable({ items }: { items: VisitorsTableItem[] }) {
           </tr>
         </thead>
         <tbody>
-          {sortedItems.map((item) => (
-            <tr key={item.visitorId}>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                <Link href={`/visitors/${item.visitorId}`} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
-                  {item.name}
-                </Link>
-              </td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>{item.email ?? "-"}</td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                <FollowupStateBadge state={item.followupState} />
-              </td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                <AttentionBadge state={item.attentionState} />
-              </td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                {item.assignedTo ?? "-"}
-              </td>
-              <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontFamily: "monospace" }}>{item.visitorId}</span>
-                  <CopyButton value={item.visitorId} label="Copy" />
-                </div>
-              </td>
-              <td
-                style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
-                title={formatAbsoluteTime(item.updatedAt)}
-              >
-                {formatRelativeTime(item.updatedAt)}
-              </td>
-            </tr>
-          ))}
+          {sortedItems.map((item) => {
+            const rowStyle =
+              item.attentionState === "Needs attention"
+                ? { background: "#fffbeb", boxShadow: "inset 4px 0 0 #f59e0b" }
+                : undefined;
+
+            return (
+              <tr key={item.visitorId} style={rowStyle}>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <Link href={`/visitors/${item.visitorId}`} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
+                    {item.name}
+                  </Link>
+                </td>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>{item.email ?? "-"}</td>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <FollowupStateBadge state={item.followupState} />
+                </td>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <AttentionBadge state={item.attentionState} />
+                </td>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  {item.assignedTo ?? "-"}
+                </td>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontFamily: "monospace" }}>{item.visitorId}</span>
+                    <CopyButton value={item.visitorId} label="Copy" />
+                  </div>
+                </td>
+                <td
+                  style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
+                  title={formatAbsoluteTime(item.updatedAt)}
+                >
+                  {formatRelativeTime(item.updatedAt)}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

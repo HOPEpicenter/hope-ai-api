@@ -140,6 +140,21 @@ export function VisitorsTable({ items }: { items: VisitorsTableItem[] }) {
                 ? { background: "#fffbeb", boxShadow: "inset 4px 0 0 #f59e0b" }
                 : undefined;
 
+            const actionCellStyle =
+              item.attentionState === "Needs attention"
+                ? {
+                    background: "#fff7ed",
+                    border: "1px solid #fed7aa",
+                    borderRadius: 10,
+                    padding: 10,
+                    display: "grid" as const,
+                    gap: 8
+                  }
+                : {
+                    display: "grid" as const,
+                    gap: 8
+                  };
+
             return (
               <tr key={item.visitorId} style={rowStyle}>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
@@ -152,10 +167,14 @@ export function VisitorsTable({ items }: { items: VisitorsTableItem[] }) {
                   <FollowupStateBadge state={item.followupState} />
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  <AttentionBadge state={item.attentionState} />
+                  <div style={actionCellStyle}>
+                    <AttentionBadge state={item.attentionState} />
+                  </div>
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  {item.assignedTo ?? "-"}
+                  <div style={actionCellStyle}>
+                    <span>{item.assignedTo ?? "-"}</span>
+                  </div>
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

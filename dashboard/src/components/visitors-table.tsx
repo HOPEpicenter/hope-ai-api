@@ -5,7 +5,7 @@ import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-ti
 import type { VisitorListItem } from "@/lib/contracts/visitors";
 
 export type VisitorsTableItem = VisitorListItem & {
-  followupState: "Assigned" | "Waiting assignment";
+  followupState: "Assigned" | "Waiting assignment" | "Contacted";
   assignedTo: string | null;
 };
 
@@ -15,8 +15,26 @@ function toTimestamp(value: string | null | undefined) {
   return Number.isNaN(time) ? 0 : time;
 }
 
+function getFollowupStateRank(state: VisitorsTableItem["followupState"]) {
+  switch (state) {
+    case "Waiting assignment":
+      return 0;
+    case "Assigned":
+      return 1;
+    case "Contacted":
+      return 2;
+    default:
+      return 99;
+  }
+}
+
 function FollowupStateBadge({ state }: { state: VisitorsTableItem["followupState"] }) {
-  const isAssigned = state === "Assigned";
+  const background =
+    state === "Waiting assignment"
+      ? "#fef3c7"
+      : state === "Assigned"
+        ? "#dbeafe"
+        : "#dcfce7";
 
   return (
     <span
@@ -26,7 +44,7 @@ function FollowupStateBadge({ state }: { state: VisitorsTableItem["followupState
         borderRadius: 9999,
         fontSize: 12,
         fontWeight: 600,
-        background: isAssigned ? "#dbeafe" : "#fef3c7",
+        background,
         color: "#111827"
       }}
     >
@@ -48,8 +66,9 @@ export function VisitorsTable({ items }: { items: VisitorsTableItem[] }) {
   }
 
   const sortedItems = [...items].sort((a, b) => {
-    if (a.assignedTo !== b.assignedTo) {
-      return a.assignedTo ? 1 : -1;
+    const stateRankDiff = getFollowupStateRank(a.followupState) - getFollowupStateRank(b.followupState);
+    if (stateRankDiff !== 0) {
+      return stateRankDiff;
     }
 
     const timeDiff = toTimestamp(b.updatedAt) - toTimestamp(a.updatedAt);

@@ -946,8 +946,24 @@ export function FollowupsTableClient({ items }: Props) {
           });
         }}
         onAssigneeSelect={(value) => {
+          setSearch("");
+          setQueueFilter("all");
+          setAgeFilter("all");
+          setStageFilter("all");
+          setOutcomeFilter("all");
           setAssigneeFilter(value);
-          updateUrl({ assignee: value });
+          setAttentionFilter("all");
+          setSort("oldest-assigned");
+          updateUrl({
+            q: "",
+            queue: "all",
+            age: "all",
+            stage: "all",
+            outcome: "all",
+            assignee: value,
+            attention: "all",
+            sort: "oldest-assigned"
+          });
         }}
         onAgeSelect={(value) => {
           setSearch("");
@@ -990,8 +1006,24 @@ export function FollowupsTableClient({ items }: Props) {
           });
         }}
         onOutcomeSelect={(value) => {
+          setSearch("");
+          setQueueFilter("all");
+          setAgeFilter("all");
+          setStageFilter("all");
           setOutcomeFilter(value);
-          updateUrl({ outcome: value });
+          setAssigneeFilter("all");
+          setAttentionFilter("all");
+          setSort("oldest-assigned");
+          updateUrl({
+            q: "",
+            queue: "all",
+            age: "all",
+            stage: "all",
+            outcome: value,
+            assignee: "all",
+            attention: "all",
+            sort: "oldest-assigned"
+          });
         }}
         onSortSelect={(value) => {
           setSort(value);

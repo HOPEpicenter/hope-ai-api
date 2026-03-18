@@ -51,6 +51,12 @@ export default async function VisitorsPage({
   const assignedCount = items.filter((x) => x.followupState === "Assigned").length;
   const contactedCount = items.filter((x) => x.followupState === "Contacted").length;
   const needsAttentionCount = items.filter((x) => x.attentionState === "Needs attention").length;
+  const myNeedsAttentionCount =
+    MY_ASSIGNEE.length > 0
+      ? items.filter(
+          (x) => x.attentionState === "Needs attention" && x.assignedTo === MY_ASSIGNEE
+        ).length
+      : 0;
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -86,7 +92,13 @@ export default async function VisitorsPage({
         </div>
       </div>
 
-      <VisitorsTable items={items} preset={preset} myAssignee={MY_ASSIGNEE} />
+      <VisitorsTable
+        items={items}
+        preset={preset}
+        myAssignee={MY_ASSIGNEE}
+        allCount={items.length}
+        myNeedsAttentionCount={myNeedsAttentionCount}
+      />
     </section>
   );
 }

@@ -164,6 +164,25 @@ function PresetScopeChip({ myAssignee }: { myAssignee: string }) {
   );
 }
 
+function ClearPresetLink() {
+  return (
+    <Link
+      href="/visitors"
+      style={{
+        padding: "8px 12px",
+        borderRadius: 10,
+        border: "1px solid #d1d5db",
+        background: "#fff",
+        color: "#111827",
+        fontWeight: 600,
+        textDecoration: "none"
+      }}
+    >
+      Clear preset
+    </Link>
+  );
+}
+
 export function VisitorsTable({
   items,
   preset,
@@ -200,6 +219,7 @@ export function VisitorsTable({
           {preset === "my-needs-attention" && myAssignee ? (
             <PresetScopeChip myAssignee={myAssignee} />
           ) : null}
+          {preset === "my-needs-attention" ? <ClearPresetLink /> : null}
         </div>
 
         {preset === "my-needs-attention" && myAssignee ? (
@@ -254,6 +274,7 @@ export function VisitorsTable({
         {preset === "my-needs-attention" && myAssignee ? (
           <PresetScopeChip myAssignee={myAssignee} />
         ) : null}
+        {preset === "my-needs-attention" ? <ClearPresetLink /> : null}
       </div>
 
       {preset === "my-needs-attention" && myAssignee ? (

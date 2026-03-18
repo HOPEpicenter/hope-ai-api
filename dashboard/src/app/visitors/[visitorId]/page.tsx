@@ -196,15 +196,15 @@ export default async function VisitorDetailPage({
         </div>
       </div>
 
-      <AssignFollowupForm visitorId={data.visitor.visitorId} assignedToOwnerId={data.formationProfile.assignedTo?.ownerId ?? null} />
+      <AssignFollowupForm visitorId={data.visitor.visitorId} assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null} />
       <MarkContactedForm
         visitorId={data.visitor.visitorId}
-        lastFollowupContactedAt={data.formationProfile.lastFollowupContactedAt ?? null}
-        lastFollowupOutcomeAt={data.formationProfile.lastFollowupOutcomeAt ?? null}
+        lastFollowupContactedAt={data.formationProfile?.lastFollowupContactedAt ?? null}
+        lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
       />
       <FollowupOutcomeForm
         visitorId={data.visitor.visitorId}
-        lastFollowupOutcomeAt={data.formationProfile.lastFollowupOutcomeAt ?? null}
+        lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16 }}>
@@ -279,4 +279,5 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 

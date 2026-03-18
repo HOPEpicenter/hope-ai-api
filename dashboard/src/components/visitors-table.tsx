@@ -10,7 +10,7 @@ export type VisitorsTableItem = VisitorListItem & {
   assignedTo: string | null;
 };
 
-type VisitorsPreset = "all" | "my-needs-attention";
+type VisitorsPreset = "all" | "my-needs-attention" | "waiting-assignment";
 
 function toTimestamp(value: string | null | undefined) {
   if (!value) return 0;
@@ -196,6 +196,8 @@ export function VisitorsTable({
   allCount: number;
   myNeedsAttentionCount: number;
 }) {
+  const waitingAssignmentCount = items.filter((item) => !item.assignedTo).length;
+
   const filteredItems =
     preset === "my-needs-attention" && myAssignee
       ? items.filter(
@@ -203,7 +205,9 @@ export function VisitorsTable({
             item.attentionState === "Needs attention" &&
             item.assignedTo === myAssignee
         )
-      : items;
+      : preset === "waiting-assignment"
+        ? items.filter((item) => !item.assignedTo)
+        : items;
 
   if (filteredItems.length === 0) {
     return (
@@ -216,29 +220,46 @@ export function VisitorsTable({
             label={`My Needs Attention (${myNeedsAttentionCount})`}
             disabled={!myAssignee}
           />
+          <PresetButton
+            active={preset === "waiting-assignment"}
+            href="/visitors?preset=waiting-assignment"
+            label={`Waiting Assignment (${waitingAssignmentCount})`}
+          />
           {preset === "my-needs-attention" && myAssignee ? (
             <PresetScopeChip myAssignee={myAssignee} />
           ) : null}
-          {preset === "my-needs-attention" ? <ClearPresetLink /> : null}
+          {preset !== "all" ? <ClearPresetLink /> : null}
         </div>
 
         {preset === "my-needs-attention" && myAssignee ? (
           <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
             Showing {myNeedsAttentionCount} visitors that need attention for {myAssignee}.
           </div>
+        ) : preset === "waiting-assignment" ? (
+          <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
+            Showing {waitingAssignmentCount} visitors waiting for assignment.
+          </div>
         ) : null}
 
         <PageState
-          title={preset === "my-needs-attention" ? "No matching visitors" : "No visitors yet"}
+          title={
+            preset === "my-needs-attention"
+              ? "No matching visitors"
+              : preset === "waiting-assignment"
+                ? "No visitors waiting for assignment"
+                : "No visitors yet"
+          }
           message={
             preset === "my-needs-attention"
               ? myAssignee
                 ? `No visitors currently need attention for assignee ${myAssignee}.`
                 : "My Needs Attention is unavailable until NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE is configured."
-              : "Visitor records will appear here once someone interacts with the system."
+              : preset === "waiting-assignment"
+                ? "All visitors currently have an assignee or have already been contacted."
+                : "Visitor records will appear here once someone interacts with the system."
           }
-          actionHref={preset === "my-needs-attention" ? "/visitors" : "/overview"}
-          actionLabel={preset === "my-needs-attention" ? "Show all visitors" : "Back to overview"}
+          actionHref={preset !== "all" ? "/visitors" : "/overview"}
+          actionLabel={preset !== "all" ? "Show all visitors" : "Back to overview"}
         />
       </div>
     );
@@ -360,3 +381,4 @@ export function VisitorsTable({
     </div>
   );
 }
+

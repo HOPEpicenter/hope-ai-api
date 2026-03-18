@@ -481,7 +481,7 @@ export function FollowupsTable({
       void onSaveOutcome(visitorId);
     }
   }
-}
+
   if (items.length === 0) {
     const hasFilters =
       queueFilter !== "all" ||
@@ -719,4 +719,5 @@ export function FollowupsTable({
     </div>
   );
 }
+
 

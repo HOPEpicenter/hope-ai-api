@@ -22,7 +22,8 @@ export default async function VisitorsPage({
 
   const preset =
     resolvedSearchParams.preset === "my-needs-attention" ||
-    resolvedSearchParams.preset === "waiting-assignment"
+    resolvedSearchParams.preset === "waiting-assignment" ||
+    resolvedSearchParams.preset === "assigned-to-me"
       ? resolvedSearchParams.preset
       : "all";
 
@@ -65,6 +66,10 @@ export default async function VisitorsPage({
           (x) => x.attentionState === "Needs attention" && x.assignedTo === MY_ASSIGNEE
         ).length
       : 0;
+  const assignedToMeCount =
+    MY_ASSIGNEE.length > 0
+      ? items.filter((x) => x.assignedTo === MY_ASSIGNEE).length
+      : 0;
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -103,6 +108,7 @@ export default async function VisitorsPage({
       <VisitorsTable
         items={items}
         preset={preset}
+        assignedToMeCount={assignedToMeCount}
         myAssignee={MY_ASSIGNEE}
         allCount={items.length}
         myNeedsAttentionCount={myNeedsAttentionCount}
@@ -110,4 +116,5 @@ export default async function VisitorsPage({
     </section>
   );
 }
+
 

@@ -10,7 +10,7 @@ export type VisitorsTableItem = VisitorListItem & {
   assignedTo: string | null;
 };
 
-type VisitorsPreset = "all" | "my-needs-attention" | "waiting-assignment";
+type VisitorsPreset = "all" | "my-needs-attention" | "waiting-assignment" | "assigned-to-me";
 
 function toTimestamp(value: string | null | undefined) {
   if (!value) return 0;
@@ -188,13 +188,15 @@ export function VisitorsTable({
   preset,
   myAssignee,
   allCount,
-  myNeedsAttentionCount
+  myNeedsAttentionCount,
+  assignedToMeCount
 }: {
   items: VisitorsTableItem[];
   preset: VisitorsPreset;
   myAssignee: string;
   allCount: number;
   myNeedsAttentionCount: number;
+  assignedToMeCount: number;
 }) {
   const waitingAssignmentCount = items.filter((item) => !item.assignedTo).length;
 
@@ -207,7 +209,9 @@ export function VisitorsTable({
         )
       : preset === "waiting-assignment"
         ? items.filter((item) => !item.assignedTo)
-        : items;
+        : preset === "assigned-to-me" && myAssignee
+          ? items.filter((item) => item.assignedTo === myAssignee)
+          : items;
 
   if (filteredItems.length === 0) {
     return (
@@ -225,7 +229,13 @@ export function VisitorsTable({
             href="/visitors?preset=waiting-assignment"
             label={`Waiting Assignment (${waitingAssignmentCount})`}
           />
-          {preset === "my-needs-attention" && myAssignee ? (
+          <PresetButton
+            active={preset === "assigned-to-me"}
+            href="/visitors?preset=assigned-to-me"
+            label={`Assigned To Me (${assignedToMeCount})`}
+            disabled={!myAssignee}
+          />
+          {(preset === "my-needs-attention" || preset === "assigned-to-me") && myAssignee ? (
             <PresetScopeChip myAssignee={myAssignee} />
           ) : null}
           {preset !== "all" ? <ClearPresetLink /> : null}
@@ -239,6 +249,10 @@ export function VisitorsTable({
           <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
             Showing {waitingAssignmentCount} visitors waiting for assignment.
           </div>
+        ) : preset === "assigned-to-me" && myAssignee ? (
+          <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
+            Showing {assignedToMeCount} visitors assigned to {myAssignee}.
+          </div>
         ) : null}
 
         <PageState
@@ -247,7 +261,9 @@ export function VisitorsTable({
               ? "No matching visitors"
               : preset === "waiting-assignment"
                 ? "No visitors waiting for assignment"
-                : "No visitors yet"
+                : preset === "assigned-to-me"
+                  ? "No visitors assigned to you"
+                  : "No visitors yet"
           }
           message={
             preset === "my-needs-attention"
@@ -256,7 +272,11 @@ export function VisitorsTable({
                 : "My Needs Attention is unavailable until NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE is configured."
               : preset === "waiting-assignment"
                 ? "All visitors currently have an assignee or have already been contacted."
-                : "Visitor records will appear here once someone interacts with the system."
+                : preset === "assigned-to-me"
+                  ? myAssignee
+                    ? `No visitors are currently assigned to ${myAssignee}.`
+                    : "Assigned To Me is unavailable until NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE is configured."
+                  : "Visitor records will appear here once someone interacts with the system."
           }
           actionHref={preset !== "all" ? "/visitors" : "/overview"}
           actionLabel={preset !== "all" ? "Show all visitors" : "Back to overview"}
@@ -292,15 +312,34 @@ export function VisitorsTable({
           label={`My Needs Attention (${myNeedsAttentionCount})`}
           disabled={!myAssignee}
         />
-        {preset === "my-needs-attention" && myAssignee ? (
+        <PresetButton
+          active={preset === "waiting-assignment"}
+          href="/visitors?preset=waiting-assignment"
+          label={`Waiting Assignment (${waitingAssignmentCount})`}
+        />
+        <PresetButton
+          active={preset === "assigned-to-me"}
+          href="/visitors?preset=assigned-to-me"
+          label={`Assigned To Me (${assignedToMeCount})`}
+          disabled={!myAssignee}
+        />
+        {(preset === "my-needs-attention" || preset === "assigned-to-me") && myAssignee ? (
           <PresetScopeChip myAssignee={myAssignee} />
         ) : null}
-        {preset === "my-needs-attention" ? <ClearPresetLink /> : null}
+        {preset !== "all" ? <ClearPresetLink /> : null}
       </div>
 
       {preset === "my-needs-attention" && myAssignee ? (
         <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
           Showing {myNeedsAttentionCount} visitors that need attention for {myAssignee}.
+        </div>
+      ) : preset === "waiting-assignment" ? (
+        <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
+          Showing {waitingAssignmentCount} visitors waiting for assignment.
+        </div>
+      ) : preset === "assigned-to-me" && myAssignee ? (
+        <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
+          Showing {assignedToMeCount} visitors assigned to {myAssignee}.
         </div>
       ) : null}
 
@@ -381,4 +420,5 @@ export function VisitorsTable({
     </div>
   );
 }
+
 

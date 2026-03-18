@@ -10,7 +10,7 @@ export type VisitorsTableItem = VisitorListItem & {
   assignedTo: string | null;
 };
 
-type VisitorsPreset = "all" | "my-needs-attention" | "waiting-assignment" | "assigned-to-me";
+type VisitorsPreset = "all" | "my-needs-attention" | "waiting-assignment" | "assigned-to-me" | "assigned";
 
 function toTimestamp(value: string | null | undefined) {
   if (!value) return 0;
@@ -189,7 +189,8 @@ export function VisitorsTable({
   myAssignee,
   allCount,
   myNeedsAttentionCount,
-  assignedToMeCount
+  assignedToMeCount,
+  assignedCount
 }: {
   items: VisitorsTableItem[];
   preset: VisitorsPreset;
@@ -197,6 +198,7 @@ export function VisitorsTable({
   allCount: number;
   myNeedsAttentionCount: number;
   assignedToMeCount: number;
+  assignedCount: number;
 }) {
   const waitingAssignmentCount = items.filter((item) => !item.assignedTo).length;
 
@@ -211,7 +213,9 @@ export function VisitorsTable({
         ? items.filter((item) => !item.assignedTo)
         : preset === "assigned-to-me" && myAssignee
           ? items.filter((item) => item.assignedTo === myAssignee)
-          : items;
+          : preset === "assigned"
+            ? items.filter((item) => !!item.assignedTo)
+            : items;
 
   if (filteredItems.length === 0) {
     return (
@@ -235,6 +239,11 @@ export function VisitorsTable({
             label={`Assigned To Me (${assignedToMeCount})`}
             disabled={!myAssignee}
           />
+          <PresetButton
+            active={preset === "assigned"}
+            href="/visitors?preset=assigned"
+            label={`Assigned (${assignedCount})`}
+          />
           {(preset === "my-needs-attention" || preset === "assigned-to-me") && myAssignee ? (
             <PresetScopeChip myAssignee={myAssignee} />
           ) : null}
@@ -253,6 +262,10 @@ export function VisitorsTable({
           <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
             Showing {assignedToMeCount} visitors assigned to {myAssignee}.
           </div>
+        ) : preset === "assigned" ? (
+          <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
+            Showing {assignedCount} assigned visitors.
+          </div>
         ) : null}
 
         <PageState
@@ -263,7 +276,9 @@ export function VisitorsTable({
                 ? "No visitors waiting for assignment"
                 : preset === "assigned-to-me"
                   ? "No visitors assigned to you"
-                  : "No visitors yet"
+                  : preset === "assigned"
+                    ? "No assigned visitors"
+                    : "No visitors yet"
           }
           message={
             preset === "my-needs-attention"
@@ -276,7 +291,9 @@ export function VisitorsTable({
                   ? myAssignee
                     ? `No visitors are currently assigned to ${myAssignee}.`
                     : "Assigned To Me is unavailable until NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE is configured."
-                  : "Visitor records will appear here once someone interacts with the system."
+                  : preset === "assigned"
+                    ? "No visitors are currently assigned."
+                    : "Visitor records will appear here once someone interacts with the system."
           }
           actionHref={preset !== "all" ? "/visitors" : "/overview"}
           actionLabel={preset !== "all" ? "Show all visitors" : "Back to overview"}
@@ -323,6 +340,11 @@ export function VisitorsTable({
           label={`Assigned To Me (${assignedToMeCount})`}
           disabled={!myAssignee}
         />
+        <PresetButton
+          active={preset === "assigned"}
+          href="/visitors?preset=assigned"
+          label={`Assigned (${assignedCount})`}
+        />
         {(preset === "my-needs-attention" || preset === "assigned-to-me") && myAssignee ? (
           <PresetScopeChip myAssignee={myAssignee} />
         ) : null}
@@ -340,6 +362,10 @@ export function VisitorsTable({
       ) : preset === "assigned-to-me" && myAssignee ? (
         <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
           Showing {assignedToMeCount} visitors assigned to {myAssignee}.
+        </div>
+      ) : preset === "assigned" ? (
+        <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
+          Showing {assignedCount} assigned visitors.
         </div>
       ) : null}
 
@@ -420,5 +446,6 @@ export function VisitorsTable({
     </div>
   );
 }
+
 
 

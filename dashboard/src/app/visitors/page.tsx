@@ -3,11 +3,20 @@ import { VisitorsTable, type VisitorsTableItem } from "@/components/visitors-tab
 import { getFollowups } from "@/lib/loaders/get-followups";
 import { getVisitors } from "@/lib/loaders/get-visitors";
 
-export default async function VisitorsPage() {
-  const [visitors, followups] = await Promise.all([
+const MY_ASSIGNEE = (process.env.NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE ?? "").trim();
+
+export default async function VisitorsPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ preset?: string }>;
+}) {
+  const [visitors, followups, resolvedSearchParams] = await Promise.all([
     getVisitors(),
-    getFollowups()
+    getFollowups(),
+    searchParams ?? Promise.resolve({})
   ]);
+
+  const preset = resolvedSearchParams.preset === "my-needs-attention" ? "my-needs-attention" : "all";
 
   const followupsByVisitorId = new Map(
     followups.items.map((item) => [item.visitorId, item])
@@ -77,7 +86,7 @@ export default async function VisitorsPage() {
         </div>
       </div>
 
-      <VisitorsTable items={items} />
+      <VisitorsTable items={items} preset={preset} myAssignee={MY_ASSIGNEE} />
     </section>
   );
 }

@@ -10,6 +10,8 @@ export type VisitorsTableItem = VisitorListItem & {
   assignedTo: string | null;
 };
 
+type VisitorsPreset = "all" | "my-needs-attention";
+
 function toTimestamp(value: string | null | undefined) {
   if (!value) return 0;
   const time = new Date(value).getTime();
@@ -90,19 +92,102 @@ function AttentionBadge({ state }: { state: VisitorsTableItem["attentionState"] 
   );
 }
 
-export function VisitorsTable({ items }: { items: VisitorsTableItem[] }) {
-  if (items.length === 0) {
+function PresetButton({
+  active,
+  disabled,
+  href,
+  label
+}: {
+  active: boolean;
+  disabled?: boolean;
+  href: string;
+  label: string;
+}) {
+  if (disabled) {
     return (
-      <PageState
-        title="No visitors yet"
-        message="Visitor records will appear here once someone interacts with the system."
-        actionHref="/overview"
-        actionLabel="Back to overview"
-      />
+      <button
+        type="button"
+        disabled={true}
+        style={{
+          padding: "8px 12px",
+          borderRadius: 10,
+          border: "1px solid #d1d5db",
+          background: "#fff",
+          color: "#111827",
+          fontWeight: 600,
+          cursor: "not-allowed",
+          opacity: 0.5
+        }}
+      >
+        {label}
+      </button>
     );
   }
 
-  const sortedItems = [...items].sort((a, b) => {
+  return (
+    <Link
+      href={href}
+      style={{
+        padding: "8px 12px",
+        borderRadius: 10,
+        border: active ? "1px solid #111827" : "1px solid #d1d5db",
+        background: active ? "#111827" : "#fff",
+        color: active ? "#fff" : "#111827",
+        fontWeight: 600,
+        textDecoration: "none"
+      }}
+    >
+      {label}
+    </Link>
+  );
+}
+
+export function VisitorsTable({
+  items,
+  preset,
+  myAssignee
+}: {
+  items: VisitorsTableItem[];
+  preset: VisitorsPreset;
+  myAssignee: string;
+}) {
+  const filteredItems =
+    preset === "my-needs-attention" && myAssignee
+      ? items.filter(
+          (item) =>
+            item.attentionState === "Needs attention" &&
+            item.assignedTo === myAssignee
+        )
+      : items;
+
+  if (filteredItems.length === 0) {
+    return (
+      <div style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <PresetButton active={preset === "all"} href="/visitors" label="All" />
+          <PresetButton
+            active={preset === "my-needs-attention"}
+            href="/visitors?preset=my-needs-attention"
+            label="My Needs Attention"
+            disabled={!myAssignee}
+          />
+        </div>
+
+        <PageState
+          title="No visitors yet"
+          message={
+            preset === "my-needs-attention"
+              ? "No visitors currently match your needs-attention preset."
+              : "Visitor records will appear here once someone interacts with the system."
+          }
+          actionHref="/overview"
+          actionLabel="Back to overview"
+        />
+      </div>
+    );
+  }
+
+  const sortedItems = [...filteredItems].sort((a, b) => {
     const attentionRankDiff = getAttentionRank(a.attentionState) - getAttentionRank(b.attentionState);
     if (attentionRankDiff !== 0) {
       return attentionRankDiff;
@@ -120,79 +205,91 @@ export function VisitorsTable({ items }: { items: VisitorsTableItem[] }) {
   });
 
   return (
-    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Name</th>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Email</th>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Followup State</th>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Attention</th>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Assigned To</th>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Visitor ID</th>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Activity</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedItems.map((item) => {
-            const rowStyle =
-              item.attentionState === "Needs attention"
-                ? { background: "#fffbeb", boxShadow: "inset 4px 0 0 #f59e0b" }
-                : undefined;
+    <div style={{ display: "grid", gap: 12 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <PresetButton active={preset === "all"} href="/visitors" label="All" />
+        <PresetButton
+          active={preset === "my-needs-attention"}
+          href="/visitors?preset=my-needs-attention"
+          label="My Needs Attention"
+          disabled={!myAssignee}
+        />
+      </div>
 
-            const actionCellStyle =
-              item.attentionState === "Needs attention"
-                ? {
-                    background: "#fff7ed",
-                    border: "1px solid #fed7aa",
-                    borderRadius: 10,
-                    padding: 10,
-                    display: "grid" as const,
-                    gap: 8
-                  }
-                : {
-                    display: "grid" as const,
-                    gap: 8
-                  };
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Name</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Email</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Followup State</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Attention</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Assigned To</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Visitor ID</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Activity</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedItems.map((item) => {
+              const rowStyle =
+                item.attentionState === "Needs attention"
+                  ? { background: "#fffbeb", boxShadow: "inset 4px 0 0 #f59e0b" }
+                  : undefined;
 
-            return (
-              <tr key={item.visitorId} style={rowStyle}>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  <Link href={`/visitors/${item.visitorId}`} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
-                    {item.name}
-                  </Link>
-                </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>{item.email ?? "-"}</td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  <FollowupStateBadge state={item.followupState} />
-                </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  <div style={actionCellStyle}>
-                    <AttentionBadge state={item.attentionState} />
-                  </div>
-                </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  <div style={actionCellStyle}>
-                    <span>{item.assignedTo ?? "-"}</span>
-                  </div>
-                </td>
-                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontFamily: "monospace" }}>{item.visitorId}</span>
-                    <CopyButton value={item.visitorId} label="Copy" />
-                  </div>
-                </td>
-                <td
-                  style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
-                  title={formatAbsoluteTime(item.updatedAt)}
-                >
-                  {formatRelativeTime(item.updatedAt)}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+              const actionCellStyle =
+                item.attentionState === "Needs attention"
+                  ? {
+                      background: "#fff7ed",
+                      border: "1px solid #fed7aa",
+                      borderRadius: 10,
+                      padding: 10,
+                      display: "grid" as const,
+                      gap: 8
+                    }
+                  : {
+                      display: "grid" as const,
+                      gap: 8
+                    };
+
+              return (
+                <tr key={item.visitorId} style={rowStyle}>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                    <Link href={`/visitors/${item.visitorId}`} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
+                      {item.name}
+                    </Link>
+                  </td>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>{item.email ?? "-"}</td>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                    <FollowupStateBadge state={item.followupState} />
+                  </td>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                    <div style={actionCellStyle}>
+                      <AttentionBadge state={item.attentionState} />
+                    </div>
+                  </td>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                    <div style={actionCellStyle}>
+                      <span>{item.assignedTo ?? "-"}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontFamily: "monospace" }}>{item.visitorId}</span>
+                      <CopyButton value={item.visitorId} label="Copy" />
+                    </div>
+                  </td>
+                  <td
+                    style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
+                    title={formatAbsoluteTime(item.updatedAt)}
+                  >
+                    {formatRelativeTime(item.updatedAt)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

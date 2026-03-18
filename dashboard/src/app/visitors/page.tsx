@@ -25,7 +25,8 @@ export default async function VisitorsPage({
     resolvedSearchParams.preset === "waiting-assignment" ||
     resolvedSearchParams.preset === "assigned-to-me" ||
     resolvedSearchParams.preset === "assigned" ||
-    resolvedSearchParams.preset === "contacted"
+    resolvedSearchParams.preset === "contacted" ||
+    resolvedSearchParams.preset === "needs-attention"
       ? resolvedSearchParams.preset
       : "all";
 
@@ -113,6 +114,7 @@ export default async function VisitorsPage({
         assignedToMeCount={assignedToMeCount}
         assignedCount={assignedCount}
         contactedCount={contactedCount}
+        needsAttentionCount={needsAttentionCount}
         myAssignee={MY_ASSIGNEE}
         allCount={items.length}
         myNeedsAttentionCount={myNeedsAttentionCount}
@@ -120,6 +122,7 @@ export default async function VisitorsPage({
     </section>
   );
 }
+
 
 
 

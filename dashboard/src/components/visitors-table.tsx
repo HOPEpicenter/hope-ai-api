@@ -10,7 +10,7 @@ export type VisitorsTableItem = VisitorListItem & {
   assignedTo: string | null;
 };
 
-type VisitorsPreset = "all" | "my-needs-attention" | "waiting-assignment" | "assigned-to-me" | "assigned" | "contacted";
+type VisitorsPreset = "all" | "my-needs-attention" | "waiting-assignment" | "assigned-to-me" | "assigned" | "contacted" | "needs-attention";
 
 function toTimestamp(value: string | null | undefined) {
   if (!value) return 0;
@@ -191,7 +191,8 @@ export function VisitorsTable({
   myNeedsAttentionCount,
   assignedToMeCount,
   assignedCount,
-  contactedCount
+  contactedCount,
+  needsAttentionCount
 }: {
   items: VisitorsTableItem[];
   preset: VisitorsPreset;
@@ -201,6 +202,7 @@ export function VisitorsTable({
   assignedToMeCount: number;
   assignedCount: number;
   contactedCount: number;
+  needsAttentionCount: number;
 }) {
   const waitingAssignmentCount = items.filter((item) => !item.assignedTo).length;
 
@@ -219,7 +221,9 @@ export function VisitorsTable({
             ? items.filter((item) => !!item.assignedTo)
             : preset === "contacted"
               ? items.filter((item) => item.followupState === "Contacted")
-              : items;
+              : preset === "needs-attention"
+                ? items.filter((item) => item.attentionState === "Needs attention")
+                : items;
 
   if (filteredItems.length === 0) {
     return (
@@ -253,6 +257,11 @@ export function VisitorsTable({
             href="/visitors?preset=contacted"
             label={`Contacted (${contactedCount})`}
           />
+          <PresetButton
+            active={preset === "needs-attention"}
+            href="/visitors?preset=needs-attention"
+            label={`Needs Attention (${needsAttentionCount})`}
+          />
           {(preset === "my-needs-attention" || preset === "assigned-to-me") && myAssignee ? (
             <PresetScopeChip myAssignee={myAssignee} />
           ) : null}
@@ -279,6 +288,10 @@ export function VisitorsTable({
           <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
             Showing {contactedCount} contacted visitors.
           </div>
+        ) : preset === "needs-attention" ? (
+          <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
+            Showing {needsAttentionCount} visitors that need attention.
+          </div>
         ) : null}
 
         <PageState
@@ -293,7 +306,9 @@ export function VisitorsTable({
                     ? "No assigned visitors"
                     : preset === "contacted"
                       ? "No contacted visitors"
-                      : "No visitors yet"
+                      : preset === "needs-attention"
+                        ? "No visitors need attention"
+                        : "No visitors yet"
           }
           message={
             preset === "my-needs-attention"
@@ -310,7 +325,9 @@ export function VisitorsTable({
                     ? "No visitors are currently assigned."
                     : preset === "contacted"
                       ? "No visitors have been contacted yet."
-                      : "Visitor records will appear here once someone interacts with the system."
+                      : preset === "needs-attention"
+                        ? "No visitors currently need attention."
+                        : "Visitor records will appear here once someone interacts with the system."
           }
           actionHref={preset !== "all" ? "/visitors" : "/overview"}
           actionLabel={preset !== "all" ? "Show all visitors" : "Back to overview"}
@@ -367,6 +384,11 @@ export function VisitorsTable({
           href="/visitors?preset=contacted"
           label={`Contacted (${contactedCount})`}
         />
+        <PresetButton
+          active={preset === "needs-attention"}
+          href="/visitors?preset=needs-attention"
+          label={`Needs Attention (${needsAttentionCount})`}
+        />
         {(preset === "my-needs-attention" || preset === "assigned-to-me") && myAssignee ? (
           <PresetScopeChip myAssignee={myAssignee} />
         ) : null}
@@ -392,6 +414,10 @@ export function VisitorsTable({
       ) : preset === "contacted" ? (
         <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
           Showing {contactedCount} contacted visitors.
+        </div>
+      ) : preset === "needs-attention" ? (
+        <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
+          Showing {needsAttentionCount} visitors that need attention.
         </div>
       ) : null}
 
@@ -472,6 +498,7 @@ export function VisitorsTable({
     </div>
   );
 }
+
 
 
 

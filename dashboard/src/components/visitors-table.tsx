@@ -178,14 +178,16 @@ export function VisitorsTable({
         </div>
 
         <PageState
-          title="No visitors yet"
+          title={preset === "my-needs-attention" ? "No matching visitors" : "No visitors yet"}
           message={
             preset === "my-needs-attention"
-              ? "No visitors currently match your needs-attention preset."
+              ? myAssignee
+                ? `No visitors currently need attention for assignee ${myAssignee}.`
+                : "My Needs Attention is unavailable until NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE is configured."
               : "Visitor records will appear here once someone interacts with the system."
           }
-          actionHref="/overview"
-          actionLabel="Back to overview"
+          actionHref={preset === "my-needs-attention" ? "/visitors" : "/overview"}
+          actionLabel={preset === "my-needs-attention" ? "Show all visitors" : "Back to overview"}
         />
       </div>
     );

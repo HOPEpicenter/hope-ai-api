@@ -145,11 +145,15 @@ function PresetButton({
 export function VisitorsTable({
   items,
   preset,
-  myAssignee
+  myAssignee,
+  allCount,
+  myNeedsAttentionCount
 }: {
   items: VisitorsTableItem[];
   preset: VisitorsPreset;
   myAssignee: string;
+  allCount: number;
+  myNeedsAttentionCount: number;
 }) {
   const filteredItems =
     preset === "my-needs-attention" && myAssignee
@@ -164,11 +168,11 @@ export function VisitorsTable({
     return (
       <div style={{ display: "grid", gap: 12 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <PresetButton active={preset === "all"} href="/visitors" label="All" />
+          <PresetButton active={preset === "all"} href="/visitors" label={`All (${allCount})`} />
           <PresetButton
             active={preset === "my-needs-attention"}
             href="/visitors?preset=my-needs-attention"
-            label="My Needs Attention"
+            label={`My Needs Attention (${myNeedsAttentionCount})`}
             disabled={!myAssignee}
           />
         </div>
@@ -207,11 +211,11 @@ export function VisitorsTable({
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <PresetButton active={preset === "all"} href="/visitors" label="All" />
+        <PresetButton active={preset === "all"} href="/visitors" label={`All (${allCount})`} />
         <PresetButton
           active={preset === "my-needs-attention"}
           href="/visitors?preset=my-needs-attention"
-          label="My Needs Attention"
+          label={`My Needs Attention (${myNeedsAttentionCount})`}
           disabled={!myAssignee}
         />
       </div>

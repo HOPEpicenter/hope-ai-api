@@ -202,6 +202,12 @@ export function VisitorsTable({
           ) : null}
         </div>
 
+        {preset === "my-needs-attention" && myAssignee ? (
+          <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
+            Showing {myNeedsAttentionCount} visitors that need attention for {myAssignee}.
+          </div>
+        ) : null}
+
         <PageState
           title={preset === "my-needs-attention" ? "No matching visitors" : "No visitors yet"}
           message={
@@ -249,6 +255,12 @@ export function VisitorsTable({
           <PresetScopeChip myAssignee={myAssignee} />
         ) : null}
       </div>
+
+      {preset === "my-needs-attention" && myAssignee ? (
+        <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
+          Showing {myNeedsAttentionCount} visitors that need attention for {myAssignee}.
+        </div>
+      ) : null}
 
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>

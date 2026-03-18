@@ -5,18 +5,26 @@ import { getVisitors } from "@/lib/loaders/get-visitors";
 
 const MY_ASSIGNEE = (process.env.NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE ?? "").trim();
 
+type VisitorsPageSearchParams = {
+  preset?: string;
+};
+
 export default async function VisitorsPage({
   searchParams
 }: {
-  searchParams?: Promise<{ preset?: string }>;
+  searchParams?: Promise<VisitorsPageSearchParams>;
 }) {
   const [visitors, followups, resolvedSearchParams] = await Promise.all([
     getVisitors(),
     getFollowups(),
-    searchParams ?? Promise.resolve({})
+    searchParams ?? Promise.resolve<VisitorsPageSearchParams>({})
   ]);
 
-  const preset = resolvedSearchParams.preset === "my-needs-attention" ? "my-needs-attention" : "all";
+  const preset =
+    resolvedSearchParams.preset === "my-needs-attention" ||
+    resolvedSearchParams.preset === "waiting-assignment"
+      ? resolvedSearchParams.preset
+      : "all";
 
   const followupsByVisitorId = new Map(
     followups.items.map((item) => [item.visitorId, item])
@@ -28,10 +36,10 @@ export default async function VisitorsPage({
     let followupState: VisitorsTableItem["followupState"] = "Waiting assignment";
     let attentionState: VisitorsTableItem["attentionState"] = null;
 
-    if (followup?.lastOutcomeAt) {
+    if (followup?.lastFollowupOutcomeAt) {
       followupState = "Contacted";
       attentionState = "Contact made";
-    } else if (followup?.lastContactedAt) {
+    } else if (followup?.lastFollowupContactedAt) {
       followupState = "Contacted";
       attentionState = "Contact made";
     } else if (followup?.assignedTo?.ownerId) {
@@ -102,3 +110,4 @@ export default async function VisitorsPage({
     </section>
   );
 }
+

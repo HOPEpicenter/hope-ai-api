@@ -142,6 +142,28 @@ function PresetButton({
   );
 }
 
+function PresetScopeChip({ myAssignee }: { myAssignee: string }) {
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "8px 12px",
+        borderRadius: 9999,
+        background: "#eff6ff",
+        border: "1px solid #bfdbfe",
+        color: "#1e40af",
+        fontSize: 12,
+        fontWeight: 600
+      }}
+    >
+      <span>Scoped to:</span>
+      <span>{myAssignee}</span>
+    </div>
+  );
+}
+
 export function VisitorsTable({
   items,
   preset,
@@ -167,7 +189,7 @@ export function VisitorsTable({
   if (filteredItems.length === 0) {
     return (
       <div style={{ display: "grid", gap: 12 }}>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <PresetButton active={preset === "all"} href="/visitors" label={`All (${allCount})`} />
           <PresetButton
             active={preset === "my-needs-attention"}
@@ -175,6 +197,9 @@ export function VisitorsTable({
             label={`My Needs Attention (${myNeedsAttentionCount})`}
             disabled={!myAssignee}
           />
+          {preset === "my-needs-attention" && myAssignee ? (
+            <PresetScopeChip myAssignee={myAssignee} />
+          ) : null}
         </div>
 
         <PageState
@@ -212,7 +237,7 @@ export function VisitorsTable({
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <PresetButton active={preset === "all"} href="/visitors" label={`All (${allCount})`} />
         <PresetButton
           active={preset === "my-needs-attention"}
@@ -220,6 +245,9 @@ export function VisitorsTable({
           label={`My Needs Attention (${myNeedsAttentionCount})`}
           disabled={!myAssignee}
         />
+        {preset === "my-needs-attention" && myAssignee ? (
+          <PresetScopeChip myAssignee={myAssignee} />
+        ) : null}
       </div>
 
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>

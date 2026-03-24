@@ -23,6 +23,9 @@ export function AssignFollowupForm({
   const [isUnassigning, setIsUnassigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isAssigned = !!assignedToOwnerId;
+  const isBusy = isSubmitting || isUnassigning;
+
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
@@ -58,7 +61,7 @@ export function AssignFollowupForm({
   }
 
   async function onUnassign() {
-    if (!assignedToOwnerId || isSubmitting || isUnassigning) {
+    if (!assignedToOwnerId || isBusy) {
       return;
     }
 
@@ -94,11 +97,38 @@ export function AssignFollowupForm({
   }
 
   return (
-    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 20 }}>
-      <div style={{ marginBottom: 12 }}>
-        <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>Assign Followup</h2>
-        <p style={{ marginTop: 6, marginBottom: 0, color: "#6b7280", fontSize: 14 }}>
-          Add this visitor to the followups queue by assigning an operator.
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 12,
+        padding: 20,
+        display: "grid",
+        gap: 12
+      }}
+    >
+      <div style={{ display: "grid", gap: 6 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>Assign Followup</h2>
+          <span
+            style={{
+              display: "inline-block",
+              padding: "2px 8px",
+              borderRadius: 9999,
+              background: isAssigned ? "#eff6ff" : "#fef3c7",
+              color: isAssigned ? "#1d4ed8" : "#92400e",
+              fontSize: 12,
+              fontWeight: 700
+            }}
+          >
+            {isAssigned ? "Assigned" : "Available"}
+          </span>
+        </div>
+
+        <p style={{ margin: 0, color: "#6b7280", fontSize: 14 }}>
+          {isAssigned
+            ? "This visitor is already assigned. You can reassign or remove the assignee."
+            : "Add this visitor to the followups queue by assigning an operator."}
         </p>
       </div>
 
@@ -110,21 +140,20 @@ export function AssignFollowupForm({
             justifyContent: "space-between",
             gap: 12,
             padding: 12,
-            border: "1px solid #e5e7eb",
+            border: "1px solid #dbeafe",
             borderRadius: 10,
-            background: "#f9fafb",
-            marginBottom: 12
+            background: "#f8fbff"
           }}
         >
           <div style={{ display: "grid", gap: 2 }}>
             <div style={{ fontSize: 12, color: "#6b7280" }}>Current assignee</div>
-            <div style={{ fontWeight: 600, color: "#111827" }}>{assignedToOwnerId}</div>
+            <div style={{ fontWeight: 700, color: "#111827" }}>{assignedToOwnerId}</div>
           </div>
 
           <button
             type="button"
             onClick={() => void onUnassign()}
-            disabled={isSubmitting || isUnassigning}
+            disabled={isBusy}
             style={{
               padding: "10px 14px",
               borderRadius: 8,
@@ -132,8 +161,8 @@ export function AssignFollowupForm({
               background: "#fff",
               color: "#111827",
               font: "inherit",
-              cursor: isSubmitting || isUnassigning ? "default" : "pointer",
-              opacity: isSubmitting || isUnassigning ? 0.7 : 1
+              cursor: isBusy ? "default" : "pointer",
+              opacity: isBusy ? 0.7 : 1
             }}
           >
             {isUnassigning ? "Unassigning..." : "Unassign Followup"}
@@ -150,12 +179,13 @@ export function AssignFollowupForm({
             id="assigneeId"
             value={assigneeId}
             onChange={(event) => setAssigneeId(event.target.value)}
+            disabled={isBusy}
             style={{
               padding: 10,
               border: "1px solid #d1d5db",
               borderRadius: 8,
               font: "inherit",
-              background: "#fff"
+              background: isBusy ? "#f3f4f6" : "#fff"
             }}
           >
             <option value="ops-user-1">ops-user-1</option>
@@ -180,7 +210,7 @@ export function AssignFollowupForm({
         <div style={{ display: "flex", justifyContent: "flex-start" }}>
           <button
             type="submit"
-            disabled={isSubmitting || isUnassigning}
+            disabled={isBusy}
             style={{
               padding: "10px 14px",
               borderRadius: 8,
@@ -188,8 +218,8 @@ export function AssignFollowupForm({
               background: "#111827",
               color: "#fff",
               font: "inherit",
-              cursor: isSubmitting || isUnassigning ? "default" : "pointer",
-              opacity: isSubmitting || isUnassigning ? 0.7 : 1
+              cursor: isBusy ? "default" : "pointer",
+              opacity: isBusy ? 0.7 : 1
             }}
           >
             {isSubmitting ? "Saving..." : assignedToOwnerId ? "Reassign Followup" : "Assign Followup"}

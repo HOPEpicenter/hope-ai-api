@@ -77,9 +77,27 @@ export function FollowupOutcomeForm({ visitorId, lastFollowupOutcomeAt }: Props)
       }}
     >
       <div style={{ display: "grid", gap: 6 }}>
-        <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>Record Followup Outcome</h2>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>Record Followup Outcome</h2>
+          <span
+            style={{
+              display: "inline-block",
+              padding: "2px 8px",
+              borderRadius: 9999,
+              background: isResolved ? "#dcfce7" : "#fef3c7",
+              color: isResolved ? "#166534" : "#92400e",
+              fontSize: 12,
+              fontWeight: 700
+            }}
+          >
+            {isResolved ? "Resolved" : "Available"}
+          </span>
+        </div>
+
         <p style={{ margin: 0, color: "#6b7280", fontSize: 14 }}>
-          Record the final followup outcome. This should resolve the open followup queue item.
+          {isResolved
+            ? "An outcome is already recorded for this followup."
+            : "Record the final followup outcome. This should resolve the open followup queue item."}
         </p>
       </div>
 
@@ -134,9 +152,9 @@ export function FollowupOutcomeForm({ visitorId, lastFollowupOutcomeAt }: Props)
         {isResolved ? (
           <div
             style={{
-              background: "#f9fafb",
-              border: "1px solid #e5e7eb",
-              color: "#4b5563",
+              background: "#ecfdf5",
+              border: "1px solid #a7f3d0",
+              color: "#166534",
               borderRadius: 10,
               padding: 12,
               fontWeight: 600
@@ -144,7 +162,19 @@ export function FollowupOutcomeForm({ visitorId, lastFollowupOutcomeAt }: Props)
           >
             Outcome already recorded. This followup is resolved.
           </div>
-        ) : null}
+        ) : (
+          <div
+            style={{
+              background: "#f9fafb",
+              border: "1px solid #e5e7eb",
+              color: "#4b5563",
+              borderRadius: 10,
+              padding: 12
+            }}
+          >
+            Use this when the followup should be closed with a final outcome.
+          </div>
+        )}
 
         {error ? (
           <div

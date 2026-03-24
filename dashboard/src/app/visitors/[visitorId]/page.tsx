@@ -327,6 +327,26 @@ function VisitorHeaderCard({
   );
 }
 
+function ResolvedActionSummaryCard() {
+  return (
+    <div
+      style={{
+        background: "#f9fafb",
+        border: "1px solid #e5e7eb",
+        borderRadius: 12,
+        padding: 16,
+        display: "grid",
+        gap: 6
+      }}
+    >
+      <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Followup closed</div>
+      <div style={{ color: "#4b5563" }}>
+        An outcome has already been recorded for this visitor. Use the timeline and status cards below for history.
+      </div>
+    </div>
+  );
+}
+
 function OutcomeSummaryCard({
   outcome,
   outcomeAt,
@@ -818,47 +838,51 @@ export default async function VisitorDetailPage({
             />
           ) : null}
 
-          <div
-            style={{
-              background: "#fff",
-              border: "1px solid #e5e7eb",
-              borderRadius: 12,
-              padding: 16,
-              display: "grid",
-              gap: 12
-            }}
-          >
-            <div style={{ display: "grid", gap: 4 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Other actions</div>
-              <div style={{ fontSize: 13, color: "#6b7280" }}>
-                Secondary actions stay available without competing with the primary next step.
+          {nextAction.actionKey === "none" ? (
+            <ResolvedActionSummaryCard />
+          ) : (
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #e5e7eb",
+                borderRadius: 12,
+                padding: 16,
+                display: "grid",
+                gap: 12
+              }}
+            >
+              <div style={{ display: "grid", gap: 4 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Other actions</div>
+                <div style={{ fontSize: 13, color: "#6b7280" }}>
+                  Secondary actions stay available without competing with the primary next step.
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gap: 12 }}>
+                {nextAction.actionKey !== "assign" ? (
+                  <AssignFollowupForm
+                    visitorId={data.visitor.visitorId}
+                    assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null}
+                  />
+                ) : null}
+
+                {nextAction.actionKey !== "contacted" ? (
+                  <MarkContactedForm
+                    visitorId={data.visitor.visitorId}
+                    lastFollowupContactedAt={data.formationProfile?.lastFollowupContactedAt ?? null}
+                    lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
+                  />
+                ) : null}
+
+                {nextAction.actionKey !== "outcome" ? (
+                  <FollowupOutcomeForm
+                    visitorId={data.visitor.visitorId}
+                    lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
+                  />
+                ) : null}
               </div>
             </div>
-
-            <div style={{ display: "grid", gap: 12 }}>
-              {nextAction.actionKey !== "assign" ? (
-                <AssignFollowupForm
-                  visitorId={data.visitor.visitorId}
-                  assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null}
-                />
-              ) : null}
-
-              {nextAction.actionKey !== "contacted" ? (
-                <MarkContactedForm
-                  visitorId={data.visitor.visitorId}
-                  lastFollowupContactedAt={data.formationProfile?.lastFollowupContactedAt ?? null}
-                  lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
-                />
-              ) : null}
-
-              {nextAction.actionKey !== "outcome" ? (
-                <FollowupOutcomeForm
-                  visitorId={data.visitor.visitorId}
-                  lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
-                />
-              ) : null}
-            </div>
-          </div>
+          )}
         </div>
       </div>
 

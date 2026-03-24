@@ -27,6 +27,22 @@ type ContactFollowupResponse = {
   error?: string;
 };
 
+type OutcomeFollowupResponse = {
+  ok?: boolean;
+  visitorId?: string;
+  eventType?: string;
+  outcome?: string;
+  error?: string;
+};
+
+const OUTCOME_OPTIONS = [
+  { value: "CONNECTED", label: "Connected" },
+  { value: "LEFT_VOICEMAIL", label: "Left voicemail" },
+  { value: "NO_ANSWER", label: "No answer" },
+  { value: "NOT_INTERESTED", label: "Not interested" },
+  { value: "FOLLOW_UP_LATER", label: "Follow up later" }
+] as const;
+
 function toTimestamp(value: string | null | undefined) {
   if (!value) return 0;
   const time = new Date(value).getTime();
@@ -222,6 +238,10 @@ export function VisitorsTable({
   const router = useRouter();
   const [assigningVisitorId, setAssigningVisitorId] = useState<string | null>(null);
   const [contactingVisitorId, setContactingVisitorId] = useState<string | null>(null);
+  const [editingOutcomeVisitorId, setEditingOutcomeVisitorId] = useState<string | null>(null);
+  const [savingOutcomeVisitorId, setSavingOutcomeVisitorId] = useState<string | null>(null);
+  const [draftOutcome, setDraftOutcome] = useState<string>(OUTCOME_OPTIONS[0].value);
+  const [draftNote, setDraftNote] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
   async function assignToMe(visitorId: string) {
@@ -289,6 +309,55 @@ export function VisitorsTable({
       setActionError(message);
     } finally {
       setContactingVisitorId(null);
+    }
+  }
+
+  function startOutcomeEditor(visitorId: string) {
+    setEditingOutcomeVisitorId(visitorId);
+    setDraftOutcome(OUTCOME_OPTIONS[0].value);
+    setDraftNote("");
+    setActionError(null);
+  }
+
+  function cancelOutcomeEditor() {
+    setEditingOutcomeVisitorId(null);
+    setDraftOutcome(OUTCOME_OPTIONS[0].value);
+    setDraftNote("");
+  }
+
+  async function saveOutcome(visitorId: string) {
+    setSavingOutcomeVisitorId(visitorId);
+    setActionError(null);
+
+    try {
+      const response = await fetch("/api/dashboard/followups/outcome", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json"
+        },
+        body: JSON.stringify({
+          visitorId,
+          outcome: draftOutcome,
+          note: draftNote
+        })
+      });
+
+      const data = (await response.json()) as OutcomeFollowupResponse;
+
+      if (!response.ok) {
+        throw new Error(data.error || `POST /api/dashboard/followups/outcome failed with status ${response.status}`);
+      }
+
+      setEditingOutcomeVisitorId(null);
+      setDraftOutcome(OUTCOME_OPTIONS[0].value);
+      setDraftNote("");
+      router.refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to record followup outcome.";
+      setActionError(message);
+    } finally {
+      setSavingOutcomeVisitorId(null);
     }
   }
 
@@ -554,41 +623,47 @@ export function VisitorsTable({
                 !!myAssignee &&
                 item.assignedTo === myAssignee;
 
+              const canSetOutcome =
+                item.followupState === "Contacted";
+
+              const isEditingOutcome =
+                editingOutcomeVisitorId === item.visitorId;
+
               return (
                 <tr key={item.visitorId} style={rowStyle}>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                     <Link href={`/visitors/${item.visitorId}`} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
                       {item.name}
                     </Link>
                   </td>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>{item.email ?? "-"}</td>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>{item.email ?? "-"}</td>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                     <FollowupStateBadge state={item.followupState} />
                   </td>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                     <AttentionBadge state={item.attentionState} />
                   </td>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                     <span>{item.assignedTo ?? "-"}</span>
                   </td>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ fontFamily: "monospace" }}>{item.visitorId}</span>
                       <CopyButton value={item.visitorId} label="Copy" />
                     </div>
                   </td>
                   <td
-                    style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}
+                    style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}
                     title={formatAbsoluteTime(item.updatedAt)}
                   >
                     {formatRelativeTime(item.updatedAt)}
                   </td>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                     {canAssignToMe ? (
                       <button
                         type="button"
                         onClick={() => assignToMe(item.visitorId)}
-                        disabled={assigningVisitorId === item.visitorId || contactingVisitorId === item.visitorId}
+                        disabled={assigningVisitorId === item.visitorId || contactingVisitorId === item.visitorId || savingOutcomeVisitorId === item.visitorId}
                         style={{
                           padding: "8px 12px",
                           borderRadius: 8,
@@ -607,7 +682,7 @@ export function VisitorsTable({
                       <button
                         type="button"
                         onClick={() => markContacted(item.visitorId)}
-                        disabled={contactingVisitorId === item.visitorId || assigningVisitorId === item.visitorId}
+                        disabled={contactingVisitorId === item.visitorId || assigningVisitorId === item.visitorId || savingOutcomeVisitorId === item.visitorId}
                         style={{
                           padding: "8px 12px",
                           borderRadius: 8,
@@ -622,6 +697,99 @@ export function VisitorsTable({
                       >
                         {contactingVisitorId === item.visitorId ? "Marking..." : "Mark contacted"}
                       </button>
+                    ) : canSetOutcome ? (
+                      isEditingOutcome ? (
+                        <div style={{ display: "grid", gap: 8, minWidth: 240 }}>
+                          <select
+                            value={draftOutcome}
+                            onChange={(event) => setDraftOutcome(event.target.value)}
+                            disabled={savingOutcomeVisitorId === item.visitorId}
+                            style={{
+                              padding: "8px 10px",
+                              borderRadius: 8,
+                              border: "1px solid #d1d5db",
+                              background: "#fff",
+                              color: "#111827",
+                              font: "inherit"
+                            }}
+                          >
+                            {OUTCOME_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                          <textarea
+                            value={draftNote}
+                            onChange={(event) => setDraftNote(event.target.value)}
+                            disabled={savingOutcomeVisitorId === item.visitorId}
+                            rows={3}
+                            placeholder="Optional operator note"
+                            style={{
+                              padding: "8px 10px",
+                              borderRadius: 8,
+                              border: "1px solid #d1d5db",
+                              background: "#fff",
+                              color: "#111827",
+                              font: "inherit",
+                              resize: "vertical"
+                            }}
+                          />
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button
+                              type="button"
+                              onClick={() => saveOutcome(item.visitorId)}
+                              disabled={savingOutcomeVisitorId === item.visitorId}
+                              style={{
+                                padding: "8px 12px",
+                                borderRadius: 8,
+                                border: "1px solid #111827",
+                                background: "#111827",
+                                color: "#fff",
+                                font: "inherit",
+                                cursor: savingOutcomeVisitorId === item.visitorId ? "default" : "pointer",
+                                opacity: savingOutcomeVisitorId === item.visitorId ? 0.7 : 1
+                              }}
+                            >
+                              {savingOutcomeVisitorId === item.visitorId ? "Saving..." : "Save outcome"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelOutcomeEditor}
+                              disabled={savingOutcomeVisitorId === item.visitorId}
+                              style={{
+                                padding: "8px 12px",
+                                borderRadius: 8,
+                                border: "1px solid #d1d5db",
+                                background: "#fff",
+                                color: "#111827",
+                                font: "inherit",
+                                cursor: savingOutcomeVisitorId === item.visitorId ? "default" : "pointer"
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => startOutcomeEditor(item.visitorId)}
+                          disabled={assigningVisitorId === item.visitorId || contactingVisitorId === item.visitorId || savingOutcomeVisitorId === item.visitorId}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: 8,
+                            border: "1px solid #111827",
+                            background: "#111827",
+                            color: "#fff",
+                            font: "inherit",
+                            cursor: "pointer",
+                            whiteSpace: "nowrap"
+                          }}
+                        >
+                          Set outcome
+                        </button>
+                      )
                     ) : (
                       <span style={{ color: "#9ca3af" }}>-</span>
                     )}

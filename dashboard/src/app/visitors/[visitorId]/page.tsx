@@ -109,6 +109,127 @@ function formatOutcomeLabel(value: string | null | undefined) {
   }
 }
 
+function HeaderChip({
+  label,
+  value
+}: {
+  label: string;
+  value: ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gap: 4,
+        padding: "10px 12px",
+        borderRadius: 10,
+        background: "#f9fafb",
+        border: "1px solid #e5e7eb",
+        minWidth: 0
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#6b7280" }}>{label}</div>
+      <div style={{ color: "#111827", fontWeight: 600, minWidth: 0 }}>{value}</div>
+    </div>
+  );
+}
+
+function VisitorHeaderCard({
+  visitorId,
+  name,
+  email,
+  stage,
+  followupStatus
+}: {
+  visitorId: string;
+  name: string;
+  email: string | null;
+  stage: string | null | undefined;
+  followupStatus: string;
+}) {
+  const statusBackground =
+    followupStatus === "Resolved"
+      ? "#dcfce7"
+      : followupStatus === "Contacted"
+        ? "#dbeafe"
+        : followupStatus === "Assigned"
+          ? "#fef3c7"
+          : "#f3f4f6";
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 16,
+        padding: 20,
+        display: "grid",
+        gap: 16
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "start" }}>
+        <div style={{ display: "grid", gap: 8 }}>
+          <Link href="/visitors" style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
+            ← Back to Visitors
+          </Link>
+
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <h1 style={{ margin: 0, color: "#111827" }}>{name}</h1>
+              <span
+                style={{
+                  display: "inline-block",
+                  padding: "4px 10px",
+                  borderRadius: 9999,
+                  background: statusBackground,
+                  color: "#111827",
+                  fontSize: 12,
+                  fontWeight: 700
+                }}
+              >
+                {followupStatus}
+              </span>
+            </div>
+
+            <div style={{ fontSize: 14, color: "#6b7280" }}>
+              Visitor detail aligned to the existing visitor and formation profile surfaces.
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+            padding: "8px 10px",
+            borderRadius: 10,
+            background: "#f9fafb",
+            border: "1px solid #e5e7eb"
+          }}
+        >
+          <span style={{ fontFamily: "monospace", color: "#111827" }}>{visitorId}</span>
+          <CopyButton value={visitorId} label="Copy ID" />
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gap: 12
+        }}
+      >
+        <HeaderChip label="Visitor ID" value={<span style={{ fontFamily: "monospace" }}>{visitorId}</span>} />
+        <HeaderChip label="Email" value={email ?? "-"} />
+        <HeaderChip label="Stage" value={<StageBadge stage={stage ?? null} />} />
+        <HeaderChip label="Followup" value={followupStatus} />
+      </div>
+    </div>
+  );
+}
+
 function OutcomeSummaryCard({
   outcome,
   outcomeAt,
@@ -303,7 +424,6 @@ function FollowupTimelineCard({
   );
 }
 
-
 function formatEventLabel(value: string | null | undefined) {
   if (!value) {
     return "Unknown event";
@@ -437,6 +557,7 @@ function EventTimelineCard({
     </div>
   );
 }
+
 export default async function VisitorDetailPage({
   params,
   searchParams
@@ -526,25 +647,13 @@ export default async function VisitorDetailPage({
         </div>
       ) : null}
 
-      <div
-        style={{
-          background: "#fff",
-          border: "1px solid #e5e7eb",
-          borderRadius: 12,
-          padding: 20
-        }}
-      >
-        <Link href="/visitors" style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
-          ← Back to Visitors
-        </Link>
-
-        <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
-          <h1 style={{ margin: 0, color: "#111827" }}>{data.visitor.name}</h1>
-          <div style={{ fontSize: 14, color: "#6b7280" }}>
-            Visitor detail aligned to the existing visitor and formation profile surfaces.
-          </div>
-        </div>
-      </div>
+      <VisitorHeaderCard
+        visitorId={data.visitor.visitorId}
+        name={data.visitor.name}
+        email={data.visitor.email}
+        stage={data.formationProfile?.stage ?? null}
+        followupStatus={followupStatus}
+      />
 
       <OutcomeSummaryCard
         outcome={data.formationProfile?.lastFollowupOutcome}
@@ -677,4 +786,3 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
-

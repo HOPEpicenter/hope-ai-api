@@ -670,16 +670,43 @@ export default async function VisitorDetailPage({
 
       <EventTimelineCard events={data.formationEvents} />
 
-      <AssignFollowupForm visitorId={data.visitor.visitorId} assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null} />
-      <MarkContactedForm
-        visitorId={data.visitor.visitorId}
-        lastFollowupContactedAt={data.formationProfile?.lastFollowupContactedAt ?? null}
-        lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
-      />
-      <FollowupOutcomeForm
-        visitorId={data.visitor.visitorId}
-        lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
-      />
+      <div
+        style={{
+          background: "#fff",
+          border: "1px solid #e5e7eb",
+          borderRadius: 12,
+          padding: 20,
+          display: "grid",
+          gap: 16
+        }}
+      >
+        <div style={{ display: "grid", gap: 4 }}>
+          <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>Actions</h2>
+          <div style={{ fontSize: 14, color: "#6b7280" }}>
+            Run followup actions for this visitor from one clear action zone.
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: 16,
+            alignItems: "start"
+          }}
+        >
+          <AssignFollowupForm visitorId={data.visitor.visitorId} assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null} />
+          <MarkContactedForm
+            visitorId={data.visitor.visitorId}
+            lastFollowupContactedAt={data.formationProfile?.lastFollowupContactedAt ?? null}
+            lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
+          />
+          <FollowupOutcomeForm
+            visitorId={data.visitor.visitorId}
+            lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
+          />
+        </div>
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16 }}>
         <DetailCard title="Visitor">
@@ -786,3 +813,4 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+

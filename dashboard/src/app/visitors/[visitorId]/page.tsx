@@ -88,6 +88,95 @@ function getFollowupStatus(profile: {
   return "No active followup";
 }
 
+function formatOutcomeLabel(value: string | null | undefined) {
+  if (!value) {
+    return "-";
+  }
+
+  switch (value.trim().toUpperCase()) {
+    case "CONNECTED":
+      return "Connected";
+    case "LEFT_VOICEMAIL":
+      return "Left voicemail";
+    case "NO_ANSWER":
+      return "No answer";
+    case "NOT_INTERESTED":
+      return "Not interested";
+    case "FOLLOW_UP_LATER":
+      return "Follow up later";
+    default:
+      return value;
+  }
+}
+
+function OutcomeSummaryCard({
+  outcome,
+  outcomeAt,
+  outcomeNotes
+}: {
+  outcome: string | null | undefined;
+  outcomeAt: string | null | undefined;
+  outcomeNotes: string | null | undefined;
+}) {
+  if (!outcomeAt) {
+    return (
+      <div
+        style={{
+          background: "#f9fafb",
+          border: "1px solid #e5e7eb",
+          borderRadius: 12,
+          padding: 16,
+          display: "grid",
+          gap: 6
+        }}
+      >
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Latest outcome</div>
+        <div style={{ color: "#6b7280" }}>No outcome recorded yet.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        background: "#ecfdf5",
+        border: "1px solid #a7f3d0",
+        borderRadius: 12,
+        padding: 16,
+        display: "grid",
+        gap: 10
+      }}
+    >
+      <div style={{ display: "grid", gap: 2 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#065f46" }}>Latest outcome</div>
+        <div style={{ fontSize: 22, fontWeight: 800, color: "#111827" }}>{formatOutcomeLabel(outcome)}</div>
+      </div>
+
+      <div style={{ display: "grid", gap: 2 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#065f46" }}>Recorded</div>
+        <div style={{ color: "#111827", fontWeight: 600 }}>{formatRelativeTime(outcomeAt)}</div>
+        <div style={{ fontSize: 12, color: "#4b5563" }}>{formatAbsoluteTime(outcomeAt)}</div>
+      </div>
+
+      {outcomeNotes ? (
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #d1fae5",
+            borderRadius: 10,
+            padding: 12,
+            display: "grid",
+            gap: 6
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#065f46" }}>Operator note</div>
+          <div style={{ color: "#111827", whiteSpace: "pre-wrap" }}>{outcomeNotes}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function VisitorDetailPage({
   params,
   searchParams
@@ -98,6 +187,7 @@ export default async function VisitorDetailPage({
   const { visitorId } = await params;
   const { created, existing, assigned, assigneeId, contacted, outcomeRecorded } = await searchParams;
   const data = await getVisitorDetail(visitorId);
+  const followupStatus = getFollowupStatus(data.formationProfile);
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -196,6 +286,12 @@ export default async function VisitorDetailPage({
         </div>
       </div>
 
+      <OutcomeSummaryCard
+        outcome={data.formationProfile?.lastFollowupOutcome}
+        outcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
+        outcomeNotes={data.formationProfile?.lastFollowupOutcomeNotes}
+      />
+
       <AssignFollowupForm visitorId={data.visitor.visitorId} assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null} />
       <MarkContactedForm
         visitorId={data.visitor.visitorId}
@@ -245,7 +341,24 @@ export default async function VisitorDetailPage({
         <DetailCard title="Followup Status">
           {data.formationProfile ? (
             <>
-              <DetailRow label="Status" value={getFollowupStatus(data.formationProfile)} />
+              <DetailRow
+                label="Status"
+                value={
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "4px 8px",
+                      borderRadius: 9999,
+                      background: followupStatus === "Resolved" ? "#dcfce7" : followupStatus === "Contacted" ? "#dbeafe" : followupStatus === "Assigned" ? "#fef3c7" : "#f3f4f6",
+                      color: "#111827",
+                      fontSize: 12,
+                      fontWeight: 700
+                    }}
+                  >
+                    {followupStatus}
+                  </span>
+                }
+              />
               <DetailRow
                 label="Assigned To"
                 value={data.formationProfile.assignedTo?.ownerId ?? "-"}
@@ -264,11 +377,27 @@ export default async function VisitorDetailPage({
               />
               <DetailRow
                 label="Outcome"
-                value={data.formationProfile.lastFollowupOutcome ?? "-"}
+                value={formatOutcomeLabel(data.formationProfile.lastFollowupOutcome)}
               />
               <DetailRow
                 label="Outcome Notes"
-                value={data.formationProfile.lastFollowupOutcomeNotes ?? "-"}
+                value={
+                  data.formationProfile.lastFollowupOutcomeNotes ? (
+                    <div
+                      style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 10,
+                        padding: 12,
+                        whiteSpace: "pre-wrap"
+                      }}
+                    >
+                      {data.formationProfile.lastFollowupOutcomeNotes}
+                    </div>
+                  ) : (
+                    "-"
+                  )
+                }
               />
             </>
           ) : (
@@ -279,5 +408,3 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
-
-

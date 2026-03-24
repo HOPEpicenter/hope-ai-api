@@ -4,7 +4,7 @@ import { FollowupUnassignButton } from "@/components/followup-unassign-button";
 import { FollowupContactButton } from "@/components/followup-contact-button";
 import { FollowupRowActionGroup, FollowupRowActionSurface } from "@/components/followup-row-action-ui";
 import { FollowupOutcomeRowActions } from "@/components/followup-outcome-row-actions";
-import { useEffect, useRef, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef, useSyncExternalStore, type CSSProperties } from "react";
 import type { FollowupItem } from "@/lib/contracts/followups";
 import { CopyButton } from "@/components/copy-button";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
@@ -715,6 +715,7 @@ export function FollowupsTable({
     </div>
   );
 }
+
 
 
 

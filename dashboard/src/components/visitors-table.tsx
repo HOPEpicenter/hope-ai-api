@@ -21,6 +21,12 @@ type AssignFollowupResponse = {
   error?: string;
 };
 
+type ContactFollowupResponse = {
+  ok?: boolean;
+  visitorId?: string;
+  error?: string;
+};
+
 function toTimestamp(value: string | null | undefined) {
   if (!value) return 0;
   const time = new Date(value).getTime();
@@ -215,6 +221,7 @@ export function VisitorsTable({
 }) {
   const router = useRouter();
   const [assigningVisitorId, setAssigningVisitorId] = useState<string | null>(null);
+  const [contactingVisitorId, setContactingVisitorId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   async function assignToMe(visitorId: string) {
@@ -251,6 +258,37 @@ export function VisitorsTable({
       setActionError(message);
     } finally {
       setAssigningVisitorId(null);
+    }
+  }
+
+  async function markContacted(visitorId: string) {
+    setContactingVisitorId(visitorId);
+    setActionError(null);
+
+    try {
+      const response = await fetch("/api/dashboard/followups/contact", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json"
+        },
+        body: JSON.stringify({
+          visitorId
+        })
+      });
+
+      const data = (await response.json()) as ContactFollowupResponse;
+
+      if (!response.ok) {
+        throw new Error(data.error || `POST /api/dashboard/followups/contact failed with status ${response.status}`);
+      }
+
+      router.refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to mark contacted.";
+      setActionError(message);
+    } finally {
+      setContactingVisitorId(null);
     }
   }
 
@@ -438,6 +476,7 @@ export function VisitorsTable({
           active={preset === "needs-attention"}
           href="/visitors?preset=needs-attention"
           label={`Needs Attention (${needsAttentionCount})`}
+          disabled={!myAssignee}
         />
         {(preset === "my-needs-attention" || preset === "assigned-to-me") && myAssignee ? (
           <PresetScopeChip myAssignee={myAssignee} />
@@ -506,20 +545,14 @@ export function VisitorsTable({
                   ? { background: "#fffbeb", boxShadow: "inset 4px 0 0 #f59e0b" }
                   : undefined;
 
-              const actionCellStyle =
-                item.attentionState === "Needs attention"
-                  ? {
-                      background: "#fff7ed",
-                      border: "1px solid #fed7aa",
-                      borderRadius: 10,
-                      padding: 10,
-                      display: "grid" as const,
-                      gap: 8
-                    }
-                  : {
-                      display: "grid" as const,
-                      gap: 8
-                    };
+              const canAssignToMe =
+                item.followupState === "Waiting assignment" &&
+                !!myAssignee;
+
+              const canMarkContacted =
+                item.followupState === "Assigned" &&
+                !!myAssignee &&
+                item.assignedTo === myAssignee;
 
               return (
                 <tr key={item.visitorId} style={rowStyle}>
@@ -533,14 +566,10 @@ export function VisitorsTable({
                     <FollowupStateBadge state={item.followupState} />
                   </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                    <div style={actionCellStyle}>
-                      <AttentionBadge state={item.attentionState} />
-                    </div>
+                    <AttentionBadge state={item.attentionState} />
                   </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                    <div style={actionCellStyle}>
-                      <span>{item.assignedTo ?? "-"}</span>
-                    </div>
+                    <span>{item.assignedTo ?? "-"}</span>
                   </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -555,11 +584,11 @@ export function VisitorsTable({
                     {formatRelativeTime(item.updatedAt)}
                   </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
-                    {item.followupState === "Waiting assignment" && myAssignee ? (
+                    {canAssignToMe ? (
                       <button
                         type="button"
                         onClick={() => assignToMe(item.visitorId)}
-                        disabled={assigningVisitorId === item.visitorId}
+                        disabled={assigningVisitorId === item.visitorId || contactingVisitorId === item.visitorId}
                         style={{
                           padding: "8px 12px",
                           borderRadius: 8,
@@ -574,6 +603,25 @@ export function VisitorsTable({
                       >
                         {assigningVisitorId === item.visitorId ? "Assigning..." : "Assign to me"}
                       </button>
+                    ) : canMarkContacted ? (
+                      <button
+                        type="button"
+                        onClick={() => markContacted(item.visitorId)}
+                        disabled={contactingVisitorId === item.visitorId || assigningVisitorId === item.visitorId}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 8,
+                          border: "1px solid #111827",
+                          background: "#111827",
+                          color: "#fff",
+                          font: "inherit",
+                          cursor: contactingVisitorId === item.visitorId ? "default" : "pointer",
+                          opacity: contactingVisitorId === item.visitorId ? 0.7 : 1,
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        {contactingVisitorId === item.visitorId ? "Marking..." : "Mark contacted"}
+                      </button>
                     ) : (
                       <span style={{ color: "#9ca3af" }}>-</span>
                     )}
@@ -587,4 +635,3 @@ export function VisitorsTable({
     </div>
   );
 }
-

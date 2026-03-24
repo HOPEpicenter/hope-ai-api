@@ -88,6 +88,26 @@ function getFollowupStatus(profile: {
   return "No active followup";
 }
 
+function getLastActivityAt(data: {
+  visitor: { updatedAt: string | null };
+  formationProfile: {
+    lastEventAt?: string | null;
+    lastFollowupAssignedAt?: string | null;
+    lastFollowupContactedAt?: string | null;
+    lastFollowupOutcomeAt?: string | null;
+    updatedAt?: string | null;
+  } | null;
+}) {
+  return (
+    data.formationProfile?.lastEventAt ??
+    data.formationProfile?.lastFollowupOutcomeAt ??
+    data.formationProfile?.lastFollowupContactedAt ??
+    data.formationProfile?.lastFollowupAssignedAt ??
+    data.formationProfile?.updatedAt ??
+    data.visitor.updatedAt
+  );
+}
+
 function formatOutcomeLabel(value: string | null | undefined) {
   if (!value) {
     return "-";
@@ -235,7 +255,8 @@ function VisitorHeaderCard({
   email,
   stage,
   followupStatus,
-  assignedToOwnerId
+  assignedToOwnerId,
+  lastActivityAt
 }: {
   visitorId: string;
   name: string;
@@ -243,6 +264,7 @@ function VisitorHeaderCard({
   stage: string | null | undefined;
   followupStatus: string;
   assignedToOwnerId: string | null | undefined;
+  lastActivityAt: string | null;
 }) {
   const statusBackground =
     followupStatus === "Resolved"
@@ -314,7 +336,7 @@ function VisitorHeaderCard({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
           gap: 12
         }}
       >
@@ -322,6 +344,19 @@ function VisitorHeaderCard({
         <HeaderChip label="Stage" value={<StageBadge stage={stage ?? null} />} />
         <HeaderChip label="Followup" value={followupStatus} />
         <HeaderChip label="Assigned To" value={assignedToOwnerId ?? "-"} />
+        <HeaderChip
+          label="Last Activity"
+          value={
+            lastActivityAt ? (
+              <div>
+                <div>{formatRelativeTime(lastActivityAt)}</div>
+                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                  {formatAbsoluteTime(lastActivityAt)}
+                </div>
+              </div>
+            ) : "-"
+          }
+        />
       </div>
     </div>
   );
@@ -686,6 +721,7 @@ export default async function VisitorDetailPage({
   const { created, existing, assigned, assigneeId, contacted, outcomeRecorded } = await searchParams;
   const data = await getVisitorDetail(visitorId);
   const followupStatus = getFollowupStatus(data.formationProfile);
+  const lastActivityAt = getLastActivityAt(data);
   const nextAction = getNextAction(
     followupStatus,
     data.formationProfile?.assignedTo?.ownerId ?? null
@@ -775,6 +811,7 @@ export default async function VisitorDetailPage({
         stage={data.formationProfile?.stage ?? null}
         followupStatus={followupStatus}
         assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null}
+        lastActivityAt={lastActivityAt}
       />
 
       <OutcomeSummaryCard

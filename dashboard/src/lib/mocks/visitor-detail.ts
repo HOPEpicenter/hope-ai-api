@@ -10,11 +10,12 @@ const mockById: Record<string, VisitorDetailResponse> = {
       createdAt: "2026-03-06T13:15:00.000Z",
       updatedAt: "2026-03-07T15:45:00.000Z"
     },
+    formationEvents: [],
     formationProfile: {
       partitionKey: "VISITOR",
       rowKey: "visitor-1002",
       stage: "Connected",
-      assignedTo: { ownerType: "user", ownerId: "ops-user-2" },
+      assignedTo: { ownerId: "ops-user-2" },
       lastFollowupAssignedAt: "2026-03-07T15:10:00.000Z",
       lastFollowupContactedAt: "2026-03-07T15:45:00.000Z",
       lastFollowupOutcomeAt: null,
@@ -34,11 +35,12 @@ const mockById: Record<string, VisitorDetailResponse> = {
       createdAt: "2026-03-05T10:30:00.000Z",
       updatedAt: "2026-03-07T12:00:00.000Z"
     },
+    formationEvents: [],
     formationProfile: {
       partitionKey: "VISITOR",
       rowKey: "visitor-1001",
       stage: "Connected",
-      assignedTo: { ownerType: "user", ownerId: "ops-user-1" },
+      assignedTo: { ownerId: "ops-user-1" },
       lastFollowupAssignedAt: "2026-03-07T11:55:00.000Z",
       lastFollowupContactedAt: null,
       lastFollowupOutcomeAt: null,
@@ -62,6 +64,7 @@ export function getMockVisitorDetail(visitorId: string): VisitorDetailResponse {
         createdAt: "2026-03-01T00:00:00.000Z",
         updatedAt: "2026-03-01T00:00:00.000Z"
       },
+      formationEvents: [],
       formationProfile: null
     }
   );

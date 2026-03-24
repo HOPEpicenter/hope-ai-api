@@ -134,6 +134,101 @@ function HeaderChip({
   );
 }
 
+function getNextAction(
+  followupStatus: string,
+  assignedToOwnerId: string | null | undefined
+) {
+  if (followupStatus === "Resolved") {
+    return {
+      title: "No action needed",
+      body: "This visitor already has a recorded followup outcome.",
+      tone: "success" as const,
+      actionKey: "none" as const
+    };
+  }
+
+  if (followupStatus === "Contacted") {
+    return {
+      title: "Next action: record outcome",
+      body: "Contact is already recorded. Add the outcome to close the loop clearly.",
+      tone: "primary" as const,
+      actionKey: "outcome" as const
+    };
+  }
+
+  if (followupStatus === "Assigned" && assignedToOwnerId) {
+    return {
+      title: "Next action: mark contacted",
+      body: "This followup is assigned and ready for outreach tracking.",
+      tone: "primary" as const,
+      actionKey: "contacted" as const
+    };
+  }
+
+  return {
+    title: "Next action: assign followup",
+    body: "This visitor does not have an active assigned followup yet.",
+    tone: "warning" as const,
+    actionKey: "assign" as const
+  };
+}
+
+function NextActionCard({
+  title,
+  body,
+  tone
+}: {
+  title: string;
+  body: string;
+  tone: "primary" | "warning" | "success";
+}) {
+  const palette =
+    tone === "success"
+      ? {
+          background: "#ecfdf5",
+          border: "#a7f3d0",
+          eyebrow: "#065f46"
+        }
+      : tone === "warning"
+        ? {
+            background: "#fffbeb",
+            border: "#fde68a",
+            eyebrow: "#92400e"
+          }
+        : {
+            background: "#eff6ff",
+            border: "#bfdbfe",
+            eyebrow: "#1d4ed8"
+          };
+
+  return (
+    <div
+      style={{
+        background: palette.background,
+        border: `1px solid ${palette.border}`,
+        borderRadius: 12,
+        padding: 16,
+        display: "grid",
+        gap: 6
+      }}
+    >
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 800,
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+          color: palette.eyebrow
+        }}
+      >
+        Next step
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: "#111827" }}>{title}</div>
+      <div style={{ color: "#4b5563" }}>{body}</div>
+    </div>
+  );
+}
+
 function VisitorHeaderCard({
   visitorId,
   name,
@@ -569,6 +664,10 @@ export default async function VisitorDetailPage({
   const { created, existing, assigned, assigneeId, contacted, outcomeRecorded } = await searchParams;
   const data = await getVisitorDetail(visitorId);
   const followupStatus = getFollowupStatus(data.formationProfile);
+  const nextAction = getNextAction(
+    followupStatus,
+    data.formationProfile?.assignedTo?.ownerId ?? null
+  );
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -687,24 +786,76 @@ export default async function VisitorDetailPage({
           </div>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-            gap: 16,
-            alignItems: "start"
-          }}
-        >
-          <AssignFollowupForm visitorId={data.visitor.visitorId} assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null} />
-          <MarkContactedForm
-            visitorId={data.visitor.visitorId}
-            lastFollowupContactedAt={data.formationProfile?.lastFollowupContactedAt ?? null}
-            lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
+        <div style={{ display: "grid", gap: 12 }}>
+          <NextActionCard
+            title={nextAction.title}
+            body={nextAction.body}
+            tone={nextAction.tone}
           />
-          <FollowupOutcomeForm
-            visitorId={data.visitor.visitorId}
-            lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
-          />
+
+          {nextAction.actionKey === "assign" ? (
+            <AssignFollowupForm
+              visitorId={data.visitor.visitorId}
+              assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null}
+            />
+          ) : null}
+
+          {nextAction.actionKey === "contacted" ? (
+            <MarkContactedForm
+              visitorId={data.visitor.visitorId}
+              lastFollowupContactedAt={data.formationProfile?.lastFollowupContactedAt ?? null}
+              lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
+            />
+          ) : null}
+
+          {nextAction.actionKey === "outcome" ? (
+            <FollowupOutcomeForm
+              visitorId={data.visitor.visitorId}
+              lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
+            />
+          ) : null}
+
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 12,
+              padding: 16,
+              display: "grid",
+              gap: 12
+            }}
+          >
+            <div style={{ display: "grid", gap: 4 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>Other actions</div>
+              <div style={{ fontSize: 13, color: "#6b7280" }}>
+                Secondary actions stay available without competing with the primary next step.
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gap: 12 }}>
+              {nextAction.actionKey !== "assign" ? (
+                <AssignFollowupForm
+                  visitorId={data.visitor.visitorId}
+                  assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null}
+                />
+              ) : null}
+
+              {nextAction.actionKey !== "contacted" ? (
+                <MarkContactedForm
+                  visitorId={data.visitor.visitorId}
+                  lastFollowupContactedAt={data.formationProfile?.lastFollowupContactedAt ?? null}
+                  lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
+                />
+              ) : null}
+
+              {nextAction.actionKey !== "outcome" ? (
+                <FollowupOutcomeForm
+                  visitorId={data.visitor.visitorId}
+                  lastFollowupOutcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
+                />
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
 

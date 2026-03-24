@@ -177,6 +177,132 @@ function OutcomeSummaryCard({
   );
 }
 
+function FollowupTimelineCard({
+  assignedAt,
+  contactedAt,
+  outcomeAt,
+  outcome
+}: {
+  assignedAt: string | null | undefined;
+  contactedAt: string | null | undefined;
+  outcomeAt: string | null | undefined;
+  outcome: string | null | undefined;
+}) {
+  const steps = [
+    {
+      label: "Assigned",
+      value: assignedAt ?? null,
+      detail: assignedAt ? "Followup was assigned to an operator." : "Not assigned yet."
+    },
+    {
+      label: "Contacted",
+      value: contactedAt ?? null,
+      detail: contactedAt ? "Contact with the visitor was recorded." : "No contact recorded yet."
+    },
+    {
+      label: "Outcome recorded",
+      value: outcomeAt ?? null,
+      detail: outcomeAt ? formatOutcomeLabel(outcome) : "No outcome recorded yet."
+    }
+  ];
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 12,
+        padding: 20,
+        display: "grid",
+        gap: 14
+      }}
+    >
+      <div style={{ display: "grid", gap: 4 }}>
+        <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>Followup Timeline</h2>
+        <div style={{ fontSize: 14, color: "#6b7280" }}>
+          Read-only sequence of the current followup lifecycle for this visitor.
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gap: 12 }}>
+        {steps.map((step, index) => {
+          const completed = !!step.value;
+          const isLast = index === steps.length - 1;
+
+          return (
+            <div
+              key={step.label}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "20px 1fr",
+                gap: 12,
+                alignItems: "start"
+              }}
+            >
+              <div style={{ display: "grid", justifyItems: "center", gap: 4 }}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: 999,
+                    background: completed ? "#10b981" : "#d1d5db",
+                    marginTop: 4
+                  }}
+                />
+                {!isLast ? (
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 2,
+                      minHeight: 36,
+                      background: completed ? "#a7f3d0" : "#e5e7eb"
+                    }}
+                  />
+                ) : null}
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gap: 4,
+                  paddingBottom: isLast ? 0 : 4
+                }}
+              >
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: 700, color: "#111827" }}>{step.label}</span>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "2px 8px",
+                      borderRadius: 9999,
+                      background: completed ? "#ecfdf5" : "#f3f4f6",
+                      color: completed ? "#065f46" : "#4b5563",
+                      fontSize: 12,
+                      fontWeight: 700
+                    }}
+                  >
+                    {completed ? "Done" : "Pending"}
+                  </span>
+                </div>
+
+                <div style={{ color: "#4b5563" }}>{step.detail}</div>
+
+                {step.value ? (
+                  <div style={{ display: "grid", gap: 2 }}>
+                    <div style={{ fontWeight: 600, color: "#111827" }}>{formatRelativeTime(step.value)}</div>
+                    <div style={{ fontSize: 12, color: "#6b7280" }}>{formatAbsoluteTime(step.value)}</div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default async function VisitorDetailPage({
   params,
   searchParams
@@ -290,6 +416,13 @@ export default async function VisitorDetailPage({
         outcome={data.formationProfile?.lastFollowupOutcome}
         outcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
         outcomeNotes={data.formationProfile?.lastFollowupOutcomeNotes}
+      />
+
+      <FollowupTimelineCard
+        assignedAt={data.formationProfile?.lastFollowupAssignedAt ?? null}
+        contactedAt={data.formationProfile?.lastFollowupContactedAt ?? null}
+        outcomeAt={data.formationProfile?.lastFollowupOutcomeAt ?? null}
+        outcome={data.formationProfile?.lastFollowupOutcome ?? null}
       />
 
       <AssignFollowupForm visitorId={data.visitor.visitorId} assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null} />

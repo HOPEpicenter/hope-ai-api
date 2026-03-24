@@ -234,13 +234,15 @@ function VisitorHeaderCard({
   name,
   email,
   stage,
-  followupStatus
+  followupStatus,
+  assignedToOwnerId
 }: {
   visitorId: string;
   name: string;
   email: string | null;
   stage: string | null | undefined;
   followupStatus: string;
+  assignedToOwnerId: string | null | undefined;
 }) {
   const statusBackground =
     followupStatus === "Resolved"
@@ -316,10 +318,10 @@ function VisitorHeaderCard({
           gap: 12
         }}
       >
-        <HeaderChip label="Visitor ID" value={<span style={{ fontFamily: "monospace" }}>{visitorId}</span>} />
         <HeaderChip label="Email" value={email ?? "-"} />
         <HeaderChip label="Stage" value={<StageBadge stage={stage ?? null} />} />
         <HeaderChip label="Followup" value={followupStatus} />
+        <HeaderChip label="Assigned To" value={assignedToOwnerId ?? "-"} />
       </div>
     </div>
   );
@@ -752,6 +754,7 @@ export default async function VisitorDetailPage({
         email={data.visitor.email}
         stage={data.formationProfile?.stage ?? null}
         followupStatus={followupStatus}
+        assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null}
       />
 
       <OutcomeSummaryCard

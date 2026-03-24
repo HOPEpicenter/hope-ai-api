@@ -67,6 +67,24 @@ export function MarkContactedForm({
     }
   }
 
+  const stateLabel = isResolved
+    ? "Locked"
+    : alreadyContacted
+      ? "Done"
+      : "Available";
+
+  const stateBackground = isResolved
+    ? "#f3f4f6"
+    : alreadyContacted
+      ? "#dbeafe"
+      : "#fef3c7";
+
+  const stateColor = isResolved
+    ? "#4b5563"
+    : alreadyContacted
+      ? "#1d4ed8"
+      : "#92400e";
+
   return (
     <div
       style={{
@@ -74,17 +92,38 @@ export function MarkContactedForm({
         borderRadius: 16,
         padding: 16,
         display: "grid",
-        gap: 12
+        gap: 12,
+        background: "#fff"
       }}
     >
-      <div style={{ display: "grid", gap: 4 }}>
-        <h2 style={{ margin: 0, fontSize: 18 }}>Contact</h2>
+      <div style={{ display: "grid", gap: 6 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <h2 style={{ margin: 0, fontSize: 18 }}>Contact</h2>
+          <span
+            style={{
+              display: "inline-block",
+              padding: "2px 8px",
+              borderRadius: 9999,
+              background: stateBackground,
+              color: stateColor,
+              fontSize: 12,
+              fontWeight: 700
+            }}
+          >
+            {stateLabel}
+          </span>
+        </div>
+
         <p style={{ margin: 0, color: "#4b5563" }}>
-          Record when the visitor has been contacted for this assignment workflow.
+          {isResolved
+            ? "This step is locked because an outcome has already been recorded."
+            : alreadyContacted
+              ? "Contact has already been recorded for this visitor."
+              : "Record when the visitor has been contacted for this assignment workflow."}
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <form onSubmit={handleSubmit} style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <button
           type="submit"
           disabled={isDisabled}
@@ -106,11 +145,15 @@ export function MarkContactedForm({
           <span style={{ color: "#4b5563", fontSize: 14 }}>
             Contact updates are locked because an outcome has already been recorded.
           </span>
-        ) : lastFollowupContactedAt ? (
+        ) : alreadyContacted ? (
           <span style={{ color: "#4b5563", fontSize: 14 }}>
             Contact already recorded.
           </span>
-        ) : null}
+        ) : (
+          <span style={{ color: "#4b5563", fontSize: 14 }}>
+            Use this after an operator reaches the visitor.
+          </span>
+        )}
       </form>
 
       {error ? (

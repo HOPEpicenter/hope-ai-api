@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
 import { PageState } from "@/components/page-state";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
@@ -11,6 +15,11 @@ export type VisitorsTableItem = VisitorListItem & {
 };
 
 type VisitorsPreset = "all" | "my-needs-attention" | "waiting-assignment" | "assigned-to-me" | "assigned" | "contacted" | "needs-attention";
+
+type AssignFollowupResponse = {
+  ok?: boolean;
+  error?: string;
+};
 
 function toTimestamp(value: string | null | undefined) {
   if (!value) return 0;
@@ -204,6 +213,47 @@ export function VisitorsTable({
   contactedCount: number;
   needsAttentionCount: number;
 }) {
+  const router = useRouter();
+  const [assigningVisitorId, setAssigningVisitorId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  async function assignToMe(visitorId: string) {
+    if (!myAssignee) {
+      setActionError("Assign to me is unavailable until NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE is configured.");
+      return;
+    }
+
+    setAssigningVisitorId(visitorId);
+    setActionError(null);
+
+    try {
+      const response = await fetch("/api/dashboard/followups/assign", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json"
+        },
+        body: JSON.stringify({
+          visitorId,
+          assigneeId: myAssignee
+        })
+      });
+
+      const data = (await response.json()) as AssignFollowupResponse;
+
+      if (!response.ok) {
+        throw new Error(data.error || `POST /api/dashboard/followups/assign failed with status ${response.status}`);
+      }
+
+      router.refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to assign visitor.";
+      setActionError(message);
+    } finally {
+      setAssigningVisitorId(null);
+    }
+  }
+
   const waitingAssignmentCount = items.filter((item) => !item.assignedTo).length;
 
   const filteredItems =
@@ -421,6 +471,20 @@ export function VisitorsTable({
         </div>
       ) : null}
 
+      {actionError ? (
+        <div
+          style={{
+            padding: 10,
+            borderRadius: 8,
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            color: "#991b1b"
+          }}
+        >
+          {actionError}
+        </div>
+      ) : null}
+
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
@@ -432,6 +496,7 @@ export function VisitorsTable({
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Assigned To</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Visitor ID</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Activity</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -489,6 +554,30 @@ export function VisitorsTable({
                   >
                     {formatRelativeTime(item.updatedAt)}
                   </td>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb" }}>
+                    {item.followupState === "Waiting assignment" && myAssignee ? (
+                      <button
+                        type="button"
+                        onClick={() => assignToMe(item.visitorId)}
+                        disabled={assigningVisitorId === item.visitorId}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 8,
+                          border: "1px solid #111827",
+                          background: "#111827",
+                          color: "#fff",
+                          font: "inherit",
+                          cursor: assigningVisitorId === item.visitorId ? "default" : "pointer",
+                          opacity: assigningVisitorId === item.visitorId ? 0.7 : 1,
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        {assigningVisitorId === item.visitorId ? "Assigning..." : "Assign to me"}
+                      </button>
+                    ) : (
+                      <span style={{ color: "#9ca3af" }}>-</span>
+                    )}
+                  </td>
                 </tr>
               );
             })}
@@ -498,8 +587,4 @@ export function VisitorsTable({
     </div>
   );
 }
-
-
-
-
 

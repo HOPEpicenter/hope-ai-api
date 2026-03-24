@@ -303,6 +303,140 @@ function FollowupTimelineCard({
   );
 }
 
+
+function formatEventLabel(value: string | null | undefined) {
+  if (!value) {
+    return "Unknown event";
+  }
+
+  return value
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function EventTimelineCard({
+  events
+}: {
+  events: Array<{
+    eventId: string;
+    eventType: string;
+    happenedAt: string | null;
+    source: string | null;
+    notes: string | null;
+  }>;
+}) {
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 12,
+        padding: 20,
+        display: "grid",
+        gap: 14
+      }}
+    >
+      <div style={{ display: "grid", gap: 4 }}>
+        <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>Recent Formation Events</h2>
+        <div style={{ fontSize: 14, color: "#6b7280" }}>
+          Latest read-only event history for this visitor.
+        </div>
+      </div>
+
+      {events.length === 0 ? (
+        <div style={{ color: "#6b7280" }}>No formation events available.</div>
+      ) : (
+        <div style={{ display: "grid", gap: 12 }}>
+          {events.map((event, index) => {
+            const isLast = index === events.length - 1;
+
+            return (
+              <div
+                key={event.eventId}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "20px 1fr",
+                  gap: 12,
+                  alignItems: "start"
+                }}
+              >
+                <div style={{ display: "grid", justifyItems: "center", gap: 4 }}>
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 999,
+                      background: "#2563eb",
+                      marginTop: 5
+                    }}
+                  />
+                  {!isLast ? (
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: 2,
+                        minHeight: 36,
+                        background: "#dbeafe"
+                      }}
+                    />
+                  ) : null}
+                </div>
+
+                <div style={{ display: "grid", gap: 4 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 700, color: "#111827" }}>{formatEventLabel(event.eventType)}</span>
+                    {event.source ? (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          padding: "2px 8px",
+                          borderRadius: 9999,
+                          background: "#f3f4f6",
+                          color: "#4b5563",
+                          fontSize: 12,
+                          fontWeight: 700
+                        }}
+                      >
+                        {event.source}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {event.happenedAt ? (
+                    <div style={{ display: "grid", gap: 2 }}>
+                      <div style={{ fontWeight: 600, color: "#111827" }}>{formatRelativeTime(event.happenedAt)}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>{formatAbsoluteTime(event.happenedAt)}</div>
+                    </div>
+                  ) : (
+                    <div style={{ color: "#6b7280" }}>No timestamp available.</div>
+                  )}
+
+                  {event.notes ? (
+                    <div
+                      style={{
+                        background: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 10,
+                        padding: 10,
+                        color: "#111827",
+                        whiteSpace: "pre-wrap"
+                      }}
+                    >
+                      {event.notes}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 export default async function VisitorDetailPage({
   params,
   searchParams
@@ -425,6 +559,8 @@ export default async function VisitorDetailPage({
         outcome={data.formationProfile?.lastFollowupOutcome ?? null}
       />
 
+      <EventTimelineCard events={data.formationEvents} />
+
       <AssignFollowupForm visitorId={data.visitor.visitorId} assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null} />
       <MarkContactedForm
         visitorId={data.visitor.visitorId}
@@ -541,3 +677,4 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+

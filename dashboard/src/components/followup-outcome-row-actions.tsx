@@ -57,8 +57,6 @@ export function FollowupOutcomeRowActions({
   const showQuickOutcomeButtons = !hasRecordedOutcome;
   const isAnotherActionSubmitting =
     !!actionGroup?.activeActionId && actionGroup.activeActionId !== ACTION_ID;
-
-  const disableQuickOutcomeButtons = isSavingOutcome || isOutcomeSuccess || isAnotherActionSubmitting;
   const disableMoreButton = isOutcomeSuccess || isAnotherActionSubmitting;
 
   useEffect(() => {
@@ -279,4 +277,5 @@ export function FollowupOutcomeRowActions({
     </>
   );
 }
+
 

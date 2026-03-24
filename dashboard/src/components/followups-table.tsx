@@ -9,14 +9,6 @@ import type { FollowupItem } from "@/lib/contracts/followups";
 import { CopyButton } from "@/components/copy-button";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
 
-const ROW_OUTCOME_OPTIONS = [
-  { value: "CONNECTED", label: "Connected" },
-  { value: "LEFT_VOICEMAIL", label: "Left voicemail" },
-  { value: "NO_ANSWER", label: "No answer" },
-  { value: "NOT_INTERESTED", label: "Not interested" },
-  { value: "FOLLOW_UP_LATER", label: "Follow up later" }
-] as const;
-
 function EmptyStatePanel({
   title,
   message
@@ -482,21 +474,6 @@ export function FollowupsTable({
     outcomeSelectRef.current?.focus();
   }, [editingVisitorId]);
 
-  function handleOutcomeEditorKeyDown(
-    event: ReactKeyboardEvent<HTMLSelectElement | HTMLTextAreaElement>,
-    visitorId: string
-  ) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onCancelOutcomeEdit();
-      return;
-    }
-
-    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-      event.preventDefault();
-      void onSaveOutcome(visitorId);
-    }
-  }
 
   if (items.length === 0) {
     const hasFilters =
@@ -738,6 +715,8 @@ export function FollowupsTable({
     </div>
   );
 }
+
+
 
 
 

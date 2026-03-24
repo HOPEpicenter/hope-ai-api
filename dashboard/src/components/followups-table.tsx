@@ -4,7 +4,7 @@ import { FollowupUnassignButton } from "@/components/followup-unassign-button";
 import { FollowupContactButton } from "@/components/followup-contact-button";
 import { FollowupRowActionGroup, FollowupRowActionSurface } from "@/components/followup-row-action-ui";
 import { FollowupOutcomeRowActions } from "@/components/followup-outcome-row-actions";
-import { useEffect, useRef, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { FollowupItem } from "@/lib/contracts/followups";
 import { CopyButton } from "@/components/copy-button";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
@@ -96,15 +96,21 @@ function AgingBadge({
   assignedAt,
   needsFollowup,
   ageFilter,
-  onAgeSelect
+  onAgeSelect,
+  hydrated
 }: {
   assignedAt: string | null | undefined;
   needsFollowup: boolean;
   ageFilter: string;
   onAgeSelect: (value: "24h+" | "48h+" | "72h+") => void;
+  hydrated: boolean;
 }) {
   if (!needsFollowup) {
     return null;
+  }
+
+  if (!hydrated) {
+    return <span style={{ color: "#6b7280" }}>-</span>;
   }
 
   const hours = getFollowupAgeHours(assignedAt);
@@ -268,11 +274,13 @@ function StageBadge({
 function LastAssignedButton({
   value,
   sort,
-  onSortSelect
+  onSortSelect,
+  hydrated
 }: {
   value: string | null | undefined;
   sort: "oldest-assigned" | "newest-assigned" | "last-contact";
   onSortSelect: (value: "oldest-assigned" | "newest-assigned" | "last-contact") => void;
+  hydrated: boolean;
 }) {
   if (!value) {
     return <span style={{ color: "#6b7280" }}>Not assigned</span>;
@@ -298,7 +306,7 @@ function LastAssignedButton({
         cursor: "pointer"
       }}
     >
-      {formatRelativeTime(value)} · {modeLabel}
+      {(hydrated ? formatRelativeTime(value) : formatAbsoluteTime(value))} · {modeLabel}
     </button>
   );
 }
@@ -306,11 +314,13 @@ function LastAssignedButton({
 function LastContactButton({
   value,
   sort,
-  onSortSelect
+  onSortSelect,
+  hydrated
 }: {
   value: string | null | undefined;
   sort: "oldest-assigned" | "newest-assigned" | "last-contact";
   onSortSelect: (value: "oldest-assigned" | "newest-assigned" | "last-contact") => void;
+  hydrated: boolean;
 }) {
   if (!value) {
     return <span style={{ color: "#6b7280" }}>Never contacted</span>;
@@ -332,7 +342,7 @@ function LastContactButton({
         cursor: "pointer"
       }}
     >
-      {formatRelativeTime(value)}
+      {hydrated ? formatRelativeTime(value) : formatAbsoluteTime(value)}
     </button>
   );
 }
@@ -385,7 +395,8 @@ function formatOutcomeLabel(value: string | null | undefined) {
 
 function renderOutcomeCell(
   outcome: string | null | undefined,
-  outcomeAt: string | null | undefined
+  outcomeAt: string | null | undefined,
+  hydrated: boolean
 ) {
   if (!outcome) {
     return <span style={{ color: "#6b7280" }}>No recorded outcome</span>;
@@ -399,7 +410,7 @@ function renderOutcomeCell(
           title={formatAbsoluteTime(outcomeAt)}
           style={{ color: "#6b7280", fontSize: 12 }}
         >
-          {formatRelativeTime(outcomeAt)}
+          {hydrated ? formatRelativeTime(outcomeAt) : formatAbsoluteTime(outcomeAt)}
         </span>
       ) : null}
     </span>
@@ -460,6 +471,11 @@ export function FollowupsTable({
   onQuickOutcome: (visitorId: string, outcome: string) => void;
 }) {
   const outcomeSelectRef = useRef<HTMLSelectElement | null>(null);
+  const hydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   useEffect(() => {
     if (!editingVisitorId) return;
@@ -604,6 +620,7 @@ export function FollowupsTable({
                     needsFollowup={item.needsFollowup}
                     ageFilter={ageFilter}
                     onAgeSelect={onAgeSelect}
+                    hydrated={hydrated}
                   />
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
@@ -611,6 +628,7 @@ export function FollowupsTable({
                     value={item.lastFollowupAssignedAt}
                     sort={sort}
                     onSortSelect={onSortSelect}
+                    hydrated={hydrated}
                   />
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
@@ -618,6 +636,7 @@ export function FollowupsTable({
                     value={item.lastFollowupContactedAt}
                     sort={sort}
                     onSortSelect={onSortSelect}
+                    hydrated={hydrated}
                   />
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
@@ -640,7 +659,7 @@ export function FollowupsTable({
                         cursor: "pointer"
                       }}
                     >
-                      {renderOutcomeCell(item.lastFollowupOutcome, item.lastFollowupOutcomeAt)}
+                      {renderOutcomeCell(item.lastFollowupOutcome, item.lastFollowupOutcomeAt, hydrated)}
                     </button>
                   ) : (
                     <div style={{ color: "#6b7280" }}>No outcome</div>
@@ -719,5 +738,7 @@ export function FollowupsTable({
     </div>
   );
 }
+
+
 
 

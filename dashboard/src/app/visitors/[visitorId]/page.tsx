@@ -7,17 +7,22 @@ import { MarkContactedForm } from "@/components/mark-contacted-form";
 import { FollowupUnassignButton } from "@/components/followup-unassign-button";
 import { CopyButton } from "@/components/copy-button";
 import { StageBadge } from "@/components/stage-badge";
+import { NextVisitorLink } from "@/components/next-visitor-link";
 import { getVisitorDetail } from "@/lib/loaders/get-visitor-detail";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
 
 function SuccessBanner({
   message,
   backHref,
-  nextHref
+  nextHref,
+  visitorId,
+  preset
 }: {
   message: string;
   backHref: string | null;
   nextHref: string | null;
+  visitorId: string;
+  preset: string | null | undefined;
 }) {
   return (
     <div
@@ -49,16 +54,23 @@ function SuccessBanner({
           ) : null}
 
           {nextHref ? (
-            <Link
-              href={nextHref}
-              style={{
-                color: "#065f46",
-                textDecoration: "underline",
-                fontWeight: 700
-              }}
-            >
-              Next visitor
-            </Link>
+            preset ? (
+              <NextVisitorLink
+                visitorId={visitorId}
+                preset={preset}
+              />
+            ) : (
+              <Link
+                href={nextHref}
+                style={{
+                  color: "#065f46",
+                  textDecoration: "underline",
+                  fontWeight: 700
+                }}
+              >
+                Next visitor
+              </Link>
+            )
           ) : null}
         </div>
       ) : null}
@@ -946,6 +958,8 @@ export default async function VisitorDetailPage({
           message={`Followup assigned${assigneeId ? ` to ${assigneeId}` : ""}.`}
           backHref={queueHref}
           nextHref={queueHref}
+          visitorId={visitorId}
+          preset={preset}
         />
       ) : null}
 
@@ -954,6 +968,8 @@ export default async function VisitorDetailPage({
           message="Followup contact recorded."
           backHref={queueHref}
           nextHref={queueHref}
+          visitorId={visitorId}
+          preset={preset}
         />
       ) : null}
 
@@ -962,6 +978,8 @@ export default async function VisitorDetailPage({
           message="Followup outcome recorded successfully."
           backHref={queueHref}
           nextHref={queueHref}
+          visitorId={visitorId}
+          preset={preset}
         />
       ) : null}
 
@@ -1193,5 +1211,4 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
-
 

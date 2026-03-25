@@ -17,6 +17,7 @@
 - ✅ **#412**: visitor detail success banners now expose a `Next visitor` CTA for preset-driven flows.
 - ✅ **#413**: `Next visitor` now navigates directly to the next visitor inside the same preset queue with queue fallback when needed.
 - ✅ **#414**: production deploy workflow now uses `Azure/functions-action@v1.5.3`.
+- ✅ **#416**: visitors-table actions column alignment was polished so inline outcome editing stays readable and left-aligned.
 
 **Why this matters (master plan alignment)**
 - Continues post-v1 dashboard usability work as tightly scoped, production-safe operator-speed slices.
@@ -27,6 +28,8 @@
 **Verification**
 - ✅ CI remained green after merged slices.
 - ✅ Staging deploy remained green after merged slices.
+- ✅ Local operator validation passed for queue continuity, next-visitor flow, fallback behavior, no-preset regression, and dashboard smoke routes.
+- ✅ Staging deploy for **#416** initially failed on trigger sync, but rerun completed successfully.
 
 **Next**
 - Treat the dashboard v1.1 operator-flow work as complete for now unless a real blocker appears.
@@ -398,5 +401,4 @@ Planning rule going forward:
 - only add another Formation slice if a real repeated-event/profile-invariant gap is found
 - only add another Integration slice if a real consumer/blocker requires it
 - otherwise treat the current Phase 3/4 surface as closed for now
-
 

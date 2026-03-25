@@ -16,9 +16,12 @@
 - ✅ Merged **#412**: added a `Next visitor` CTA to visitor detail success banners for preset-driven flows.
 - ✅ Merged **#413**: made `Next visitor` navigate directly to the next visitor within the same preset queue, with queue fallback when needed.
 - ✅ Merged **#414**: updated `Azure/functions-action` from `v1.5.1` to `v1.5.3`.
+- ✅ Merged **#416**: aligned the visitors-table actions column so inline outcome editing stays readable and left-aligned.
 
 - ✅ Verified CI green after merged slices.
 - ✅ Verified staging deploy green after merged slices.
+- ✅ Verified local operator validation passed for waiting-assignment queue flow, last-item fallback, no-preset regression, and dashboard smoke routes.
+- ✅ Verified staging deploy rerun passed after a transient trigger-sync failure on **#416**.
 
 ### Dashboard v1.1 operator-flow note
 

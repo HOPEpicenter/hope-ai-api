@@ -13,6 +13,9 @@
 - [x] Merged **#408**: visitors preset context is preserved from list to detail and back.
 - [x] Merged **#409**: visitor detail assign/contact/outcome flows now preserve preset context after action.
 - [x] Merged **#410**: visitor detail success banners now include a back-to-queue CTA when preset context exists.
+- [x] Merged **#412**: visitor detail success banners now expose a `Next visitor` CTA for preset-driven flows.
+- [x] Merged **#413**: `Next visitor` now navigates directly to the next visitor within the same preset queue, with queue fallback when needed.
+- [x] Merged **#414**: production deploy workflow now uses `Azure/functions-action@v1.5.3`.
 - [x] Verified CI passed after merged slices.
 - [x] Verified staging deploy passed after merged slices.
 ## Session Closeout
@@ -279,8 +282,11 @@ Post-v1 rule:
 - [x] Visitors-table assignee values now link to ownership presets
 - [x] Visitors preset context is preserved through list -> detail -> back
 - [x] Visitor detail action success flow now provides a back-to-queue CTA
+- [x] Visitor detail success flow now exposes a `Next visitor` CTA for preset-driven work
+- [x] `Next visitor` now navigates directly within the same preset queue with queue fallback
 
 Current rule:
-- [x] Keep future dashboard work scoped to explicit v1.1 usability slices
+- [x] Treat the current dashboard v1.1 operator-flow work as complete unless a real blocker appears
 - [x] Do not widen backend scope unless a real blocker appears
-- [ ] Follow up later on GitHub Actions Node 20 deprecation warning in deploy workflows
+- [ ] Follow up later on `azure/login@v2` GitHub Actions Node 20 deprecation warning in deploy workflows
+

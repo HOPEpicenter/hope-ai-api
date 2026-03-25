@@ -14,16 +14,24 @@
 - ✅ **#408**: visitors list → detail flow now preserves preset context, and detail back-link returns to the same preset.
 - ✅ **#409**: assign / contact / outcome detail flows now preserve preset context after action.
 - ✅ **#410**: visitor detail success banners now include a back-to-queue CTA when opened from a preset queue.
+- ✅ **#412**: visitor detail success banners now expose a `Next visitor` CTA for preset-driven flows.
+- ✅ **#413**: `Next visitor` now navigates directly to the next visitor inside the same preset queue with queue fallback when needed.
+- ✅ **#414**: production deploy workflow now uses `Azure/functions-action@v1.5.3`.
 
 **Why this matters (master plan alignment)**
 - Continues post-v1 dashboard usability work as tightly scoped, production-safe operator-speed slices.
 - Improves queue processing without widening backend/API scope.
 - Tightens the list → detail → action → return loop so operators can stay in the same working queue.
+- Keeps deploy/workflow maintenance separate from dashboard product scope.
+
+**Verification**
+- ✅ CI remained green after merged slices.
+- ✅ Staging deploy remained green after merged slices.
 
 **Next**
-- Keep dashboard work limited to explicit v1.1 usability slices only.
+- Treat the dashboard v1.1 operator-flow work as complete for now unless a real blocker appears.
 - Do not reopen backend scope unless a real workflow blocker appears.
-- Track deploy maintenance separately: GitHub Actions Node 20 deprecation warning still needs a future workflow/tooling pass.
+- Track deploy maintenance separately: `azure/login@v2` still surfaces the GitHub Actions Node 20 deprecation warning and remains a follow-up workflow/tooling item.
 ## 2026-03-14 Update
 
 **What landed**
@@ -390,4 +398,5 @@ Planning rule going forward:
 - only add another Formation slice if a real repeated-event/profile-invariant gap is found
 - only add another Integration slice if a real consumer/blocker requires it
 - otherwise treat the current Phase 3/4 surface as closed for now
+
 

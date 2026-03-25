@@ -106,20 +106,25 @@ function AttentionBadge({ state }: { state: VisitorsTableItem["attentionState"] 
   const background = state === "Needs attention" ? "#fee2e2" : "#e0f2fe";
   const color = state === "Needs attention" ? "#991b1b" : "#0c4a6e";
 
+  const badgeStyle = {
+    display: "inline-block",
+    padding: "4px 8px",
+    borderRadius: 9999,
+    fontSize: 12,
+    fontWeight: 600,
+    background,
+    color,
+    textDecoration: "none"
+  } as const;
+
+  if (state !== "Needs attention") {
+    return <span style={badgeStyle}>{state}</span>;
+  }
+
   return (
-    <span
-      style={{
-        display: "inline-block",
-        padding: "4px 8px",
-        borderRadius: 9999,
-        fontSize: 12,
-        fontWeight: 600,
-        background,
-        color
-      }}
-    >
+    <Link href="/visitors?preset=needs-attention" style={badgeStyle}>
       {state}
-    </span>
+    </Link>
   );
 }
 

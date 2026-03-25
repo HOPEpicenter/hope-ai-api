@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AssignFollowupForm } from "@/components/assign-followup-form";
+import { FollowupAssignButton } from "@/components/followup-assign-button";
 import { FollowupOutcomeForm } from "@/components/followup-outcome-form";
 import { MarkContactedForm } from "@/components/mark-contacted-form";
 import { FollowupUnassignButton } from "@/components/followup-unassign-button";
@@ -348,6 +349,24 @@ function VisitorHeaderCard({
                 <FollowupUnassignButton
                   visitorId={visitorId}
                   assignedToOwnerId={assignedToOwnerId}
+                />
+              </div>
+            </div>
+          ) : followupStatus === "No active followup" ? (
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #e5e7eb",
+                borderRadius: 10,
+                padding: 10
+              }}
+            >
+              <div style={{ display: "grid", gap: 6 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#6b7280" }}>Quick action</div>
+                <FollowupAssignButton
+                  visitorId={visitorId}
+                  assignedToOwnerId={assignedToOwnerId}
+                  needsFollowup
                 />
               </div>
             </div>

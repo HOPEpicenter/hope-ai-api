@@ -649,7 +649,20 @@ export function VisitorsTable({
                     <AttentionBadge state={item.attentionState} />
                   </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
-                    <span>{item.assignedTo ?? "-"}</span>
+                    {item.assignedTo ? (
+                      <Link
+                        href={item.assignedTo === myAssignee ? "/visitors?preset=assigned-to-me" : "/visitors?preset=assigned"}
+                        style={{
+                          color: "#2563eb",
+                          textDecoration: "none",
+                          fontWeight: 600
+                        }}
+                      >
+                        {item.assignedTo}
+                      </Link>
+                    ) : (
+                      <span>-</span>
+                    )}
                   </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

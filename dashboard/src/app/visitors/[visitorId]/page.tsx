@@ -10,6 +10,45 @@ import { StageBadge } from "@/components/stage-badge";
 import { getVisitorDetail } from "@/lib/loaders/get-visitor-detail";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
 
+function SuccessBanner({
+  message,
+  backHref
+}: {
+  message: string;
+  backHref: string | null;
+}) {
+  return (
+    <div
+      style={{
+        background: "#ecfdf5",
+        border: "1px solid #a7f3d0",
+        color: "#065f46",
+        borderRadius: 12,
+        padding: 12,
+        fontWeight: 600,
+        display: "grid",
+        gap: 8
+      }}
+    >
+      <div>{message}</div>
+      {backHref ? (
+        <div>
+          <Link
+            href={backHref}
+            style={{
+              color: "#065f46",
+              textDecoration: "underline",
+              fontWeight: 700
+            }}
+          >
+            Back to queue
+          </Link>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function TimestampValue({ value }: { value: string | null }) {
   if (!value) {
     return <span>-</span>;
@@ -847,6 +886,7 @@ export default async function VisitorDetailPage({
   const attentionState = getAttentionState(followupStatus);
   const lastActivityAt = getLastActivityAt(data);
   const backHref = preset ? `/visitors?preset=${preset}` : "/visitors";
+  const queueHref = preset ? `/visitors?preset=${preset}` : null;
   const nextAction = getNextAction(
     followupStatus,
     data.formationProfile?.assignedTo?.ownerId ?? null
@@ -885,48 +925,24 @@ export default async function VisitorDetailPage({
       ) : null}
 
       {assigned === "1" ? (
-        <div
-          style={{
-            background: "#ecfdf5",
-            border: "1px solid #a7f3d0",
-            color: "#065f46",
-            borderRadius: 12,
-            padding: 12,
-            fontWeight: 600
-          }}
-        >
-          Followup assigned{assigneeId ? ` to ${assigneeId}` : ""}.
-        </div>
+        <SuccessBanner
+          message={`Followup assigned${assigneeId ? ` to ${assigneeId}` : ""}.`}
+          backHref={queueHref}
+        />
       ) : null}
 
       {contacted === "1" ? (
-        <div
-          style={{
-            background: "#ecfdf5",
-            border: "1px solid #a7f3d0",
-            color: "#065f46",
-            borderRadius: 12,
-            padding: 12,
-            fontWeight: 600
-          }}
-        >
-          Followup contact recorded.
-        </div>
+        <SuccessBanner
+          message="Followup contact recorded."
+          backHref={queueHref}
+        />
       ) : null}
 
       {outcomeRecorded === "1" ? (
-        <div
-          style={{
-            background: "#ecfdf5",
-            border: "1px solid #a7f3d0",
-            color: "#065f46",
-            borderRadius: 12,
-            padding: 12,
-            fontWeight: 600
-          }}
-        >
-          Followup outcome recorded successfully.
-        </div>
+        <SuccessBanner
+          message="Followup outcome recorded successfully."
+          backHref={queueHref}
+        />
       ) : null}
 
       <VisitorHeaderCard

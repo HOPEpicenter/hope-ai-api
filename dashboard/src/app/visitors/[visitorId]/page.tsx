@@ -395,33 +395,65 @@ function VisitorHeaderCard({
         <HeaderChip
           label="Attention"
           value={
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                width: "fit-content",
-                padding: "4px 8px",
-                borderRadius: 999,
-                background: attentionState === "Needs attention" ? "#fef3c7" : "#f3f4f6",
-                color: attentionState === "Needs attention" ? "#92400e" : "#374151",
-                border: attentionState === "Needs attention" ? "1px solid #fcd34d" : "1px solid #d1d5db",
-                fontSize: 12,
-                fontWeight: 700
-              }}
-            >
-              <span
-                aria-hidden="true"
+            attentionState === "Needs attention" ? (
+              <Link
+                href="#action-zone"
                 style={{
-                  width: 8,
-                  height: 8,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  width: "fit-content",
+                  padding: "4px 8px",
                   borderRadius: 999,
-                  background: attentionState === "Needs attention" ? "#f59e0b" : "#9ca3af",
-                  display: "inline-block"
+                  background: "#fef3c7",
+                  color: "#92400e",
+                  border: "1px solid #fcd34d",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  textDecoration: "none"
                 }}
-              />
-              {attentionState}
-            </span>
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 999,
+                    background: "#f59e0b",
+                    display: "inline-block"
+                  }}
+                />
+                {attentionState}
+              </Link>
+            ) : (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  width: "fit-content",
+                  padding: "4px 8px",
+                  borderRadius: 999,
+                  background: "#f3f4f6",
+                  color: "#374151",
+                  border: "1px solid #d1d5db",
+                  fontSize: 12,
+                  fontWeight: 700
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 999,
+                    background: "#9ca3af",
+                    display: "inline-block"
+                  }}
+                />
+                {attentionState}
+              </span>
+            )
           }
         />
         <HeaderChip label="Assigned To" value={assignedToOwnerId ?? "-"} />
@@ -913,13 +945,15 @@ export default async function VisitorDetailPage({
       <EventTimelineCard events={data.formationEvents} />
 
       <div
+        id="action-zone"
         style={{
           background: "#fff",
           border: "1px solid #e5e7eb",
           borderRadius: 12,
           padding: 20,
           display: "grid",
-          gap: 16
+          gap: 16,
+          scrollMarginTop: 24
         }}
       >
         <div style={{ display: "grid", gap: 4 }}>

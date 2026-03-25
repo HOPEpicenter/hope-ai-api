@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { AssignFollowupForm } from "@/components/assign-followup-form";
 import { FollowupOutcomeForm } from "@/components/followup-outcome-form";
 import { MarkContactedForm } from "@/components/mark-contacted-form";
+import { FollowupUnassignButton } from "@/components/followup-unassign-button";
 import { CopyButton } from "@/components/copy-button";
 import { StageBadge } from "@/components/stage-badge";
 import { getVisitorDetail } from "@/lib/loaders/get-visitor-detail";
@@ -316,20 +317,41 @@ function VisitorHeaderCard({
           </div>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            flexWrap: "wrap",
-            padding: "8px 10px",
-            borderRadius: 10,
-            background: "#f9fafb",
-            border: "1px solid #e5e7eb"
-          }}
-        >
-          <span style={{ fontFamily: "monospace", color: "#111827" }}>{visitorId}</span>
-          <CopyButton value={visitorId} label="Copy ID" />
+        <div style={{ display: "grid", gap: 8, justifyItems: "end" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+              padding: "8px 10px",
+              borderRadius: 10,
+              background: "#f9fafb",
+              border: "1px solid #e5e7eb"
+            }}
+          >
+            <span style={{ fontFamily: "monospace", color: "#111827" }}>{visitorId}</span>
+            <CopyButton value={visitorId} label="Copy ID" />
+          </div>
+
+          {followupStatus === "Assigned" && assignedToOwnerId ? (
+            <div
+              style={{
+                background: "#fff",
+                border: "1px solid #e5e7eb",
+                borderRadius: 10,
+                padding: 10
+              }}
+            >
+              <div style={{ display: "grid", gap: 6 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#6b7280" }}>Quick action</div>
+                <FollowupUnassignButton
+                  visitorId={visitorId}
+                  assignedToOwnerId={assignedToOwnerId}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 

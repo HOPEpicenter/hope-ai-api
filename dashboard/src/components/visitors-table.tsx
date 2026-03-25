@@ -637,7 +637,10 @@ export function VisitorsTable({
               return (
                 <tr key={item.visitorId} style={rowStyle}>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
-                    <Link href={`/visitors/${item.visitorId}`} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
+                    <Link
+                      href={preset === "all" ? `/visitors/${item.visitorId}` : `/visitors/${item.visitorId}?preset=${preset}`}
+                      style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}
+                    >
                       {item.name}
                     </Link>
                   </td>

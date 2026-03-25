@@ -265,7 +265,8 @@ function VisitorHeaderCard({
   followupStatus,
   assignedToOwnerId,
   lastActivityAt,
-  attentionState
+  attentionState,
+  backHref
 }: {
   visitorId: string;
   name: string;
@@ -275,6 +276,7 @@ function VisitorHeaderCard({
   assignedToOwnerId: string | null | undefined;
   lastActivityAt: string | null;
   attentionState: "Needs attention" | "Clear";
+  backHref: string;
 }) {
   const statusBackground =
     followupStatus === "Resolved"
@@ -298,7 +300,7 @@ function VisitorHeaderCard({
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "start" }}>
         <div style={{ display: "grid", gap: 8 }}>
-          <Link href="/visitors" style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
+          <Link href={backHref} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
             ← Back to Visitors
           </Link>
 
@@ -828,14 +830,23 @@ export default async function VisitorDetailPage({
   searchParams
 }: {
   params: Promise<{ visitorId: string }>;
-  searchParams: Promise<{ created?: string; existing?: string; assigned?: string; assigneeId?: string; contacted?: string; outcomeRecorded?: string }>;
+  searchParams: Promise<{
+    preset?: string;
+    created?: string;
+    existing?: string;
+    assigned?: string;
+    assigneeId?: string;
+    contacted?: string;
+    outcomeRecorded?: string;
+  }>;
 }) {
   const { visitorId } = await params;
-  const { created, existing, assigned, assigneeId, contacted, outcomeRecorded } = await searchParams;
+  const { preset, created, existing, assigned, assigneeId, contacted, outcomeRecorded } = await searchParams;
   const data = await getVisitorDetail(visitorId);
   const followupStatus = getFollowupStatus(data.formationProfile);
   const attentionState = getAttentionState(followupStatus);
   const lastActivityAt = getLastActivityAt(data);
+  const backHref = preset ? `/visitors?preset=${preset}` : "/visitors";
   const nextAction = getNextAction(
     followupStatus,
     data.formationProfile?.assignedTo?.ownerId ?? null
@@ -927,6 +938,7 @@ export default async function VisitorDetailPage({
         assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null}
         lastActivityAt={lastActivityAt}
         attentionState={attentionState}
+        backHref={backHref}
       />
 
       <OutcomeSummaryCard

@@ -90,6 +90,12 @@ function getFollowupStatus(profile: {
   return "No active followup";
 }
 
+function getAttentionState(followupStatus: string) {
+  return followupStatus === "No active followup" || followupStatus === "Assigned"
+    ? "Needs attention"
+    : "Clear";
+}
+
 function getLastActivityAt(data: {
   visitor: { updatedAt: string | null };
   formationProfile: {
@@ -258,7 +264,8 @@ function VisitorHeaderCard({
   stage,
   followupStatus,
   assignedToOwnerId,
-  lastActivityAt
+  lastActivityAt,
+  attentionState
 }: {
   visitorId: string;
   name: string;
@@ -267,6 +274,7 @@ function VisitorHeaderCard({
   followupStatus: string;
   assignedToOwnerId: string | null | undefined;
   lastActivityAt: string | null;
+  attentionState: "Needs attention" | "Clear";
 }) {
   const statusBackground =
     followupStatus === "Resolved"
@@ -377,13 +385,45 @@ function VisitorHeaderCard({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+          gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
           gap: 12
         }}
       >
         <HeaderChip label="Email" value={email ?? "-"} />
         <HeaderChip label="Stage" value={<StageBadge stage={stage ?? null} />} />
         <HeaderChip label="Followup" value={followupStatus} />
+        <HeaderChip
+          label="Attention"
+          value={
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                width: "fit-content",
+                padding: "4px 8px",
+                borderRadius: 999,
+                background: attentionState === "Needs attention" ? "#fef3c7" : "#f3f4f6",
+                color: attentionState === "Needs attention" ? "#92400e" : "#374151",
+                border: attentionState === "Needs attention" ? "1px solid #fcd34d" : "1px solid #d1d5db",
+                fontSize: 12,
+                fontWeight: 700
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 999,
+                  background: attentionState === "Needs attention" ? "#f59e0b" : "#9ca3af",
+                  display: "inline-block"
+                }}
+              />
+              {attentionState}
+            </span>
+          }
+        />
         <HeaderChip label="Assigned To" value={assignedToOwnerId ?? "-"} />
         <HeaderChip
           label="Last Activity"
@@ -762,6 +802,7 @@ export default async function VisitorDetailPage({
   const { created, existing, assigned, assigneeId, contacted, outcomeRecorded } = await searchParams;
   const data = await getVisitorDetail(visitorId);
   const followupStatus = getFollowupStatus(data.formationProfile);
+  const attentionState = getAttentionState(followupStatus);
   const lastActivityAt = getLastActivityAt(data);
   const nextAction = getNextAction(
     followupStatus,
@@ -853,6 +894,7 @@ export default async function VisitorDetailPage({
         followupStatus={followupStatus}
         assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null}
         lastActivityAt={lastActivityAt}
+        attentionState={attentionState}
       />
 
       <OutcomeSummaryCard

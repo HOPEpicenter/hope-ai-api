@@ -598,8 +598,8 @@ export function VisitorsTable({
         </div>
       ) : null}
 
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
           <thead>
             <tr>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Name</th>
@@ -609,7 +609,7 @@ export function VisitorsTable({
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Assigned To</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Visitor ID</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Activity</th>
-              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Actions</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 320 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -636,7 +636,7 @@ export function VisitorsTable({
 
               return (
                 <tr key={item.visitorId} style={rowStyle}>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
                     <Link
                       href={preset === "all" ? `/visitors/${item.visitorId}` : `/visitors/${item.visitorId}?preset=${preset}`}
                       style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}
@@ -644,14 +644,14 @@ export function VisitorsTable({
                       {item.name}
                     </Link>
                   </td>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>{item.email ?? "-"}</td>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>{item.email ?? "-"}</td>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
                     <FollowupStateBadge state={item.followupState} />
                   </td>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
                     <AttentionBadge state={item.attentionState} />
                   </td>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
                     {item.assignedTo ? (
                       <Link
                         href={item.assignedTo === myAssignee ? "/visitors?preset=assigned-to-me" : "/visitors?preset=assigned"}
@@ -667,7 +667,7 @@ export function VisitorsTable({
                       <span>-</span>
                     )}
                   </td>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ fontFamily: "monospace" }}>{item.visitorId}</span>
                       <CopyButton value={item.visitorId} label="Copy" />
@@ -679,7 +679,7 @@ export function VisitorsTable({
                   >
                     {formatRelativeTime(item.updatedAt)}
                   </td>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
                     {canAssignToMe ? (
                       <button
                         type="button"
@@ -720,7 +720,7 @@ export function VisitorsTable({
                       </button>
                     ) : canSetOutcome ? (
                       isEditingOutcome ? (
-                        <div style={{ display: "grid", gap: 8, minWidth: 240 }}>
+                        <div style={{ display: "grid", gap: 8, width: "100%", maxWidth: 280, justifyItems: "start" }}>
                           <select
                             value={draftOutcome}
                             onChange={(event) => setDraftOutcome(event.target.value)}
@@ -824,3 +824,4 @@ export function VisitorsTable({
     </div>
   );
 }
+

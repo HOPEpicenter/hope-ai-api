@@ -12,10 +12,12 @@ import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-ti
 
 function SuccessBanner({
   message,
-  backHref
+  backHref,
+  nextHref
 }: {
   message: string;
   backHref: string | null;
+  nextHref: string | null;
 }) {
   return (
     <div
@@ -31,18 +33,33 @@ function SuccessBanner({
       }}
     >
       <div>{message}</div>
-      {backHref ? (
-        <div>
-          <Link
-            href={backHref}
-            style={{
-              color: "#065f46",
-              textDecoration: "underline",
-              fontWeight: 700
-            }}
-          >
-            Back to queue
-          </Link>
+      {backHref || nextHref ? (
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          {backHref ? (
+            <Link
+              href={backHref}
+              style={{
+                color: "#065f46",
+                textDecoration: "underline",
+                fontWeight: 700
+              }}
+            >
+              Back to queue
+            </Link>
+          ) : null}
+
+          {nextHref ? (
+            <Link
+              href={nextHref}
+              style={{
+                color: "#065f46",
+                textDecoration: "underline",
+                fontWeight: 700
+              }}
+            >
+              Next visitor
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -928,6 +945,7 @@ export default async function VisitorDetailPage({
         <SuccessBanner
           message={`Followup assigned${assigneeId ? ` to ${assigneeId}` : ""}.`}
           backHref={queueHref}
+          nextHref={queueHref}
         />
       ) : null}
 
@@ -935,6 +953,7 @@ export default async function VisitorDetailPage({
         <SuccessBanner
           message="Followup contact recorded."
           backHref={queueHref}
+          nextHref={queueHref}
         />
       ) : null}
 
@@ -942,6 +961,7 @@ export default async function VisitorDetailPage({
         <SuccessBanner
           message="Followup outcome recorded successfully."
           backHref={queueHref}
+          nextHref={queueHref}
         />
       ) : null}
 
@@ -1173,4 +1193,5 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 

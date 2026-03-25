@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 const OUTCOME_OPTIONS = [
   { value: "CONNECTED", label: "Connected" },
@@ -18,6 +18,8 @@ type Props = {
 
 export function FollowupOutcomeForm({ visitorId, lastFollowupOutcomeAt }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [outcome, setOutcome] = useState<string>(OUTCOME_OPTIONS[0].value);
   const [note, setNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,7 +58,9 @@ export function FollowupOutcomeForm({ visitorId, lastFollowupOutcomeAt }: Props)
         throw new Error(data.error || `POST /api/dashboard/followups/outcome failed with status ${response.status}`);
       }
 
-      router.push(`/visitors/${visitorId}?outcomeRecorded=1`);
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set("outcomeRecorded", "1");
+      router.push(`${pathname}?${nextParams.toString()}`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record followup outcome.");

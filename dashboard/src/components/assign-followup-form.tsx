@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type AssignFollowupResponse = {
   ok?: boolean;
@@ -18,6 +18,8 @@ export function AssignFollowupForm({
   assignedToOwnerId?: string | null;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [assigneeId, setAssigneeId] = useState("ops-user-1");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUnassigning, setIsUnassigning] = useState(false);
@@ -50,7 +52,10 @@ export function AssignFollowupForm({
         throw new Error(data.error || `POST /api/dashboard/followups/assign failed with status ${response.status}`);
       }
 
-      router.push(`/visitors/${visitorId}?assigned=1&assigneeId=${encodeURIComponent(assigneeId)}`);
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set("assigned", "1");
+      nextParams.set("assigneeId", assigneeId);
+      router.push(`${pathname}?${nextParams.toString()}`);
       router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to assign followup.";

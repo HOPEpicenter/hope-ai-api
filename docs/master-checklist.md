@@ -16,8 +16,11 @@
 - [x] Merged **#412**: visitor detail success banners now expose a `Next visitor` CTA for preset-driven flows.
 - [x] Merged **#413**: `Next visitor` now navigates directly to the next visitor within the same preset queue, with queue fallback when needed.
 - [x] Merged **#414**: production deploy workflow now uses `Azure/functions-action@v1.5.3`.
+- [x] Merged **#416**: visitors-table actions column alignment was polished for inline outcome editing.
 - [x] Verified CI passed after merged slices.
 - [x] Verified staging deploy passed after merged slices.
+- [x] Verified local operator validation passed for queue flow, fallback behavior, no-preset regression, and dashboard smoke routes.
+- [x] Verified staging rerun passed after a transient trigger-sync failure on **#416**.
 ## Session Closeout
 
 ### 2026-03-14 (Session Closeout)
@@ -284,6 +287,7 @@ Post-v1 rule:
 - [x] Visitor detail action success flow now provides a back-to-queue CTA
 - [x] Visitor detail success flow now exposes a `Next visitor` CTA for preset-driven work
 - [x] `Next visitor` now navigates directly within the same preset queue with queue fallback
+- [x] Visitors-table actions column alignment now supports cleaner inline outcome editing
 
 Current rule:
 - [x] Treat the current dashboard v1.1 operator-flow work as complete unless a real blocker appears

@@ -1,3 +1,31 @@
+## 2026-03-25
+
+- ✅ Merged **#398**: emphasized the next operator action on visitor detail based on followup state.
+- ✅ Merged **#399**: surfaced assignee in the visitor detail header.
+- ✅ Merged **#400**: simplified the resolved visitor action zone with a passive closed-state summary.
+- ✅ Merged **#401**: surfaced last activity in the visitor detail header.
+- ✅ Merged **#402**: added a header-level unassign quick action on visitor detail.
+- ✅ Merged **#403**: added a header-level assign-to-me quick action on visitor detail.
+- ✅ Merged **#404**: surfaced needs-attention state in the visitor detail header.
+- ✅ Merged **#405**: linked the visitor detail attention chip to the action zone.
+- ✅ Merged **#406**: linked the visitors-table needs-attention badge to the needs-attention preset.
+- ✅ Merged **#407**: linked visitors-table assignee values to ownership presets.
+- ✅ Merged **#408**: preserved visitors preset context in the detail flow.
+- ✅ Merged **#409**: preserved preset context after assign/contact/outcome actions on visitor detail.
+- ✅ Merged **#410**: added a back-to-queue CTA on visitor detail success banners when a preset is present.
+
+- ✅ Verified CI green after merged slices.
+- ✅ Verified staging deploy green after merged slices.
+
+### Dashboard v1.1 operator-flow note
+
+These post-v1 slices improved the dashboard’s operator workflow without widening backend scope:
+
+- visitor detail now surfaces ownership, freshness, attention state, and state-aware quick actions in the header
+- visitor detail action flow now emphasizes the next action and de-noises resolved records
+- list/detail navigation now preserves queue context
+- attention and ownership signals now act as direct navigation shortcuts
+- success flows now provide a direct path back to the active queue
 ## 2026-03-14
 
 - ✅ Merged **#330**: staging deploy switched from config-zip to `func azure functionapp publish --no-build`.

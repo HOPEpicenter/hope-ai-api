@@ -1,3 +1,29 @@
+## 2026-03-25 Update
+
+**What landed**
+- ✅ **#398**: visitor detail now emphasizes the next operator action based on followup state.
+- ✅ **#399**: visitor detail header now surfaces assignee instead of duplicating visitor ID.
+- ✅ **#400**: resolved visitor action zone now de-noises secondary actions and shows a closed-state summary.
+- ✅ **#401**: visitor detail header now surfaces last activity.
+- ✅ **#402**: visitor detail header now exposes an unassign quick action for assigned followups.
+- ✅ **#403**: visitor detail header now exposes an assign-to-me quick action for waiting-assignment visitors.
+- ✅ **#404**: visitor detail header now surfaces needs-attention state.
+- ✅ **#405**: visitor detail attention chip now links directly to the action zone when attention is needed.
+- ✅ **#406**: visitors-table needs-attention badge now links to the existing needs-attention preset.
+- ✅ **#407**: visitors-table assignee cell now links to ownership presets.
+- ✅ **#408**: visitors list → detail flow now preserves preset context, and detail back-link returns to the same preset.
+- ✅ **#409**: assign / contact / outcome detail flows now preserve preset context after action.
+- ✅ **#410**: visitor detail success banners now include a back-to-queue CTA when opened from a preset queue.
+
+**Why this matters (master plan alignment)**
+- Continues post-v1 dashboard usability work as tightly scoped, production-safe operator-speed slices.
+- Improves queue processing without widening backend/API scope.
+- Tightens the list → detail → action → return loop so operators can stay in the same working queue.
+
+**Next**
+- Keep dashboard work limited to explicit v1.1 usability slices only.
+- Do not reopen backend scope unless a real workflow blocker appears.
+- Track deploy maintenance separately: GitHub Actions Node 20 deprecation warning still needs a future workflow/tooling pass.
 ## 2026-03-14 Update
 
 **What landed**
@@ -364,3 +390,4 @@ Planning rule going forward:
 - only add another Formation slice if a real repeated-event/profile-invariant gap is found
 - only add another Integration slice if a real consumer/blocker requires it
 - otherwise treat the current Phase 3/4 surface as closed for now
+

@@ -1,3 +1,20 @@
+### 2026-03-25 (Session Closeout)
+
+- [x] Merged **#398**: visitor detail now emphasizes the next operator action.
+- [x] Merged **#399**: visitor detail header now surfaces assignee.
+- [x] Merged **#400**: resolved visitor action zone now shows a closed-state summary instead of noisy secondary actions.
+- [x] Merged **#401**: visitor detail header now surfaces last activity.
+- [x] Merged **#402**: visitor detail header now supports unassign quick action.
+- [x] Merged **#403**: visitor detail header now supports assign-to-me quick action.
+- [x] Merged **#404**: visitor detail header now surfaces needs-attention state.
+- [x] Merged **#405**: visitor detail needs-attention chip now links to the action zone.
+- [x] Merged **#406**: visitors-table needs-attention badge now links to the needs-attention preset.
+- [x] Merged **#407**: visitors-table assignee values now link to ownership presets.
+- [x] Merged **#408**: visitors preset context is preserved from list to detail and back.
+- [x] Merged **#409**: visitor detail assign/contact/outcome flows now preserve preset context after action.
+- [x] Merged **#410**: visitor detail success banners now include a back-to-queue CTA when preset context exists.
+- [x] Verified CI passed after merged slices.
+- [x] Verified staging deploy passed after merged slices.
 ## Session Closeout
 
 ### 2026-03-14 (Session Closeout)
@@ -251,3 +268,19 @@ Post-v1 rule:
 - [x] CI green on main
 - [x] Staging deploy green on main
 - [x] Current Phase 3/4 surface treated as closed unless a real blocker appears
+
+## Dashboard v1.1 operator-flow slices - 2026-03-25
+
+- [x] Visitor detail next-action emphasis shipped
+- [x] Visitor detail header ownership/freshness/attention signals shipped
+- [x] Visitor detail header assign/unassign quick actions shipped
+- [x] Visitor detail attention chip now links to action zone
+- [x] Visitors-table needs-attention badge now links to the needs-attention preset
+- [x] Visitors-table assignee values now link to ownership presets
+- [x] Visitors preset context is preserved through list -> detail -> back
+- [x] Visitor detail action success flow now provides a back-to-queue CTA
+
+Current rule:
+- [x] Keep future dashboard work scoped to explicit v1.1 usability slices
+- [x] Do not widen backend scope unless a real blocker appears
+- [ ] Follow up later on GitHub Actions Node 20 deprecation warning in deploy workflows

@@ -13,6 +13,9 @@
 - ✅ Merged **#408**: preserved visitors preset context in the detail flow.
 - ✅ Merged **#409**: preserved preset context after assign/contact/outcome actions on visitor detail.
 - ✅ Merged **#410**: added a back-to-queue CTA on visitor detail success banners when a preset is present.
+- ✅ Merged **#412**: added a `Next visitor` CTA to visitor detail success banners for preset-driven flows.
+- ✅ Merged **#413**: made `Next visitor` navigate directly to the next visitor within the same preset queue, with queue fallback when needed.
+- ✅ Merged **#414**: updated `Azure/functions-action` from `v1.5.1` to `v1.5.3`.
 
 - ✅ Verified CI green after merged slices.
 - ✅ Verified staging deploy green after merged slices.
@@ -25,7 +28,13 @@ These post-v1 slices improved the dashboard’s operator workflow without wideni
 - visitor detail action flow now emphasizes the next action and de-noises resolved records
 - list/detail navigation now preserves queue context
 - attention and ownership signals now act as direct navigation shortcuts
-- success flows now provide a direct path back to the active queue
+- success flows now provide both queue return and direct next-visitor continuation
+- preset-driven queue work can now continue from one detail record to the next with less operator friction
+
+### Deploy/workflow maintenance note
+
+- staging and CI remained green after the workflow maintenance slice
+- `azure/login@v2` still reports the GitHub Actions Node 20 deprecation warning and remains a tracked follow-up
 ## 2026-03-14
 
 - ✅ Merged **#330**: staging deploy switched from config-zip to `func azure functionapp publish --no-build`.
@@ -168,3 +177,4 @@ Verification:
 - staging deploy green on main
 - no new Formation or Integration code added in this closeout
 - future work should be blocker-driven, not speculative expansion
+

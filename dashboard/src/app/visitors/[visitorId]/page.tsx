@@ -9,6 +9,7 @@ import { CopyButton } from "@/components/copy-button";
 import { StageBadge } from "@/components/stage-badge";
 import { NextVisitorLink } from "@/components/next-visitor-link";
 import { getVisitorDetail } from "@/lib/loaders/get-visitor-detail";
+import { TimelineList } from "@/components/timeline-list";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
 
 function SuccessBanner({
@@ -129,7 +130,16 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
       }}
     >
       <div style={{ color: "#6b7280", fontSize: 13, fontWeight: 600 }}>{label}</div>
-      <div style={{ color: "#111827", minWidth: 0 }}>{value}</div>
+      <div
+        style={{
+          color: "#111827",
+          minWidth: 0,
+          overflowWrap: "anywhere",
+          wordBreak: "break-word"
+        }}
+      >
+        {value}
+      </div>
     </div>
   );
 }
@@ -225,7 +235,17 @@ function HeaderChip({
       }}
     >
       <div style={{ fontSize: 12, fontWeight: 700, color: "#6b7280" }}>{label}</div>
-      <div style={{ color: "#111827", fontWeight: 600, minWidth: 0 }}>{value}</div>
+      <div
+        style={{
+          color: "#111827",
+          fontWeight: 600,
+          minWidth: 0,
+          overflowWrap: "anywhere",
+          wordBreak: "break-word"
+        }}
+      >
+        {value}
+      </div>
     </div>
   );
 }
@@ -455,7 +475,7 @@ function VisitorHeaderCard({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
           gap: 12
         }}
       >
@@ -1010,6 +1030,11 @@ export default async function VisitorDetailPage({
 
       <EventTimelineCard events={data.formationEvents} />
 
+      <div style={{ display: "grid", gap: 12 }}>
+        <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>Engagement Timeline</h2>
+        <TimelineList items={data.engagementTimeline ?? []} />
+      </div>
+
       <div
         id="action-zone"
         style={{
@@ -1211,4 +1236,10 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
+
+
+
+
+
 

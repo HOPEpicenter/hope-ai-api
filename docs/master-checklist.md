@@ -312,3 +312,9 @@ Current rule:
 
 
 
+
+- [x] Add visitor-scoped engagement timeline endpoint (`GET /api/engagements/{visitorId}/timeline`)
+- [x] Add regression coverage for integrated visitor timeline (engagement + formation)
+- [x] Verify CI green after merge
+- [x] Verify staging deploy green after merge
+

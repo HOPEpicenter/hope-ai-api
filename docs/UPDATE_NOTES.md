@@ -210,3 +210,11 @@ Verification:
 - `/visitors` now supports direct visitor ID lookup and cleaner table scanning.
 - Timeline remains intentionally deferred until a real consumer or blocker appears.
 
+
+## 2026-03-26
+
+- Engagement: merged PR #425 to add `GET /api/engagements/{visitorId}/timeline`, exposing a visitor-level integrated timeline backed by existing engagement + formation records.
+- Engagement: merged PR #426 to add `scripts/assert-visitor-engagement-timeline.ps1` and wire it into `scripts/regression.ps1`, locking the new timeline contract with mixed-stream regression coverage.
+- Validation: CI green after merge; staging Azure Functions deploy green after merge.
+- Outcome: Phase 2 Engagement now has a deterministic, visitor-scoped timeline truth surface plus regression protection.
+

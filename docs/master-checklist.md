@@ -1,6 +1,14 @@
 
 ### 2026-03-26 (Session Closeout)
 
+- [x] Merged **#422**: visitors search now supports visitor ID lookup.
+- [x] Merged **#422**: visitors table overflow/layout issue fixed for email, visitor ID, copy action, and last activity.
+- [x] Merged **#423**: overview upgraded into a practical operator triage page.
+- [x] Verified dashboard staging on Vercel for `/overview` and `/visitors`.
+- [x] Confirmed Timeline remains deferred intentionally until a real blocker or consumer appears.
+
+### 2026-03-26 (Session Closeout)
+
 - [x] Merged **#420**: dashboard followups loader now uses `GET /api/formation/profiles?limit=200` instead of `/ops/followups`.
 - [x] Verified dashboard staging works against the API-only Azure Functions host.
 - [x] Verified remote pages load on staging: `/overview`, `/followups`, `/visitors`, `/timeline`.
@@ -301,5 +309,6 @@ Current rule:
 - [x] Treat the current dashboard v1.1 operator-flow work as complete unless a real blocker appears
 - [x] Do not widen backend scope unless a real blocker appears
 - [ ] Follow up later on `azure/login@v2` GitHub Actions Node 20 deprecation warning in deploy workflows
+
 
 

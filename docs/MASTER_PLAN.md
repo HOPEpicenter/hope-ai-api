@@ -163,7 +163,8 @@
 
 **What landed**
 - ✅ OPS followups queue: ensure formation profiles table exists before listing (fresh Azurite/Azurite resets don’t 500).
-- ✅ OPS followups queue: include esolvedForAssignment in response items (queue consumers can decide what to hide).
+- ✅ OPS followups queue: include 
+esolvedForAssignment in response items (queue consumers can decide what to hide).
 
 **Why this matters (master plan alignment)**
 - Keeps /ops/* as dev/admin tooling while preserving write discipline via /api/* (OPS reads projections; writes remain formation events).

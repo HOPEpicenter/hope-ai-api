@@ -1,3 +1,21 @@
+
+## 2026-03-26 Update
+
+**What landed**
+- ✅ **#420**: dashboard followups loader now uses `GET /api/formation/profiles?limit=200` instead of `/ops/followups`.
+- ✅ Followup rows are now derived client-side from formation profiles using the existing API surface.
+- ✅ Dashboard staging on Vercel was verified against the API-only Azure Functions host.
+- ✅ Remote validation passed for `/overview`, `/followups`, `/visitors`, and `/timeline`.
+- ✅ Remote API smoke passed on staging with `scripts/run-smoke-remote.ps1`.
+
+**Why this matters (master plan alignment)**
+- Removes a real staging blocker without widening backend scope.
+- Keeps the dashboard aligned to hardened `/api/*` surfaces instead of `/ops/*`.
+- Preserves momentum and production-safe behavior for Dashboard v1.x.
+
+**Next**
+- Treat dashboard API-only compatibility as complete unless another real blocker appears.
+- Do not reopen backend/dashboard scope here without a concrete workflow or contract problem.
 ## 2026-03-25 Update
 
 **What landed**
@@ -401,4 +419,5 @@ Planning rule going forward:
 - only add another Formation slice if a real repeated-event/profile-invariant gap is found
 - only add another Integration slice if a real consumer/blocker requires it
 - otherwise treat the current Phase 3/4 surface as closed for now
+
 

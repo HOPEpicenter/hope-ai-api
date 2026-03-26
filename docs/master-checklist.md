@@ -1,3 +1,11 @@
+
+### 2026-03-26 (Session Closeout)
+
+- [x] Merged **#420**: dashboard followups loader now uses `GET /api/formation/profiles?limit=200` instead of `/ops/followups`.
+- [x] Verified dashboard staging works against the API-only Azure Functions host.
+- [x] Verified remote pages load on staging: `/overview`, `/followups`, `/visitors`, `/timeline`.
+- [x] Verified `scripts/run-smoke-remote.ps1` passed against `https://hope-ai-api-staging.azurewebsites.net`.
+- [x] Confirmed dashboard followups no longer depend on `/ops/*`.
 ### 2026-03-25 (Session Closeout)
 
 - [x] Merged **#398**: visitor detail now emphasizes the next operator action.
@@ -293,4 +301,5 @@ Current rule:
 - [x] Treat the current dashboard v1.1 operator-flow work as complete unless a real blocker appears
 - [x] Do not widen backend scope unless a real blocker appears
 - [ ] Follow up later on `azure/login@v2` GitHub Actions Node 20 deprecation warning in deploy workflows
+
 

@@ -29,10 +29,12 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
   const baseUrl = requireEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
   const apiKey = requireEnv("HOPE_API_KEY");
 
-  const [visitorData, profileData, eventsData] = await Promise.all([
+  const [visitorData, profileData, eventsData, timelineData] = await Promise.all([
     getJson(`${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}`, apiKey),
     getJson(`${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}/formation/profile`, apiKey),
     getJson(`${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}/formation/events`, apiKey)
+      ,
+    getJson(`${baseUrl}/api/engagements/${encodeURIComponent(visitorId)}/timeline`, apiKey)
   ]);
 
   const visitor = visitorData?.visitor ?? visitorData;
@@ -45,6 +47,8 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
         : [];
 
   return {
+    engagementTimeline: timelineData?.items ?? [],
+
     ok: true,
     visitor: {
       visitorId: String(visitor?.visitorId ?? visitor?.id ?? visitorId),
@@ -58,7 +62,11 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
           partitionKey: String(profileData.profile.partitionKey ?? "VISITOR"),
           rowKey: String(profileData.profile.rowKey ?? visitorId),
           stage: profileData.profile.stage ?? null,
-          assignedTo: profileData.profile.assignedTo ?? null,
+          assignedTo: profileData.profile.assignedTo
+            ? (typeof profileData.profile.assignedTo === "string"
+                ? { ownerId: profileData.profile.assignedTo }
+                : { ownerId: profileData.profile.assignedTo.ownerId ?? null })
+            : null,
           lastFollowupAssignedAt: profileData.profile.lastFollowupAssignedAt ?? null,
           lastFollowupContactedAt: profileData.profile.lastFollowupContactedAt ?? null,
           lastFollowupOutcomeAt: profileData.profile.lastFollowupOutcomeAt ?? null,
@@ -105,4 +113,6 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
       .slice(0, 8)
   };
 }
+
+
 

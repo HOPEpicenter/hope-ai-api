@@ -1,4 +1,7 @@
+import type { TimelineItem } from "@/lib/contracts/timeline";
+
 export type VisitorDetailResponse = {
+  engagementTimeline: TimelineItem[];
   ok: boolean;
   visitor: {
     visitorId: string;
@@ -31,3 +34,4 @@ export type VisitorDetailResponse = {
     notes: string | null;
   }>;
 };
+

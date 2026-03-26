@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CreateVisitorForm } from "@/components/create-visitor-form";
 import { VisitorsTable, type VisitorsTableItem } from "@/components/visitors-table";
 import { getFollowups } from "@/lib/loaders/get-followups";
@@ -7,6 +8,7 @@ const MY_ASSIGNEE = (process.env.NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE ?? "").trim()
 
 type VisitorsPageSearchParams = {
   preset?: string;
+  q?: string;
 };
 
 export default async function VisitorsPage({
@@ -29,6 +31,11 @@ export default async function VisitorsPage({
     resolvedSearchParams.preset === "needs-attention"
       ? resolvedSearchParams.preset
       : "all";
+
+  const searchQuery =
+    typeof resolvedSearchParams.q === "string"
+      ? resolvedSearchParams.q.trim()
+      : "";
 
   const followupsByVisitorId = new Map(
     followups.items.map((item) => [item.visitorId, item])
@@ -74,6 +81,11 @@ export default async function VisitorsPage({
       ? items.filter((x) => x.assignedTo === MY_ASSIGNEE).length
       : 0;
 
+  const clearSearchHref =
+    preset === "all"
+      ? "/visitors"
+      : `/visitors?preset=${encodeURIComponent(preset)}`;
+
   return (
     <section style={{ display: "grid", gap: 16 }}>
       <div>
@@ -108,9 +120,79 @@ export default async function VisitorsPage({
         </div>
       </div>
 
+      <form
+        action="/visitors"
+        method="get"
+        style={{
+          display: "grid",
+          gap: 10,
+          background: "#fff",
+          border: "1px solid #e5e7eb",
+          borderRadius: 12,
+          padding: 16
+        }}
+      >
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#111827" }}>
+          Search visitors
+        </div>
+
+        {preset !== "all" ? <input type="hidden" name="preset" value={preset} /> : null}
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <input
+            type="search"
+            name="q"
+            defaultValue={searchQuery}
+            placeholder="Search by name, email, assigned to, or visitor ID"
+            style={{
+              flex: "1 1 320px",
+              minWidth: 260,
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid #d1d5db",
+              background: "#fff",
+              color: "#111827",
+              font: "inherit"
+            }}
+          />
+          <button
+            type="submit"
+            style={{
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid #111827",
+              background: "#111827",
+              color: "#fff",
+              font: "inherit",
+              fontWeight: 600,
+              cursor: "pointer"
+            }}
+          >
+            Search
+          </button>
+          {searchQuery ? (
+            <Link
+              href={clearSearchHref}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid #d1d5db",
+                background: "#fff",
+                color: "#111827",
+                textDecoration: "none",
+                fontWeight: 600
+              }}
+            >
+              Clear
+            </Link>
+          ) : null}
+        </div>
+      </form>
+
       <VisitorsTable
         items={items}
         preset={preset}
+        searchQuery={searchQuery}
         assignedToMeCount={assignedToMeCount}
         assignedCount={assignedCount}
         contactedCount={contactedCount}
@@ -122,8 +204,3 @@ export default async function VisitorsPage({
     </section>
   );
 }
-
-
-
-
-

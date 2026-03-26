@@ -222,6 +222,7 @@ function ClearPresetLink() {
 export function VisitorsTable({
   items,
   preset,
+  searchQuery,
   myAssignee,
   allCount,
   myNeedsAttentionCount,
@@ -232,6 +233,7 @@ export function VisitorsTable({
 }: {
   items: VisitorsTableItem[];
   preset: VisitorsPreset;
+  searchQuery: string;
   myAssignee: string;
   allCount: number;
   myNeedsAttentionCount: number;
@@ -368,7 +370,7 @@ export function VisitorsTable({
 
   const waitingAssignmentCount = items.filter((item) => !item.assignedTo).length;
 
-  const filteredItems =
+  const presetItems =
     preset === "my-needs-attention" && myAssignee
       ? items.filter(
           (item) =>
@@ -386,6 +388,29 @@ export function VisitorsTable({
               : preset === "needs-attention"
                 ? items.filter((item) => item.attentionState === "Needs attention")
                 : items;
+
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+
+  const filteredItems =
+    normalizedSearch.length > 0
+      ? presetItems.filter((item) => {
+          const haystack = [
+            item.name,
+            item.email ?? "",
+            item.assignedTo ?? "",
+            item.visitorId
+          ]
+            .join(" ")
+            .toLowerCase();
+
+          return haystack.includes(normalizedSearch);
+        })
+      : presetItems;
+
+  const clearSearchHref =
+    preset === "all"
+      ? "/visitors"
+      : `/visitors?preset=${encodeURIComponent(preset)}`;
 
   if (filteredItems.length === 0) {
     return (
@@ -430,7 +455,11 @@ export function VisitorsTable({
           {preset !== "all" ? <ClearPresetLink /> : null}
         </div>
 
-        {preset === "my-needs-attention" && myAssignee ? (
+        {searchQuery ? (
+          <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
+            No visitors match &quot;{searchQuery}&quot; in this view.
+          </div>
+        ) : preset === "my-needs-attention" && myAssignee ? (
           <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
             Showing {myNeedsAttentionCount} visitors that need attention for {myAssignee}.
           </div>
@@ -457,42 +486,30 @@ export function VisitorsTable({
         ) : null}
 
         <PageState
-          title={
-            preset === "my-needs-attention"
-              ? "No matching visitors"
-              : preset === "waiting-assignment"
-                ? "No visitors waiting for assignment"
-                : preset === "assigned-to-me"
-                  ? "No visitors assigned to you"
-                  : preset === "assigned"
-                    ? "No assigned visitors"
-                    : preset === "contacted"
-                      ? "No contacted visitors"
-                      : preset === "needs-attention"
-                        ? "No visitors need attention"
-                        : "No visitors yet"
-          }
+          title="No matching visitors"
           message={
-            preset === "my-needs-attention"
-              ? myAssignee
-                ? `No visitors currently need attention for assignee ${myAssignee}.`
-                : "My Needs Attention is unavailable until NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE is configured."
-              : preset === "waiting-assignment"
-                ? "All visitors currently have an assignee or have already been contacted."
-                : preset === "assigned-to-me"
-                  ? myAssignee
-                    ? `No visitors are currently assigned to ${myAssignee}.`
-                    : "Assigned To Me is unavailable until NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE is configured."
-                  : preset === "assigned"
-                    ? "No visitors are currently assigned."
-                    : preset === "contacted"
-                      ? "No visitors have been contacted yet."
-                      : preset === "needs-attention"
-                        ? "No visitors currently need attention."
-                        : "Visitor records will appear here once someone interacts with the system."
+            searchQuery
+              ? `No visitors match "${searchQuery}" in the current view.`
+              : preset === "my-needs-attention"
+                ? myAssignee
+                  ? `No visitors currently need attention for assignee ${myAssignee}.`
+                  : "My Needs Attention is unavailable until NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE is configured."
+                : preset === "waiting-assignment"
+                  ? "All visitors currently have an assignee or have already been contacted."
+                  : preset === "assigned-to-me"
+                    ? myAssignee
+                      ? `No visitors are currently assigned to ${myAssignee}.`
+                      : "Assigned To Me is unavailable until NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE is configured."
+                    : preset === "assigned"
+                      ? "No visitors are currently assigned."
+                      : preset === "contacted"
+                        ? "No visitors have been contacted yet."
+                        : preset === "needs-attention"
+                          ? "No visitors currently need attention."
+                          : "Visitor records will appear here once someone interacts with the system."
           }
-          actionHref={preset !== "all" ? "/visitors" : "/overview"}
-          actionLabel={preset !== "all" ? "Show all visitors" : "Back to overview"}
+          actionHref={searchQuery ? clearSearchHref : preset !== "all" ? "/visitors" : "/overview"}
+          actionLabel={searchQuery ? "Clear search" : preset !== "all" ? "Show all visitors" : "Back to overview"}
         />
       </div>
     );
@@ -584,6 +601,12 @@ export function VisitorsTable({
         </div>
       ) : null}
 
+      {searchQuery ? (
+        <div style={{ fontSize: 13, color: "#4b5563", fontWeight: 600 }}>
+          Showing {filteredItems.length} of {presetItems.length} visitors matching &quot;{searchQuery}&quot;.
+        </div>
+      ) : null}
+
       {actionError ? (
         <div
           style={{
@@ -599,17 +622,17 @@ export function VisitorsTable({
       ) : null}
 
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+        <table style={{ width: "100%", minWidth: 1360, borderCollapse: "collapse", tableLayout: "fixed" }}>
           <thead>
             <tr>
-              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Name</th>
-              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Email</th>
-              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Followup State</th>
-              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Attention</th>
-              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Assigned To</th>
-              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Visitor ID</th>
-              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Activity</th>
-              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 320 }}>Actions</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 180 }}>Name</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 260 }}>Email</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 140 }}>Followup State</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 140 }}>Attention</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 150 }}>Assigned To</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 220 }}>Visitor ID</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 140 }}>Last Activity</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 220 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -639,26 +662,55 @@ export function VisitorsTable({
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
                     <Link
                       href={preset === "all" ? `/visitors/${item.visitorId}` : `/visitors/${item.visitorId}?preset=${preset}`}
-                      style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}
+                      style={{
+                        color: "#2563eb",
+                        textDecoration: "none",
+                        fontWeight: 600,
+                        display: "inline-block",
+                        wordBreak: "break-word",
+                        overflowWrap: "anywhere"
+                      }}
                     >
                       {item.name}
                     </Link>
                   </td>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>{item.email ?? "-"}</td>
+                  <td
+                    style={{
+                      padding: 12,
+                      borderBottom: "1px solid #e5e7eb",
+                      verticalAlign: "top",
+                      textAlign: "left",
+                      wordBreak: "break-word",
+                      overflowWrap: "anywhere"
+                    }}
+                  >
+                    {item.email ?? "-"}
+                  </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
                     <FollowupStateBadge state={item.followupState} />
                   </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
                     <AttentionBadge state={item.attentionState} />
                   </td>
-                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
+                  <td
+                    style={{
+                      padding: 12,
+                      borderBottom: "1px solid #e5e7eb",
+                      verticalAlign: "top",
+                      textAlign: "left",
+                      wordBreak: "break-word",
+                      overflowWrap: "anywhere"
+                    }}
+                  >
                     {item.assignedTo ? (
                       <Link
                         href={item.assignedTo === myAssignee ? "/visitors?preset=assigned-to-me" : "/visitors?preset=assigned"}
                         style={{
                           color: "#2563eb",
                           textDecoration: "none",
-                          fontWeight: 600
+                          fontWeight: 600,
+                          wordBreak: "break-word",
+                          overflowWrap: "anywhere"
                         }}
                       >
                         {item.assignedTo}
@@ -668,13 +720,21 @@ export function VisitorsTable({
                     )}
                   </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontFamily: "monospace" }}>{item.visitorId}</span>
+                    <div style={{ display: "grid", gap: 8, justifyItems: "start" }}>
+                      <span
+                        style={{
+                          fontFamily: "monospace",
+                          wordBreak: "break-all",
+                          overflowWrap: "anywhere"
+                        }}
+                      >
+                        {item.visitorId}
+                      </span>
                       <CopyButton value={item.visitorId} label="Copy" />
                     </div>
                   </td>
                   <td
-                    style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top" }}
+                    style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}
                     title={formatAbsoluteTime(item.updatedAt)}
                   >
                     {formatRelativeTime(item.updatedAt)}

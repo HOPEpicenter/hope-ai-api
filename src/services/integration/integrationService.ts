@@ -89,12 +89,18 @@ function deriveSummary(item: any): string {
   }
 
   if (item.stream === "engagement") {
-    const notes = item.notes ?? item.data?.notes;
-    if (typeof notes === "string" && notes.trim().length > 0) {
-      return notes.trim();
-    }
-    return type || "engagement event";
+  const text = item.data?.text;
+  if (typeof text === "string" && text.trim().length > 0) {
+    return text.trim();
   }
+
+  const notes = item.data?.notes ?? item.notes;
+  if (typeof notes === "string" && notes.trim().length > 0) {
+    return notes.trim();
+  }
+
+  return type || "engagement event";
+}
 
   return "event";
 }
@@ -306,6 +312,8 @@ return { items: enrichedItems, nextCursor };
   }
 
 }
+
+
 
 
 

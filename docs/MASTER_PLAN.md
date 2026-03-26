@@ -441,3 +441,10 @@ Planning rule going forward:
 
 
 
+
+- 2026-03-26: Landed visitor-level engagement timeline foundation.
+  - `GET /api/engagements/{visitorId}/timeline` is now available.
+  - Timeline is reconstructed deterministically from existing engagement + formation records.
+  - Mixed-stream regression coverage is in place and passing.
+  - Keep next work narrow: only consume this surface where needed; do not widen into scoring/AI/new infra.
+

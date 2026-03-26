@@ -455,3 +455,9 @@ Planning rule going forward:
   - Assigned-owner rendering and operator action guidance were corrected.
   - Keep next work narrow; do not widen dashboard scope without a concrete operator need.
 
+
+- 2026-03-26: Landed deterministic summary enrichment for integrated timeline items.
+  - Existing timeline truth is now more readable for dashboard consumers.
+  - No new endpoints, storage, or UI expansion were added.
+  - Keep next work narrow: refine existing timeline quality before any broader engagement expansion.
+

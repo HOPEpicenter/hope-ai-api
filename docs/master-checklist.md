@@ -325,3 +325,8 @@ Current rule:
 - [x] Verify CI green after merge
 - [x] Verify staging deploy green after merge
 
+
+- [x] Add deterministic summary enrichment for integrated timeline items
+- [x] Verify CI green after merge
+- [x] Verify staging healthy after redeploy
+

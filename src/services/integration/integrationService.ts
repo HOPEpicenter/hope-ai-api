@@ -79,6 +79,26 @@ function toBase64(s: string): string {
   return Buffer.from(s, "utf8").toString("base64");
 }
 
+
+function deriveSummary(item: any): string {
+  const type = String(item.type ?? "").trim();
+
+  if (item.stream === "formation") {
+    if (type === "FOLLOWUP_ASSIGNED") return "Followup assigned";
+    return type || "formation event";
+  }
+
+  if (item.stream === "engagement") {
+    const notes = item.notes ?? item.data?.notes;
+    if (typeof notes === "string" && notes.trim().length > 0) {
+      return notes.trim();
+    }
+    return type || "engagement event";
+  }
+
+  return "event";
+}
+
 export class IntegrationService {
   constructor(
     private engagementRepo: EngagementEventsRepository,
@@ -220,7 +240,12 @@ const merged = mergeTimelines(
           })
         : null;
 
-    return { items: pageItems, nextCursor };
+    const enrichedItems = pageItems.map((it) => ({
+  ...it,
+  summary: deriveSummary(it)
+}));
+
+return { items: enrichedItems, nextCursor };
   }
   async readIntegrationSummary(visitorId: string) {
     // Read-only derived view: no new writes, no persistence.
@@ -281,4 +306,6 @@ const merged = mergeTimelines(
   }
 
 }
+
+
 

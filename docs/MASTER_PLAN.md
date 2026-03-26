@@ -448,3 +448,10 @@ Planning rule going forward:
   - Mixed-stream regression coverage is in place and passing.
   - Keep next work narrow: only consume this surface where needed; do not widen into scoring/AI/new infra.
 
+
+- 2026-03-26: Landed first read-only dashboard consumer of the visitor engagement timeline.
+  - Visitor detail now displays the integrated engagement timeline.
+  - This reuses the backend timeline truth without expanding backend scope.
+  - Assigned-owner rendering and operator action guidance were corrected.
+  - Keep next work narrow; do not widen dashboard scope without a concrete operator need.
+

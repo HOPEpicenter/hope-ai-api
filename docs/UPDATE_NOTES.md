@@ -218,3 +218,12 @@ Verification:
 - Validation: CI green after merge; staging Azure Functions deploy green after merge.
 - Outcome: Phase 2 Engagement now has a deterministic, visitor-scoped timeline truth surface plus regression protection.
 
+
+## 2026-03-26
+
+- Dashboard: merged PR #428 to show the integrated visitor engagement timeline on `/visitors/[visitorId]`.
+- Dashboard: visitor detail now consumes the backend engagement timeline truth using the existing timeline list component.
+- Dashboard: normalized assigned owner handling on visitor detail so assigned followups display correctly and next-action guidance stays accurate.
+- Dashboard: fixed visitor detail layout so long email values no longer bleed into adjacent fields.
+- Validation: CI green after merge; staging deploy green after merge.
+

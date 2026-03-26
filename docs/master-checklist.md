@@ -318,3 +318,10 @@ Current rule:
 - [x] Verify CI green after merge
 - [x] Verify staging deploy green after merge
 
+
+- [x] Show integrated visitor engagement timeline on dashboard visitor detail
+- [x] Normalize assigned owner display on visitor detail
+- [x] Fix long email wrapping/layout on visitor detail
+- [x] Verify CI green after merge
+- [x] Verify staging deploy green after merge
+

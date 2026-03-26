@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getVisitorEngagementTimeline/index.js",
+  "entryPoint": "getVisitorEngagementTimeline",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "engagements/{visitorId}/timeline"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

@@ -227,3 +227,11 @@ Verification:
 - Dashboard: fixed visitor detail layout so long email values no longer bleed into adjacent fields.
 - Validation: CI green after merge; staging deploy green after merge.
 
+
+## 2026-03-26
+
+- Engagement: merged PR #430 to add deterministic summary enrichment for integrated timeline items.
+- Engagement: timeline items now return `summary` for known event types, improving dashboard readability without changing routes or storage.
+- Validation: CI green after merge.
+- Staging: initial deploy hit transient Azure trigger-sync failure; manual redeploy succeeded and `/api/version` returned healthy.
+

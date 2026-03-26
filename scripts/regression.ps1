@@ -502,3 +502,15 @@ if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
 } else {
   Write-Host "[5] Skipping OPS followups lifecycle assertions (HOPE_API_KEY not set)."
 }
+
+
+# Visitor engagement timeline (integrated) contract
+if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+  Write-Host "[regression] Visitor engagement timeline (integrated) contract..."
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-visitor-engagement-timeline.ps1") -ApiBaseUrl $BaseUrl -ApiKey $env:HOPE_API_KEY
+  if ($LASTEXITCODE -ne 0) { throw "Visitor engagement timeline regression failed ($LASTEXITCODE)" }
+  Ok "Visitor engagement timeline regression passed."
+} else {
+  Write-Host "[regression] Skipping visitor engagement timeline regression (HOPE_API_KEY not set)."
+}
+

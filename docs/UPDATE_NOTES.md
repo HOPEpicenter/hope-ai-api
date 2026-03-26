@@ -181,3 +181,17 @@ Verification:
 - no new Formation or Integration code added in this closeout
 - future work should be blocker-driven, not speculative expansion
 
+
+## 2026-03-26
+
+- ✅ Merged **#420**: made the dashboard followups loader API-only compatible by replacing `/ops/followups` with `GET /api/formation/profiles?limit=200` and deriving unresolved followup rows client-side.
+- ✅ Verified dashboard staging on Vercel now works against the API-only Azure Functions host.
+- ✅ Verified remote pages load successfully on staging: `/overview`, `/followups`, `/visitors`, `/timeline`.
+- ✅ Verified `scripts/run-smoke-remote.ps1` passes against `https://hope-ai-api-staging.azurewebsites.net` and correctly detects the API-only Functions host.
+
+### Dashboard API-only compatibility note
+
+- Dashboard followups no longer depend on the `/ops/*` surface.
+- Dashboard staging compatibility is preserved by using existing hardened `/api/*` surfaces first.
+- No backend scope expansion was required for this fix.
+

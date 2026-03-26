@@ -2,6 +2,24 @@
 ## 2026-03-26 Update
 
 **What landed**
+- ✅ **#422**: visitors page now supports search by visitor ID and other visible row fields.
+- ✅ **#422**: visitors table layout was tightened so long email / visitor ID content and the Copy action no longer crowd adjacent columns.
+- ✅ **#423**: overview was upgraded from a mock-first summary to a real operator triage page.
+- ✅ **#423**: overview cards now route directly into the relevant visitor queues using existing surfaces.
+- ✅ Verified staging dashboard behavior on Vercel for `/overview` and `/visitors` after both merges.
+
+**Why this matters (master plan alignment)**
+- Improves operator speed and scanability without widening backend/API scope.
+- Makes two existing dashboard surfaces materially more useful using the current hardened loaders.
+- Keeps Timeline deferred until a real consumer/blocker justifies opening that surface.
+
+**Next**
+- Treat Overview and Visitors improvements as complete unless a real operator blocker appears.
+- Do not open Timeline yet without a concrete consumer need or a narrow blocker-driven slice.
+
+## 2026-03-26 Update
+
+**What landed**
 - ✅ **#420**: dashboard followups loader now uses `GET /api/formation/profiles?limit=200` instead of `/ops/followups`.
 - ✅ Followup rows are now derived client-side from formation profiles using the existing API surface.
 - ✅ Dashboard staging on Vercel was verified against the API-only Azure Functions host.
@@ -145,7 +163,8 @@
 
 **What landed**
 - ✅ OPS followups queue: ensure formation profiles table exists before listing (fresh Azurite/Azurite resets don’t 500).
-- ✅ OPS followups queue: include esolvedForAssignment in response items (queue consumers can decide what to hide).
+- ✅ OPS followups queue: include 
+esolvedForAssignment in response items (queue consumers can decide what to hide).
 
 **Why this matters (master plan alignment)**
 - Keeps /ops/* as dev/admin tooling while preserving write discipline via /api/* (OPS reads projections; writes remain formation events).
@@ -419,5 +438,6 @@ Planning rule going forward:
 - only add another Formation slice if a real repeated-event/profile-invariant gap is found
 - only add another Integration slice if a real consumer/blocker requires it
 - otherwise treat the current Phase 3/4 surface as closed for now
+
 
 

@@ -195,3 +195,18 @@ Verification:
 - Dashboard staging compatibility is preserved by using existing hardened `/api/*` surfaces first.
 - No backend scope expansion was required for this fix.
 
+
+## 2026-03-26
+
+- ✅ Merged **#422**: added visitors search including visitor ID matching, and fixed visitors table overflow so email, visitor ID, copy button, and last activity no longer collide.
+- ✅ Merged **#423**: upgraded Overview from a mock-first summary to a real operator triage page using existing visitors and followups surfaces.
+- ✅ Verified dashboard staging on Vercel for `/overview` and `/visitors` after the merged slices.
+- ✅ Confirmed `/overview` now provides actionable queue entry points without widening backend scope.
+- ✅ Confirmed `/visitors` search works by visitor ID and the table layout remains readable on staging.
+
+### Dashboard operator-surface note
+
+- `/overview` now acts as a practical triage surface instead of a placeholder summary.
+- `/visitors` now supports direct visitor ID lookup and cleaner table scanning.
+- Timeline remains intentionally deferred until a real consumer or blocker appears.
+

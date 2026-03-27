@@ -467,3 +467,9 @@ Planning rule going forward:
   - No new endpoints, storage, or UI expansion were added.
   - Keep next work narrow: continue timeline quality improvements only where they directly improve operator readability.
 
+
+- 2026-03-27: Landed formation event timestamp mapping improvement on dashboard visitor detail.
+  - Formation events now display existing event times more reliably.
+  - No backend routes, storage, or UI expansion were added.
+  - Keep next work narrow: continue timeline quality improvements only where they directly improve operator trust.
+

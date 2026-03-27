@@ -1,4 +1,19 @@
 
+### 2026-03-27 (Session Closeout)
+
+- [x] Merged **#438–#444**: dashboard readability and scanability polish across timeline and visitors table
+- [x] Timeline:
+  - removed event ID noise
+  - softened fallback copy
+  - improved wrapping, spacing, and timestamp clarity
+- [x] Visitors table:
+  - compacted visitor ID cell with inline copy action
+  - softened empty-cell placeholders
+  - improved truncation and row density
+- [x] Verified CI passed after merged slices
+- [x] Verified staging deploy passed after merged slices
+
+
 ### 2026-03-26 (Session Closeout)
 
 - [x] Merged **#422**: visitors search now supports visitor ID lookup.
@@ -339,4 +354,5 @@ Current rule:
 - [x] Map formation event timestamp fallbacks on visitor detail
 - [x] Verify CI green after merge
 - [x] Verify staging deploy green after merge
+
 

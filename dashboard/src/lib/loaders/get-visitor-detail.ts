@@ -84,6 +84,8 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
         eventType?: string | null;
         type?: string | null;
         happenedAt?: string | null;
+        occurredAt?: string | null;
+        recordedAt?: string | null;
         createdAt?: string | null;
         timestamp?: string | null;
         source?: string | null;
@@ -96,7 +98,13 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
       }, index: number) => ({
         eventId: String(event?.eventId ?? event?.id ?? `${visitorId}-${index}`),
         eventType: String(event?.eventType ?? event?.type ?? "UNKNOWN"),
-        happenedAt: event?.happenedAt ?? event?.createdAt ?? event?.timestamp ?? null,
+        happenedAt:
+          event?.happenedAt ??
+          event?.occurredAt ??
+          event?.recordedAt ??
+          event?.createdAt ??
+          event?.timestamp ??
+          null,
         source: event?.source ?? null,
         notes:
           event?.notes ??
@@ -113,6 +121,8 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
       .slice(0, 8)
   };
 }
+
+
 
 
 

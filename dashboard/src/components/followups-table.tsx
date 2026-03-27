@@ -11,10 +11,14 @@ import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-ti
 
 function EmptyStatePanel({
   title,
-  message
+  message,
+  actionHref,
+  actionLabel
 }: {
   title: string;
   message: string;
+  actionHref?: string;
+  actionLabel?: string;
 }) {
   return (
     <div
@@ -28,7 +32,27 @@ function EmptyStatePanel({
       }}
     >
       <div style={{ fontSize: 16, fontWeight: 600, color: "#111827" }}>{title}</div>
-      <div style={{ fontSize: 14, color: "#6b7280" }}>{message}</div>
+            <div style={{ fontSize: 14, color: "#6b7280" }}>{message}</div>
+      {actionHref && actionLabel ? (
+        <div>
+          <Link
+            href={actionHref}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "8px 12px",
+              borderRadius: 10,
+              background: "#111827",
+              color: "#fff",
+              textDecoration: "none",
+              fontSize: 14,
+              fontWeight: 600
+            }}
+          >
+            {actionLabel}
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -490,8 +514,10 @@ export function FollowupsTable({
       />
     ) : (
       <EmptyStatePanel
-        title="No followups yet"
-        message="New followups will appear here when action is required."
+        title="No assigned followups need action"
+        message="Assigned followups are clear right now. Waiting-assignment work still lives in Visitors."
+        actionHref="/visitors?preset=waiting-assignment"
+        actionLabel="Open waiting assignment"
       />
     );
   }
@@ -715,6 +741,7 @@ export function FollowupsTable({
     </div>
   );
 }
+
 
 
 

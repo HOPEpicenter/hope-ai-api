@@ -139,7 +139,7 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
                 </div>
 
                 <div style={{ color: "#374151", lineHeight: 1.5 }}>
-                  {item.summary ?? "No summary provided."}
+                  {item.summary || "No details recorded"}
                 </div>
               </div>
             );
@@ -149,3 +149,4 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
     </div>
   );
 }
+

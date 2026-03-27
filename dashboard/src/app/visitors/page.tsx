@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CreateVisitorForm } from "@/components/create-visitor-form";
 import { VisitorsTable, type VisitorsTableItem } from "@/components/visitors-table";
-import { getFollowups } from "@/lib/loaders/get-followups";
+import { getFormationProfiles } from "@/lib/loaders/get-formation-profiles";
 import { getVisitors } from "@/lib/loaders/get-visitors";
 
 const MY_ASSIGNEE = (process.env.NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE ?? "").trim();
@@ -16,9 +16,9 @@ export default async function VisitorsPage({
 }: {
   searchParams?: Promise<VisitorsPageSearchParams>;
 }) {
-  const [visitors, followups, resolvedSearchParams] = await Promise.all([
+  const [visitors, formationProfiles, resolvedSearchParams] = await Promise.all([
     getVisitors(),
-    getFollowups(),
+    getFormationProfiles(),
     searchParams ?? Promise.resolve<VisitorsPageSearchParams>({})
   ]);
 
@@ -37,23 +37,23 @@ export default async function VisitorsPage({
       ? resolvedSearchParams.q.trim()
       : "";
 
-  const followupsByVisitorId = new Map(
-    followups.items.map((item) => [item.visitorId, item])
+  const formationProfilesByVisitorId = new Map(
+    formationProfiles.items.map((item) => [item.visitorId, item])
   );
 
   const items: VisitorsTableItem[] = visitors.items.map((visitor) => {
-    const followup = followupsByVisitorId.get(visitor.visitorId);
+    const profile = formationProfilesByVisitorId.get(visitor.visitorId);
 
     let followupState: VisitorsTableItem["followupState"] = "Waiting assignment";
     let attentionState: VisitorsTableItem["attentionState"] = null;
 
-    if (followup?.lastFollowupOutcomeAt) {
+    if (profile?.lastFollowupOutcomeAt) {
+      followupState = "Contacted";
+      attentionState = null;
+    } else if (profile?.lastFollowupContactedAt) {
       followupState = "Contacted";
       attentionState = "Contact made";
-    } else if (followup?.lastFollowupContactedAt) {
-      followupState = "Contacted";
-      attentionState = "Contact made";
-    } else if (followup?.assignedTo?.ownerId) {
+    } else if (profile?.assignedTo) {
       followupState = "Assigned";
       attentionState = "Needs attention";
     }
@@ -62,7 +62,7 @@ export default async function VisitorsPage({
       ...visitor,
       followupState,
       attentionState,
-      assignedTo: followup?.assignedTo?.ownerId ?? null
+      assignedTo: profile?.assignedTo ?? null
     };
   });
 
@@ -204,3 +204,4 @@ export default async function VisitorsPage({
     </section>
   );
 }
+

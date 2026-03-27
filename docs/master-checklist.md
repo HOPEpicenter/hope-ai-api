@@ -330,3 +330,8 @@ Current rule:
 - [x] Verify CI green after merge
 - [x] Verify staging healthy after redeploy
 
+
+- [x] Prefer engagement event text in integrated timeline summaries
+- [x] Verify CI green after merge
+- [x] Verify staging deploy green after merge
+

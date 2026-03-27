@@ -335,3 +335,8 @@ Current rule:
 - [x] Verify CI green after merge
 - [x] Verify staging deploy green after merge
 
+
+- [x] Map formation event timestamp fallbacks on visitor detail
+- [x] Verify CI green after merge
+- [x] Verify staging deploy green after merge
+

@@ -242,3 +242,10 @@ Verification:
 - Engagement: engagement timeline items now return more operator-readable summaries instead of low-value fallbacks like `note.add` when event text is present.
 - Validation: CI green after merge; staging deploy green after merge.
 
+
+## 2026-03-27
+
+- Dashboard: merged PR #434 to map formation event timestamp fallbacks on visitor detail.
+- Dashboard: Recent Formation Events now uses happenedAt, occurredAt, recordedAt, createdAt, then timestamp to avoid false "No timestamp available" states.
+- Validation: CI green after merge; staging deploy green after merge.
+

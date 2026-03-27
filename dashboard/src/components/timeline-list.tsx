@@ -37,6 +37,23 @@ function EventTypeLabel({ type }: { type: string }) {
   );
 }
 
+function formatEventType(type?: string): string {
+  if (!type) return "Event";
+
+  const map: Record<string, string> = {
+    FOLLOWUP_ASSIGNED: "Follow-up assigned",
+    FOLLOWUP_CONTACTED: "Follow-up contacted",
+    FOLLOWUP_OUTCOME: "Follow-up outcome",
+    "note.add": "Note added"
+  };
+
+  if (map[type]) return map[type];
+
+  return type
+    .replace(/[_\.]/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
 export function TimelineList({ items }: { items: TimelineItem[] }) {
   if (items.length === 0) {
     return (
@@ -75,8 +92,19 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
           >
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
               <div style={{ display: "grid", gap: 8 }}>
-                <StreamBadge stream={item.stream} />
-                <EventTypeLabel type={item.type} />
+                <span style={{
+                  fontSize: 11,
+                  padding: "2px 6px",
+                  borderRadius: 6,
+                  background: item.stream === "formation" ? "#E0F2FE" : "#F0FDF4",
+                  color: item.stream === "formation" ? "#0369A1" : "#166534",
+                  fontWeight: 600,
+                  width: "fit-content",
+                  textTransform: "capitalize"
+                }}>
+                  {item.stream}
+                </span>
+                <EventTypeLabel type={formatEventType(item.type)} />
               </div>
 
               <div
@@ -108,3 +136,6 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
     </div>
   );
 }
+
+
+

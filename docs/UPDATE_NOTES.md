@@ -235,3 +235,10 @@ Verification:
 - Validation: CI green after merge.
 - Staging: initial deploy hit transient Azure trigger-sync failure; manual redeploy succeeded and `/api/version` returned healthy.
 
+
+## 2026-03-26
+
+- Engagement: merged PR #432 to prefer engagement `data.text` in integrated timeline summaries.
+- Engagement: engagement timeline items now return more operator-readable summaries instead of low-value fallbacks like `note.add` when event text is present.
+- Validation: CI green after merge; staging deploy green after merge.
+

@@ -461,3 +461,9 @@ Planning rule going forward:
   - No new endpoints, storage, or UI expansion were added.
   - Keep next work narrow: refine existing timeline quality before any broader engagement expansion.
 
+
+- 2026-03-26: Landed engagement summary text fallback improvement for integrated timeline items.
+  - Engagement summaries now prefer existing event text when available.
+  - No new endpoints, storage, or UI expansion were added.
+  - Keep next work narrow: continue timeline quality improvements only where they directly improve operator readability.
+

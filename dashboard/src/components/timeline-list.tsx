@@ -54,6 +54,26 @@ function formatEventType(type?: string): string {
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
+function formatDayLabel(value: string | null | undefined): string {
+  if (!value) return "Unknown date";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown date";
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((today.getTime() - target.getTime()) / 86400000);
+
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
 export function TimelineList({ items }: { items: TimelineItem[] }) {
   if (items.length === 0) {
     return (
@@ -72,70 +92,90 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
     return a.eventId.localeCompare(b.eventId);
   });
 
+  const groups = sortedItems.reduce((acc, item) => {
+    const label = formatDayLabel(item.occurredAt);
+    if (!acc[label]) acc[label] = [];
+    acc[label].push(item);
+    return acc;
+  }, {} as Record<string, TimelineItem[]>);
+
+  const orderedLabels = Object.keys(groups);
+
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      {sortedItems.map((item) => {
-        const accent = item.stream === "formation" ? "#93c5fd" : "#c4b5fd";
-
-        return (
-          <div
-            key={item.eventId}
-            style={{
-              background: "#fff",
-              border: "1px solid #e5e7eb",
-              borderLeft: `4px solid ${accent}`,
-              borderRadius: 12,
-              padding: 16,
-              display: "grid",
-              gap: 10
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-              <div style={{ display: "grid", gap: 8 }}>
-                <span style={{
-                  fontSize: 11,
-                  padding: "2px 6px",
-                  borderRadius: 6,
-                  background: item.stream === "formation" ? "#E0F2FE" : "#F0FDF4",
-                  color: item.stream === "formation" ? "#0369A1" : "#166534",
-                  fontWeight: 600,
-                  width: "fit-content",
-                  textTransform: "capitalize"
-                }}>
-                  {item.stream}
-                </span>
-                <EventTypeLabel type={formatEventType(item.type)} />
-              </div>
-
-              <div
-                style={{ textAlign: "right", minWidth: 160 }}
-                title={formatAbsoluteTime(item.occurredAt)}
-              >
-                <div style={{ color: "#374151", fontSize: 14, fontWeight: 600 }}>
-                  {formatRelativeTime(item.occurredAt)}
-                </div>
-                <div style={{ color: "#6b7280", fontSize: 12, marginTop: 2 }}>
-                  {formatAbsoluteTime(item.occurredAt)}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ color: "#374151", lineHeight: 1.5 }}>
-              {item.summary ?? "No summary provided."}
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-              <div style={{ fontSize: 12, color: "#6b7280" }}>Event ID</div>
-              <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "monospace" }}>
-                {item.eventId}
-              </div>
-            </div>
+    <div style={{ display: "grid", gap: 18 }}>
+      {orderedLabels.map((label) => (
+        <div key={label} style={{ display: "grid", gap: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4 }}>
+            {label}
           </div>
-        );
-      })}
+
+          {groups[label].map((item) => {
+            const accent = item.stream === "formation" ? "#93c5fd" : "#c4b5fd";
+
+            return (
+              <div
+                key={item.eventId}
+                style={{
+                  background: "#fff",
+                  border: "1px solid #e5e7eb",
+                  borderLeft: `4px solid ${accent}`,
+                  borderRadius: 12,
+                  padding: 16,
+                  display: "grid",
+                  gap: 10
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <span style={{
+                      fontSize: 11,
+                      padding: "2px 6px",
+                      borderRadius: 6,
+                      background: item.stream === "formation" ? "#E0F2FE" : "#F0FDF4",
+                      color: item.stream === "formation" ? "#0369A1" : "#166534",
+                      fontWeight: 600,
+                      width: "fit-content",
+                      textTransform: "capitalize"
+                    }}>
+                      {item.stream}
+                    </span>
+                    <EventTypeLabel type={formatEventType(item.type)} />
+                  </div>
+
+                  <div
+                    style={{ textAlign: "right", minWidth: 160 }}
+                    title={formatAbsoluteTime(item.occurredAt)}
+                  >
+                    <div style={{ color: "#374151", fontSize: 14, fontWeight: 600 }}>
+                      {formatRelativeTime(item.occurredAt)}
+                    </div>
+                    <div style={{ color: "#6b7280", fontSize: 12, marginTop: 2 }}>
+                      {formatAbsoluteTime(item.occurredAt)}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ color: "#374151", lineHeight: 1.5 }}>
+                  {item.summary ?? "No summary provided."}
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                  <div style={{ fontSize: 12, color: "#6b7280" }}>Event ID</div>
+                  <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "monospace" }}>
+                    {item.eventId}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }
+
+
+
 
 
 

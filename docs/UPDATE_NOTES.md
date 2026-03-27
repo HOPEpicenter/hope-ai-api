@@ -1,3 +1,24 @@
+
+## 2026-03-27
+
+- ✅ Merged **#438–#444**: dashboard readability and scanability polish across timeline and visitors table.
+- Timeline:
+  - removed event ID from cards to reduce noise
+  - softened empty summary fallback copy
+  - improved long-text wrapping behavior
+  - refined spacing and reduced time-label dominance
+  - removed duplicate timestamp display and clarified page copy
+- Visitors table:
+  - compacted visitor ID cell with inline copy control
+  - softened empty-cell placeholders using em dash styling
+  - improved truncation + layout behavior for long IDs
+
+### Dashboard readability note
+
+- These slices improve operator scanability and reduce visual noise without changing behavior or backend scope.
+- Timeline and visitors surfaces are now easier to read under real data conditions (long text, empty states, dense rows).
+- No new surfaces or workflows were introduced.
+
 ## 2026-03-25
 
 - ✅ Merged **#398**: emphasized the next operator action on visitor detail based on followup state.
@@ -248,4 +269,5 @@ Verification:
 - Dashboard: merged PR #434 to map formation event timestamp fallbacks on visitor detail.
 - Dashboard: Recent Formation Events now uses happenedAt, occurredAt, recordedAt, createdAt, then timestamp to avoid false "No timestamp available" states.
 - Validation: CI green after merge; staging deploy green after merge.
+
 

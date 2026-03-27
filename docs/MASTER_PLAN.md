@@ -1,4 +1,27 @@
 
+## 2026-03-27 Update
+
+**What landed**
+- ✅ **#438–#444**: dashboard readability polish across timeline and visitors table.
+- Timeline readability improvements:
+  - removed non-essential identifiers (event ID)
+  - reduced duplicate timestamp noise
+  - improved wrapping and spacing for real-world text
+- Visitors table readability improvements:
+  - compact visitor ID display with inline copy action
+  - softened empty-cell placeholders
+  - improved truncation and row density
+
+**Why this matters (master plan alignment)**
+- Improves operator speed and scanability without widening backend/API scope.
+- Strengthens real-data usability (long text, empty states, dense tables).
+- Keeps all work within post-v1 “narrow, non-speculative” dashboard slices.
+
+**Next**
+- Treat dashboard readability polish as complete unless a real operator blocker appears.
+- Continue selecting only high-signal, non-speculative UI slices that improve operator workflow.
+
+
 ## 2026-03-26 Update
 
 **What landed**
@@ -472,4 +495,5 @@ Planning rule going forward:
   - Formation events now display existing event times more reliably.
   - No backend routes, storage, or UI expansion were added.
   - Keep next work narrow: continue timeline quality improvements only where they directly improve operator trust.
+
 

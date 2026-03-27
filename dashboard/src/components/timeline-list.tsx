@@ -10,7 +10,7 @@ function toTimestamp(value: string | null | undefined) {
 
 function EventTypeLabel({ type }: { type: string }) {
   return (
-    <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", lineHeight: 1.3 }}>
+    <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", lineHeight: 1.3, overflowWrap: "anywhere", wordBreak: "break-word" }}>
       {type}
     </div>
   );
@@ -138,7 +138,7 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
                   </div>
                 </div>
 
-                <div style={{ color: "#374151", lineHeight: 1.5 }}>
+                <div style={{ color: "#374151", lineHeight: 1.5, overflowWrap: "anywhere", wordBreak: "break-word", whiteSpace: "pre-wrap" }}>
                   {item.summary || "No details recorded"}
                 </div>
               </div>
@@ -149,4 +149,5 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
     </div>
   );
 }
+
 

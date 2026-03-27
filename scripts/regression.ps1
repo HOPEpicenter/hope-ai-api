@@ -458,7 +458,11 @@ if ($LASTEXITCODE -ne 0) { Fail "Integration summary late/older events contract 
 Write-Host ""
 # Add formation milestones v1 contract assertion (safe, standalone)
 if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
-  Write-Host "[regression] Formation idempotency..."
+  Write-Host "[regression] Formation idempotency...
+pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-formation-stage-metadata-stability.ps1") -ApiBase $BaseUrl -ApiKey $env:HOPE_API_KEY
+if ($LASTEXITCODE -ne 0) { throw "Formation stage metadata stability failed ($LASTEXITCODE)" }
+
+Formation idempotency..."
   pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-formation-idempotency.ps1") -ApiBase $BaseUrl
   if ($LASTEXITCODE -ne 0) { throw "Formation idempotency asserts failed ($LASTEXITCODE)" }
 
@@ -513,4 +517,5 @@ if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
 } else {
   Write-Host "[regression] Skipping visitor engagement timeline regression (HOPE_API_KEY not set)."
 }
+
 

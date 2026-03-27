@@ -720,18 +720,20 @@ export function VisitorsTable({
                     )}
                   </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
-                    <div style={{ display: "grid", gap: 8, justifyItems: "start" }}>
-                      <span
-                        style={{
-                          fontFamily: "monospace",
-                          wordBreak: "break-all",
-                          overflowWrap: "anywhere"
-                        }}
-                      >
-                        {item.visitorId}
-                      </span>
-                      <CopyButton value={item.visitorId} label="Copy" />
-                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+  <span
+    style={{
+      fontFamily: "monospace",
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      maxWidth: 140
+    }}
+  >
+    {item.visitorId}
+  </span>
+  <CopyButton value={item.visitorId} label="Copy" />
+</div>
                   </td>
                   <td
                     style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}
@@ -884,4 +886,5 @@ export function VisitorsTable({
     </div>
   );
 }
+
 

@@ -85,7 +85,7 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
   return (
     <div style={{ display: "grid", gap: 18 }}>
       {orderedLabels.map((label) => (
-        <div key={label} style={{ display: "grid", gap: 12 }}>
+        <div key={label} style={{ display: "grid", gap: 16 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.4 }}>
             {label}
           </div>
@@ -103,7 +103,7 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
                   borderRadius: 12,
                   padding: 16,
                   display: "grid",
-                  gap: 10
+                  gap: 12
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
@@ -129,7 +129,7 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
                     style={{ textAlign: "right", minWidth: 160 }}
                     title={formatAbsoluteTime(item.occurredAt)}
                   >
-                    <div style={{ color: "#374151", fontSize: 14, fontWeight: 600 }}>
+                    <div style={{ color: "#374151", fontSize: 13, fontWeight: 500 }}>
                       {formatRelativeTime(item.occurredAt)}
                     </div>
                     <div style={{ color: "#6b7280", fontSize: 12, marginTop: 2 }}>
@@ -149,5 +149,6 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
     </div>
   );
 }
+
 
 

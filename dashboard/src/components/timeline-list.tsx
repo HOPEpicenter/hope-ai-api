@@ -8,27 +8,6 @@ function toTimestamp(value: string | null | undefined) {
   return Number.isNaN(time) ? 0 : time;
 }
 
-function StreamBadge({ stream }: { stream: TimelineItem["stream"] }) {
-  const background = stream === "formation" ? "#dbeafe" : "#ede9fe";
-
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        padding: "4px 8px",
-        borderRadius: 9999,
-        fontSize: 12,
-        fontWeight: 600,
-        background,
-        color: "#111827",
-        textTransform: "capitalize"
-      }}
-    >
-      {stream}
-    </span>
-  );
-}
-
 function EventTypeLabel({ type }: { type: string }) {
   return (
     <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", lineHeight: 1.3 }}>
@@ -54,6 +33,7 @@ function formatEventType(type?: string): string {
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
 function formatDayLabel(value: string | null | undefined): string {
   if (!value) return "Unknown date";
 
@@ -74,6 +54,7 @@ function formatDayLabel(value: string | null | undefined): string {
     year: "numeric"
   });
 }
+
 export function TimelineList({ items }: { items: TimelineItem[] }) {
   if (items.length === 0) {
     return (
@@ -127,16 +108,18 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
               >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
                   <div style={{ display: "grid", gap: 8 }}>
-                    <span style={{
-                      fontSize: 11,
-                      padding: "2px 6px",
-                      borderRadius: 6,
-                      background: item.stream === "formation" ? "#E0F2FE" : "#F0FDF4",
-                      color: item.stream === "formation" ? "#0369A1" : "#166534",
-                      fontWeight: 600,
-                      width: "fit-content",
-                      textTransform: "capitalize"
-                    }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        padding: "2px 6px",
+                        borderRadius: 6,
+                        background: item.stream === "formation" ? "#E0F2FE" : "#F0FDF4",
+                        color: item.stream === "formation" ? "#0369A1" : "#166534",
+                        fontWeight: 600,
+                        width: "fit-content",
+                        textTransform: "capitalize"
+                      }}
+                    >
                       {item.stream}
                     </span>
                     <EventTypeLabel type={formatEventType(item.type)} />
@@ -158,13 +141,6 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
                 <div style={{ color: "#374151", lineHeight: 1.5 }}>
                   {item.summary ?? "No summary provided."}
                 </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-                  <div style={{ fontSize: 12, color: "#6b7280" }}>Event ID</div>
-                  <div style={{ fontSize: 12, color: "#6b7280", fontFamily: "monospace" }}>
-                    {item.eventId}
-                  </div>
-                </div>
               </div>
             );
           })}
@@ -173,9 +149,3 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
     </div>
   );
 }
-
-
-
-
-
-

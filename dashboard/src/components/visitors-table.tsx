@@ -100,7 +100,7 @@ function FollowupStateBadge({ state }: { state: VisitorsTableItem["followupState
 
 function AttentionBadge({ state }: { state: VisitorsTableItem["attentionState"] }) {
   if (!state) {
-    return <span style={{ color: "#9ca3af" }}>-</span>;
+    return <span style={{ color: "#9ca3af" }}>—</span>;
   }
 
   const background = state === "Needs attention" ? "#fee2e2" : "#e0f2fe";
@@ -716,23 +716,27 @@ export function VisitorsTable({
                         {item.assignedTo}
                       </Link>
                     ) : (
-                      <span>-</span>
+                      <span style={{ color: "#9ca3af" }}>—</span>
                     )}
                   </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "nowrap", minWidth: 0 }}>
   <span
     style={{
+      display: "block",
       fontFamily: "monospace",
+      minWidth: 0,
+      flex: "1 1 auto",
       whiteSpace: "nowrap",
       overflow: "hidden",
-      textOverflow: "ellipsis",
-      maxWidth: 140
+      textOverflow: "ellipsis"
     }}
   >
     {item.visitorId}
   </span>
-  <CopyButton value={item.visitorId} label="Copy" />
+  <span style={{ flex: "0 0 auto" }}>
+    <CopyButton value={item.visitorId} label="Copy" />
+  </span>
 </div>
                   </td>
                   <td
@@ -874,7 +878,7 @@ export function VisitorsTable({
                         </button>
                       )
                     ) : (
-                      <span style={{ color: "#9ca3af" }}>-</span>
+                      <span style={{ color: "#9ca3af" }}>—</span>
                     )}
                   </td>
                 </tr>
@@ -886,5 +890,4 @@ export function VisitorsTable({
     </div>
   );
 }
-
 

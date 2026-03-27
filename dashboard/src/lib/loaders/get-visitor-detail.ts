@@ -84,6 +84,8 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
         eventType?: string | null;
         type?: string | null;
         happenedAt?: string | null;
+        occurredAt?: string | null;
+        recordedAt?: string | null;
         createdAt?: string | null;
         timestamp?: string | null;
         source?: string | null;
@@ -119,6 +121,7 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
       .slice(0, 8)
   };
 }
+
 
 
 

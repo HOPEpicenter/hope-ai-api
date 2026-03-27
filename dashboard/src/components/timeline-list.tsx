@@ -1,6 +1,6 @@
 import { PageState } from "@/components/page-state";
 import type { TimelineItem } from "@/lib/contracts/timeline";
-import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
+import { formatAbsoluteTime } from "@/lib/format-relative-time";
 
 function toTimestamp(value: string | null | undefined) {
   if (!value) return 0;
@@ -130,9 +130,6 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
                     title={formatAbsoluteTime(item.occurredAt)}
                   >
                     <div style={{ color: "#374151", fontSize: 13, fontWeight: 500 }}>
-                      {formatRelativeTime(item.occurredAt)}
-                    </div>
-                    <div style={{ color: "#6b7280", fontSize: 12, marginTop: 2 }}>
                       {formatAbsoluteTime(item.occurredAt)}
                     </div>
                   </div>
@@ -149,6 +146,7 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
     </div>
   );
 }
+
 
 
 

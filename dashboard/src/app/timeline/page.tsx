@@ -9,7 +9,7 @@ export default async function TimelinePage() {
       <div>
         <h1 style={{ marginBottom: 8 }}>Timeline</h1>
         <p style={{ marginTop: 0, color: "#4b5563" }}>
-          Mock-first integrated activity stream aligned to the existing integration timeline surface.
+          Integrated activity stream for operator review across engagement and formation events.
         </p>
       </div>
 
@@ -36,3 +36,4 @@ export default async function TimelinePage() {
     </section>
   );
 }
+

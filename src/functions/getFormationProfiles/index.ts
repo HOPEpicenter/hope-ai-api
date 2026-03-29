@@ -40,7 +40,7 @@ export async function getFormationProfiles(context: any, req: any): Promise<any>
       const one = await getFormationProfileByVisitorId(table, visitorIdQ);
       items = one
         ? [one]
-        : [{ partitionKey: "VISITOR", rowKey: visitorIdQ, visitorId: visitorIdQ }];
+        : [];
     } else {
       const out = await listFormationProfiles(table, {
         limit,
@@ -73,3 +73,5 @@ export async function getFormationProfiles(context: any, req: any): Promise<any>
     };
   }
 }
+
+

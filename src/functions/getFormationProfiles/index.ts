@@ -1,3 +1,34 @@
+
+function mapProfile(entity: any) {
+  if (!entity) return null;
+
+  return {
+    partitionKey: entity.partitionKey,
+    rowKey: entity.rowKey,
+    visitorId: entity.visitorId,
+
+    assignedTo: entity.assignedTo ?? null,
+
+    stage: entity.stage ?? null,
+    stageReason: entity.stageReason ?? null,
+    stageUpdatedAt: entity.stageUpdatedAt ?? null,
+    stageUpdatedBy: entity.stageUpdatedBy ?? null,
+
+    lastEventId: entity.lastEventId ?? null,
+    lastEventType: entity.lastEventType ?? null,
+    lastEventAt: entity.lastEventAt ?? null,
+
+    lastFollowupAssignedAt: entity.lastFollowupAssignedAt ?? null,
+    lastFollowupContactedAt: entity.lastFollowupContactedAt ?? null,
+    lastFollowupOutcome: entity.lastFollowupOutcome ?? null,
+    lastFollowupOutcomeAt: entity.lastFollowupOutcomeAt ?? null,
+    lastFollowupOutcomeNotes: entity.lastFollowupOutcomeNotes ?? null,
+
+    lastNextStepAt: entity.lastNextStepAt ?? null,
+
+    updatedAt: entity.updatedAt ?? null
+  };
+}
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
   ensureTable,
@@ -39,7 +70,7 @@ export async function getFormationProfiles(context: any, req: any): Promise<any>
     if (visitorIdQ) {
       const one = await getFormationProfileByVisitorId(table, visitorIdQ);
       items = one
-        ? [one]
+        ? [mapProfile(one)]
         : [];
     } else {
       const out = await listFormationProfiles(table, {
@@ -50,7 +81,7 @@ export async function getFormationProfiles(context: any, req: any): Promise<any>
         q
       });
 
-      items = out.items;
+      items = out.items.map((item: any) => mapProfile(item));
       nextCursor = out.cursor ?? null;
     }
 
@@ -73,5 +104,6 @@ export async function getFormationProfiles(context: any, req: any): Promise<any>
     };
   }
 }
+
 
 

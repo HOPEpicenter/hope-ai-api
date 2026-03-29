@@ -1,4 +1,16 @@
 
+### 2026-03-29 — Formation truth lane
+
+- [x] #451 formation profile parity
+- [x] #452 engagement → formation bridge
+- [x] #453 profile response normalization
+- [x] #454 profiles list normalization
+- [x] #455 backfill script (PowerShell)
+- [x] #456 assignedTo normalization
+- [x] #457 regression asserts
+
+
+
 ### 2026-03-27 (Session Closeout)
 
 - [x] Merged **#438–#444**: dashboard readability and scanability polish across timeline and visitors table
@@ -354,5 +366,8 @@ Current rule:
 - [x] Map formation event timestamp fallbacks on visitor detail
 - [x] Verify CI green after merge
 - [x] Verify staging deploy green after merge
+
+
+
 
 

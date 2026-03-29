@@ -1,4 +1,16 @@
 
+## 2026-03-29 — Formation profile truth / parity lane closed
+
+- ✅ Merged **#451**: restored formation profile endpoint parity by removing fallback rows so list/profile now agree.
+- ✅ Merged **#452**: bridged engagement events into formation projection.
+- ✅ Merged **#453**: normalized single formation profile response shape.
+- ✅ Merged **#454**: normalized formation profiles list response shape.
+- ✅ Merged **#455**: added PowerShell backfill script for engagement → formation recovery.
+- ✅ Merged **#456**: normalized assignedTo in formation projection.
+- ✅ Merged **#457**: added regression asserts for assignedTo and removed storage leakage.
+- ✅ CI and staging deploys green after final slices.
+
+
 ## 2026-03-27
 
 - ✅ Merged **#438–#444**: dashboard readability and scanability polish across timeline and visitors table.
@@ -269,5 +281,6 @@ Verification:
 - Dashboard: merged PR #434 to map formation event timestamp fallbacks on visitor detail.
 - Dashboard: Recent Formation Events now uses happenedAt, occurredAt, recordedAt, createdAt, then timestamp to avoid false "No timestamp available" states.
 - Validation: CI green after merge; staging deploy green after merge.
+
 
 

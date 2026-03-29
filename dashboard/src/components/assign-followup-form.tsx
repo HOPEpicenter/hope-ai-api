@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+const MY_ASSIGNEE = (process.env.NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE ?? "").trim();
+
 type AssignFollowupResponse = {
   ok?: boolean;
   visitorId?: string;
@@ -20,7 +22,7 @@ export function AssignFollowupForm({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [assigneeId, setAssigneeId] = useState("ops-user-1");
+  const [assigneeId, setAssigneeId] = useState(MY_ASSIGNEE || "ops-user-1");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUnassigning, setIsUnassigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -234,3 +236,4 @@ export function AssignFollowupForm({
     </div>
   );
 }
+

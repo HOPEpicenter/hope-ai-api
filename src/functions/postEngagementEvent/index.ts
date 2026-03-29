@@ -2,6 +2,7 @@ import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { validateEngagementEventEnvelopeV1Strict } from "../../contracts/engagementEvent.v1";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { EngagementsService } from "../../services/engagements/engagementsService";
+import { recordFormationEventV1 } from "../_shared/formation";
 
 const service = new EngagementsService(new EngagementEventsRepository());
 
@@ -36,7 +37,30 @@ export async function postEngagementEvent(context: any, req: any): Promise<void>
       return;
     }
 
-    await service.appendEvent(parsed.value);
+        await service.appendEvent(parsed.value);
+
+    // Bridge: engagement → formation
+    const evt = parsed.value;
+    const type = String(evt.type ?? "").trim();
+
+    const formationTypes = [
+      "FOLLOWUP_ASSIGNED",
+      "FOLLOWUP_CONTACTED",
+      "FOLLOWUP_OUTCOME_RECORDED",
+      "FOLLOWUP_UNASSIGNED"
+    ];
+
+    if (formationTypes.includes(type)) {
+      await recordFormationEventV1({
+        v: 1,
+        eventId: evt.eventId,
+        visitorId: evt.visitorId,
+        type,
+        occurredAt: evt.occurredAt,
+        source: { system: "engagements" },
+        data: evt.data ?? {}
+      });
+    }
 
     context.res = {
       status: 202,
@@ -56,3 +80,5 @@ export async function postEngagementEvent(context: any, req: any): Promise<void>
     };
   }
 }
+
+

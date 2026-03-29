@@ -1,3 +1,14 @@
+
+function normalizeAssignedTo(input: any): string | null {
+  if (input === null || input === undefined) return null;
+
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  return null;
+}
 import { TableClient } from "@azure/data-tables";
 import { getConnString } from "./tableClient";
 
@@ -387,7 +398,7 @@ export async function recordFormationEventV1(body: unknown): Promise<{
   }
 
   if (type === "FOLLOWUP_ASSIGNED") {
-    const assigneeId = String(data.assigneeId ?? "").trim();
+    const assigneeId = normalizeAssignedTo(data.assigneeId);
     if (!assigneeId) {
       throw new Error("FOLLOWUP_ASSIGNED requires data.assigneeId (string)");
     }
@@ -594,5 +605,6 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
+
 
 

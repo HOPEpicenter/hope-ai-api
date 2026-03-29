@@ -69,5 +69,33 @@ if ([string]::IsNullOrWhiteSpace([string]$p.profile.updatedAt)) { throw "Expecte
 # stage should be Connected after NEXT_STEP_SELECTED
 if ($p.profile.stage -ne "Connected") { throw "Expected stage=Connected after NEXT_STEP_SELECTED, got $($p.profile.stage)" }
 
+
+# --- NEW: assignment normalization assertions ---
+
+if ($null -ne $profile.assignedTo) {
+  if (-not ($profile.assignedTo -is [string])) {
+    throw "assignedTo must be string or null"
+  }
+
+  if ([string]::IsNullOrWhiteSpace($profile.assignedTo)) {
+    throw "assignedTo must not be empty string"
+  }
+}
+
+# --- NEW: no storage leakage ---
+
+if ($profile.PSObject.Properties["odata.metadata"]) {
+  throw "profile contains odata.metadata (should be removed)"
+}
+
+if ($profile.PSObject.Properties["etag"]) {
+  throw "profile contains etag (should be removed)"
+}
+
+if ($profile.PSObject.Properties["timestamp"]) {
+  throw "profile contains timestamp (should be removed)"
+}
+
 Write-Host "[assert-formation-profile] OK: formation profile snapshot assertions passed."
+
 

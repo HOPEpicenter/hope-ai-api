@@ -1,4 +1,14 @@
 
+## ✅ Formation profile truth / parity lane CLOSED (PRs #451–#457)
+
+- formation list/profile parity restored
+- engagement → formation projection enforced
+- historical backfill completed and scripted
+- profile + list endpoints normalized (no storage leakage)
+- assignedTo normalized at projection layer
+- regression assertions added for contract protection
+
+
 ## 2026-03-27 Update
 
 **What landed**
@@ -495,5 +505,7 @@ Planning rule going forward:
   - Formation events now display existing event times more reliably.
   - No backend routes, storage, or UI expansion were added.
   - Keep next work narrow: continue timeline quality improvements only where they directly improve operator trust.
+
+
 
 

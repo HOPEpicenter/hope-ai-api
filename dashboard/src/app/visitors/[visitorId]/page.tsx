@@ -1,3 +1,18 @@
+
+function getAssignedToOwnerId(
+  assignedTo: { ownerId: string | null } | string | null | undefined
+): string | null {
+  if (typeof assignedTo === "string") {
+    return assignedTo.trim().length > 0 ? assignedTo.trim() : null;
+  }
+
+  if (assignedTo && typeof assignedTo === "object" && "ownerId" in assignedTo) {
+    const ownerId = assignedTo.ownerId;
+    return typeof ownerId === "string" && ownerId.trim().length > 0 ? ownerId.trim() : null;
+  }
+
+  return null;
+}
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AssignFollowupForm } from "@/components/assign-followup-form";
@@ -938,7 +953,7 @@ export default async function VisitorDetailPage({
   const queueHref = preset ? `/visitors?preset=${preset}` : null;
   const nextAction = getNextAction(
     followupStatus,
-    data.formationProfile?.assignedTo?.ownerId ?? null
+    getAssignedToOwnerId(data.formationProfile?.assignedTo)
   );
 
   return (
@@ -1009,7 +1024,7 @@ export default async function VisitorDetailPage({
         email={data.visitor.email}
         stage={data.formationProfile?.stage ?? null}
         followupStatus={followupStatus}
-        assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null}
+        assignedToOwnerId={getAssignedToOwnerId(data.formationProfile?.assignedTo)}
         lastActivityAt={lastActivityAt}
         attentionState={attentionState}
         backHref={backHref}
@@ -1064,7 +1079,7 @@ export default async function VisitorDetailPage({
           {nextAction.actionKey === "assign" ? (
             <AssignFollowupForm
               visitorId={data.visitor.visitorId}
-              assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null}
+              assignedToOwnerId={getAssignedToOwnerId(data.formationProfile?.assignedTo)}
             />
           ) : null}
 
@@ -1107,7 +1122,7 @@ export default async function VisitorDetailPage({
                 {nextAction.actionKey !== "assign" ? (
                   <AssignFollowupForm
                     visitorId={data.visitor.visitorId}
-                    assignedToOwnerId={data.formationProfile?.assignedTo?.ownerId ?? null}
+                    assignedToOwnerId={getAssignedToOwnerId(data.formationProfile?.assignedTo)}
                   />
                 ) : null}
 
@@ -1189,7 +1204,7 @@ export default async function VisitorDetailPage({
               />
               <DetailRow
                 label="Assigned To"
-                value={data.formationProfile.assignedTo?.ownerId ?? "-"}
+                value={getAssignedToOwnerId(data.formationProfile?.assignedTo) ?? "-"}
               />
               <DetailRow
                 label="Assigned At"
@@ -1236,6 +1251,9 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
+
+
 
 
 

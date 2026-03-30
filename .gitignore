@@ -89,3 +89,5 @@ __blobstorage__/
 # Generated Azure Functions folders (copied from src/functions/**/function.json)
 get*/ 
 post*/
+!src/functions/get*/
+!src/functions/post*/

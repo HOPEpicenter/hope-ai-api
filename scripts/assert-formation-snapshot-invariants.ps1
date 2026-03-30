@@ -111,8 +111,14 @@ function Get-FormationProfileEventually {
 Post-FormationEventV1 -EventId $evtA -Type "FOLLOWUP_ASSIGNED" -OccurredAt $t1 -Data @{ assigneeId = "ops-smoke" } | Out-Null
 Post-FormationEventV1 -EventId $evtB -Type "FOLLOWUP_OUTCOME_RECORDED" -OccurredAt $t2 -Data @{ outcome = "reached" } | Out-Null
 
-$profile1 = Get-FormationProfile
-Assert-True ($null -ne $profile1) "profile should exist after events"
+$profile1 = Get-FormationProfileEventually `
+  -Predicate {
+    param($p)
+    ($null -ne $p) -and
+    ($null -ne $p.lastEventAt) -and
+    ($p.lastEventType -eq "FOLLOWUP_OUTCOME_RECORDED")
+  } `
+  -FailureMessage "profile should exist after events and reflect newest event"
 
 # Compare instants: Invoke-RestMethod may materialize ISO strings as DateTime
 function To-UtcDto {
@@ -123,7 +129,8 @@ function To-UtcDto {
 }
 
 function To-IsoMillis {
-  param([Parameter(Mandatory=$true)]$Value)
+  param($Value)
+  if ($null -eq $Value) { return $null }
   return (To-UtcDto $Value).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
 }
 
@@ -132,6 +139,9 @@ Post-FormationEventV1 -EventId $evtA -Type "FOLLOWUP_ASSIGNED" -OccurredAt $t1 -
 $profile1b = Get-FormationProfileEventually `
   -Predicate {
     param($p)
+    ($null -ne $p) -and
+    ($null -ne $profile1.lastEventAt) -and
+    ($null -ne $p.lastEventAt) -and
     ((To-IsoMillis $profile1.lastEventAt) -eq (To-IsoMillis $p.lastEventAt)) -and
     ($profile1.lastEventType -eq $p.lastEventType)
   } `
@@ -142,6 +152,8 @@ Post-FormationEventV1 -EventId $evtC -Type "FOLLOWUP_CONTACTED" -OccurredAt $t0 
 $profile2 = Get-FormationProfileEventually `
   -Predicate {
     param($p)
+    ($null -ne $p) -and
+    ($null -ne $p.lastEventAt) -and
     ((To-IsoMillis $p.lastEventAt) -eq (To-IsoMillis $t2)) -and
     ($p.lastEventType -eq "FOLLOWUP_OUTCOME_RECORDED")
   } `
@@ -163,6 +175,8 @@ Post-FormationEventV1 -EventId $evtTieHigh -Type "FOLLOWUP_OUTCOME_RECORDED" -Oc
 $profile3 = Get-FormationProfileEventually `
   -Predicate {
     param($p)
+    ($null -ne $p) -and
+    ($null -ne $p.lastEventAt) -and
     ((To-IsoMillis $p.lastEventAt) -eq (To-IsoMillis $tieAt)) -and
     ($p.lastEventType -eq "FOLLOWUP_OUTCOME_RECORDED")
   } `
@@ -176,9 +190,16 @@ $evtTieHigh = "evt-formation-tie-z-" + [Guid]::NewGuid().ToString("N")
 Post-FormationEventV1 -EventId $evtTieLow  -Type "FOLLOWUP_ASSIGNED"         -OccurredAt $t3 -Data @{ assigneeId = "ops-smoke-tie" } | Out-Null
 Post-FormationEventV1 -EventId $evtTieHigh -Type "FOLLOWUP_OUTCOME_RECORDED" -OccurredAt $t3 -Data @{ outcome = "reached" } | Out-Null
 
-$profile3 = Get-FormationProfile
+$profile3 = Get-FormationProfileEventually `
+  -Predicate {
+    param($p)
+    ($null -ne $p) -and
+    ($null -ne $p.lastEventAt) -and
+    ((To-IsoMillis $p.lastEventAt) -eq (To-IsoMillis $t3)) -and
+    ($p.lastEventType -eq "FOLLOWUP_OUTCOME_RECORDED")
+  } `
+  -FailureMessage "tie-break projection should stabilize"
 
-Assert-True ((To-UtcDto $profile3.lastEventAt).UtcDateTime -eq (To-UtcDto $t3).UtcDateTime) "lastEventAt should equal shared tie timestamp (t3)"
 Assert-True ($profile3.lastEventType -eq "FOLLOWUP_OUTCOME_RECORDED") "lastEventType should follow greater eventId on equal occurredAt"
 if ($profile3.PSObject.Properties.Name -contains "lastEventId") {
   Assert-True ($profile3.lastEventId -eq $evtTieHigh) "lastEventId should be the lexicographically greater eventId on equal occurredAt"

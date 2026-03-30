@@ -63,6 +63,11 @@ function normalizeIso(value: unknown, fieldName: string): string {
     throw new Error(fieldName + " is required");
   }
 
+  const isoUtcPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?Z$/;
+  if (!isoUtcPattern.test(text)) {
+    throw new Error(fieldName + " must be a valid UTC ISO timestamp ending in Z");
+  }
+
   const parsed = new Date(text);
   if (Number.isNaN(parsed.getTime())) {
     throw new Error(fieldName + " must be a valid ISO timestamp");

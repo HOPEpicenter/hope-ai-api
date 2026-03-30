@@ -240,6 +240,10 @@ function toComparableProfileState(profile: FunctionFormationProfileEntity | null
   return JSON.stringify(comparable);
 }
 
+function logFormationEventDecision(payload: Record<string, unknown>): void {
+  console.log("[formation-event]", JSON.stringify(payload));
+}
+
 export function toFormationHttpError(error: any, fallbackStatus = 400): number {
   const code = Number(error?.statusCode ?? error?.status ?? 0);
   if (code > 0) {
@@ -486,6 +490,17 @@ export async function recordFormationEventV1(body: unknown): Promise<{
       visitorId
     };
 
+    logFormationEventDecision({
+      eventId,
+      visitorId,
+      type,
+      occurredAt,
+      rowKey,
+      accepted: false,
+      projectionChanged: false,
+      reason: "duplicate"
+    });
+
     return {
       accepted: false,
       id: eventId,
@@ -572,10 +587,22 @@ export async function recordFormationEventV1(body: unknown): Promise<{
   const beforeState = toComparableProfileState(existingProfile);
   const afterState = toComparableProfileState(profile);
 
-  if (beforeState !== afterState) {
+  const projectionChanged = beforeState !== afterState;
+
+  if (projectionChanged) {
     profile.updatedAt = new Date().toISOString();
     await profilesTable.upsertEntity(profile as any, "Merge");
   }
+
+  logFormationEventDecision({
+    eventId,
+    visitorId,
+    type,
+    occurredAt,
+    rowKey,
+    accepted: true,
+    projectionChanged
+  });
 
   return {
     accepted: true,

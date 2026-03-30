@@ -209,6 +209,10 @@ function maybeSetStage(
   }
 }
 
+function shouldAdvanceTouchpointAt(currentAt: unknown, occurredAtIso: string): boolean {
+  return !currentAt || occurredAtIso > String(currentAt);
+}
+
 function toComparableProfileState(profile: FunctionFormationProfileEntity | null): string {
   if (!profile) {
     return "";
@@ -515,7 +519,7 @@ export async function recordFormationEventV1(body: unknown): Promise<{
       throw new Error("FOLLOWUP_ASSIGNED requires data.assigneeId (string)");
     }
 
-    if (shouldAdvance) {
+    if (shouldAdvanceTouchpointAt(profile.lastFollowupAssignedAt, occurredAt)) {
       profile.assignedTo = assigneeId;
       profile.lastFollowupAssignedAt = occurredAt;
       maybeSetStage(profile, "Connected", occurredAt, type);
@@ -544,7 +548,7 @@ export async function recordFormationEventV1(body: unknown): Promise<{
       throw new Error("FOLLOWUP_OUTCOME_RECORDED requires data.outcome (string)");
     }
 
-    if (shouldAdvance) {
+    if (shouldAdvanceTouchpointAt(profile.lastFollowupOutcomeAt, occurredAt)) {
       profile.lastFollowupOutcomeAt = occurredAt;
       profile.lastFollowupOutcome = outcome;
       profile.lastFollowupOutcomeNotes =
@@ -559,7 +563,7 @@ export async function recordFormationEventV1(body: unknown): Promise<{
       throw new Error("NEXT_STEP_SELECTED requires data.nextStep (string)");
     }
 
-    if (shouldAdvance) {
+    if (shouldAdvanceTouchpointAt(profile.lastNextStepAt, occurredAt)) {
       profile.lastNextStepAt = occurredAt;
       maybeSetStage(profile, "Connected", occurredAt, type);
     }

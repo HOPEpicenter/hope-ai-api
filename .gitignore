@@ -85,3 +85,7 @@ azure-running*.zip
 run-*-logs/
 run-*-logs.zip
 __blobstorage__/
+
+# Generated Azure Functions folders (copied from src/functions/**/function.json)
+get*/ 
+post*/

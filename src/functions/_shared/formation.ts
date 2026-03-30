@@ -416,7 +416,18 @@ export async function recordFormationEventV1(body: unknown): Promise<{
       summary: type
     };
 
-    await eventsTable.createEntity(eventEntity);
+    try {
+      await eventsTable.createEntity(eventEntity);
+    } catch (err: any) {
+      const code = Number(err?.statusCode ?? err?.status ?? 0);
+
+      // 409 = already exists; treat as idempotent success
+      if (code === 409) {
+        existingEvent = eventEntity;
+      } else {
+        throw err;
+      }
+    }
   }
 
   const existingProfile = await getFormationProfileByVisitorId(profilesTable, visitorId);

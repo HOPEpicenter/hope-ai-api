@@ -322,10 +322,18 @@ export async function getFormationProfileByVisitorId(
 
 export async function listFormationEventsByVisitorId(
   table: TableClient,
-  visitorIdOrInput: string | { visitorId: string; limit?: number; beforeRowKey?: string },
+  visitorIdOrInput: string | {
+    visitorId: string;
+    limit?: number;
+    beforeRowKey?: string;
+    sinceOccurredAt?: string;
+    untilOccurredAt?: string;
+  },
   input?: {
     limit?: number;
     beforeRowKey?: string;
+    sinceOccurredAt?: string;
+    untilOccurredAt?: string;
   }
 ): Promise<FunctionFormationEventEntity[]> {
   const visitorId =
@@ -337,7 +345,9 @@ export async function listFormationEventsByVisitorId(
       ? input
       : {
           limit: visitorIdOrInput.limit,
-          beforeRowKey: visitorIdOrInput.beforeRowKey
+          beforeRowKey: visitorIdOrInput.beforeRowKey,
+          sinceOccurredAt: visitorIdOrInput.sinceOccurredAt,
+          untilOccurredAt: visitorIdOrInput.untilOccurredAt
         };
   const limit = resolvedInput?.limit ?? 50;
 
@@ -383,7 +393,18 @@ export async function listFormationEventsByVisitorId(
 
   results.sort((a, b) => String(b.rowKey).localeCompare(String(a.rowKey)));
 
-  return results.slice(0, limit);
+  const filtered = results.filter((item) => {
+    const occurredAt = String(item.occurredAt ?? "");
+    if (resolvedInput?.sinceOccurredAt && occurredAt < resolvedInput.sinceOccurredAt) {
+      return false;
+    }
+    if (resolvedInput?.untilOccurredAt && occurredAt > resolvedInput.untilOccurredAt) {
+      return false;
+    }
+    return true;
+  });
+
+  return filtered.slice(0, limit);
 }
 
 export async function recordFormationEventV1(body: unknown): Promise<{

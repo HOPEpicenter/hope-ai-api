@@ -47,11 +47,13 @@ export async function getOpsFormationRecentEvents(context: any, req: any): Promi
 
   const rawLimit = Number(req?.query?.limit ?? 20);
   const limit = Math.max(1, Math.min(rawLimit || 20, 100));
+  const beforeRowKey = String(req?.query?.before ?? "").trim() || undefined;
 
   try {
     const table = getFormationEventsTableClient();
-    const items = await listFormationEventsByVisitorId(table, { visitorId, limit } as any);
+    const items = await listFormationEventsByVisitorId(table, { visitorId, limit, beforeRowKey } as any);
     const shapedItems = items.map(toOpsFormationEvent);
+    const nextCursor = items.length >= limit ? items[items.length - 1]?.rowKey ?? null : null;
 
     context.res = {
       status: 200,
@@ -59,6 +61,7 @@ export async function getOpsFormationRecentEvents(context: any, req: any): Promi
         ok: true,
         visitorId,
         count: shapedItems.length,
+        nextCursor,
         items: shapedItems
       }
     };

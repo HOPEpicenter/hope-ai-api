@@ -322,16 +322,27 @@ export async function getFormationProfileByVisitorId(
 
 export async function listFormationEventsByVisitorId(
   table: TableClient,
-  visitorId: string,
+  visitorIdOrInput: string | { visitorId: string; limit?: number; beforeRowKey?: string },
   input?: {
     limit?: number;
     beforeRowKey?: string;
   }
 ): Promise<FunctionFormationEventEntity[]> {
-  const limit = input?.limit ?? 50;
+  const visitorId =
+    typeof visitorIdOrInput === "string"
+      ? visitorIdOrInput
+      : String(visitorIdOrInput.visitorId ?? "").trim();
+  const resolvedInput =
+    typeof visitorIdOrInput === "string"
+      ? input
+      : {
+          limit: visitorIdOrInput.limit,
+          beforeRowKey: visitorIdOrInput.beforeRowKey
+        };
+  const limit = resolvedInput?.limit ?? 50;
 
-  const filter = input?.beforeRowKey
-    ? `PartitionKey eq '${escapeOData(visitorId)}' and RowKey lt '${escapeOData(input.beforeRowKey)}'`
+  const filter = resolvedInput?.beforeRowKey
+    ? `PartitionKey eq '${escapeOData(visitorId)}' and RowKey lt '${escapeOData(resolvedInput!.beforeRowKey)}'`
     : `PartitionKey eq '${escapeOData(visitorId)}'`;
 
   const select = [

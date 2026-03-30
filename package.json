@@ -7,7 +7,7 @@
   "scripts": {
     "build": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/write-version.ps1 && pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/clean.ps1 && tsc -p tsconfig.json && tsc -p tsconfig.functions.json && npm run copy",
     "clean": "rimraf dist",
-    "copy": "copyfiles -u 2 \"src/functions/**/function.json\" ./",
+    "copy": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/copy-function-json.ps1",
     "deploy:staging": "npm run build && npm run copy && npm run verify:layout && func azure functionapp publish hope-ai-api-staging --no-build --source .",
     "dev": "ts-node src/index.ts",
     "guard": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/guard-no-azure-functions.ps1",

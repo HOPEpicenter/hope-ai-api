@@ -379,13 +379,11 @@ export async function listFormationEventsByVisitorId(
       metadata: entity.metadata,
       idempotencyKey: entity.idempotencyKey
     });
-
-    if (results.length >= limit) {
-      break;
-    }
   }
 
-  return results;
+  results.sort((a, b) => String(b.rowKey).localeCompare(String(a.rowKey)));
+
+  return results.slice(0, limit);
 }
 
 export async function recordFormationEventV1(body: unknown): Promise<{

@@ -379,6 +379,25 @@ export async function recordFormationEventV1(body: unknown): Promise<{
   }
 
   const existingProfile = await getFormationProfileByVisitorId(profilesTable, visitorId);
+  if (existingEvent) {
+    const profile: FunctionFormationProfileEntity = {
+      ...(existingProfile ?? {}),
+      partitionKey: "VISITOR",
+      rowKey: visitorId,
+      visitorId
+    };
+
+    return {
+      accepted: false,
+      id: eventId,
+      visitorId,
+      type,
+      occurredAt,
+      rowKey,
+      profile
+    };
+  }
+
 
   const profile: FunctionFormationProfileEntity = {
     ...(existingProfile ?? {}),

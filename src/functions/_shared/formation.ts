@@ -209,6 +209,33 @@ function maybeSetStage(
   }
 }
 
+function toComparableProfileState(profile: FunctionFormationProfileEntity | null): string {
+  if (!profile) {
+    return "";
+  }
+
+  const comparable = {
+    stage: profile.stage ?? null,
+    stageUpdatedAt: profile.stageUpdatedAt ?? null,
+    stageUpdatedBy: profile.stageUpdatedBy ?? null,
+    stageReason: profile.stageReason ?? null,
+    assignedTo: profile.assignedTo ?? null,
+    lastEventType: profile.lastEventType ?? null,
+    lastEventAt: profile.lastEventAt ?? null,
+    lastEventId: (profile as any).lastEventId ?? null,
+    lastServiceAttendedAt: profile.lastServiceAttendedAt ?? null,
+    lastFollowupAssignedAt: profile.lastFollowupAssignedAt ?? null,
+    lastFollowupContactedAt: profile.lastFollowupContactedAt ?? null,
+    lastFollowupOutcomeAt: profile.lastFollowupOutcomeAt ?? null,
+    lastFollowupOutcome: profile.lastFollowupOutcome ?? null,
+    lastFollowupOutcomeNotes: profile.lastFollowupOutcomeNotes ?? null,
+    lastNextStepAt: profile.lastNextStepAt ?? null,
+    lastPrayerRequestedAt: profile.lastPrayerRequestedAt ?? null
+  };
+
+  return JSON.stringify(comparable);
+}
+
 export function toFormationHttpError(error: any, fallbackStatus = 400): number {
   const code = Number(error?.statusCode ?? error?.status ?? 0);
   if (code > 0) {
@@ -474,8 +501,6 @@ export async function recordFormationEventV1(body: unknown): Promise<{
     visitorId
   };
 
-  profile.updatedAt = new Date().toISOString();
-
   const shouldAdvance = shouldAdvanceEventState(existingProfile, occurredAt, eventId);
 
   if (shouldAdvance) {
@@ -540,7 +565,13 @@ export async function recordFormationEventV1(body: unknown): Promise<{
     }
   }
 
-  await profilesTable.upsertEntity(profile as any, "Merge");
+  const beforeState = toComparableProfileState(existingProfile);
+  const afterState = toComparableProfileState(profile);
+
+  if (beforeState !== afterState) {
+    profile.updatedAt = new Date().toISOString();
+    await profilesTable.upsertEntity(profile as any, "Merge");
+  }
 
   return {
     accepted: true,

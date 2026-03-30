@@ -359,6 +359,47 @@ export async function recordFormationEventV1(body: unknown): Promise<{
   }
 
   if (!existingEvent) {
+    const duplicateFilter =
+      "PartitionKey eq '" + escapeOData(visitorId) + "' and idempotencyKey eq '" + escapeOData(eventId) + "'";
+
+    for await (const entity of eventsTable.listEntities<any>({
+      queryOptions: {
+        filter: duplicateFilter,
+        select: [
+          "PartitionKey",
+          "RowKey",
+          "visitorId",
+          "type",
+          "occurredAt",
+          "recordedAt",
+          "channel",
+          "visibility",
+          "sensitivity",
+          "summary",
+          "metadata",
+          "idempotencyKey"
+        ]
+      }
+    })) {
+      existingEvent = {
+        partitionKey: entity.partitionKey ?? entity.PartitionKey,
+        rowKey: entity.rowKey ?? entity.RowKey,
+        visitorId: entity.visitorId,
+        type: entity.type,
+        occurredAt: entity.occurredAt,
+        recordedAt: entity.recordedAt,
+        channel: entity.channel,
+        visibility: entity.visibility,
+        sensitivity: entity.sensitivity,
+        summary: entity.summary,
+        metadata: entity.metadata,
+        idempotencyKey: entity.idempotencyKey
+      };
+      break;
+    }
+  }
+
+  if (!existingEvent) {
     const eventEntity: { partitionKey: string; rowKey: string } & Record<string, any> = {
       partitionKey: visitorId,
       rowKey,

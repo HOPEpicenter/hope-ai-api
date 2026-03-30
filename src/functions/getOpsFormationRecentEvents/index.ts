@@ -4,6 +4,32 @@ import {
   listFormationEventsByVisitorId
 } from "../_shared/formation";
 
+function tryParseJson(value: unknown): unknown {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function toOpsFormationEvent(item: any): Record<string, unknown> {
+  return {
+    id: item.idempotencyKey ?? null,
+    rowKey: item.rowKey ?? null,
+    visitorId: item.visitorId ?? null,
+    type: item.type ?? null,
+    occurredAt: item.occurredAt ?? null,
+    recordedAt: item.recordedAt ?? null,
+    channel: item.channel ?? null,
+    summary: item.summary ?? null,
+    metadata: tryParseJson(item.metadata)
+  };
+}
+
 export async function getOpsFormationRecentEvents(context: any, req: any): Promise<void> {
   const auth = requireApiKeyForFunction(req);
   if (!auth.ok) {
@@ -25,13 +51,15 @@ export async function getOpsFormationRecentEvents(context: any, req: any): Promi
   try {
     const table = getFormationEventsTableClient();
     const items = await listFormationEventsByVisitorId(table, { visitorId, limit } as any);
+    const shapedItems = items.map(toOpsFormationEvent);
+
     context.res = {
       status: 200,
       body: {
         ok: true,
         visitorId,
-        count: items.length,
-        items
+        count: shapedItems.length,
+        items: shapedItems
       }
     };
   } catch (err: any) {

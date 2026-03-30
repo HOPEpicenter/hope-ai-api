@@ -86,6 +86,14 @@ function requireNonEmptyString(value: unknown, fieldName: string): string {
   return text;
 }
 
+const SUPPORTED_FORMATION_EVENT_TYPES = new Set([
+  "FOLLOWUP_ASSIGNED",
+  "FOLLOWUP_UNASSIGNED",
+  "FOLLOWUP_CONTACTED",
+  "FOLLOWUP_OUTCOME_RECORDED",
+  "NEXT_STEP_SELECTED"
+]);
+
 function validateFormationEventEnvelopeV1Strict(body: unknown): {
   v: number;
   eventId: string;
@@ -105,6 +113,9 @@ function validateFormationEventEnvelopeV1Strict(body: unknown): {
   const eventId = requireNonEmptyString(obj.eventId, "eventId");
   const visitorId = requireNonEmptyString(obj.visitorId, "visitorId");
   const type = requireNonEmptyString(obj.type, "type");
+  if (!SUPPORTED_FORMATION_EVENT_TYPES.has(type)) {
+    throw new Error("type must be one of: " + Array.from(SUPPORTED_FORMATION_EVENT_TYPES).join(", "));
+  }
   const occurredAt = requireNonEmptyString(obj.occurredAt, "occurredAt");
 
   const source = asObject(obj.source);

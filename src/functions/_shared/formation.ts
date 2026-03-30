@@ -437,7 +437,10 @@ export async function recordFormationEventV1(body: unknown): Promise<{
   }
 
   if (type === "FOLLOWUP_CONTACTED") {
-    if (shouldAdvance) {
+    if (
+      !profile.lastFollowupContactedAt ||
+      occurredAt > profile.lastFollowupContactedAt
+    ) {
       profile.lastFollowupContactedAt = occurredAt;
     }
   }

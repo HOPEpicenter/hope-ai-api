@@ -37,3 +37,4 @@ Returned when the email already exists (idempotent repeat).
 ### GET /api/visitors/:id
 Fetch a visitor by id.
 
+

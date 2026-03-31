@@ -49,21 +49,62 @@ function toOpsFormationEvent(item: any): Record<string, unknown> {
   };
 }
 
+async function listRecentFormationEvents(table: any, options: {
+  limit: number;
+  beforeRowKey?: string;
+  sinceOccurredAt?: string;
+  untilOccurredAt?: string;
+}): Promise<any[]> {
+  const formationTypes = new Set([
+    "NEXT_STEP_SELECTED"
+  ]);
+
+  const filterParts: string[] = [];
+
+  if (options.beforeRowKey) {
+    filterParts.push(`RowKey lt '${String(options.beforeRowKey).replace(/'/g, "''")}'`);
+  }
+
+  if (options.sinceOccurredAt) {
+    filterParts.push(`occurredAt ge '${String(options.sinceOccurredAt).replace(/'/g, "''")}'`);
+  }
+
+  if (options.untilOccurredAt) {
+    filterParts.push(`occurredAt le '${String(options.untilOccurredAt).replace(/'/g, "''")}'`);
+  }
+
+  const filter = filterParts.length ? filterParts.join(" and ") : undefined;
+  const results: any[] = [];
+
+  const entities = table.listEntities({
+    queryOptions: {
+      filter
+    }
+  });
+
+  for await (const entity of entities) {
+    const type = String(entity?.type ?? "").trim();
+    if (!formationTypes.has(type)) {
+      continue;
+    }
+
+    results.push(entity);
+
+    if (results.length >= options.limit) {
+      break;
+    }
+  }
+
+  return results;
+}
+
 export async function getOpsFormationRecentEvents(context: any, req: any): Promise<void> {
   const auth = requireApiKeyForFunction(req);
   if (!auth.ok) {
     return;
   }
 
-  const visitorId = String(req?.query?.visitorId ?? "").trim();
-  if (!visitorId) {
-    context.res = {
-      status: 400,
-      body: { ok: false, error: "visitorId is required" }
-    };
-    return;
-  }
-
+  const visitorId = String(req?.query?.visitorId ?? "").trim() || undefined;
   const rawLimit = Number(req?.query?.limit ?? 20);
   const limit = Math.max(1, Math.min(rawLimit || 20, 100));
   const beforeRowKey = String(req?.query?.before ?? "").trim() || undefined;
@@ -79,14 +120,24 @@ export async function getOpsFormationRecentEvents(context: any, req: any): Promi
       };
       return;
     }
+
     const table = getFormationEventsTableClient();
-    const items = await listFormationEventsByVisitorId(table, {
-      visitorId,
-      limit,
-      beforeRowKey,
-      sinceOccurredAt,
-      untilOccurredAt
-    } as any);
+
+    const items = visitorId
+      ? await listFormationEventsByVisitorId(table, {
+          visitorId,
+          limit,
+          beforeRowKey,
+          sinceOccurredAt,
+          untilOccurredAt
+        } as any)
+      : await listRecentFormationEvents(table, {
+          limit,
+          beforeRowKey,
+          sinceOccurredAt,
+          untilOccurredAt
+        });
+
     const shapedItems = items.map(toOpsFormationEvent);
     const nextCursor = items.length >= limit ? items[items.length - 1]?.rowKey ?? null : null;
 
@@ -94,7 +145,7 @@ export async function getOpsFormationRecentEvents(context: any, req: any): Promi
       status: 200,
       body: {
         ok: true,
-        visitorId,
+        visitorId: visitorId ?? null,
         count: shapedItems.length,
         nextCursor,
         sinceOccurredAt: sinceOccurredAt ?? null,
@@ -117,3 +168,6 @@ export async function getOpsFormationRecentEvents(context: any, req: any): Promi
     };
   }
 }
+
+
+

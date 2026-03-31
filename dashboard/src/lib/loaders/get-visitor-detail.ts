@@ -30,11 +30,11 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
   const apiKey = requireEnv("HOPE_API_KEY");
 
   const [visitorData, profileData, eventsData, timelineData] = await Promise.all([
-    getJson(`${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}`, apiKey),
-    getJson(`${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}/formation/profile`, apiKey),
-    getJson(`${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}/formation/events`, apiKey)
+    getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}`, apiKey),
+    getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}/formation/profile`, apiKey),
+    getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}/formation/events`, apiKey)
       ,
-    getJson(`${baseUrl}/api/engagements/${encodeURIComponent(visitorId)}/timeline`, apiKey)
+    getJson(`${baseUrl}/engagements/${encodeURIComponent(visitorId)}/timeline`, apiKey)
   ]);
 
   const visitor = visitorData?.visitor ?? visitorData;

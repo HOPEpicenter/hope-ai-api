@@ -4,6 +4,25 @@ import {
   listFormationEventsByVisitorId
 } from "../_shared/formation";
 
+function normalizeQueryIso(value: unknown, fieldName: string): string | undefined {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return undefined;
+  }
+
+  const isoUtcPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?Z$/;
+  if (!isoUtcPattern.test(text)) {
+    throw new Error(fieldName + " must be a valid UTC ISO timestamp ending in Z");
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(fieldName + " must be a valid ISO timestamp");
+  }
+
+  return parsed.toISOString();
+}
+
 function tryParseJson(value: unknown): unknown {
   if (typeof value !== "string") {
     return null;
@@ -48,10 +67,18 @@ export async function getOpsFormationRecentEvents(context: any, req: any): Promi
   const rawLimit = Number(req?.query?.limit ?? 20);
   const limit = Math.max(1, Math.min(rawLimit || 20, 100));
   const beforeRowKey = String(req?.query?.before ?? "").trim() || undefined;
-  const sinceOccurredAt = String(req?.query?.since ?? "").trim() || undefined;
-  const untilOccurredAt = String(req?.query?.until ?? "").trim() || undefined;
 
   try {
+    const sinceOccurredAt = normalizeQueryIso(req?.query?.since, "since");
+    const untilOccurredAt = normalizeQueryIso(req?.query?.until, "until");
+
+    if (sinceOccurredAt && untilOccurredAt && sinceOccurredAt > untilOccurredAt) {
+      context.res = {
+        status: 400,
+        body: { ok: false, error: "since must be less than or equal to until" }
+      };
+      return;
+    }
     const table = getFormationEventsTableClient();
     const items = await listFormationEventsByVisitorId(table, {
       visitorId,
@@ -76,11 +103,16 @@ export async function getOpsFormationRecentEvents(context: any, req: any): Promi
       }
     };
   } catch (err: any) {
+    const message = String(err?.message ?? err ?? "Unknown error");
+    const isValidationError =
+      message.includes("must be a valid UTC ISO timestamp ending in Z") ||
+      message.includes("must be a valid ISO timestamp");
+
     context.res = {
-      status: 500,
+      status: isValidationError ? 400 : 500,
       body: {
         ok: false,
-        error: String(err?.message ?? err ?? "Unknown error")
+        error: message
       }
     };
   }

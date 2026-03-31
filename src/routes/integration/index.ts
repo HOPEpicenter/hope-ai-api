@@ -78,3 +78,20 @@ integrationRouter.get("/integration/summary", async (req, res, next) => {
 });
 
 
+
+integrationRouter.get("/integration/timeline/global", async (req, res, next) => {
+  try {
+    const limit = Number(req.query.limit ?? 50);
+    const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
+
+    const page = await service.readGlobalIntegratedTimeline(limit, cursor);
+
+    return res.status(200).json({
+      ok: true,
+      items: page.items,
+      nextCursor: page.nextCursor ?? null,
+    });
+  } catch (err) {
+    return next(err);
+  }
+});

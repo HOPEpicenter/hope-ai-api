@@ -338,12 +338,52 @@ return { items: enrichedItems, nextCursor };
     });
   }
 
+  async readGlobalIntegratedTimeline(
+    limit: number,
+    cursor?: string,
+  ): Promise<IntegratedTimelinePageV1> {
+    const safeLimit = Math.max(1, Math.min(200, limit || 50));
+    const perStream = Math.min(200, Math.max(50, safeLimit * 5));
+
+    const storageConnectionString = process.env.STORAGE_CONNECTION_STRING;
+    if (!storageConnectionString) throw new Error("Missing STORAGE_CONNECTION_STRING");
+
+    const eventsTable = getFormationEventsTableClient(storageConnectionString);
+    await ensureTableExists(eventsTable);
+
+    const formationEntities: any[] = [];
+    for await (const e of (eventsTable as any).listEntities()) {
+      formationEntities.push(e);
+      if (formationEntities.length >= perStream) break;
+    }
+
+    const formationItems = formationEntities.map((e: any) => ({
+      v: 1,
+      eventId: e.id ?? e.eventId ?? e.rowKey,
+      visitorId: e.visitorId,
+      type: e.type,
+      occurredAt: e.occurredAt,
+      stream: "formation",
+      source: { system: "formation" },
+      data: e.metadata ? { metadata: e.metadata } : undefined,
+    }));
+
+    const merged = mergeTimelines([], formationItems);
+    merged.sort(compareItemsNewestFirst);
+
+    const pagePlus = merged.slice(0, safeLimit + 1);
+    const pageItems = pagePlus.slice(0, safeLimit);
+    const hasMore = pagePlus.length > safeLimit;
+
+    const nextCursor = hasMore
+      ? String(pageItems[pageItems.length - 1].eventId)
+      : null;
+
+    const enrichedItems = pageItems.map((it) => ({
+      ...it,
+      summary: deriveSummary(it)
+    }));
+
+    return { items: enrichedItems, nextCursor };
+  }
 }
-
-
-
-
-
-
-
-

@@ -227,9 +227,36 @@ const merged = mergeTimelines(
       formationPage.items ?? [],
     );
     merged.sort(compareItemsNewestFirst);
+
+    const FOLLOWUP_MIRROR_TYPES = new Set([
+      "FOLLOWUP_ASSIGNED",
+      "FOLLOWUP_CONTACTED",
+      "FOLLOWUP_OUTCOME_RECORDED",
+      "FOLLOWUP_UNASSIGNED"
+    ]);
+
+    const engagementKeys = new Set(
+      merged
+        .filter((it: any) => it.stream === "engagement")
+        .map((it: any) => `${it.occurredAt}|${it.type}`)
+    );
+
+    const dedupedMerged = merged.filter((it: any) => {
+      if (
+        it.stream === "formation" &&
+        typeof it.type === "string" &&
+        FOLLOWUP_MIRROR_TYPES.has(it.type)
+      ) {
+        const key = `${it.occurredAt}|${it.type}`;
+        return !engagementKeys.has(key);
+      }
+      return true;
+    });
+
     const filtered = after
-      ? merged.filter((it) => isOlderThanAfter(it, after))
-      : merged;
+      ? dedupedMerged.filter((it) => isOlderThanAfter(it, after))
+      : dedupedMerged;
+
     const pagePlus = filtered.slice(0, safeLimit + 1);
     const pageItems = pagePlus.slice(0, safeLimit);
     const hasMore = pagePlus.length > safeLimit;
@@ -312,6 +339,9 @@ return { items: enrichedItems, nextCursor };
   }
 
 }
+
+
+
 
 
 

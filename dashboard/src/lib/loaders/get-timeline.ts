@@ -13,11 +13,12 @@ function getBaseUrl(): string {
   return `https://${url.replace(/\/+$/, "")}`;
 }
 
-export async function getTimeline(before?: string): Promise<TimelineResponse> {
+export async function getTimeline(cursor?: string): Promise<TimelineResponse> {
   const params = new URLSearchParams();
   params.set("limit", "50");
-  if (before) {
-    params.set("before", before);
+
+  if (cursor) {
+    params.set("cursor", cursor);
   }
 
   const response = await fetch(
@@ -32,7 +33,12 @@ export async function getTimeline(before?: string): Promise<TimelineResponse> {
   const json = text ? JSON.parse(text) : {};
 
   if (!response.ok) {
-    throw new Error(json?.error || `Timeline request failed with status ${response.status}`);
+    const errorMessage =
+      typeof json?.error === "string"
+        ? json.error
+        : json?.error?.message || JSON.stringify(json?.error) || `Timeline request failed with status ${response.status}`;
+
+    throw new Error(errorMessage);
   }
 
   return json as TimelineResponse;

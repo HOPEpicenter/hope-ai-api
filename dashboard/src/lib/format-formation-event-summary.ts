@@ -3,6 +3,7 @@ export function formatFormationEventSummary(
   metadata: any
 ): string {
   const nextStep = metadata?.data?.nextStep;
+  const sourceSystem = metadata?.source?.system;
 
   switch (type) {
     case "NEXT_STEP_SELECTED":
@@ -11,6 +12,12 @@ export function formatFormationEventSummary(
         : "Selected a next step";
 
     default:
-      return type?.trim() || "Formation event";
+      if (type?.trim()) {
+        return sourceSystem
+          ? `${type.trim()} via ${String(sourceSystem)}`
+          : type.trim();
+      }
+
+      return "Formation event";
   }
 }

@@ -138,7 +138,15 @@ export async function getOpsFormationRecentEvents(context: any, req: any): Promi
           untilOccurredAt
         });
 
-    const shapedItems = items.map(toOpsFormationEvent);
+    const unique = new Map<string, any>();
+for (const item of items) {
+  const key = String(item?.rowKey ?? "");
+  if (!unique.has(key)) {
+    unique.set(key, item);
+  }
+}
+
+const shapedItems = Array.from(unique.values()).map(toOpsFormationEvent);
     const nextCursor = items.length >= limit ? items[items.length - 1]?.rowKey ?? null : null;
 
     context.res = {
@@ -168,6 +176,7 @@ export async function getOpsFormationRecentEvents(context: any, req: any): Promi
     };
   }
 }
+
 
 
 

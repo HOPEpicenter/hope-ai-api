@@ -1,7 +1,11 @@
+import { NextResponse } from "next/server";
 import http from "node:http";
 import https from "node:https";
 
-function requireEnv(name: string): string {
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+function getRequiredEnv(name: string): string {
   const value = process.env[name];
   if (!value || value.trim().length === 0) {
     throw new Error(`Missing required env var: ${name}`);
@@ -71,32 +75,42 @@ function toTimelineItem(e: any): any {
   };
 }
 
-export async function getTimeline() {
-  const baseUrl = requireEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
-  const apiKey = requireEnv("HOPE_API_KEY");
+export async function GET() {
+  try {
+    const baseUrl = getRequiredEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
+    const apiKey = getRequiredEnv("HOPE_API_KEY");
 
-  const formation = await requestJson(
-    `${baseUrl}/_ops/formation/recent-events?limit=50`,
-    apiKey
-  );
+    const formation = await requestJson(
+      `${baseUrl}/_ops/formation/recent-events?limit=50`,
+      apiKey
+    );
 
-  if (formation.status >= 400) {
-    throw new Error(formation.data?.error || "Failed to load timeline");
+    if (formation.status >= 400) {
+      return NextResponse.json(formation.data, { status: formation.status });
+    }
+
+    const formationItems = Array.isArray(formation.data?.items)
+      ? formation.data.items.map(toTimelineItem)
+      : [];
+
+    const items = [...formationItems].sort((a, b) => {
+      const ta = new Date(a.occurredAt ?? 0).getTime();
+      const tb = new Date(b.occurredAt ?? 0).getTime();
+      return tb - ta;
+    });
+
+    return NextResponse.json({
+      ok: true,
+      items,
+      nextCursor: null
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: error instanceof Error ? error.message : "Timeline error"
+      },
+      { status: 500 }
+    );
   }
-
-  const formationItems = Array.isArray(formation.data?.items)
-    ? formation.data.items.map(toTimelineItem)
-    : [];
-
-  const items = [...formationItems].sort((a, b) => {
-    const ta = new Date(a.occurredAt ?? 0).getTime();
-    const tb = new Date(b.occurredAt ?? 0).getTime();
-    return tb - ta;
-  });
-
-  return {
-    ok: true,
-    items,
-    nextCursor: null
-  };
 }

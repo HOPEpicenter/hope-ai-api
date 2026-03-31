@@ -29,6 +29,10 @@ function Json-Get {
 }
 
 $ApiBase = ($BaseUrl.TrimEnd("/") + "/api")
+if (-not $ApiKey -and -not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+  $ApiKey = $env:HOPE_API_KEY
+}
+
 $headers = @{}
 if ($ApiKey) { $headers["x-api-key"] = $ApiKey }
 
@@ -205,3 +209,4 @@ if ($profile3.PSObject.Properties.Name -contains "lastEventId") {
   Assert-True ($profile3.lastEventId -eq $evtTieHigh) "lastEventId should be the lexicographically greater eventId on equal occurredAt"
 }
 Write-Host "[assert-formation-snapshot] OK: formation snapshot invariants passed." -ForegroundColor Green
+

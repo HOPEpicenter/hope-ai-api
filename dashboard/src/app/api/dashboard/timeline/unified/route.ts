@@ -31,7 +31,7 @@ function requestJson(urlString: string, apiKey: string): Promise<{ status: numbe
         method: "GET",
         headers: {
           "x-api-key": apiKey,
-          "accept": "application/json"
+          accept: "application/json"
         }
       },
       (res) => {
@@ -59,18 +59,19 @@ function requestJson(urlString: string, apiKey: string): Promise<{ status: numbe
 export async function GET(request: NextRequest) {
   try {
     const limit = request.nextUrl.searchParams.get("limit")?.trim() ?? "50";
-    const before = request.nextUrl.searchParams.get("before")?.trim() ?? "";
+    const cursor = request.nextUrl.searchParams.get("cursor")?.trim() ?? "";
 
     const opsBaseUrl = getOpsBaseUrl();
     const apiKey = getRequiredEnv("HOPE_API_KEY");
 
     const params = new URLSearchParams();
     params.set("limit", limit);
-    if (before) {
-      params.set("before", before);
+
+    if (cursor) {
+      params.set("cursor", cursor);
     }
 
-    const upstreamUrl = `${opsBaseUrl}/timeline/unified?${params.toString()}`;
+    const upstreamUrl = `${opsBaseUrl}/integration/timeline/global?${params.toString()}`;
     const upstream = await requestJson(upstreamUrl, apiKey);
 
     return NextResponse.json(upstream.data, { status: upstream.status });
@@ -84,5 +85,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
-

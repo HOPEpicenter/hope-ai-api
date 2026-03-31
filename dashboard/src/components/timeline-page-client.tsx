@@ -27,7 +27,7 @@ export function TimelinePageClient({ initialItems, initialNextCursor }: Props) {
     try {
       const params = new URLSearchParams();
       params.set("limit", "50");
-      params.set("before", nextCursor);
+      params.set("cursor", nextCursor);
 
       const response = await fetch(`/api/dashboard/timeline/unified?${params.toString()}`, {
         method: "GET",
@@ -103,3 +103,4 @@ export function TimelinePageClient({ initialItems, initialNextCursor }: Props) {
     </section>
   );
 }
+

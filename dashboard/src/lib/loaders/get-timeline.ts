@@ -20,10 +20,13 @@ export async function getTimeline(before?: string): Promise<TimelineResponse> {
     params.set("before", before);
   }
 
-  const response = await fetch(`${getBaseUrl()}/api/dashboard/timeline/unified?${params.toString()}`, {
-    method: "GET",
-    cache: "no-store"
-  });
+  const response = await fetch(
+    `${getBaseUrl()}/api/dashboard/timeline/unified?${params.toString()}`,
+    {
+      method: "GET",
+      cache: "no-store"
+    }
+  );
 
   const text = await response.text();
   const json = text ? JSON.parse(text) : {};

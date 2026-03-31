@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    const upstream = await fetch(`${opsBaseUrl}/api/formation/events`, {
+    const upstream = await fetch(`${opsBaseUrl}/formation/events`, {
       method: "POST",
       headers: {
         "content-type": "application/json",

@@ -1,102 +1,36 @@
-import http from "node:http";
-import https from "node:https";
+import type { TimelineResponse } from "@/lib/contracts/timeline";
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value || value.trim().length === 0) {
-    throw new Error(`Missing required env var: ${name}`);
-  }
-  return value.trim();
-}
+function getBaseUrl(): string {
+  const url =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.VERCEL_URL?.trim() ||
+    "http://127.0.0.1:3000";
 
-function requestJson(urlString: string, apiKey: string): Promise<{ status: number; data: any }> {
-  return new Promise((resolve, reject) => {
-    const url = new URL(urlString);
-    const client = url.protocol === "https:" ? https : http;
-
-    const req = client.request(
-      {
-        protocol: url.protocol,
-        hostname: url.hostname,
-        port: url.port,
-        path: `${url.pathname}${url.search}`,
-        method: "GET",
-        headers: {
-          "x-api-key": apiKey,
-          "accept": "application/json"
-        }
-      },
-      (res) => {
-        let raw = "";
-        res.setEncoding("utf8");
-        res.on("data", (chunk) => {
-          raw += chunk;
-        });
-        res.on("end", () => {
-          try {
-            const data = raw ? JSON.parse(raw) : {};
-            resolve({ status: res.statusCode ?? 500, data });
-          } catch (error) {
-            reject(error);
-          }
-        });
-      }
-    );
-
-    req.on("error", reject);
-    req.end();
-  });
-}
-
-function formatSummary(e: any): string {
-  if (!e) {
-    return "Event";
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url.replace(/\/+$/, "");
   }
 
-  if (e.type === "NEXT_STEP_SELECTED") {
-    const step = e.metadata?.nextStep ?? e.metadata?.data?.nextStep;
-    return step ? `Selected next step: ${step}` : "Selected a next step";
-  }
-
-  return e.summary ?? e.type ?? "Event";
+  return `https://${url.replace(/\/+$/, "")}`;
 }
 
-function toTimelineItem(e: any): any {
-  return {
-    eventId: String(e.id ?? e.rowKey ?? Math.random()),
-    occurredAt: e.occurredAt ?? null,
-    stream: "formation",
-    type: e.type ?? "UNKNOWN",
-    summary: formatSummary(e)
-  };
-}
-
-export async function getTimeline() {
-  const baseUrl = requireEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
-  const apiKey = requireEnv("HOPE_API_KEY");
-
-  const formation = await requestJson(
-    `${baseUrl}/_ops/formation/recent-events?limit=50`,
-    apiKey
-  );
-
-  if (formation.status >= 400) {
-    throw new Error(formation.data?.error || "Failed to load timeline");
+export async function getTimeline(before?: string): Promise<TimelineResponse> {
+  const params = new URLSearchParams();
+  params.set("limit", "50");
+  if (before) {
+    params.set("before", before);
   }
 
-  const formationItems = Array.isArray(formation.data?.items)
-    ? formation.data.items.map(toTimelineItem)
-    : [];
-
-  const items = [...formationItems].sort((a, b) => {
-    const ta = new Date(a.occurredAt ?? 0).getTime();
-    const tb = new Date(b.occurredAt ?? 0).getTime();
-    return tb - ta;
+  const response = await fetch(`${getBaseUrl()}/api/dashboard/timeline/unified?${params.toString()}`, {
+    method: "GET",
+    cache: "no-store"
   });
 
-  return {
-    ok: true,
-    items,
-    nextCursor: null
-  };
+  const text = await response.text();
+  const json = text ? JSON.parse(text) : {};
+
+  if (!response.ok) {
+    throw new Error(json?.error || `Timeline request failed with status ${response.status}`);
+  }
+
+  return json as TimelineResponse;
 }

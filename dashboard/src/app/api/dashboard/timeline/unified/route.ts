@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import http from "node:http";
 import https from "node:https";
 
@@ -13,7 +13,11 @@ function getRequiredEnv(name: string): string {
   return value.trim();
 }
 
-function requestJson(urlString: string, apiKey: string): Promise<{ status: number; data: any }> {
+function getOpsBaseUrl(): string {
+  return getRequiredEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
+}
+
+function requestJson(urlString: string, apiKey: string): Promise<{ status: number; data: unknown }> {
   return new Promise((resolve, reject) => {
     const url = new URL(urlString);
     const client = url.protocol === "https:" ? https : http;
@@ -52,65 +56,33 @@ function requestJson(urlString: string, apiKey: string): Promise<{ status: numbe
   });
 }
 
-function formatSummary(e: any): string {
-  if (!e) {
-    return "Event";
-  }
-
-  if (e.type === "NEXT_STEP_SELECTED") {
-    const step = e.metadata?.nextStep ?? e.metadata?.data?.nextStep;
-    return step ? `Selected next step: ${step}` : "Selected a next step";
-  }
-
-  return e.summary ?? e.type ?? "Event";
-}
-
-function toTimelineItem(e: any): any {
-  return {
-    eventId: String(e.id ?? e.rowKey ?? Math.random()),
-    occurredAt: e.occurredAt ?? null,
-    stream: "formation",
-    type: e.type ?? "UNKNOWN",
-    summary: formatSummary(e)
-  };
-}
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const baseUrl = getRequiredEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
+    const limit = request.nextUrl.searchParams.get("limit")?.trim() ?? "50";
+    const before = request.nextUrl.searchParams.get("before")?.trim() ?? "";
+
+    const opsBaseUrl = getOpsBaseUrl();
     const apiKey = getRequiredEnv("HOPE_API_KEY");
 
-    const formation = await requestJson(
-      `${baseUrl}/_ops/formation/recent-events?limit=50`,
-      apiKey
-    );
-
-    if (formation.status >= 400) {
-      return NextResponse.json(formation.data, { status: formation.status });
+    const params = new URLSearchParams();
+    params.set("limit", limit);
+    if (before) {
+      params.set("before", before);
     }
 
-    const formationItems = Array.isArray(formation.data?.items)
-      ? formation.data.items.map(toTimelineItem)
-      : [];
+    const upstreamUrl = `${opsBaseUrl}/timeline/unified?${params.toString()}`;
+    const upstream = await requestJson(upstreamUrl, apiKey);
 
-    const items = [...formationItems].sort((a, b) => {
-      const ta = new Date(a.occurredAt ?? 0).getTime();
-      const tb = new Date(b.occurredAt ?? 0).getTime();
-      return tb - ta;
-    });
-
-    return NextResponse.json({
-      ok: true,
-      items,
-      nextCursor: null
-    });
+    return NextResponse.json(upstream.data, { status: upstream.status });
   } catch (error) {
     return NextResponse.json(
       {
         ok: false,
-        error: error instanceof Error ? error.message : "Timeline error"
+        error: error instanceof Error ? error.message : "Unexpected dashboard unified timeline error."
       },
       { status: 500 }
     );
   }
 }
+
+

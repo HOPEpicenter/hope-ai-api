@@ -519,3 +519,13 @@ if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
 }
 
 
+
+# Global unified timeline regression
+if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+  Write-Host "[regression] Global unified timeline contract..."
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-global-integration-timeline.ps1") -ApiBaseUrl $BaseUrl -ApiKey $env:HOPE_API_KEY
+  if ($LASTEXITCODE -ne 0) { throw "Global unified timeline regression failed ($LASTEXITCODE)" }
+  Ok "Global unified timeline regression passed."
+} else {
+  Write-Host "[regression] Skipping global timeline regression (HOPE_API_KEY not set)."
+}

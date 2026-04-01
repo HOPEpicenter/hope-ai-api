@@ -345,6 +345,12 @@ return { items: enrichedItems, nextCursor };
     const safeLimit = Math.max(1, Math.min(200, limit || 50));
     const perStream = Math.min(200, Math.max(50, safeLimit * 5));
 
+    let after: IntegrationAfterV1 | undefined;
+    if (cursor) {
+      const decoded = decodeIntegrationCursorV1(cursor);
+      after = decoded.after;
+    }
+
     const storageConnectionString = process.env.STORAGE_CONNECTION_STRING;
     if (!storageConnectionString) throw new Error("Missing STORAGE_CONNECTION_STRING");
 
@@ -388,13 +394,26 @@ return { items: enrichedItems, nextCursor };
     const merged = mergeTimelines(engagementItems, formationItems);
     merged.sort(compareItemsNewestFirst);
 
-    const pagePlus = merged.slice(0, safeLimit + 1);
+    const filtered = after
+      ? merged.filter((it) => isOlderThanAfter(it, after))
+      : merged;
+
+    const pagePlus = filtered.slice(0, safeLimit + 1);
     const pageItems = pagePlus.slice(0, safeLimit);
     const hasMore = pagePlus.length > safeLimit;
 
-    const nextCursor = hasMore
-      ? String(pageItems[pageItems.length - 1].eventId)
-      : null;
+    const nextCursor =
+      hasMore && pageItems.length > 0
+        ? encodeIntegrationCursorV1({
+            v: 1,
+            visitorId: "global",
+            after: {
+              occurredAt: String(pageItems[pageItems.length - 1].occurredAt),
+              stream: pageItems[pageItems.length - 1].stream,
+              eventId: String(pageItems[pageItems.length - 1].eventId),
+            },
+          })
+        : null;
 
     const enrichedItems = pageItems.map((it) => ({
       ...it,
@@ -404,5 +423,6 @@ return { items: enrichedItems, nextCursor };
     return { items: enrichedItems, nextCursor };
   }
 }
+
 
 

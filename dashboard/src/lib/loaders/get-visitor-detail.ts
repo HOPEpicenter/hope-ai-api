@@ -29,12 +29,12 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
   const baseUrl = requireEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
   const apiKey = requireEnv("HOPE_API_KEY");
 
-  const [visitorData, profileData, eventsData, timelineData] = await Promise.all([
+  const [visitorData, profileData, eventsData, summaryData] = await Promise.all([
     getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}`, apiKey),
     getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}/formation/profile`, apiKey),
     getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}/formation/events`, apiKey)
       ,
-    getJson(`${baseUrl}/engagements/${encodeURIComponent(visitorId)}/timeline`, apiKey)
+    getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}/summary`, apiKey)
   ]);
 
   const visitor = visitorData?.visitor ?? visitorData;
@@ -47,7 +47,7 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
         : [];
 
   return {
-    engagementTimeline: timelineData?.items ?? [],
+    engagementTimeline: summaryData?.summary?.engagement?.summary?.items ?? [],
 
     ok: true,
     visitor: {
@@ -121,6 +121,7 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
       .slice(0, 8)
   };
 }
+
 
 
 

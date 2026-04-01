@@ -1,3 +1,14 @@
+## 2026-04-01
+
+- ✅ Merged **#490**: added GET /api/integration/timeline/global (global unified timeline).
+- Global timeline is now available as a protected API surface.
+- Endpoint supports limit + cursor paging aligned with integration timeline contract.
+- Initial implementation is formation-backed (engagement merge deferred).
+- Verified:
+  - CI green
+  - staging deploy green
+  - dashboard proxy (/api/dashboard/timeline/unified) successfully returns data
+
 
 ## 2026-03-29 — Formation profile truth / parity lane closed
 
@@ -281,6 +292,7 @@ Verification:
 - Dashboard: merged PR #434 to map formation event timestamp fallbacks on visitor detail.
 - Dashboard: Recent Formation Events now uses happenedAt, occurredAt, recordedAt, createdAt, then timestamp to avoid false "No timestamp available" states.
 - Validation: CI green after merge; staging deploy green after merge.
+
 
 
 

@@ -39,6 +39,10 @@ Fetch a visitor by id.
 
 ## GET /api/integration/timeline/global
 
+**Auth**
+- Requires x-api-key header
+
+
 ### Query
 - `limit` (optional)
 - `cursor` (optional)
@@ -58,4 +62,5 @@ Fetch a visitor by id.
 - Future phases will:
   - include engagement events in the global feed
   - introduce a production-grade stable cursor
+
 

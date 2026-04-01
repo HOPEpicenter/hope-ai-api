@@ -1,4 +1,14 @@
 
+### 2026-04-01 — Global unified timeline
+
+- [x] #490 global integration timeline endpoint
+- [x] GET /api/integration/timeline/global implemented
+- [x] Cursor + limit paging supported
+- [x] Verified CI green
+- [x] Verified staging deploy green
+- [x] Verified dashboard proxy returns data
+
+
 ### 2026-03-29 — Formation truth lane
 
 - [x] #451 formation profile parity
@@ -366,6 +376,7 @@ Current rule:
 - [x] Map formation event timestamp fallbacks on visitor detail
 - [x] Verify CI green after merge
 - [x] Verify staging deploy green after merge
+
 
 
 

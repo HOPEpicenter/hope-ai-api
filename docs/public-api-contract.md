@@ -37,3 +37,25 @@ Returned when the email already exists (idempotent repeat).
 ### GET /api/visitors/:id
 Fetch a visitor by id.
 
+## GET /api/integration/timeline/global
+
+### Query
+- `limit` (optional)
+- `cursor` (optional)
+
+### Response
+```json
+{
+  "ok": true,
+  "items": [],
+  "nextCursor": null
+}
+```
+
+### Notes
+- Phase 1 global unified timeline is formation-backed.
+- Visitor-scoped integrated timeline remains available separately.
+- Future phases will:
+  - include engagement events in the global feed
+  - introduce a production-grade stable cursor
+

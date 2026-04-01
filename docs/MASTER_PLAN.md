@@ -509,3 +509,21 @@ Planning rule going forward:
 
 
 
+
+
+## 2026-04-01 Update
+
+**What landed**
+- ✅ **#490**: added global unified timeline endpoint GET /api/integration/timeline/global.
+- Endpoint provides cross-visitor timeline feed using integration layer.
+- Initial implementation is formation-backed (engagement merge deferred).
+
+**Why this matters (master plan alignment)**
+- Establishes first global read surface for integration timeline.
+- Keeps contract aligned with existing cursor-based paging model.
+- Does not widen backend scope beyond existing integration aggregation.
+
+**Next**
+- Keep global timeline narrow and contract-stable.
+- Only expand (engagement merge, ordering refinements) if a real consumer requires it.
+

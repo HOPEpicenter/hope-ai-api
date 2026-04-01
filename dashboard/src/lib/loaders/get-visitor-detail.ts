@@ -47,7 +47,7 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
         : [];
 
   return {
-    engagementTimeline: summaryData?.summary?.engagement?.summary?.items ?? [],
+    engagementTimeline: summaryData?.summary?.engagement?.timelinePreview ?? [],
 
     ok: true,
     visitor: {
@@ -121,6 +121,7 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
       .slice(0, 8)
   };
 }
+
 
 
 

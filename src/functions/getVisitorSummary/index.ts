@@ -34,9 +34,10 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
       return;
     }
 
-    const [engagementSummary, integrationSummary] = await Promise.all([
+    const [engagementSummary, integrationSummary, timelinePage] = await Promise.all([
       engagementSummaryRepo.get(visitorId),
       integrationService.readIntegrationSummary(visitorId),
+      integrationService.readIntegratedTimeline(visitorId, 5)
     ]);
 
     context.res = {
@@ -48,7 +49,8 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
         visitorId,
         summary: {
           engagement: {
-            summary: engagementSummary ?? null
+            summary: engagementSummary ?? null,
+            timelinePreview: timelinePage?.items ?? []
           },
           integration: integrationSummary ?? null
         }

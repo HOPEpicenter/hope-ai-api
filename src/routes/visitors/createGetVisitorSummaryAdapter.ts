@@ -24,9 +24,10 @@ export function createGetVisitorSummaryAdapter() {
         });
       }
 
-      const [engagementSummary, integrationSummary] = await Promise.all([
+      const [engagementSummary, integrationSummary, timelinePage] = await Promise.all([
         engagementSummaryRepo.get(visitorId),
         integrationService.readIntegrationSummary(visitorId),
+        integrationService.readIntegratedTimeline(visitorId, 5)
       ]);
 
       return res.status(200).json({
@@ -36,6 +37,7 @@ export function createGetVisitorSummaryAdapter() {
         summary: {
           engagement: {
             summary: engagementSummary ?? null,
+            timelinePreview: timelinePage?.items ?? []
           },
           integration: integrationSummary ?? null,
         },

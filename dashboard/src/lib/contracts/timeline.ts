@@ -4,6 +4,9 @@ export type TimelineItem = {
   stream: "engagement" | "formation";
   type: string;
   summary: string | null;
+  source?: {
+    system?: string;
+  } | null;
 };
 
 export type TimelineResponse = {

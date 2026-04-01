@@ -23,7 +23,11 @@ function formatEventType(type?: string): string {
     FOLLOWUP_ASSIGNED: "Follow-up assigned",
     FOLLOWUP_CONTACTED: "Follow-up contacted",
     FOLLOWUP_OUTCOME: "Follow-up outcome",
-    "note.add": "Note added"
+    FOLLOWUP_OUTCOME_RECORDED: "Follow-up outcome recorded",
+    FOLLOWUP_UNASSIGNED: "Follow-up unassigned",
+    NEXT_STEP_SELECTED: "Next step selected",
+    "note.add": "Note added",
+    "status.transition": "Status transition"
   };
 
   if (map[type]) return map[type];
@@ -122,6 +126,21 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
                     >
                       {item.stream}
                     </span>
+                    {item.source?.system && item.source.system !== item.stream ? (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          padding: "2px 6px",
+                          borderRadius: 6,
+                          background: "#f3f4f6",
+                          color: "#6b7280",
+                          fontWeight: 500,
+                          width: "fit-content"
+                        }}
+                      >
+                        {item.source.system}
+                      </span>
+                    ) : null}
                     <EventTypeLabel type={formatEventType(item.type)} />
                   </div>
 
@@ -146,6 +165,9 @@ export function TimelineList({ items }: { items: TimelineItem[] }) {
     </div>
   );
 }
+
+
+
 
 
 

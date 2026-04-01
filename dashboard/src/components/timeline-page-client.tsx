@@ -7,6 +7,7 @@ import type { TimelineItem, TimelineResponse } from "@/lib/contracts/timeline";
 type Props = {
   initialItems: TimelineItem[];
   initialNextCursor: string | null;
+  initialPageSize: number;
 };
 
 async function fetchTimelinePage(limit: number, cursor?: string): Promise<TimelineResponse> {
@@ -32,10 +33,18 @@ async function fetchTimelinePage(limit: number, cursor?: string): Promise<Timeli
   return json as TimelineResponse;
 }
 
-export function TimelinePageClient({ initialItems, initialNextCursor }: Props) {
+function syncLimitToUrl(limit: number) {
+  if (typeof window === "undefined") return;
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("limit", String(limit));
+  window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}`);
+}
+
+export function TimelinePageClient({ initialItems, initialNextCursor, initialPageSize }: Props) {
   const [items, setItems] = useState<TimelineItem[]>(initialItems);
   const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
-  const [pageSize, setPageSize] = useState<number>(50);
+  const [pageSize, setPageSize] = useState<number>(initialPageSize);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,10 +90,12 @@ export function TimelinePageClient({ initialItems, initialNextCursor }: Props) {
   async function handlePageSizeChange(value: string) {
     const nextPageSize = Number(value);
     setPageSize(nextPageSize);
+    syncLimitToUrl(nextPageSize);
     await resetToPageSize(nextPageSize);
   }
 
   const canShowFewer = items.length > pageSize;
+  const showFewerDisabled = isLoading || !canShowFewer;
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -191,3 +202,4 @@ export function TimelinePageClient({ initialItems, initialNextCursor }: Props) {
     </section>
   );
 }
+

@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getGlobalIntegrationTimeline/index.js",
+  "entryPoint": "getGlobalIntegrationTimeline",
+  "bindings": [
+    {
+      "authLevel": "anonymous",
+      "type": "httpTrigger",
+      "direction": "in",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "integration/timeline/global"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "$return"
+    }
+  ]
+}

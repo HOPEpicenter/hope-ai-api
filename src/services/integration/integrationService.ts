@@ -367,8 +367,25 @@ return { items: enrichedItems, nextCursor };
       source: { system: "formation" },
       data: e.metadata ? { metadata: e.metadata } : undefined,
     }));
+    // Collect unique visitorIds from formation events
+    const visitorIds = Array.from(
+      new Set(formationItems.map((f: any) => f.visitorId).filter(Boolean))
+    );
 
-    const merged = mergeTimelines([], formationItems);
+    // Pull engagement events per visitor
+    const engagementResults = await Promise.all(
+      visitorIds.map((visitorId) =>
+        this.engagementRepo.readTimeline(
+          visitorId,
+          Math.ceil(perStream / Math.max(visitorIds.length, 1)),
+          undefined
+        )
+      )
+    );
+
+    const engagementItems = engagementResults.flatMap((r) => r.items ?? []);
+
+    const merged = mergeTimelines(engagementItems, formationItems);
     merged.sort(compareItemsNewestFirst);
 
     const pagePlus = merged.slice(0, safeLimit + 1);
@@ -387,3 +404,5 @@ return { items: enrichedItems, nextCursor };
     return { items: enrichedItems, nextCursor };
   }
 }
+
+

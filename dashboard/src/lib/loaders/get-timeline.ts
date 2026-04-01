@@ -1,25 +1,24 @@
 import type { TimelineResponse } from "@/lib/contracts/timeline";
 
 function getBaseUrl(): string {
-  const url =
+  const value =
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.VERCEL_URL?.trim() ||
-    "http://127.0.0.1:3000";
+    process.env.VERCEL_URL?.trim();
 
-  if (url.startsWith("http://") || url.startsWith("https://")) {
-    return url.replace(/\/+$/, "");
+  if (!value) {
+    return "http://127.0.0.1:3001";
   }
 
-  return `https://${url.replace(/\/+$/, "")}`;
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    return value.replace(/\/+$/, "");
+  }
+
+  return `https://${value.replace(/\/+$/, "")}`;
 }
 
-export async function getTimeline(cursor?: string): Promise<TimelineResponse> {
+export async function getTimeline(limit = 50): Promise<TimelineResponse> {
   const params = new URLSearchParams();
-  params.set("limit", "50");
-
-  if (cursor) {
-    params.set("cursor", cursor);
-  }
+  params.set("limit", String(limit));
 
   const response = await fetch(
     `${getBaseUrl()}/api/dashboard/timeline/unified?${params.toString()}`,

@@ -14,15 +14,15 @@ export type VisitorDetailResponse = {
     partitionKey?: string | null;
     rowKey?: string | null;
     stage?: string | null;
-    assignedTo?: { ownerId?: string | null } | null;
+    assignedTo?: { ownerId: string | null } | null;
     lastFollowupAssignedAt?: string | null;
     lastFollowupContactedAt?: string | null;
     lastFollowupOutcomeAt?: string | null;
     lastFollowupOutcome?: string | null;
     lastFollowupOutcomeNotes?: string | null;
     lastEventType?: string | null;
-    lastEventAt?: string | null;
-    updatedAt?: string | null;
+    lastEventAt: string | null;
+    updatedAt: string | null;
   } | null;
   formationMilestones: {
     hasSalvation: boolean;
@@ -37,3 +37,6 @@ export type VisitorDetailResponse = {
     notes: string | null;
   }>;
 };
+
+
+

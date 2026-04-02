@@ -22,9 +22,14 @@ const mockById: Record<string, VisitorDetailResponse> = {
       lastFollowupOutcomeAt: null,
       lastFollowupOutcome: null,
       lastFollowupOutcomeNotes: null,
-      lastEventType: "NEXT_STEP_SELECTED",
+      lastEventType: "SALVATION_RECORDED",
       lastEventAt: "2026-03-07T15:40:00.000Z",
       updatedAt: "2026-03-07T15:40:01.000Z"
+    },
+    formationMilestones: {
+      hasSalvation: true,
+      hasBaptism: false,
+      hasMembership: false
     }
   },
   "visitor-1001": {
@@ -51,6 +56,11 @@ const mockById: Record<string, VisitorDetailResponse> = {
       lastEventType: "FOLLOWUP_ASSIGNED",
       lastEventAt: "2026-03-07T11:55:00.000Z",
       updatedAt: "2026-03-07T11:55:01.000Z"
+    },
+    formationMilestones: {
+      hasSalvation: false,
+      hasBaptism: false,
+      hasMembership: false
     }
   }
 };
@@ -59,7 +69,7 @@ export function getMockVisitorDetail(visitorId: string): VisitorDetailResponse {
   return (
     mockById[visitorId] ?? {
       ok: true,
-    engagementTimeline: [],
+      engagementTimeline: [],
       visitor: {
         visitorId,
         name: "Unknown Visitor",
@@ -68,8 +78,12 @@ export function getMockVisitorDetail(visitorId: string): VisitorDetailResponse {
         updatedAt: "2026-03-01T00:00:00.000Z"
       },
       formationEvents: [],
-      formationProfile: null
+      formationProfile: null,
+      formationMilestones: {
+        hasSalvation: false,
+        hasBaptism: false,
+        hasMembership: false
+      }
     }
   );
 }
-

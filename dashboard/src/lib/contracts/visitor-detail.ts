@@ -11,21 +11,24 @@ export type VisitorDetailResponse = {
     updatedAt: string;
   };
   formationProfile: {
-    partitionKey: string;
-    rowKey: string;
-    stage: string | null;
-    assignedTo: {
-      ownerId: string | null;
-    } | null;
-    lastFollowupAssignedAt: string | null;
-    lastFollowupContactedAt: string | null;
-    lastFollowupOutcomeAt: string | null;
-    lastFollowupOutcome: string | null;
-    lastFollowupOutcomeNotes: string | null;
-    lastEventType: string | null;
+    partitionKey?: string | null;
+    rowKey?: string | null;
+    stage?: string | null;
+    assignedTo?: { ownerId: string | null } | null;
+    lastFollowupAssignedAt?: string | null;
+    lastFollowupContactedAt?: string | null;
+    lastFollowupOutcomeAt?: string | null;
+    lastFollowupOutcome?: string | null;
+    lastFollowupOutcomeNotes?: string | null;
+    lastEventType?: string | null;
     lastEventAt: string | null;
     updatedAt: string | null;
   } | null;
+  formationMilestones: {
+    hasSalvation: boolean;
+    hasBaptism: boolean;
+    hasMembership: boolean;
+  };
   formationEvents: Array<{
     eventId: string;
     eventType: string;
@@ -34,4 +37,6 @@ export type VisitorDetailResponse = {
     notes: string | null;
   }>;
 };
+
+
 

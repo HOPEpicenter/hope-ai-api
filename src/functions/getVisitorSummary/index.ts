@@ -58,8 +58,13 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
           },
           integration: integrationSummary ?? null,
           formation: {
-            profile: formationProfile ?? null
-          }
+  profile: formationProfile ?? null,
+  milestones: {
+    hasSalvation: formationProfile?.lastEventType === "SALVATION_RECORDED",
+    hasBaptism: formationProfile?.lastEventType === "BAPTISM_RECORDED",
+    hasMembership: formationProfile?.lastEventType === "MEMBERSHIP_RECORDED"
+  }
+}
         }
       }
     };
@@ -72,3 +77,4 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
     };
   }
 }
+

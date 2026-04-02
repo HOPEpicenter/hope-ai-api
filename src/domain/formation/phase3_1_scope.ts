@@ -57,6 +57,9 @@ export const FormationEventType = {
   NEXT_STEP_SELECTED: "NEXT_STEP_SELECTED",
   INFO_REQUESTED: "INFO_REQUESTED",
   PRAYER_REQUESTED: "PRAYER_REQUESTED",
+  SALVATION_RECORDED: "SALVATION_RECORDED",
+  BAPTISM_RECORDED: "BAPTISM_RECORDED",
+  MEMBERSHIP_RECORDED: "MEMBERSHIP_RECORDED",
 } as const;
 
 export type FormationEventType =
@@ -146,6 +149,18 @@ export type PrayerRequestedMetadata = {
   notes?: string; // minimal, avoid sensitive details
 };
 
+export type SalvationRecordedMetadata = {
+  notes?: string;
+};
+
+export type BaptismRecordedMetadata = {
+  notes?: string;
+};
+
+export type MembershipRecordedMetadata = {
+  notes?: string;
+};
+
 /** Union of metadata by event type */
 export type FormationEventMetadataByType = {
   SERVICE_ATTENDED: ServiceAttendedMetadata;
@@ -156,6 +171,9 @@ export type FormationEventMetadataByType = {
   NEXT_STEP_SELECTED: NextStepSelectedMetadata;
   INFO_REQUESTED: InfoRequestedMetadata;
   PRAYER_REQUESTED: PrayerRequestedMetadata;
+  SALVATION_RECORDED: SalvationRecordedMetadata;
+  BAPTISM_RECORDED: BaptismRecordedMetadata;
+  MEMBERSHIP_RECORDED: MembershipRecordedMetadata;
 };
 
 export type FormationEventMetadata =
@@ -166,7 +184,10 @@ export type FormationEventMetadata =
   | FollowupOutcomeRecordedMetadata
   | NextStepSelectedMetadata
   | InfoRequestedMetadata
-  | PrayerRequestedMetadata;
+  | PrayerRequestedMetadata
+  | SalvationRecordedMetadata
+  | BaptismRecordedMetadata
+  | MembershipRecordedMetadata;
 
 /** Normalized event input used by handlers/services */
 export type FormationEventInput<T extends FormationEventType = FormationEventType> = {
@@ -217,29 +238,25 @@ export function validateFormationEvent(input: FormationEventInput): ValidationRe
   const sizeCheck = validateMetadataSize(input.metadata);
   if (!sizeCheck.ok) return sizeCheck;
 
-  // Type-specific requirements
   const md: any = input.metadata ?? {};
 
   switch (input.type) {
-    case FormationEventType.FOLLOWUP_ASSIGNED:
-      {
-        const raw =
-          (md as any)?.assigneeId ??
-          (md as any)?.assignedTo ??
-          (md as any)?.assignee;
+    case FormationEventType.FOLLOWUP_ASSIGNED: {
+      const raw =
+        (md as any)?.assigneeId ??
+        (md as any)?.assignedTo ??
+        (md as any)?.assignee;
 
-        const assigneeId = typeof raw === "string" ? raw.trim() : "";
-        if (!assigneeId) {
-          return { ok: false, error: "metadata.assigneeId required for FOLLOWUP_ASSIGNED" };
-        }
-
-        // normalize to canonical key
-        (md as any).assigneeId = assigneeId;
+      const assigneeId = typeof raw === "string" ? raw.trim() : "";
+      if (!assigneeId) {
+        return { ok: false, error: "metadata.assigneeId required for FOLLOWUP_ASSIGNED" };
       }
+
+      (md as any).assigneeId = assigneeId;
       break;
+    }
 
     case FormationEventType.FOLLOWUP_UNASSIGNED:
-      // no required metadata
       break;
 
     case FormationEventType.FOLLOWUP_CONTACTED:
@@ -260,11 +277,14 @@ export function validateFormationEvent(input: FormationEventInput): ValidationRe
       break;
 
     case FormationEventType.PRAYER_REQUESTED:
-      // notes/topic optional; privacy handled via sensitivity/visibility
       break;
 
     case FormationEventType.SERVICE_ATTENDED:
-      // all optional
+      break;
+
+    case FormationEventType.SALVATION_RECORDED:
+    case FormationEventType.BAPTISM_RECORDED:
+    case FormationEventType.MEMBERSHIP_RECORDED:
       break;
 
     default:
@@ -295,7 +315,6 @@ export function applyFormationDefaults(input: FormationEventInput): Required<Pic
     channel: input.channel ?? "unknown",
   };
 }
-
 
 
 

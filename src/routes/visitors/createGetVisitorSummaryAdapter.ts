@@ -51,8 +51,13 @@ export function createGetVisitorSummaryAdapter() {
           },
           integration: integrationSummary ?? null,
           formation: {
-            profile: formationProfile ?? null
-          }
+  profile: formationProfile ?? null,
+  milestones: {
+    hasSalvation: formationProfile?.lastEventType === "SALVATION_RECORDED",
+    hasBaptism: formationProfile?.lastEventType === "BAPTISM_RECORDED",
+    hasMembership: formationProfile?.lastEventType === "MEMBERSHIP_RECORDED"
+  }
+}
         },
       });
     } catch (err) {
@@ -60,3 +65,4 @@ export function createGetVisitorSummaryAdapter() {
     }
   };
 }
+

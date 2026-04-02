@@ -56,6 +56,11 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
       updatedAt: String(visitor?.updatedAt ?? visitor?.createdAt ?? "")
     },
     formationProfile: summaryData?.summary?.formation?.profile ?? null,
+    formationMilestones: {
+      hasSalvation: summaryData?.summary?.formation?.milestones?.hasSalvation ?? false,
+      hasBaptism: summaryData?.summary?.formation?.milestones?.hasBaptism ?? false,
+      hasMembership: summaryData?.summary?.formation?.milestones?.hasMembership ?? false
+    },
     formationEvents: events
       .map((event: {
         eventId?: string | null;

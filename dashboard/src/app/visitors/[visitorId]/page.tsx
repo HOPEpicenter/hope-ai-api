@@ -264,6 +264,31 @@ function HeaderChip({
     </div>
   );
 }
+function MilestoneBadge({
+  label,
+  active
+}: {
+  label: string;
+  active: boolean;
+}) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "4px 10px",
+        borderRadius: 9999,
+        fontSize: 12,
+        fontWeight: 700,
+        background: active ? "#dcfce7" : "#f3f4f6",
+        color: active ? "#166534" : "#4b5563",
+        border: active ? "1px solid #86efac" : "1px solid #d1d5db"
+      }}
+    >
+      {label}
+    </span>
+  );
+}
 
 function getNextAction(
   followupStatus: string,
@@ -1036,6 +1061,14 @@ export default async function VisitorDetailPage({
         outcomeNotes={data.formationProfile?.lastFollowupOutcomeNotes}
       />
 
+      <DetailCard title="Milestones">
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <MilestoneBadge label="Saved" active={data.formationMilestones.hasSalvation} />
+          <MilestoneBadge label="Baptized" active={data.formationMilestones.hasBaptism} />
+          <MilestoneBadge label="Member" active={data.formationMilestones.hasMembership} />
+        </div>
+      </DetailCard>
+
       <FollowupTimelineCard
         assignedAt={data.formationProfile?.lastFollowupAssignedAt ?? null}
         contactedAt={data.formationProfile?.lastFollowupContactedAt ?? null}
@@ -1251,6 +1284,8 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
+
 
 
 

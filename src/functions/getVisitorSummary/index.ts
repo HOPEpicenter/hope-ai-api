@@ -3,6 +3,7 @@ import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepo
 import { IntegrationService } from "../../services/integration/integrationService";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
+import { getFormationProfilesTableClient, getFormationProfileByVisitorId } from "../_shared/formation";
 
 const engagementSummaryRepo = new EngagementSummaryRepository();
 
@@ -34,10 +35,13 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
       return;
     }
 
-    const [engagementSummary, integrationSummary, timelinePage] = await Promise.all([
+    const table = getFormationProfilesTableClient();
+
+    const [engagementSummary, integrationSummary, timelinePage, formationProfile] = await Promise.all([
       engagementSummaryRepo.get(visitorId),
       integrationService.readIntegrationSummary(visitorId),
-      integrationService.readIntegratedTimeline(visitorId, 5)
+      integrationService.readIntegratedTimeline(visitorId, 5),
+      getFormationProfileByVisitorId(table, visitorId)
     ]);
 
     context.res = {
@@ -52,7 +56,10 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
             summary: engagementSummary ?? null,
             timelinePreview: timelinePage?.items ?? []
           },
-          integration: integrationSummary ?? null
+          integration: integrationSummary ?? null,
+          formation: {
+            profile: formationProfile ?? null
+          }
         }
       }
     };

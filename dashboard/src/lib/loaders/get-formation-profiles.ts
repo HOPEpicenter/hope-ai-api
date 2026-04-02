@@ -3,6 +3,7 @@ type RawFormationProfile = {
   rowKey?: unknown;
   assignedTo?: unknown;
   stage?: unknown;
+  lastEventType?: unknown;
   lastFollowupAssignedAt?: unknown;
   lastFollowupContactedAt?: unknown;
   lastFollowupOutcomeAt?: unknown;
@@ -17,6 +18,7 @@ export type FormationProfileListItem = {
   visitorId: string;
   assignedTo: string | null;
   stage: string | null;
+  lastEventType: string | null;
   lastFollowupAssignedAt: string | null;
   lastFollowupContactedAt: string | null;
   lastFollowupOutcomeAt: string | null;
@@ -87,6 +89,10 @@ export async function getFormationProfiles(): Promise<FormationProfilesResponse>
           typeof profile.stage === "string" && profile.stage.trim().length > 0
             ? profile.stage.trim()
             : null,
+        lastEventType:
+          typeof profile.lastEventType === "string" && profile.lastEventType.trim().length > 0
+            ? profile.lastEventType.trim()
+            : null,
         lastFollowupAssignedAt: toIsoOrNull(profile.lastFollowupAssignedAt),
         lastFollowupContactedAt: toIsoOrNull(profile.lastFollowupContactedAt),
         lastFollowupOutcomeAt: toIsoOrNull(profile.lastFollowupOutcomeAt)
@@ -99,3 +105,4 @@ export async function getFormationProfiles(): Promise<FormationProfilesResponse>
     items
   };
 }
+

@@ -45,10 +45,10 @@ export default async function VisitorsPage({
     const profile = formationProfilesByVisitorId.get(visitor.visitorId);
 
     const formationMilestones = {
-  hasSalvation: false,
-  hasBaptism: false,
-  hasMembership: false
-};
+      hasSalvation: profile?.lastEventType === "SALVATION_RECORDED",
+      hasBaptism: profile?.lastEventType === "BAPTISM_RECORDED",
+      hasMembership: profile?.lastEventType === "MEMBERSHIP_RECORDED"
+    };
 
     let followupState: VisitorsTableItem["followupState"] = "Waiting assignment";
     let attentionState: VisitorsTableItem["attentionState"] = null;
@@ -211,3 +211,4 @@ export default async function VisitorsPage({
     </section>
   );
 }
+

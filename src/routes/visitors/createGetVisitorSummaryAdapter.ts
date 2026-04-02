@@ -3,6 +3,8 @@ import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepo
 import { IntegrationService } from "../../services/integration/integrationService";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
+import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
+import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
 
 const engagementSummaryRepo = new EngagementSummaryRepository();
 
@@ -24,10 +26,18 @@ export function createGetVisitorSummaryAdapter() {
         });
       }
 
-      const [engagementSummary, integrationSummary, timelinePage] = await Promise.all([
+      const storageConnectionString = process.env.STORAGE_CONNECTION_STRING;
+      if (!storageConnectionString) {
+        return res.status(500).json({ ok: false, error: "Missing STORAGE_CONNECTION_STRING" });
+      }
+
+      const profilesTable = getFormationProfilesTableClient(storageConnectionString);
+
+      const [engagementSummary, integrationSummary, timelinePage, formationProfile] = await Promise.all([
         engagementSummaryRepo.get(visitorId),
         integrationService.readIntegrationSummary(visitorId),
-        integrationService.readIntegratedTimeline(visitorId, 5)
+        integrationService.readIntegratedTimeline(visitorId, 5),
+        getFormationProfile(profilesTable as any, visitorId)
       ]);
 
       return res.status(200).json({
@@ -40,6 +50,9 @@ export function createGetVisitorSummaryAdapter() {
             timelinePreview: timelinePage?.items ?? []
           },
           integration: integrationSummary ?? null,
+          formation: {
+            profile: formationProfile ?? null
+          }
         },
       });
     } catch (err) {

@@ -29,11 +29,9 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
   const baseUrl = requireEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
   const apiKey = requireEnv("HOPE_API_KEY");
 
-  const [visitorData, profileData, eventsData, summaryData] = await Promise.all([
+  const [visitorData, eventsData, summaryData] = await Promise.all([
     getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}`, apiKey),
-    getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}/formation/profile`, apiKey),
-    getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}/formation/events`, apiKey)
-      ,
+    getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}/formation/events`, apiKey),
     getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}/summary`, apiKey)
   ]);
 
@@ -57,26 +55,7 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
       createdAt: String(visitor?.createdAt ?? ""),
       updatedAt: String(visitor?.updatedAt ?? visitor?.createdAt ?? "")
     },
-    formationProfile: profileData?.profile
-      ? {
-          partitionKey: String(profileData.profile.partitionKey ?? "VISITOR"),
-          rowKey: String(profileData.profile.rowKey ?? visitorId),
-          stage: profileData.profile.stage ?? null,
-          assignedTo: profileData.profile.assignedTo
-            ? (typeof profileData.profile.assignedTo === "string"
-                ? { ownerId: profileData.profile.assignedTo }
-                : { ownerId: profileData.profile.assignedTo.ownerId ?? null })
-            : null,
-          lastFollowupAssignedAt: profileData.profile.lastFollowupAssignedAt ?? null,
-          lastFollowupContactedAt: profileData.profile.lastFollowupContactedAt ?? null,
-          lastFollowupOutcomeAt: profileData.profile.lastFollowupOutcomeAt ?? null,
-          lastFollowupOutcome: profileData.profile.lastFollowupOutcome ?? null,
-          lastFollowupOutcomeNotes: profileData.profile.lastFollowupOutcomeNotes ?? null,
-          lastEventType: profileData.profile.lastEventType ?? null,
-          lastEventAt: profileData.profile.lastEventAt ?? null,
-          updatedAt: profileData.profile.updatedAt ?? null
-        }
-      : null,
+    formationProfile: summaryData?.summary?.formation?.profile ?? null,
     formationEvents: events
       .map((event: {
         eventId?: string | null;
@@ -121,10 +100,3 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
       .slice(0, 8)
   };
 }
-
-
-
-
-
-
-

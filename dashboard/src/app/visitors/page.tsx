@@ -44,6 +44,12 @@ export default async function VisitorsPage({
   const items: VisitorsTableItem[] = visitors.items.map((visitor) => {
     const profile = formationProfilesByVisitorId.get(visitor.visitorId);
 
+    const formationMilestones = {
+  hasSalvation: false,
+  hasBaptism: false,
+  hasMembership: false
+};
+
     let followupState: VisitorsTableItem["followupState"] = "Waiting assignment";
     let attentionState: VisitorsTableItem["attentionState"] = null;
 
@@ -62,7 +68,8 @@ export default async function VisitorsPage({
       ...visitor,
       followupState,
       attentionState,
-      assignedTo: profile?.assignedTo ?? null
+      assignedTo: profile?.assignedTo ?? null,
+      formationMilestones
     };
   });
 
@@ -204,4 +211,3 @@ export default async function VisitorsPage({
     </section>
   );
 }
-

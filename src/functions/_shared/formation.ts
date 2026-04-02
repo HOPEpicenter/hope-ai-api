@@ -96,7 +96,10 @@ const SUPPORTED_FORMATION_EVENT_TYPES = new Set([
   "FOLLOWUP_UNASSIGNED",
   "FOLLOWUP_CONTACTED",
   "FOLLOWUP_OUTCOME_RECORDED",
-  "NEXT_STEP_SELECTED"
+  "NEXT_STEP_SELECTED",
+  "SALVATION_RECORDED",
+  "BAPTISM_RECORDED",
+  "MEMBERSHIP_RECORDED"
 ]);
 
 function validateFormationEventEnvelopeV1Strict(body: unknown): {
@@ -787,6 +790,4 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
-
-
 

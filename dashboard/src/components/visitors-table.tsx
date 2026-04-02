@@ -12,6 +12,11 @@ export type VisitorsTableItem = VisitorListItem & {
   followupState: "Assigned" | "Waiting assignment" | "Contacted";
   attentionState: "Needs attention" | "Contact made" | null;
   assignedTo: string | null;
+  formationMilestones: {
+    hasSalvation: boolean;
+    hasBaptism: boolean;
+    hasMembership: boolean;
+  };
 };
 
 type VisitorsPreset = "all" | "my-needs-attention" | "waiting-assignment" | "assigned-to-me" | "assigned" | "contacted" | "needs-attention";
@@ -126,6 +131,54 @@ function AttentionBadge({ state }: { state: VisitorsTableItem["attentionState"] 
       {state}
     </Link>
   );
+}
+
+function MilestoneBadges({
+  milestones
+}: {
+  milestones: VisitorsTableItem["formationMilestones"];
+}) {
+  const badgeStyle = {
+    display: "inline-block",
+    padding: "4px 8px",
+    borderRadius: 9999,
+    fontSize: 12,
+    fontWeight: 600,
+    background: "#f3f4f6",
+    color: "#111827"
+  } as const;
+
+  const badges: React.ReactNode[] = [];
+
+  if (milestones.hasSalvation) {
+    badges.push(
+      <span key="saved" style={badgeStyle}>
+        Saved
+      </span>
+    );
+  }
+
+  if (milestones.hasBaptism) {
+    badges.push(
+      <span key="baptized" style={badgeStyle}>
+        Baptized
+      </span>
+    );
+  }
+
+  if (milestones.hasMembership) {
+    badges.push(
+      <span key="member" style={badgeStyle}>
+        Member
+      </span>
+    );
+  }
+
+  if (badges.length === 0) {
+    return <span style={{ color: "#9ca3af" }}>—</span>;
+  }
+
+  return <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{badges}</div>;
 }
 
 function PresetButton({
@@ -622,13 +675,14 @@ export function VisitorsTable({
       ) : null}
 
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflowX: "auto" }}>
-        <table style={{ width: "100%", minWidth: 1360, borderCollapse: "collapse", tableLayout: "fixed" }}>
+        <table style={{ width: "100%", minWidth: 1520, borderCollapse: "collapse", tableLayout: "fixed" }}>
           <thead>
             <tr>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 180 }}>Name</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 260 }}>Email</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 140 }}>Followup State</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 140 }}>Attention</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 180 }}>Milestones</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 150 }}>Assigned To</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 220 }}>Visitor ID</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 140 }}>Last Activity</th>
@@ -691,6 +745,9 @@ export function VisitorsTable({
                   </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
                     <AttentionBadge state={item.attentionState} />
+                  </td>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
+                    <MilestoneBadges milestones={item.formationMilestones} />
                   </td>
                   <td
                     style={{
@@ -890,4 +947,3 @@ export function VisitorsTable({
     </div>
   );
 }
-

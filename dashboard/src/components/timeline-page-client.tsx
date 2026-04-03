@@ -8,14 +8,19 @@ type Props = {
   initialItems: TimelineItem[];
   initialNextCursor: string | null;
   initialPageSize: number;
+  initialVisitorId: string | null;
 };
 
-async function fetchTimelinePage(limit: number, cursor?: string): Promise<TimelineResponse> {
+async function fetchTimelinePage(limit: number, cursor?: string, visitorId?: string | null): Promise<TimelineResponse> {
   const params = new URLSearchParams();
   params.set("limit", String(limit));
 
   if (cursor) {
     params.set("cursor", cursor);
+  }
+
+  if (visitorId?.trim()) {
+    params.set("visitorId", visitorId.trim());
   }
 
   const response = await fetch(`/api/dashboard/timeline/unified?${params.toString()}`, {
@@ -33,15 +38,22 @@ async function fetchTimelinePage(limit: number, cursor?: string): Promise<Timeli
   return json as TimelineResponse;
 }
 
-function syncLimitToUrl(limit: number) {
+function syncParamsToUrl(limit: number, visitorId?: string | null) {
   if (typeof window === "undefined") return;
 
   const url = new URL(window.location.href);
   url.searchParams.set("limit", String(limit));
+
+  if (visitorId?.trim()) {
+    url.searchParams.set("visitorId", visitorId.trim());
+  } else {
+    url.searchParams.delete("visitorId");
+  }
+
   window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}`);
 }
 
-export function TimelinePageClient({ initialItems, initialNextCursor, initialPageSize }: Props) {
+export function TimelinePageClient({ initialItems, initialNextCursor, initialPageSize, initialVisitorId }: Props) {
   const [items, setItems] = useState<TimelineItem[]>(initialItems);
   const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
   const [pageSize, setPageSize] = useState<number>(initialPageSize);
@@ -58,7 +70,7 @@ export function TimelinePageClient({ initialItems, initialNextCursor, initialPag
     setError(null);
 
     try {
-      const data = await fetchTimelinePage(pageSize, nextCursor);
+      const data = await fetchTimelinePage(pageSize, nextCursor, initialVisitorId);
       setItems((current) => [...current, ...(data.items ?? [])]);
       setNextCursor(data.nextCursor ?? null);
     } catch (err) {
@@ -77,7 +89,7 @@ export function TimelinePageClient({ initialItems, initialNextCursor, initialPag
     setError(null);
 
     try {
-      const data = await fetchTimelinePage(limit);
+      const data = await fetchTimelinePage(limit, undefined, initialVisitorId);
       setItems(data.items ?? []);
       setNextCursor(data.nextCursor ?? null);
     } catch (err) {
@@ -90,12 +102,11 @@ export function TimelinePageClient({ initialItems, initialNextCursor, initialPag
   async function handlePageSizeChange(value: string) {
     const nextPageSize = Number(value);
     setPageSize(nextPageSize);
-    syncLimitToUrl(nextPageSize);
+    syncParamsToUrl(nextPageSize, initialVisitorId);
     await resetToPageSize(nextPageSize);
   }
 
   const canShowFewer = items.length > pageSize;
-  const showFewerDisabled = isLoading || !canShowFewer;
 
   return (
     <section style={{ display: "grid", gap: 16 }}>
@@ -104,6 +115,11 @@ export function TimelinePageClient({ initialItems, initialNextCursor, initialPag
         <p style={{ marginTop: 0, color: "#4b5563" }}>
           Unified pastoral activity stream across formation and engagement.
         </p>
+        {initialVisitorId ? (
+          <p style={{ marginTop: 8, marginBottom: 0, color: "#111827", fontWeight: 600 }}>
+            Filtered to visitor {initialVisitorId}
+          </p>
+        ) : null}
       </div>
 
       <div
@@ -202,4 +218,3 @@ export function TimelinePageClient({ initialItems, initialNextCursor, initialPag
     </section>
   );
 }
-

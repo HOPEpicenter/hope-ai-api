@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
   try {
     const limit = request.nextUrl.searchParams.get("limit")?.trim() ?? "50";
     const cursor = request.nextUrl.searchParams.get("cursor")?.trim() ?? "";
+    const visitorId = request.nextUrl.searchParams.get("visitorId")?.trim() ?? "";
 
     const opsBaseUrl = getOpsBaseUrl();
     const apiKey = getRequiredEnv("HOPE_API_KEY");
@@ -69,6 +70,10 @@ export async function GET(request: NextRequest) {
 
     if (cursor) {
       params.set("cursor", cursor);
+    }
+
+    if (visitorId) {
+      params.set("visitorId", visitorId);
     }
 
     const upstreamUrl = `${opsBaseUrl}/integration/timeline/global?${params.toString()}`;

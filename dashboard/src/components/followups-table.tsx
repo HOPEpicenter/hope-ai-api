@@ -672,13 +672,31 @@ export function FollowupsTable({
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
   		  {item.lastFollowupOutcome ? (
   		    <span style={{ color: "#6b7280", fontWeight: 600 }}>Done</span>
- 		  ) : item.lastFollowupContactedAt ? (
-  		    <span style={{ fontWeight: 700, color: "#1d4ed8" }}>Record outcome</span>
- 		  ) : item.assignedTo?.ownerId ? (
- 		    <span style={{ fontWeight: 700, color: "#92400e" }}>Mark contacted</span>
-		  ) : (
-  		    <span style={{ color: "#6b7280" }}>Unassigned</span>
- 		  )}
+                  ) : item.lastFollowupContactedAt ? (
+                    <button
+                      type="button"
+                      onClick={() => onStartOutcomeEdit(item.visitorId)}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: 999,
+                        border: "1px solid #1d4ed8",
+                        background: "#1d4ed8",
+                        color: "#fff",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: "pointer"
+                      }}
+                    >
+                      Record outcome
+                    </button>
+                  ) : item.assignedTo?.ownerId ? (
+                    <FollowupContactButton
+                      visitorId={item.visitorId}
+                      needsFollowup={item.needsFollowup}
+                    />
+                  ) : (
+                    <span style={{ color: "#6b7280" }}>Unassigned</span>
+                  )}
 		</td>
 
 		 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>

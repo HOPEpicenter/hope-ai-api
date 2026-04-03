@@ -487,6 +487,8 @@ export function FollowupsTable({
   onQuickOutcome: (visitorId: string, outcome: string) => void;
 }) {
   const outcomeSelectRef = useRef<HTMLSelectElement | null>(null);
+  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const hasAutoFocused = useRef(false);
   const hydrated = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -498,6 +500,51 @@ export function FollowupsTable({
     outcomeSelectRef.current?.focus();
   }, [editingVisitorId]);
 
+
+  const sortedItems = [...items].sort((a, b) => {
+    if (a.needsFollowup !== b.needsFollowup) {
+      return a.needsFollowup ? -1 : 1;
+    }
+
+    const contactedDiff =
+      toTimestamp(a.lastFollowupContactedAt) - toTimestamp(b.lastFollowupContactedAt);
+    if (contactedDiff !== 0) return contactedDiff;
+
+    const assignedDiff =
+      toTimestamp(a.lastFollowupAssignedAt) - toTimestamp(b.lastFollowupAssignedAt);
+    if (assignedDiff !== 0) return assignedDiff;
+
+    return a.visitorId.localeCompare(b.visitorId);
+  });
+
+  useEffect(() => {
+    if (hasAutoFocused.current) return;
+
+    if (queueFilter !== "action-needed" && ageFilter === "all") {
+      return;
+    }
+
+    const findTarget = (minHours: number) =>
+      sortedItems.find((item) => {
+        if (!item.needsFollowup) return false;
+        const hours = getFollowupAgeHours(item.lastFollowupAssignedAt);
+        return hours !== null && hours >= minHours;
+      });
+
+    const target =
+      findTarget(72) ??
+      findTarget(48) ??
+      findTarget(24);
+
+    if (!target) return;
+
+    const el = rowRefs.current[target.visitorId];
+    if (!el) return;
+
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+
+    hasAutoFocused.current = true;
+  }, [sortedItems, queueFilter, ageFilter]);
 
   if (items.length === 0) {
     const hasFilters =
@@ -521,22 +568,6 @@ export function FollowupsTable({
       />
     );
   }
-
-  const sortedItems = [...items].sort((a, b) => {
-    if (a.needsFollowup !== b.needsFollowup) {
-      return a.needsFollowup ? -1 : 1;
-    }
-
-    const contactedDiff =
-      toTimestamp(a.lastFollowupContactedAt) - toTimestamp(b.lastFollowupContactedAt);
-    if (contactedDiff !== 0) return contactedDiff;
-
-    const assignedDiff =
-      toTimestamp(a.lastFollowupAssignedAt) - toTimestamp(b.lastFollowupAssignedAt);
-    if (assignedDiff !== 0) return assignedDiff;
-
-    return a.visitorId.localeCompare(b.visitorId);
-  });
 
   return (
     <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
@@ -587,7 +618,13 @@ export function FollowupsTable({
             const isEditing = editingVisitorId === item.visitorId;
 
             return (
-              <tr key={item.visitorId} style={rowStyle}>
+              <tr
+                key={item.visitorId}
+                ref={(el) => {
+                  rowRefs.current[item.visitorId] = el;
+                 }}
+                 style={rowStyle}
+              >
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Link
@@ -795,6 +832,9 @@ export function FollowupsTable({
     </div>
   );
 }
+
+
+
 
 
 

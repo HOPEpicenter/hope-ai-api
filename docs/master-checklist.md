@@ -382,3 +382,24 @@ Current rule:
 
 
 
+
+## 2026-04-02 Session Closeout - Visitor Summary + Formation Milestones
+
+- [x] Visitor summary endpoint added
+- [x] Dashboard visitor detail moved to visitor summary
+- [x] Timeline preview added to visitor summary
+- [x] Dashboard visitor detail consumes summary timeline preview
+- [x] Formation profile added to visitor summary
+- [x] Dashboard visitor detail consumes summary formation profile
+- [x] Formation milestone event types added end-to-end:
+  - [x] SALVATION_RECORDED
+  - [x] BAPTISM_RECORDED
+  - [x] MEMBERSHIP_RECORDED
+- [x] Milestone flags added to visitor summary
+- [x] Visitor detail milestone badges shipped
+- [x] Visitors table milestone column scaffold shipped
+- [x] Visitors table milestone column hydrated from formation profile lastEventType
+- [x] Main merged cleanly
+- [x] CI green
+- [x] Staging deploy green
+- [x] Non-blocking azure/login Node 20 deprecation warning acknowledged and deferred

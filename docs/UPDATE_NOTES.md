@@ -296,3 +296,32 @@ Verification:
 
 
 
+
+## 2026-04-02
+
+Closed out the visitor summary and formation milestone lane.
+
+Merged:
+- #496 feat(api): add visitor summary endpoint
+- #498 feat(dashboard): use visitor summary endpoint
+- #499 feat(api): add timeline preview to visitor summary
+- #500 feat(dashboard): use timeline preview from visitor summary
+- #501 feat(api): add formation profile to visitor summary
+- #502 feat(dashboard): use formation profile from visitor summary
+- #503 feat(api): add formation milestone event types
+- #504 feat(api): add milestone flags to visitor summary
+- #505 feat(dashboard): show formation milestone badges
+- #506 feat(dashboard): add formation milestones column to visitors table (scaffold)
+- #507 feat(dashboard): hydrate visitors milestone column from formation profile lastEventType
+
+Result:
+- visitor detail is now summary-backed for engagement + formation
+- milestone flags are available in visitor summary
+- milestone badges render in visitor detail
+- milestone column renders in visitors table and is hydrated from formation profile lastEventType
+
+Verification:
+- merge to main successful
+- CI green
+- staging deploy green
+- Node 20 deprecation warning on azure/login remains non-blocking

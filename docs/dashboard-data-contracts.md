@@ -94,3 +94,31 @@ If a page needs data not defined here:
 2. use mock data
 3. document the gap
 4. only then expand the backend
+## 2026-04-02 Addendum - Visitor Detail + Formation Milestones
+
+### Visitor Detail data contract (current shipped state)
+
+Visitor detail is no longer only a thin visitor + formation page composition. The dashboard now treats the visitor summary endpoint as the primary truth source for summary-backed data.
+
+Current detail consumer shape includes:
+- visitor
+- engagementTimeline
+- formationProfile
+- formationMilestones
+  - hasSalvation
+  - hasBaptism
+  - hasMembership
+- formationEvents
+
+### Summary-backed fields now used by dashboard visitor detail
+
+The visitor detail page consumes:
+- summary.engagement.summary
+- summary.engagement.timelinePreview
+- summary.integration
+- summary.formation.profile
+- summary.formation.milestones
+
+### Followups / visitors list note
+
+The visitors table milestone column is hydrated from formation profile lastEventType through the dashboard formation profiles loader. The followups/visitors list path remains bulk/list-oriented and does not switch to per-row summary calls.

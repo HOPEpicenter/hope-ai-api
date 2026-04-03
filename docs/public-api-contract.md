@@ -64,3 +64,46 @@ Fetch a visitor by id.
   - introduce a production-grade stable cursor
 
 
+
+## 2026-04-02 Addendum - GET /api/visitors/:id/summary
+
+### Route
+GET /api/visitors/:id/summary
+
+### Auth
+Requires x-api-key.
+
+### Response shape
+```json
+{
+  "ok": true,
+  "v": 1,
+  "visitorId": "string",
+  "summary": {
+    "engagement": {
+      "summary": {},
+      "timelinePreview": []
+    },
+    "integration": {},
+    "formation": {
+      "profile": {},
+      "milestones": {
+        "hasSalvation": false,
+        "hasBaptism": false,
+        "hasMembership": false
+      }
+    }
+  }
+```
+Current dashboard usage
+
+The dashboard visitor detail page consumes this route as the primary summary-backed source for:
+
+engagement summary
+engagement timeline preview
+integration summary
+formation profile
+formation milestone flags
+
+
+

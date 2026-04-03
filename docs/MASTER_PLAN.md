@@ -527,3 +527,41 @@ Planning rule going forward:
 - Keep global timeline narrow and contract-stable.
 - Only expand (engagement merge, ordering refinements) if a real consumer requires it.
 
+
+## 2026-04-02 Update - Visitor Summary + Formation Milestones Closeout
+
+Completed and merged:
+- #496 feat(api): add visitor summary endpoint
+- #498 feat(dashboard): use visitor summary endpoint
+- #499 feat(api): add timeline preview to visitor summary
+- #500 feat(dashboard): use timeline preview from visitor summary
+- #501 feat(api): add formation profile to visitor summary
+- #502 feat(dashboard): use formation profile from visitor summary
+- #503 feat(api): add formation milestone event types
+- #504 feat(api): add milestone flags to visitor summary
+- #505 feat(dashboard): show formation milestone badges
+- #506 feat(dashboard): add formation milestones column to visitors table (scaffold)
+- #507 feat(dashboard): hydrate visitors milestone column from formation profile lastEventType
+
+Current shipped state:
+- Global unified timeline backend remains live and consumed by dashboard timeline.
+- Visitor detail consumes visitor summary as the dashboard truth.
+- Visitor summary now includes:
+  - engagement.summary
+  - engagement.timelinePreview
+  - integration
+  - formation.profile
+  - formation.milestones
+- Supported formation milestone event types now include:
+  - SALVATION_RECORDED
+  - BAPTISM_RECORDED
+  - MEMBERSHIP_RECORDED
+- Dashboard surfaces now show milestone state in:
+  - visitor detail
+  - visitors table
+
+Operational verification:
+- Main merged cleanly.
+- CI green after merge.
+- Staging deploy green after merge.
+- azure/login@v2.3.0 Node 20 deprecation warning still appears but remains non-blocking.

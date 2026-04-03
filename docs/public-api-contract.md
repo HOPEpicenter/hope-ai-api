@@ -94,6 +94,7 @@ Requires x-api-key.
       }
     }
   }
+}
 ```
 Current dashboard usage
 

@@ -675,6 +675,23 @@ lastFocusContext.current = contextKey;
                       <div style={{ fontSize: 12, color: "#6b7280" }}>Visitor ID</div>
                     </Link>
                     <CopyButton value={item.visitorId} label="Copy" />
+                    <Link
+                      href={`/timeline?visitorId=${encodeURIComponent(item.visitorId)}&limit=50`}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        padding: "6px 10px",
+                        borderRadius: 999,
+                        border: "1px solid #d1d5db",
+                        background: "#fff",
+                        color: "#111827",
+                        textDecoration: "none",
+                        fontSize: 12,
+                        fontWeight: 600
+                      }}
+                    >
+                      View timeline
+                    </Link>
                   </div>
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
@@ -867,6 +884,7 @@ lastFocusContext.current = contextKey;
     </div>
   );
 }
+
 
 
 

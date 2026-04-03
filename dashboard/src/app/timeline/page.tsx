@@ -6,6 +6,7 @@ import { getTimeline } from "@/lib/loaders/get-timeline";
 type TimelinePageProps = {
   searchParams?: Promise<{
     limit?: string;
+    visitorId?: string;
   }>;
 };
 
@@ -20,14 +21,16 @@ function clampLimit(value?: string): number {
 export default async function TimelinePage({ searchParams }: TimelinePageProps) {
   const params = searchParams ? await searchParams : undefined;
   const limit = clampLimit(params?.limit);
+  const visitorId = params?.visitorId?.trim() || undefined;
 
-  const data = await getTimeline(limit);
+  const data = await getTimeline(limit, visitorId);
 
   return (
     <TimelinePageClient
       initialItems={data.items}
       initialNextCursor={data.nextCursor ?? null}
       initialPageSize={limit}
+      initialVisitorId={visitorId ?? null}
     />
   );
 }

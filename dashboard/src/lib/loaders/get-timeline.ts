@@ -16,9 +16,13 @@ function getBaseUrl(): string {
   return `https://${value.replace(/\/+$/, "")}`;
 }
 
-export async function getTimeline(limit = 50): Promise<TimelineResponse> {
+export async function getTimeline(limit = 50, visitorId?: string): Promise<TimelineResponse> {
   const params = new URLSearchParams();
   params.set("limit", String(limit));
+
+  if (visitorId?.trim()) {
+    params.set("visitorId", visitorId.trim());
+  }
 
   const response = await fetch(
     `${getBaseUrl()}/api/dashboard/timeline/unified?${params.toString()}`,

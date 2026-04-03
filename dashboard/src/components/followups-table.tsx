@@ -490,6 +490,7 @@ export function FollowupsTable({
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const hasAutoFocused = useRef(false);
 const lastFocusContext = useRef<string | null>(null);
+const userHasScrolledRef = useRef(false);
   
   const hydrated = useSyncExternalStore(
     () => () => {},
@@ -501,6 +502,19 @@ const lastFocusContext = useRef<string | null>(null);
     if (!editingVisitorId) return;
     outcomeSelectRef.current?.focus();
   }, [editingVisitorId]);
+  useEffect(() => {
+    const handleUserScroll = () => {
+      userHasScrolledRef.current = true;
+    };
+
+    window.addEventListener("wheel", handleUserScroll, { passive: true });
+    window.addEventListener("touchmove", handleUserScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("wheel", handleUserScroll);
+      window.removeEventListener("touchmove", handleUserScroll);
+    };
+  }, []);
 
 
   const sortedItems = [...items].sort((a, b) => {
@@ -527,6 +541,8 @@ const lastFocusContext = useRef<string | null>(null);
       lastFocusContext.current !== contextKey;
 
     if (!shouldRun) return;
+
+    if (userHasScrolledRef.current) return;
 
     if (queueFilter !== "action-needed" && ageFilter === "all") {
       return;
@@ -851,6 +867,7 @@ lastFocusContext.current = contextKey;
     </div>
   );
 }
+
 
 
 

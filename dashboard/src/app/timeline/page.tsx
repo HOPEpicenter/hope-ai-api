@@ -7,6 +7,7 @@ type TimelinePageProps = {
   searchParams?: Promise<{
     limit?: string;
     visitorId?: string;
+    returnTo?: string;
   }>;
 };
 
@@ -22,6 +23,7 @@ export default async function TimelinePage({ searchParams }: TimelinePageProps) 
   const params = searchParams ? await searchParams : undefined;
   const limit = clampLimit(params?.limit);
   const visitorId = params?.visitorId?.trim() || undefined;
+  const returnTo = params?.returnTo ?? undefined;
 
   const data = await getTimeline(limit, visitorId);
 
@@ -31,6 +33,8 @@ export default async function TimelinePage({ searchParams }: TimelinePageProps) 
       initialNextCursor={data.nextCursor ?? null}
       initialPageSize={limit}
       initialVisitorId={visitorId ?? null}
+      returnTo={returnTo ?? null}
     />
   );
 }
+

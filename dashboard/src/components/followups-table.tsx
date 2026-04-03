@@ -434,6 +434,7 @@ function renderOutcomeCell(
 }
 
 export function FollowupsTable({
+  returnTo,
   items,
   queueFilter,
   assigneeFilter,
@@ -460,6 +461,7 @@ export function FollowupsTable({
   onSaveOutcome,
   onQuickOutcome
 }: {
+  returnTo?: string;
   items: FollowupItem[];
   queueFilter: "all" | "action-needed" | "contact-made";
   assigneeFilter: string;
@@ -676,7 +678,9 @@ lastFocusContext.current = contextKey;
                     </Link>
                     <CopyButton value={item.visitorId} label="Copy" />
                     <Link
-                      href={`/timeline?visitorId=${encodeURIComponent(item.visitorId)}&limit=50`}
+                      href={`/timeline?visitorId=${encodeURIComponent(item.visitorId)}&limit=50${
+  returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""
+}`}
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
@@ -884,6 +888,7 @@ lastFocusContext.current = contextKey;
     </div>
   );
 }
+
 
 
 

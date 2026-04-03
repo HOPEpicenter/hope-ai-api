@@ -9,6 +9,7 @@ type Props = {
   initialNextCursor: string | null;
   initialPageSize: number;
   initialVisitorId: string | null;
+  returnTo: string | null;
 };
 
 async function fetchTimelinePage(limit: number, cursor?: string, visitorId?: string | null): Promise<TimelineResponse> {
@@ -53,7 +54,7 @@ function syncParamsToUrl(limit: number, visitorId?: string | null) {
   window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}`);
 }
 
-export function TimelinePageClient({ initialItems, initialNextCursor, initialPageSize, initialVisitorId }: Props) {
+export function TimelinePageClient({ initialItems, initialNextCursor, initialPageSize, initialVisitorId, returnTo }: Props) {
   const [items, setItems] = useState<TimelineItem[]>(initialItems);
   const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
   const [pageSize, setPageSize] = useState<number>(initialPageSize);
@@ -121,7 +122,7 @@ export function TimelinePageClient({ initialItems, initialNextCursor, initialPag
               Filtered to visitor {initialVisitorId}
             </p>
             <a
-              href="/followups"
+              href={returnTo || "/followups"}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -237,4 +238,5 @@ export function TimelinePageClient({ initialItems, initialNextCursor, initialPag
     </section>
   );
 }
+
 

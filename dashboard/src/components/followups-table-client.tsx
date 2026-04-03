@@ -507,6 +507,11 @@ export function FollowupsTableClient({ items }: Props) {
     }
   }
 
+  const currentFollowupsUrl =
+    typeof window !== "undefined"
+      ? `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
+      : pathname;
+
   return (
     <section style={{ display: "grid", gap: 12 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
@@ -1042,6 +1047,7 @@ export function FollowupsTableClient({ items }: Props) {
       ) : null}
 
       <FollowupsTable
+        returnTo={currentFollowupsUrl}
         items={filteredItems}
         queueFilter={queueFilter}
         assigneeFilter={assigneeFilter}
@@ -1169,4 +1175,5 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
+
 

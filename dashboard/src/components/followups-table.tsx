@@ -551,7 +551,8 @@ export function FollowupsTable({
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Assigned</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Contact</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Outcome</th>
-            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Actions</th>
+            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Next Action</th>
+	    <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -669,6 +670,18 @@ export function FollowupsTable({
                   )}
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
+  		  {item.lastFollowupOutcome ? (
+  		    <span style={{ color: "#6b7280", fontWeight: 600 }}>Done</span>
+ 		  ) : item.lastFollowupContactedAt ? (
+  		    <span style={{ fontWeight: 700, color: "#1d4ed8" }}>Record outcome</span>
+ 		  ) : item.assignedTo?.ownerId ? (
+ 		    <span style={{ fontWeight: 700, color: "#92400e" }}>Mark contacted</span>
+		  ) : (
+  		    <span style={{ color: "#6b7280" }}>Unassigned</span>
+ 		  )}
+		</td>
+
+		 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   <FollowupRowActionGroup>
                     <div style={{ display: "grid", gap: 8 }}>
                       {item.needsFollowup ? (

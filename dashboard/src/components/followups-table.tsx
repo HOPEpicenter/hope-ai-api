@@ -557,9 +557,32 @@ export function FollowupsTable({
         </thead>
         <tbody>
           {sortedItems.map((item) => {
-            const rowStyle: CSSProperties = item.needsFollowup
-              ? { background: "#fffbeb", boxShadow: "inset 4px 0 0 #f59e0b" }
-              : {};
+            let rowStyle: CSSProperties = {};
+
+            if (item.needsFollowup) {
+              const hours = getFollowupAgeHours(item.lastFollowupAssignedAt);
+
+              if (hours !== null && hours >= 72) {
+                rowStyle = {
+                  background: "#fef2f2",
+                  boxShadow: "inset 4px 0 0 #dc2626"
+                };
+              } else if (hours !== null && hours >= 48) {
+                rowStyle = {
+                  background: "#fff7ed",
+                  boxShadow: "inset 4px 0 0 #ea580c"
+                };
+              } else if (hours !== null && hours >= 24) {
+                rowStyle = {
+                  background: "#fffbeb",
+                  boxShadow: "inset 4px 0 0 #f59e0b"
+                };
+              } else {
+                rowStyle = {
+                  background: "#f9fafb"
+                };
+              }
+            }
 
             const isEditing = editingVisitorId === item.visitorId;
 
@@ -772,6 +795,7 @@ export function FollowupsTable({
     </div>
   );
 }
+
 
 
 

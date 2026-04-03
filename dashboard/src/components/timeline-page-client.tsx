@@ -116,9 +116,28 @@ export function TimelinePageClient({ initialItems, initialNextCursor, initialPag
           Unified pastoral activity stream across formation and engagement.
         </p>
         {initialVisitorId ? (
-          <p style={{ marginTop: 8, marginBottom: 0, color: "#111827", fontWeight: 600 }}>
-            Filtered to visitor {initialVisitorId}
-          </p>
+          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12 }}>
+            <p style={{ margin: 0, color: "#111827", fontWeight: 600 }}>
+              Filtered to visitor {initialVisitorId}
+            </p>
+            <a
+              href="/followups"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "6px 10px",
+                borderRadius: 999,
+                border: "1px solid #d1d5db",
+                background: "#fff",
+                color: "#111827",
+                textDecoration: "none",
+                fontSize: 12,
+                fontWeight: 600
+              }}
+            >
+              Back to followups
+            </a>
+          </div>
         ) : null}
       </div>
 
@@ -218,3 +237,4 @@ export function TimelinePageClient({ initialItems, initialNextCursor, initialPag
     </section>
   );
 }
+

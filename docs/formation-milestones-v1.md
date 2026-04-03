@@ -85,3 +85,25 @@ If stage does not change, these fields are not newly required for that event and
 
 
 
+
+## 2026-04-02 Addendum - Supported milestone event types
+
+Supported formation milestone event types now include:
+
+- SALVATION_RECORDED
+- BAPTISM_RECORDED
+- MEMBERSHIP_RECORDED
+Current dashboard consumer behavior
+
+Current shipped dashboard behavior derives milestone flags for visitor summary/dashboard surfaces from formation profile lastEventType:
+
+hasSalvation => lastEventType == SALVATION_RECORDED
+hasBaptism => lastEventType == BAPTISM_RECORDED
+hasMembership => lastEventType == MEMBERSHIP_RECORDED
+Current shipped milestone surfaces
+
+Milestone state is now visible in:
+
+visitor detail milestone badges
+visitors table milestone column
+

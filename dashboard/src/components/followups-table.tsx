@@ -489,6 +489,7 @@ export function FollowupsTable({
   const outcomeSelectRef = useRef<HTMLSelectElement | null>(null);
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const hasAutoFocused = useRef(false);
+  
   const hydrated = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -542,6 +543,16 @@ export function FollowupsTable({
     if (!el) return;
 
     el.scrollIntoView({ block: "center", behavior: "smooth" });
+
+    el.style.outline = "2px solid #2563eb";
+    el.style.boxShadow = "0 0 0 4px rgba(37, 99, 235, 0.15)";
+    el.style.transition = "all 0.6s ease";
+
+    setTimeout(() => {
+      if (!el) return;
+      el.style.outline = "";
+      el.style.boxShadow = "";
+    }, 1600);
 
     hasAutoFocused.current = true;
   }, [sortedItems, queueFilter, ageFilter]);
@@ -622,8 +633,8 @@ export function FollowupsTable({
                 key={item.visitorId}
                 ref={(el) => {
                   rowRefs.current[item.visitorId] = el;
-                 }}
-                 style={rowStyle}
+                }}
+                style={rowStyle}
               >
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -832,6 +843,8 @@ export function FollowupsTable({
     </div>
   );
 }
+
+
 
 
 

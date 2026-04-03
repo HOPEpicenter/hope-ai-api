@@ -489,6 +489,7 @@ export function FollowupsTable({
   const outcomeSelectRef = useRef<HTMLSelectElement | null>(null);
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const hasAutoFocused = useRef(false);
+const lastFocusContext = useRef<string | null>(null);
   
   const hydrated = useSyncExternalStore(
     () => () => {},
@@ -519,7 +520,13 @@ export function FollowupsTable({
   });
 
   useEffect(() => {
-    if (hasAutoFocused.current) return;
+    const contextKey = `${queueFilter}|${ageFilter}`;
+
+    const shouldRun =
+      !hasAutoFocused.current ||
+      lastFocusContext.current !== contextKey;
+
+    if (!shouldRun) return;
 
     if (queueFilter !== "action-needed" && ageFilter === "all") {
       return;
@@ -555,6 +562,7 @@ export function FollowupsTable({
     }, 1600);
 
     hasAutoFocused.current = true;
+lastFocusContext.current = contextKey;
   }, [sortedItems, queueFilter, ageFilter]);
 
   if (items.length === 0) {
@@ -843,6 +851,8 @@ export function FollowupsTable({
     </div>
   );
 }
+
+
 
 
 

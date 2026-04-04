@@ -166,6 +166,11 @@ function PresetButton({
   );
 }
 
+function getScrollPosition(): number {
+  if (typeof window === "undefined") return 0;
+  return window.scrollY || window.pageYOffset || 0;
+}
+
 export function FollowupsTableClient({ items }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -223,6 +228,29 @@ export function FollowupsTableClient({ items }: Props) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const scrollValue = params.get("returnScroll");
+
+    if (!scrollValue) return;
+
+    const scrollY = Number(scrollValue);
+    if (!Number.isFinite(scrollY)) return;
+
+    window.scrollTo({ top: scrollY, behavior: "auto" });
+
+    params.delete("returnScroll");
+
+    const newUrl =
+      params.toString().length > 0
+        ? `${window.location.pathname}?${params.toString()}`
+        : window.location.pathname;
+
+    window.history.replaceState(null, "", newUrl);
+  }, []);
+
   const assigneeOptions = useMemo(() => {
     return Array.from(new Set(items.map((item) => item.assignedTo?.ownerId).filter(Boolean))).sort();
   }, [items]);
@@ -277,7 +305,6 @@ export function FollowupsTableClient({ items }: Props) {
     } else {
       params.delete("outcome");
     }
-
 
     if (sortValue !== "oldest-assigned") {
       params.set("sort", sortValue);
@@ -352,6 +379,7 @@ export function FollowupsTableClient({ items }: Props) {
     sort !== "oldest-assigned";
 
   const hasCustomFilters = hasActiveFilters && activePresetLabel === null;
+
   function applyAllPreset() {
     setSearch("");
     setQueueFilter("all");
@@ -509,7 +537,16 @@ export function FollowupsTableClient({ items }: Props) {
 
   const currentFollowupsUrl =
     typeof window !== "undefined"
-      ? `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`
+      ? (() => {
+          const params = new URLSearchParams(searchParams.toString());
+
+          const scroll = getScrollPosition();
+          if (scroll > 0) {
+            params.set("returnScroll", String(scroll));
+          }
+
+          return `${pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+        })()
       : pathname;
 
   return (
@@ -1175,5 +1212,3 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
-
-

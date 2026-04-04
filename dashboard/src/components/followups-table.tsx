@@ -655,8 +655,7 @@ lastFocusContext.current = contextKey;
             const isEditing = editingVisitorId === item.visitorId;
 
             return (
-              <tr
-                key={item.visitorId}
+              <tr key={item.visitorId} data-visitor-id={item.visitorId}
                 ref={(el) => {
                   rowRefs.current[item.visitorId] = el;
                 }}
@@ -678,9 +677,7 @@ lastFocusContext.current = contextKey;
                     </Link>
                     <CopyButton value={item.visitorId} label="Copy" />
                     <Link
-                      href={`/timeline?visitorId=${encodeURIComponent(item.visitorId)}&limit=50${
-  returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""
-}`}
+                      href={`/timeline?visitorId=${encodeURIComponent(item.visitorId)}&limit=50&returnVisitorId=${encodeURIComponent(item.visitorId)}${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ""}`}
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
@@ -888,6 +885,9 @@ lastFocusContext.current = contextKey;
     </div>
   );
 }
+
+
+
 
 
 

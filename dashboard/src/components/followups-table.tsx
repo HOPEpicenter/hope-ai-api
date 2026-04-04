@@ -4,7 +4,7 @@ import { FollowupUnassignButton } from "@/components/followup-unassign-button";
 import { FollowupContactButton } from "@/components/followup-contact-button";
 import { FollowupRowActionGroup, FollowupRowActionSurface } from "@/components/followup-row-action-ui";
 import { FollowupOutcomeRowActions } from "@/components/followup-outcome-row-actions";
-import { useEffect, useRef, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import type { FollowupItem } from "@/lib/contracts/followups";
 import { CopyButton } from "@/components/copy-button";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
@@ -490,6 +490,7 @@ export function FollowupsTable({
 }) {
   const outcomeSelectRef = useRef<HTMLSelectElement | null>(null);
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+const [selectedVisitorId, setSelectedVisitorId] = useState<string | null>(null);
   const hasAutoFocused = useRef(false);
 const lastFocusContext = useRef<string | null>(null);
 const userHasScrolledRef = useRef(false);
@@ -582,6 +583,48 @@ const userHasScrolledRef = useRef(false);
     hasAutoFocused.current = true;
 lastFocusContext.current = contextKey;
   }, [sortedItems, queueFilter, ageFilter]);
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (sortedItems.length === 0) return;
+
+      const currentIndex = sortedItems.findIndex(
+        (i) => i.visitorId === selectedVisitorId
+      );
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        const nextIndex = currentIndex < sortedItems.length - 1 ? currentIndex + 1 : 0;
+        const next = sortedItems[nextIndex];
+        setSelectedVisitorId(next.visitorId);
+
+        const el = rowRefs.current[next.visitorId];
+        el?.scrollIntoView({ block: "nearest" });
+      }
+
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const prevIndex = currentIndex > 0 ? currentIndex - 1 : sortedItems.length - 1;
+        const prev = sortedItems[prevIndex];
+        setSelectedVisitorId(prev.visitorId);
+
+        const el = rowRefs.current[prev.visitorId];
+        el?.scrollIntoView({ block: "nearest" });
+      }
+
+      if (e.key === "Enter") {
+        if (!selectedVisitorId) return;
+
+        const id = selectedVisitorId;
+        const base = `/timeline?visitorId=${encodeURIComponent(id)}&limit=50&returnVisitorId=${encodeURIComponent(id)}`;
+        const url = returnTo ? `${base}&returnTo=${encodeURIComponent(returnTo)}` : base;
+
+        window.location.href = url;
+      }
+    };
+
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [sortedItems, returnTo, selectedVisitorId]);
 
   if (items.length === 0) {
     const hasFilters =
@@ -626,6 +669,14 @@ lastFocusContext.current = contextKey;
         <tbody>
           {sortedItems.map((item) => {
             let rowStyle: CSSProperties = {};
+
+if (selectedVisitorId === item.visitorId) {
+  rowStyle = {
+    ...rowStyle,
+    outline: "2px solid #3b82f6",
+    outlineOffset: "-2px"
+  };
+}
 
             if (item.needsFollowup) {
               const hours = getFollowupAgeHours(item.lastFollowupAssignedAt);
@@ -885,6 +936,11 @@ lastFocusContext.current = contextKey;
     </div>
   );
 }
+
+
+
+
+
 
 
 

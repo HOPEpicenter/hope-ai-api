@@ -611,7 +611,7 @@ lastFocusContext.current = contextKey;
         el?.scrollIntoView({ block: "nearest" });
       }
 
-      if (e.key === "Enter") {
+      const openTimeline = () => {
         if (!selectedVisitorId) return;
 
         const id = selectedVisitorId;
@@ -619,6 +619,15 @@ lastFocusContext.current = contextKey;
         const url = returnTo ? `${base}&returnTo=${encodeURIComponent(returnTo)}` : base;
 
         window.location.href = url;
+      };
+
+      if (e.key === "Enter") {
+        openTimeline();
+      }
+
+      if (e.key === "t") {
+        e.preventDefault();
+        openTimeline();
       }
     };
 
@@ -936,6 +945,7 @@ if (selectedVisitorId === item.visitorId) {
     </div>
   );
 }
+
 
 
 

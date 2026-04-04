@@ -629,6 +629,12 @@ lastFocusContext.current = contextKey;
         e.preventDefault();
         openTimeline();
       }
+
+      if (e.key === "o") {
+        e.preventDefault();
+        if (!selectedVisitorId) return;
+        onStartOutcomeEdit(selectedVisitorId);
+      }
     };
 
     window.addEventListener("keydown", handleKey);
@@ -945,6 +951,7 @@ if (selectedVisitorId === item.visitorId) {
     </div>
   );
 }
+
 
 
 

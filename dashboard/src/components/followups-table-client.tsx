@@ -250,6 +250,36 @@ export function FollowupsTableClient({ items }: Props) {
 
     window.history.replaceState(null, "", newUrl);
   }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const returnVisitorId = params.get("returnVisitorId");
+
+    if (!returnVisitorId) return;
+
+    const selector = `[data-visitor-id="${returnVisitorId}"]`;
+    const el = document.querySelector(selector) as HTMLElement | null;
+    if (!el) return;
+
+    el.style.outline = "2px solid #22c55e";
+    el.style.boxShadow = "0 0 0 4px rgba(34, 197, 94, 0.2)";
+    el.style.transition = "all 0.6s ease";
+
+    setTimeout(() => {
+      el.style.outline = "";
+      el.style.boxShadow = "";
+    }, 1800);
+
+    params.delete("returnVisitorId");
+
+    const newUrl =
+      params.toString().length > 0
+        ? `${window.location.pathname}?${params.toString()}`
+        : window.location.pathname;
+
+    window.history.replaceState(null, "", newUrl);
+  }, []);
 
   const assigneeOptions = useMemo(() => {
     return Array.from(new Set(items.map((item) => item.assignedTo?.ownerId).filter(Boolean))).sort();
@@ -1212,3 +1242,5 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
+
+

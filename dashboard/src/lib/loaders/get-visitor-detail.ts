@@ -45,6 +45,7 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
         : [];
 
   return {
+    journey: summaryData?.summary?.journey ?? null,
     engagementTimeline: summaryData?.summary?.engagement?.timelinePreview ?? [],
 
     ok: true,
@@ -105,3 +106,4 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
       .slice(0, 8)
   };
 }
+

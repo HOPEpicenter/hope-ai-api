@@ -290,6 +290,32 @@ function MilestoneBadge({
   );
 }
 
+
+function JourneyCard({ journey }: { journey: any }) {
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 12,
+        padding: 20,
+        display: "grid",
+        gap: 10
+      }}
+    >
+      <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>Journey</h2>
+
+      {!journey ? (
+        <div style={{ color: "#6b7280" }}>No journey state yet.</div>
+      ) : (
+        <>
+          <DetailRow label="Current Step" value={journey.currentStep ?? "-"} />
+          <DetailRow label="Updated At" value={<TimestampValue value={journey.updatedAt ?? null} />} />
+        </>
+      )}
+    </div>
+  );
+}
 function getNextAction(
   followupStatus: string,
   assignedToOwnerId: string | null | undefined
@@ -1069,6 +1095,8 @@ export default async function VisitorDetailPage({
         </div>
       </DetailCard>
 
+      <JourneyCard journey={data.journey} />
+
       <FollowupTimelineCard
         assignedAt={data.formationProfile?.lastFollowupAssignedAt ?? null}
         contactedAt={data.formationProfile?.lastFollowupContactedAt ?? null}
@@ -1284,6 +1312,8 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
+
 
 
 

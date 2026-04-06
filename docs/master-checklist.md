@@ -207,7 +207,7 @@
 - [x] Public formation profile snapshot works: GET /api/visitors/:id/formation/profile
 - [x] Regression/assert coverage now includes formation milestones v1, snapshot invariants, tie-break behavior, and idempotency
 - [x] Define formation milestones/events and derivations (docs/formation-milestones-v1.md + assert script)
-- [ ] Track journey steps in an auditable way (prefer derive from events) — defer unless a real producer/blocker requires it.
+- [ ] Track journey steps in an auditable way (prefer derive from events) — ACTIVE NEXT BACKEND SLICE (2026-04-06).
 
 ## Cross-cutting — Auth scoping (COMPLETED)
 
@@ -403,3 +403,4 @@ Current rule:
 - [x] CI green
 - [x] Staging deploy green
 - [x] Non-blocking azure/login Node 20 deprecation warning acknowledged and deferred
+

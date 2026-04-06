@@ -565,3 +565,34 @@ Operational verification:
 - CI green after merge.
 - Staging deploy green after merge.
 - azure/login@v2.3.0 Node 20 deprecation warning still appears but remains non-blocking.
+
+## 2026-04-06 — Next Backend Slice: Journey Read Model
+
+**Decision**
+- Engagement is LOCKED.
+- Integration global timeline exists.
+- Next backend work moves to Formation-adjacent journey tracking.
+
+**What we are building next**
+- Read-only journey state derived from events.
+- No new write surface.
+- No workflow engine.
+- No dashboard expansion unless required.
+
+**Planned endpoint**
+- GET /api/visitors/:id/journey
+
+**Principles**
+- Derived, not stored.
+- Anchored to visitorId.
+- Built from engagement + formation events.
+- Minimal contract, auditable output.
+
+**Why**
+- Explicit gap in checklist: journey tracking not implemented.
+- Enables operator understanding without expanding scope.
+- Keeps system event-driven and deterministic.
+
+**Rule**
+- Do NOT expand beyond this slice unless a real blocker appears.
+

@@ -325,3 +325,12 @@ Verification:
 - CI green
 - staging deploy green
 - Node 20 deprecation warning on azure/login remains non-blocking
+
+## 2026-04-06
+
+- 📌 Decision: next backend slice is Journey Read Model.
+- Engagement confirmed complete and locked.
+- Global integration timeline already implemented.
+- Identified remaining gap: auditable journey step tracking (derived from events).
+- No code changes yet — docs aligned before implementation.
+

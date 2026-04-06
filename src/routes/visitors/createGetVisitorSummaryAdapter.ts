@@ -1,3 +1,4 @@
+import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1";
 import type { Request, Response, NextFunction } from "express";
 import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepository";
 import { IntegrationService } from "../../services/integration/integrationService";
@@ -40,6 +41,11 @@ export function createGetVisitorSummaryAdapter() {
         getFormationProfile(profilesTable as any, visitorId)
       ]);
 
+      const journey = deriveJourneySummaryV1({
+        engagementEvents: timelinePage?.items ?? [],
+        formationProfile: formationProfile ?? null
+      });
+
       return res.status(200).json({
         ok: true,
         v: 1,
@@ -51,13 +57,14 @@ export function createGetVisitorSummaryAdapter() {
           },
           integration: integrationSummary ?? null,
           formation: {
-  profile: formationProfile ?? null,
-  milestones: {
-    hasSalvation: formationProfile?.lastEventType === "SALVATION_RECORDED",
-    hasBaptism: formationProfile?.lastEventType === "BAPTISM_RECORDED",
-    hasMembership: formationProfile?.lastEventType === "MEMBERSHIP_RECORDED"
-  }
-}
+            profile: formationProfile ?? null,
+            milestones: {
+              hasSalvation: formationProfile?.lastEventType === "SALVATION_RECORDED",
+              hasBaptism: formationProfile?.lastEventType === "BAPTISM_RECORDED",
+              hasMembership: formationProfile?.lastEventType === "MEMBERSHIP_RECORDED"
+            }
+          },
+          journey: journey
         },
       });
     } catch (err) {
@@ -65,4 +72,3 @@ export function createGetVisitorSummaryAdapter() {
     }
   };
 }
-

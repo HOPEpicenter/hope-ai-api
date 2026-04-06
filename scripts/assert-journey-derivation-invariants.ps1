@@ -147,6 +147,23 @@ $pairForming = Get-JourneyStepPair -VisitorId $visitorForming.visitorId
 Assert-True ($pairForming.Step -eq "FORMING") "Expected SALVATION_RECORDED to promote journey to FORMING, got $($pairForming.Step)"
 Write-Host "[journey-invariants] salvation promotion to FORMING OK"
 
+$visitorContacted = New-Visitor -Tag "contacted"
+$t3 = (Get-Date).ToUniversalTime()
+Post-EngagementEvent -VisitorId $visitorContacted.visitorId -OccurredAt $t3.ToString("o")
+Post-FormationEvent -VisitorId $visitorContacted.visitorId -Type "FOLLOWUP_CONTACTED" -OccurredAt $t3.AddSeconds(1).ToString("o") -Data @{
+  method = "sms"
+  result = "reached"
+}
+
+$pairContacted = Get-JourneyStepPair -VisitorId $visitorContacted.visitorId
+Assert-True ($pairContacted.Step -eq "ENGAGED") "Expected contacted follow-up to remain ENGAGED (current contract), got $($pairContacted.Step)"
+Write-Host "[journey-invariants] contacted follow-up stays ENGAGED (baseline) OK"
+
 Write-Host "[journey-invariants] ALL OK"
+
+
+
+
+
 
 

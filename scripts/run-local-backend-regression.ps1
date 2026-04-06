@@ -162,6 +162,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "assert-journey-derivation-invariants.ps1 failed" }
   }
 
+  Run-Step -Name "Engagement status invariants" -Action {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\assert-engagement-status-invariants.ps1") -ApiBase $BaseUrl -ApiKey $ApiKey
+    if ($LASTEXITCODE -ne 0) { throw "assert-engagement-status-invariants.ps1 failed" }
+  }
+
   Run-Step -Name "Visitor engagement timeline check" -Action {
     pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\assert-visitor-engagement-timeline.ps1") -ApiBaseUrl $BaseUrl -ApiKey $ApiKey
     if ($LASTEXITCODE -ne 0) { throw "assert-visitor-engagement-timeline.ps1 failed" }
@@ -178,5 +183,6 @@ finally {
     Get-Process func -ErrorAction SilentlyContinue | Stop-Process -Force
   }
 }
+
 
 

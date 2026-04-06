@@ -101,12 +101,16 @@ export class EngagementsService {
   async getCurrentStatus(visitorId: string) {
     const page = await this.repo.readTimeline(visitorId, 200, undefined);
 
-    // Repo returns ascending RowKey order (oldest -> newest).
-    const events = page.items;
+    const events = [...page.items].sort((a, b) => {
+      const aTime = Date.parse(a?.occurredAt ?? "");
+      const bTime = Date.parse(b?.occurredAt ?? "");
+      return aTime - bTime;
+    });
 
     return deriveEngagementStatusFromEvents(visitorId, events);
   }
 }
+
 
 
 

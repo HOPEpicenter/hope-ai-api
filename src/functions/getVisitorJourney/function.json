@@ -1,4 +1,6 @@
 {
+  "scriptFile": "../dist/functions/getVisitorJourney/index.js",
+  "entryPoint": "getVisitorJourney",
   "bindings": [
     {
       "authLevel": "anonymous",

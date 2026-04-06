@@ -156,7 +156,7 @@ These post-v1 slices improved the dashboard’s operator workflow without wideni
 
 ## 2026-03-05
 - Staging deploy packaging: Oryx/build disabled; staged .deploy zip now installs prod deps via npm ci --omit=dev so the artifact is self-contained. (PR #197)
-- Cleanup: removed orphan root function folder opsFollowups/ that caused Core Tools discovery errors (function.json without entrypoint). (PR #198)
+- Cleanup: removed orphan root function folder opsFollowups/ that caused Core Tools discovery errors (function.json without entryPoint). (PR #198)
 - Visitors: implemented POST /api/visitors (createVisitor) + GET /api/visitors/{visitorId} (getVisitor) using Azure Table Storage (Visitors table; PK=visitors, RK=visitorId). Shared table client helper + ensure table exists. (PRs #199, #200)
 - Verified staging: /api/health, /api/version, POST/GET visitors (read-after-write) on hope-ai-api-staging.azurewebsites.net.
 ## 2026-03-10
@@ -333,4 +333,22 @@ Verification:
 - Global integration timeline already implemented.
 - Identified remaining gap: auditable journey step tracking (derived from events).
 - No code changes yet — docs aligned before implementation.
+
+
+## 2026-04-06
+
+- ✅ Merged **#523**: followups keyboard flow now supports o to open the outcome editor for the selected row.
+- ✅ Merged **#524**: added GET /api/visitors/{visitorId}/journey.
+- ✅ Journey state is derived from existing engagement + formation data.
+- ✅ No new storage, projections, or write pipeline were added.
+- ✅ Added regression coverage for the journey read model.
+- ✅ Merged **#525**: added missing Azure Functions metadata for getVisitorJourney (scriptFile + nentryPoint) so runtime discovery works correctly.
+- ✅ Verified CI green after both backend PRs.
+- ✅ Verified staging deploy green after both backend PRs.
+
+Notes:
+- Journey is backend-only at this point and is not yet consumed by visitor summary or dashboard views.
+- azure/login@v2.3.0 Node 20 deprecation warning remains non-blocking and deferred.
+
+
 

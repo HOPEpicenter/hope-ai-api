@@ -207,7 +207,7 @@
 - [x] Public formation profile snapshot works: GET /api/visitors/:id/formation/profile
 - [x] Regression/assert coverage now includes formation milestones v1, snapshot invariants, tie-break behavior, and idempotency
 - [x] Define formation milestones/events and derivations (docs/formation-milestones-v1.md + assert script)
-- [ ] Track journey steps in an auditable way (prefer derive from events) — ACTIVE NEXT BACKEND SLICE (2026-04-06).
+- [x] Track journey steps in an auditable way (prefer derive from events) — COMPLETE (2026-04-06, #524).
 
 ## Cross-cutting — Auth scoping (COMPLETED)
 
@@ -403,4 +403,16 @@ Current rule:
 - [x] CI green
 - [x] Staging deploy green
 - [x] Non-blocking azure/login Node 20 deprecation warning acknowledged and deferred
+
+
+## 2026-04-06 Session Closeout
+
+- [x] Merged **#523**: followups keyboard flow now supports o to open the outcome editor for the selected row.
+- [x] Merged **#524**: added GET /api/visitors/{visitorId}/journey.
+- [x] Journey read model is derived from existing engagement + formation truth.
+- [x] No new storage, projections, or write pipeline added.
+- [x] Added regression coverage for visitor journey.
+- [x] Merged **#525**: added missing Azure Functions metadata for getVisitorJourney.
+- [x] Verified CI green.
+- [x] Verified staging deploy green.
 

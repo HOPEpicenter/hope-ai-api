@@ -596,3 +596,29 @@ Operational verification:
 **Rule**
 - Do NOT expand beyond this slice unless a real blocker appears.
 
+
+## 2026-04-06 Update
+
+**What landed**
+- ✅ **#523**: followups keyboard flow now supports o to open the outcome editor for the selected row.
+- ✅ **#524**: added GET /api/visitors/{visitorId}/journey.
+- ✅ Journey is derived from existing engagement + formation truth only.
+- ✅ No new storage, projections, or write pipeline were added.
+- ✅ **#525**: fixed Azure Functions metadata for getVisitorJourney so runtime/local function discovery works correctly.
+
+**Why this matters (master plan alignment)**
+- Closes the remaining Formation-adjacent backend gap for auditable journey-step visibility.
+- Keeps journey read-only and visitorId-anchored.
+- Avoids widening Engagement, Formation, or dashboard scope.
+- Preserves backend-first discipline while keeping dashboard changes limited to operator validation/workflow polish.
+
+**Verification**
+- ✅ CI green after #524.
+- ✅ Staging deploy green after #524.
+- ✅ CI green after #525.
+- ✅ Staging deploy green after #525.
+
+**Current rule**
+- Treat journey read model as complete unless a real consumer/blocker requires summary integration or dashboard consumption.
+- Treat o keyboard shortcut as a dashboard-only operator-flow improvement; no backend implications.
+

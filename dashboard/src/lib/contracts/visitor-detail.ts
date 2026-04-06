@@ -1,6 +1,17 @@
 import type { TimelineItem } from "@/lib/contracts/timeline";
 
 export type VisitorDetailResponse = {
+  journey: {
+    currentStep: string;
+    updatedAt: string | null;
+    sources: string[];
+    evidence: Array<{
+      source: string;
+      eventType: string;
+      at: string | null;
+      summary?: string | null;
+    }>;
+  } | null;
   engagementTimeline: TimelineItem[];
   ok: boolean;
   visitor: {
@@ -37,6 +48,3 @@ export type VisitorDetailResponse = {
     notes: string | null;
   }>;
 };
-
-
-

@@ -3,6 +3,12 @@ import type { VisitorDetailResponse } from "@/lib/contracts/visitor-detail";
 const mockById: Record<string, VisitorDetailResponse> = {
   "visitor-1002": {
     ok: true,
+    journey: {
+      currentStep: "NEW",
+      updatedAt: null,
+      sources: [],
+      evidence: []
+    },
     engagementTimeline: [],
     visitor: {
       visitorId: "visitor-1002",
@@ -34,6 +40,12 @@ const mockById: Record<string, VisitorDetailResponse> = {
   },
   "visitor-1001": {
     ok: true,
+    journey: {
+      currentStep: "NEW",
+      updatedAt: null,
+      sources: [],
+      evidence: []
+    },
     engagementTimeline: [],
     visitor: {
       visitorId: "visitor-1001",
@@ -69,6 +81,12 @@ export function getMockVisitorDetail(visitorId: string): VisitorDetailResponse {
   return (
     mockById[visitorId] ?? {
       ok: true,
+    journey: {
+      currentStep: "NEW",
+      updatedAt: null,
+      sources: [],
+      evidence: []
+    },
       engagementTimeline: [],
       visitor: {
         visitorId,
@@ -87,3 +105,4 @@ export function getMockVisitorDetail(visitorId: string): VisitorDetailResponse {
     }
   );
 }
+

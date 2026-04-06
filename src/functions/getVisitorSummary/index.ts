@@ -1,3 +1,4 @@
+import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepository";
 import { IntegrationService } from "../../services/integration/integrationService";
@@ -44,6 +45,11 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
       getFormationProfileByVisitorId(table, visitorId)
     ]);
 
+    const journey = deriveJourneySummaryV1({
+      engagementEvents: timelinePage?.items ?? [],
+      formationProfile: formationProfile ?? null
+    });
+
     context.res = {
       status: 200,
       headers: { "content-type": "application/json; charset=utf-8" },
@@ -58,13 +64,14 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
           },
           integration: integrationSummary ?? null,
           formation: {
-  profile: formationProfile ?? null,
-  milestones: {
-    hasSalvation: formationProfile?.lastEventType === "SALVATION_RECORDED",
-    hasBaptism: formationProfile?.lastEventType === "BAPTISM_RECORDED",
-    hasMembership: formationProfile?.lastEventType === "MEMBERSHIP_RECORDED"
-  }
-}
+            profile: formationProfile ?? null,
+            milestones: {
+              hasSalvation: formationProfile?.lastEventType === "SALVATION_RECORDED",
+              hasBaptism: formationProfile?.lastEventType === "BAPTISM_RECORDED",
+              hasMembership: formationProfile?.lastEventType === "MEMBERSHIP_RECORDED"
+            }
+          },
+          journey: journey
         }
       }
     };
@@ -77,4 +84,3 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
     };
   }
 }
-

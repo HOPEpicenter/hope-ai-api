@@ -3,12 +3,18 @@ import { getConnString } from "../_shared/tableClient";
 
 import { getVisitorById } from "../_shared/visitorsRepository";
 import { getFormationProfileByVisitorId } from "../_shared/formation";
-import { listByVisitorWithFallback } from "../../shared/timeline/timelineQuery";
-
 import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1";
+import { IntegrationService } from "../../services/integration/integrationService";
+import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
+import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
 
 const ENGAGEMENT_TABLE = process.env.ENGAGEMENT_EVENTS_TABLE || "devEngagementEvents";
 const FORMATION_PROFILES_TABLE = process.env.FORMATION_PROFILES_TABLE || "devFormationProfiles";
+
+const integrationService = new IntegrationService(
+  new EngagementEventsRepository(),
+  new AzureTableFormationEventsRepository()
+);
 
 function getEngagementTable(): TableClient {
   const conn = getConnString();
@@ -41,14 +47,14 @@ export async function getVisitorJourney(context: any, req: any): Promise<void> {
   const formationProfilesTable = getFormationProfilesTable();
 
   // --- engagement events ---
-  const engagementResult = await listByVisitorWithFallback(
-    engagementTable,
-    visitorId,
-    null,
-    5
-  );
+  let engagementEvents: any[] = [];
 
-  const engagementEvents = engagementResult.rows || [];
+  try {
+    const timelinePage = await integrationService.readIntegratedTimeline(visitorId, 5);
+    engagementEvents = Array.isArray(timelinePage?.items) ? timelinePage.items : [];
+  } catch {
+    engagementEvents = [];
+  }
 
   // --- formation profile ---
   const formationProfile = await getFormationProfileByVisitorId(
@@ -66,7 +72,12 @@ export async function getVisitorJourney(context: any, req: any): Promise<void> {
     body: {
       ok: true,
       visitorId,
-      journey
+      ...journey
     }
   };
 }
+
+
+
+
+

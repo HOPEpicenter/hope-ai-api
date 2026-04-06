@@ -38,15 +38,31 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
 
     const table = getFormationProfilesTableClient();
 
-    const [engagementSummary, integrationSummary, timelinePage, formationProfile] = await Promise.all([
-      engagementSummaryRepo.get(visitorId),
-      integrationService.readIntegrationSummary(visitorId),
-      integrationService.readIntegratedTimeline(visitorId, 5),
-      getFormationProfileByVisitorId(table, visitorId)
-    ]);
+    let engagementSummary: any = null;
+    let integrationSummary: any = null;
+    let timelinePage: any = { items: [] };
+    let formationProfile: any = null;
+
+    try {
+      [engagementSummary, integrationSummary, timelinePage, formationProfile] = await Promise.all([
+        engagementSummaryRepo.get(visitorId),
+        integrationService.readIntegrationSummary(visitorId),
+        integrationService.readIntegratedTimeline(visitorId, 5),
+        getFormationProfileByVisitorId(table, visitorId)
+      ]);
+    } catch {
+      engagementSummary = null;
+      integrationSummary = null;
+      timelinePage = { items: [] };
+      formationProfile = null;
+    }
+
+    const safeTimelineItems = Array.isArray(timelinePage?.items)
+      ? timelinePage.items
+      : [];
 
     const journey = deriveJourneySummaryV1({
-      engagementEvents: timelinePage?.items ?? [],
+      engagementEvents: safeTimelineItems,
       formationProfile: formationProfile ?? null
     });
 
@@ -84,3 +100,4 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
     };
   }
 }
+

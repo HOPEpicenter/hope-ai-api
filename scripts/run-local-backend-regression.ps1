@@ -183,6 +183,11 @@ Write-Host "=== Summary vs engagement-status consistency invariant ==="
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-summary-engagement-status-consistency.ps1
 if ($LASTEXITCODE -ne 0) { throw "assert-summary-engagement-status-consistency.ps1 failed" }
 Write-Host "[OK] Summary vs engagement-status consistency invariant"
+
+Write-Host "=== Journey vs engagement consistency invariant ==="
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-journey-engagement-consistency.ps1
+if ($LASTEXITCODE -ne 0) { throw "assert-journey-engagement-consistency.ps1 failed" }
+Write-Host "[OK] Journey vs engagement consistency invariant"
 }
 finally {
   if ($null -ne $funcProc -and -not $funcProc.HasExited) {

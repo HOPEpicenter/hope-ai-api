@@ -16,6 +16,9 @@ export type DeriveIntegrationSummaryInput = {
   lastEngagementAt: string | null;
   lastFormationAt: string | null;
   assignedToUserId?: string | null;
+  lastFollowupAssignedAt?: string | null;
+  lastFollowupContactedAt?: string | null;
+  lastFollowupOutcomeAt?: string | null;
   groups?: unknown;
   programs?: unknown;
   workflows?: unknown;
@@ -81,25 +84,54 @@ export function deriveIntegrationSummaryV1(
 ): IntegrationSummaryV1 {
   const assignedToUserId = String(input.assignedToUserId ?? "").trim();
 
-  const assignedTo: OwnerRefV1 | undefined =
-    assignedToUserId
-      ? {
-          ownerType: "user",
-          ownerId: assignedToUserId,
-        }
-      : undefined;
+  const hasAssignee = !!assignedToUserId;
 
-  const hasAssignee = !!assignedTo;
+  const assignedAt = input.lastFollowupAssignedAt;
+  const outcomeAt = input.lastFollowupOutcomeAt;
+
+  const followupResolved =
+    !!assignedAt &&
+    !!outcomeAt &&
+    outcomeAt >= assignedAt;
+
+  const assignedTo: OwnerRefV1 | undefined =
+    followupResolved
+      ? undefined
+      : assignedToUserId
+        ? {
+            ownerType: "user",
+            ownerId: assignedToUserId,
+          }
+        : undefined;
+
+  let needsFollowup: boolean;
+
+  if (followupResolved) {
+    needsFollowup = false;
+  } else if (hasAssignee) {
+    needsFollowup = true;
+  } else if (!input.lastEngagementAt) {
+    needsFollowup = true;
+  } else {
+    needsFollowup = false;
+  }
+
   const lastIntegratedAt = maxIso(input.lastEngagementAt, input.lastFormationAt);
   const groups = normalizeGroupRefs(input.groups);
   const programs = normalizeProgramRefs(input.programs);
   const workflowRefs = normalizeWorkflowRefs(input.workflows);
-  const needsFollowup = !!hasAssignee || !input.lastEngagementAt;
-  const followupReason = hasAssignee
-    ? "FOLLOWUP_ASSIGNED"
-    : !input.lastEngagementAt
-      ? "no_engagement_yet"
-      : undefined;
+
+  let followupReason: string | undefined;
+
+  if (followupResolved) {
+    followupReason = "FOLLOWUP_OUTCOME_RECORDED";
+  } else if (input.lastFollowupContactedAt) {
+    followupReason = "FOLLOWUP_CONTACTED";
+  } else if (hasAssignee) {
+    followupReason = "FOLLOWUP_ASSIGNED";
+  } else if (!input.lastEngagementAt) {
+    followupReason = "no_engagement_yet";
+  }
 
   const workflows =
     workflowRefs ??
@@ -118,6 +150,7 @@ export function deriveIntegrationSummaryV1(
     },
     needsFollowup,
     followupReason,
+    followupResolved,
     assignedTo,
     groups,
     programs,

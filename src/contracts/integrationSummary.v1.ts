@@ -29,6 +29,7 @@ export type IntegrationSummaryV1 = {
   assignedTo?: OwnerRefV1;
   needsFollowup: boolean;
   followupReason?: string;
+  followupResolved?: boolean;
 
   groups?: GroupRefV1[];
   programs?: ProgramRefV1[];
@@ -69,3 +70,4 @@ export function validateIntegrationSummaryQueryV1(
   const visitorIdStr = visitorId as string;
   return { ok: true, value: { visitorId: visitorIdStr } };
 }
+

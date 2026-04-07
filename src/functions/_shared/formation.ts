@@ -570,14 +570,14 @@ export async function recordFormationEventV1(body: unknown): Promise<{
     if (shouldAdvanceTouchpointAt(profile.lastFollowupAssignedAt, occurredAt)) {
       profile.assignedTo = assigneeId;
       profile.lastFollowupAssignedAt = occurredAt;
-      maybeSetStage(profile, "Connected", occurredAt, type);
+      maybeSetStage(profile, "Guest", occurredAt, type);
     }
   }
 
   if (type === "FOLLOWUP_UNASSIGNED") {
     if (shouldAdvance) {
       profile.assignedTo = null;
-      maybeSetStage(profile, "Connected", occurredAt, type);
+      // stage unchanged on FOLLOWUP_UNASSIGNED
     }
   }
 

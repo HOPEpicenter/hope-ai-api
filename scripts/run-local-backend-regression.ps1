@@ -174,15 +174,31 @@ try {
 
   Write-Host ""
   Write-Host "[local-backend] All local backend checks passed."
+
+Write-Host "=== Invalid first transition invariant ==="
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-engagement-transition-invalid-first-transition.ps1
+Write-Host "[OK] Invalid first transition invariant"
+
+Write-Host "=== Summary vs engagement-status consistency invariant ==="
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-summary-engagement-status-consistency.ps1
+if ($LASTEXITCODE -ne 0) { throw "assert-summary-engagement-status-consistency.ps1 failed" }
+Write-Host "[OK] Summary vs engagement-status consistency invariant"
 }
 finally {
   if ($null -ne $funcProc -and -not $funcProc.HasExited) {
+
+Write-Host "=== Engagement transition validity invariants ==="
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-engagement-transition-validity.ps1
+Write-Host "[OK] Engagement transition validity invariants"
+
     Write-Host "[local-backend] Stopping Azure Functions host..."
     Stop-Process -Id $funcProc.Id -Force
   } else {
     Get-Process func -ErrorAction SilentlyContinue | Stop-Process -Force
   }
 }
+
+
 
 
 

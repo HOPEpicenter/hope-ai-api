@@ -33,6 +33,8 @@ export type IntegrationSummaryV1 = {
   followupOverdue?: boolean;
   followupUrgency?: "ON_TRACK" | "AT_RISK" | "OVERDUE";
   followupPriorityScore?: number;
+  followupAgingBucket?: "SAME_DAY" | "ONE_DAY" | "TWO_PLUS_DAYS";
+  followupEscalated?: boolean;
 
   groups?: GroupRefV1[];
   programs?: ProgramRefV1[];

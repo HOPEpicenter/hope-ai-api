@@ -282,24 +282,18 @@ return { items: enrichedItems, nextCursor };
   }
   async readIntegrationSummary(visitorId: string) {
     // Read-only derived view: no new writes, no persistence.
-    // Pull "latest" from each stream via their existing read methods.
-    const [eng, form] = await Promise.all([
-      this.engagementRepo.readTimeline(visitorId, 1, undefined),
-      this.formationRepo.listByVisitor({ visitorId, limit: 1, cursor: undefined }),
-    ]);
+    // Engagement timestamp comes from engagement events.
+    // Formation truth comes from the Formation Profile snapshot.
+    const eng = await this.engagementRepo.readTimeline(visitorId, 1, undefined);
 
     const lastEngagementAt = eng.items?.[0]?.occurredAt ?? null;
-    const lastFormationAt = form.items?.[0]?.occurredAt ?? null;
 
-    const lastIntegratedAt =
-      lastEngagementAt && lastFormationAt
-        ? (Date.parse(lastEngagementAt) >= Date.parse(lastFormationAt) ? lastEngagementAt : lastFormationAt)
-        : (lastEngagementAt ?? lastFormationAt ?? null);
-
-
-    // Derive assignedTo + optional snapshot refs from Formation Profile snapshot (read-only).
-    // Additive: only populate when we have real values.
+    let lastFormationAt: string | null = null;
+let lastFormationEventType: string | null = null;
     let assignedTo: { ownerType: "user" | "team"; ownerId: string; displayName?: string } | undefined;
+    let lastFollowupAssignedAt: string | null = null;
+    let lastFollowupContactedAt: string | null = null;
+    let lastFollowupOutcomeAt: string | null = null;
     let groups: unknown = undefined;
     let programs: unknown = undefined;
     let workflows: unknown = undefined;
@@ -309,10 +303,18 @@ return { items: enrichedItems, nextCursor };
       if (cs) {
         const profiles = getFormationProfilesTableClient(cs);
         const profile = await getFormationProfile(profiles as any, visitorId);
+
+        lastFormationAt = String((profile as any)?.lastEventAt ?? "").trim() || null;
+lastFormationEventType = String((profile as any)?.lastEventType ?? "").trim() || null;
+
         const assigneeId = String((profile as any)?.assignedTo ?? "").trim();
         if (assigneeId) {
           assignedTo = { ownerType: "user", ownerId: assigneeId };
         }
+
+        lastFollowupAssignedAt = (profile as any)?.lastFollowupAssignedAt ?? null;
+        lastFollowupContactedAt = (profile as any)?.lastFollowupContactedAt ?? null;
+        lastFollowupOutcomeAt = (profile as any)?.lastFollowupOutcomeAt ?? null;
 
         groups = (profile as any)?.groups;
         programs = (profile as any)?.programs;
@@ -328,10 +330,14 @@ return { items: enrichedItems, nextCursor };
         : null;
 
     return deriveIntegrationSummaryV1({
+
       visitorId,
       lastEngagementAt,
       lastFormationAt,
       assignedToUserId,
+      lastFollowupAssignedAt,
+      lastFollowupContactedAt,
+      lastFollowupOutcomeAt,
       groups,
       programs,
       workflows,
@@ -423,6 +429,8 @@ return { items: enrichedItems, nextCursor };
     return { items: enrichedItems, nextCursor };
   }
 }
+
+
 
 
 

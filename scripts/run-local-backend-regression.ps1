@@ -193,6 +193,31 @@ Write-Host "=== Follow-up progression invariants ==="
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-followup-progression-invariants.ps1
 if ($LASTEXITCODE -ne 0) { throw "assert-followup-progression-invariants.ps1 failed" }
 Write-Host "[OK] Follow-up progression invariants"
+
+Write-Host "=== Invalid follow-up progression invariants ==="
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-followup-invalid-progression-invariants.ps1
+if ($LASTEXITCODE -ne 0) { throw "assert-followup-invalid-progression-invariants.ps1 failed" }
+Write-Host "[OK] Invalid follow-up progression invariants"
+
+Write-Host "=== Follow-up semantic progression invariant ==="
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-followup-semantic-progression.ps1
+if ($LASTEXITCODE -ne 0) { throw "assert-followup-semantic-progression.ps1 failed" }
+Write-Host "[OK] Follow-up semantic progression invariant"
+
+Write-Host "=== Follow-up integration consistency invariant ==="
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-followup-integration-consistency.ps1
+if ($LASTEXITCODE -ne 0) { throw "assert-followup-integration-consistency.ps1 failed" }
+Write-Host "[OK] Follow-up integration consistency invariant"
+
+Write-Host "=== Follow-up reason accuracy invariant ==="
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-followup-reason-accuracy.ps1
+if ($LASTEXITCODE -ne 0) { throw "assert-followup-reason-accuracy.ps1 failed" }
+Write-Host "[OK] Follow-up reason accuracy invariant"
+
+Write-Host "=== Follow-up resolution semantics invariant ==="
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-followup-resolution-semantics.ps1
+if ($LASTEXITCODE -ne 0) { throw "assert-followup-resolution-semantics.ps1 failed" }
+Write-Host "[OK] Follow-up resolution semantics invariant"
 }
 finally {
   if ($null -ne $funcProc -and -not $funcProc.HasExited) {

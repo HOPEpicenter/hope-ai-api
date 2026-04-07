@@ -35,40 +35,46 @@ function maxIso(a?: string | null, b?: string | null): string | null {
 function hoursBetween(a: string, b: string): number {
   const ams = Date.parse(a);
   const bms = Date.parse(b);
-  if (isNaN(ams) || isNaN(bms)) return 0;
+  if (Number.isNaN(ams) || Number.isNaN(bms)) return 0;
   return (bms - ams) / (1000 * 60 * 60);
 }
 
 function normalizeGroupRefs(value: unknown): GroupRefV1[] | undefined {
   if (!Array.isArray(value)) return undefined;
-  const refs = value.map((i: any) => {
-    const groupId = String(i?.groupId ?? "").trim();
-    const displayName = String(i?.displayName ?? "").trim();
-    if (!groupId) return null;
-    return displayName ? { groupId, displayName } : { groupId };
-  }).filter(Boolean) as GroupRefV1[];
+  const refs = value
+    .map((i: any) => {
+      const groupId = String(i?.groupId ?? "").trim();
+      const displayName = String(i?.displayName ?? "").trim();
+      if (!groupId) return null;
+      return displayName ? { groupId, displayName } : { groupId };
+    })
+    .filter(Boolean) as GroupRefV1[];
   return refs.length ? refs : undefined;
 }
 
 function normalizeProgramRefs(value: unknown): ProgramRefV1[] | undefined {
   if (!Array.isArray(value)) return undefined;
-  const refs = value.map((i: any) => {
-    const programId = String(i?.programId ?? "").trim();
-    const displayName = String(i?.displayName ?? "").trim();
-    if (!programId) return null;
-    return displayName ? { programId, displayName } : { programId };
-  }).filter(Boolean) as ProgramRefV1[];
+  const refs = value
+    .map((i: any) => {
+      const programId = String(i?.programId ?? "").trim();
+      const displayName = String(i?.displayName ?? "").trim();
+      if (!programId) return null;
+      return displayName ? { programId, displayName } : { programId };
+    })
+    .filter(Boolean) as ProgramRefV1[];
   return refs.length ? refs : undefined;
 }
 
 function normalizeWorkflowRefs(value: unknown): WorkflowRefV1[] | undefined {
   if (!Array.isArray(value)) return undefined;
-  const refs = value.map((i: any) => {
-    const workflowId = String(i?.workflowId ?? "").trim();
-    const displayName = String(i?.displayName ?? "").trim();
-    if (!workflowId) return null;
-    return displayName ? { workflowId, displayName } : { workflowId };
-  }).filter(Boolean) as WorkflowRefV1[];
+  const refs = value
+    .map((i: any) => {
+      const workflowId = String(i?.workflowId ?? "").trim();
+      const displayName = String(i?.displayName ?? "").trim();
+      if (!workflowId) return null;
+      return displayName ? { workflowId, displayName } : { workflowId };
+    })
+    .filter(Boolean) as WorkflowRefV1[];
   return refs.length ? refs : undefined;
 }
 
@@ -86,11 +92,22 @@ export function deriveIntegrationSummaryV1(
     !!outcomeAt &&
     outcomeAt >= assignedAt;
 
-  // SLA: 48 hours
+  let followupUrgency: "ON_TRACK" | "AT_RISK" | "OVERDUE" | undefined;
   let followupOverdue = false;
+
   if (assignedAt && !followupResolved) {
     const ageHours = hoursBetween(assignedAt, new Date().toISOString());
-    followupOverdue = ageHours >= 48;
+
+    if (ageHours >= 48) {
+      followupUrgency = "OVERDUE";
+      followupOverdue = true;
+    } else if (ageHours >= 24) {
+      followupUrgency = "AT_RISK";
+      followupOverdue = false;
+    } else {
+      followupUrgency = "ON_TRACK";
+      followupOverdue = false;
+    }
   }
 
   const assignedTo: OwnerRefV1 | undefined =
@@ -148,6 +165,7 @@ export function deriveIntegrationSummaryV1(
     followupReason,
     followupResolved,
     followupOverdue,
+    followupUrgency,
     assignedTo,
     groups,
     programs,

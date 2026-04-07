@@ -31,6 +31,7 @@ export type IntegrationSummaryV1 = {
   followupReason?: string;
   followupResolved?: boolean;
   followupOverdue?: boolean;
+  followupUrgency?: "ON_TRACK" | "AT_RISK" | "OVERDUE";
 
   groups?: GroupRefV1[];
   programs?: ProgramRefV1[];

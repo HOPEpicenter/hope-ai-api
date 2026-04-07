@@ -30,6 +30,7 @@ export type IntegrationSummaryV1 = {
   needsFollowup: boolean;
   followupReason?: string;
   followupResolved?: boolean;
+  followupOverdue?: boolean;
 
   groups?: GroupRefV1[];
   programs?: ProgramRefV1[];

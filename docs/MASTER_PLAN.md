@@ -622,3 +622,55 @@ Operational verification:
 - Treat journey read model as complete unless a real consumer/blocker requires summary integration or dashboard consumption.
 - Treat o keyboard shortcut as a dashboard-only operator-flow improvement; no backend implications.
 
+
+## 2026-04-07 Update
+
+**What landed**
+- ✅ **#537**: follow-up resolution semantics + needsFollowup fix + assignment cleanup.
+- ✅ `followupResolved` semantics are now correct:
+  - assigned only => false
+  - assigned + contacted => false
+  - assigned + contacted + outcome => true
+- ✅ `needsFollowup = false` when `followupResolved = true`.
+- ✅ Assignment is cleared from integration summary when follow-up is resolved.
+- ✅ **#538**: added follow-up overdue SLA signal using 48h threshold.
+- ✅ **#539**: added follow-up urgency tier:
+  - `ON_TRACK`
+  - `AT_RISK`
+  - `OVERDUE`
+- ✅ Added derived follow-up prioritization signals:
+  - `followupPriorityScore`
+  - `followupAgingBucket`
+  - `followupEscalated`
+- ✅ **#542**: shipped `/ops/followups` priority queue with urgency, scoring, and deterministic sorting.
+- ✅ **#543**: shipped `/ops/followups` `includeResolved=true` support and resolved stats.
+
+**Why this matters (master plan alignment)**
+- Tightens backend follow-up lifecycle semantics without widening journey scope.
+- Keeps work backend-first and visitorId-anchored.
+- Turns follow-up handling into a regression-protected operational read model instead of ad hoc queue behavior.
+- Preserves `/ops/*` as the operator/dev tooling surface while keeping `/api/*` as the product surface.
+- Avoids speculative redesign: journey stayed untouched because no new invariant required widening it.
+
+**Verification**
+- ✅ Local regression/invariant checks passed before each PR.
+- ✅ CI green for merged PRs.
+- ✅ Staging deploy green after merged follow-up / ops queue slices.
+
+**Current backend truth**
+- Follow-up lifecycle semantics are aligned across integration summary and formation profile usage.
+- Follow-up SLA, urgency, aging, escalation, and queue-read behavior are now derived and regression-covered.
+- `/ops/followups` now supports:
+  - deterministic priority sorting
+  - `assignedTo` filtering
+  - `includeResolved=true`
+  - resolved-aware stats
+
+**Not shipped / parked**
+- Teams registry / teams surface wiring
+- Ops followups owner rollups
+
+**Next**
+- Continue only on already-working backend surfaces.
+- Do not reopen teams or owner-rollup work unless they become the next intentional slice.
+- Keep docs/checklists aligned only to merged/shipped backend slices.

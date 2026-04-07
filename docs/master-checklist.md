@@ -416,3 +416,13 @@ Current rule:
 - [x] Verified CI green.
 - [x] Verified staging deploy green.
 
+
+### 2026-04-07 shipped follow-up / ops queue sync
+- [x] Follow-up resolution semantics aligned (`followupResolved`, `needsFollowup`, assignment cleanup) — #537
+- [x] Follow-up overdue SLA signal (48h) — #538
+- [x] Follow-up urgency tier (`ON_TRACK` / `AT_RISK` / `OVERDUE`) — #539
+- [x] Follow-up prioritization signals shipped (`followupPriorityScore`, `followupAgingBucket`, `followupEscalated`)
+- [x] `/ops/followups` priority queue shipped — #542
+- [x] `/ops/followups` includeResolved + resolved stats shipped — #543
+- [ ] Teams registry
+- [ ] Ops followups owner rollup

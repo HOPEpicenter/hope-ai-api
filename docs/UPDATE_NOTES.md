@@ -352,3 +352,31 @@ Notes:
 
 
 
+
+## 2026-04-07
+
+- ✅ **#537**: follow-up resolution semantics + needsFollowup fix + assignment cleanup.
+- ✅ `followupResolved` now only becomes true once follow-up outcome is recorded.
+- ✅ `needsFollowup` now clears correctly when follow-up is resolved.
+- ✅ **#538**: follow-up overdue SLA signal added with 48h threshold.
+- ✅ **#539**: follow-up urgency tier added (`ON_TRACK`, `AT_RISK`, `OVERDUE`).
+- ✅ Follow-up prioritization model extended with:
+  - `followupPriorityScore`
+  - `followupAgingBucket`
+  - `followupEscalated`
+- ✅ **#542**: `/ops/followups` priority queue shipped with urgency + scoring + deterministic sorting.
+- ✅ **#543**: `/ops/followups` now supports `includeResolved=true` and resolved-aware stats.
+
+### Why this matters
+- Backend follow-up behavior is now lifecycle-consistent, SLA-aware, and queryable through a stable ops queue surface.
+- Follow-up handling stayed backend-first and did not widen dashboard or journey scope.
+- Queue behavior is now regression-covered rather than relying on implicit operator behavior.
+
+### Verification
+- ✅ Local regression/invariant suite green before merge.
+- ✅ CI green on merged slices.
+- ✅ Staging deploy green after merged slices.
+
+### Parked / not shipped
+- Teams registry
+- Ops followups owner rollup

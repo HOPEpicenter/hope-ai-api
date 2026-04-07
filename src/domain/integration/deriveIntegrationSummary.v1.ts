@@ -94,6 +94,7 @@ export function deriveIntegrationSummaryV1(
 
   let followupUrgency: "ON_TRACK" | "AT_RISK" | "OVERDUE" | undefined;
   let followupOverdue = false;
+  let followupPriorityScore: number | undefined;
 
   if (assignedAt && !followupResolved) {
     const ageHours = hoursBetween(assignedAt, new Date().toISOString());
@@ -101,12 +102,15 @@ export function deriveIntegrationSummaryV1(
     if (ageHours >= 48) {
       followupUrgency = "OVERDUE";
       followupOverdue = true;
+      followupPriorityScore = 90;
     } else if (ageHours >= 24) {
       followupUrgency = "AT_RISK";
       followupOverdue = false;
+      followupPriorityScore = 60;
     } else {
       followupUrgency = "ON_TRACK";
       followupOverdue = false;
+      followupPriorityScore = 25;
     }
   }
 
@@ -166,6 +170,7 @@ export function deriveIntegrationSummaryV1(
     followupResolved,
     followupOverdue,
     followupUrgency,
+    followupPriorityScore,
     assignedTo,
     groups,
     programs,

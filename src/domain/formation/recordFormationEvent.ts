@@ -89,6 +89,8 @@ function maxStage(a: FormationStage, b: FormationStage): FormationStage {
   return STAGE_RANK[a] >= STAGE_RANK[b] ? a : b;
 }
 
+/* PATCHED: formation stage semantics fix */
+
 function computeNextStage(
   currentStage: unknown,
   eventType: string,
@@ -98,14 +100,17 @@ function computeNextStage(
 
   switch (eventType) {
     case FormationEventType.FOLLOWUP_ASSIGNED:
-      // When staff takes ownership, treat as an active Guest (no downgrade)
-      return maxStage(current, "Connected");
+      return maxStage(current, "Guest");
+
+    case FormationEventType.FOLLOWUP_CONTACTED:
+      return maxStage(current, "Guest");
 
     case FormationEventType.NEXT_STEP_SELECTED:
       return maxStage(current, "Connected");
 
     case FormationEventType.FOLLOWUP_OUTCOME_RECORDED: {
       const outcome = String(metadata?.outcome ?? "").toUpperCase().trim();
+
       const CONNECTED_OUTCOMES = new Set([
         "CONNECTED",
         "WILL_VISIT",
@@ -114,8 +119,9 @@ function computeNextStage(
         "NEXT_STEP_TAKEN",
         "JOINED_GROUP",
         "MEMBER_CLASS",
-        "BAPTISM_CLASS",
+        "BAPTISM_CLASS"
       ]);
+
       return CONNECTED_OUTCOMES.has(outcome)
         ? maxStage(current, "Connected")
         : current;
@@ -125,6 +131,7 @@ function computeNextStage(
       return current;
   }
 }
+
 
 function applyProfileTouchpoint(
   profile: FormationProfileEntity,
@@ -320,6 +327,7 @@ export async function recordFormationEvent(
 
   return { eventRowKey: rowKey, profile };
 }
+
 
 
 

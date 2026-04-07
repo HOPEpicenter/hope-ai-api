@@ -1,12 +1,17 @@
-import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepository";
 import { IntegrationService } from "../../services/integration/integrationService";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
+import { EngagementsService } from "../../services/engagements/engagementsService";
 import { getFormationProfilesTableClient, getFormationProfileByVisitorId } from "../_shared/formation";
+import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1";
 
 const engagementSummaryRepo = new EngagementSummaryRepository();
+const engagementEventsRepo = new EngagementEventsRepository();
+const formationEventsRepo = new AzureTableFormationEventsRepository();
+
+const engagementsService = new EngagementsService(engagementEventsRepo);
 
 const integrationService = new IntegrationService(
   new EngagementEventsRepository(),
@@ -38,24 +43,19 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
 
     const table = getFormationProfilesTableClient();
 
-    let engagementSummary: any = null;
-    let integrationSummary: any = null;
-    let timelinePage: any = { items: [] };
-    let formationProfile: any = null;
-
-    try {
-      [engagementSummary, integrationSummary, timelinePage, formationProfile] = await Promise.all([
-        engagementSummaryRepo.get(visitorId),
-        integrationService.readIntegrationSummary(visitorId),
-        integrationService.readIntegratedTimeline(visitorId, 5),
-        getFormationProfileByVisitorId(table, visitorId)
-      ]);
-    } catch {
-      engagementSummary = null;
-      integrationSummary = null;
-      timelinePage = { items: [] };
-      formationProfile = null;
-    }
+    const [
+      engagementSummary,
+      engagementStatus,
+      integrationSummary,
+      timelinePage,
+      formationProfile
+    ] = await Promise.all([
+      engagementSummaryRepo.get(visitorId),
+      engagementsService.getCurrentStatus(visitorId),
+      integrationService.readIntegrationSummary(visitorId),
+      integrationService.readIntegratedTimeline(visitorId, 5),
+      getFormationProfileByVisitorId(table, visitorId)
+    ]);
 
     const safeTimelineItems = Array.isArray(timelinePage?.items)
       ? timelinePage.items
@@ -76,7 +76,10 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
         summary: {
           engagement: {
             summary: engagementSummary ?? null,
-            timelinePreview: timelinePage?.items ?? []
+            status: engagementStatus?.status ?? null,
+            lastChangedAt: engagementStatus?.lastChangedAt ?? null,
+            lastEventId: engagementStatus?.lastEventId ?? null,
+            timelinePreview: safeTimelineItems
           },
           integration: integrationSummary ?? null,
           formation: {
@@ -87,7 +90,7 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
               hasMembership: formationProfile?.lastEventType === "MEMBERSHIP_RECORDED"
             }
           },
-          journey: journey
+          journey
         }
       }
     };
@@ -100,4 +103,3 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
     };
   }
 }
-

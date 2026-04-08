@@ -674,3 +674,27 @@ Operational verification:
 - Continue only on already-working backend surfaces.
 - Do not reopen teams or owner-rollup work unless they become the next intentional slice.
 - Keep docs/checklists aligned only to merged/shipped backend slices.
+
+## 2026-04-08 Update
+
+**What landed**
+- ✅ **#545**: `GROUP_JOINED` added to the formation/integration path.
+- ✅ **#546**: `GROUP_LEFT` added as the symmetric removal signal.
+- ✅ Formation profile now carries minimal group membership refs.
+- ✅ Storage boundary serializes/deserializes group membership safely for Azure Tables.
+- ✅ Integration summary can surface group membership additively when present.
+
+**Why this matters**
+- Closes the minimal v1 group membership lifecycle (`join` + `leave`).
+- Preserves backend-first, event-driven, auditable behavior.
+- Avoids widening into roles, permissions, or workflow automation.
+
+**Verification**
+- ✅ CI green after #545.
+- ✅ Staging deploy green after #545.
+- ✅ CI green after #546.
+- ✅ Staging deploy green after #546.
+
+**Current rule**
+- Treat minimal group membership signals as complete unless a real consumer/blocker requires richer group/program/workflow behavior.
+

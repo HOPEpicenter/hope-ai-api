@@ -426,3 +426,13 @@ Current rule:
 - [x] `/ops/followups` includeResolved + resolved stats shipped — #543
 - [ ] Teams registry
 - [ ] Ops followups owner rollup
+## 2026-04-08 Session Closeout
+
+- [x] Merged **#545**: add `GROUP_JOINED` event with formation snapshot + integration summary support
+- [x] Merged **#546**: add `GROUP_LEFT` event with group removal support
+- [x] Persist group membership through repo JSON boundary (`groupsJson`)
+- [x] Added regression for integration summary group visibility
+- [x] Added regression for group removal
+- [x] Verified CI green
+- [x] Verified staging deploy green
+

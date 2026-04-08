@@ -172,6 +172,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "assert-visitor-engagement-timeline.ps1 failed" }
   }
 
+  Run-Step -Name "Integration group joined signal" -Action {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\assert-integration-group-joined.ps1") -ApiBase $BaseUrl -ApiKey $ApiKey
+    if ($LASTEXITCODE -ne 0) { throw "assert-integration-group-joined.ps1 failed" }
+  }
+
   Write-Host ""
   Write-Host "[local-backend] All local backend checks passed."
 

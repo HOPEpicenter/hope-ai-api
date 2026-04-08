@@ -198,6 +198,27 @@ function applyProfileTouchpoint(
 
       break;
     }
+
+    case "GROUP_LEFT": {
+      const groupId = String((metadata as any)?.groupId ?? "").trim();
+
+      if (!groupId) {
+        break;
+      }
+
+      const currentGroups = Array.isArray((profile as any).groups)
+        ? [...(profile as any).groups]
+        : [];
+
+      const groups = currentGroups.filter(
+        (g: any) => String(g?.groupId ?? "").trim() !== groupId
+      );
+
+      (profile as any).groups = groups;
+
+      break;
+    }
+
     case FormationEventType.FOLLOWUP_CONTACTED:
       (profile as any).lastFollowupContactedAt = occurredAt;
       break;
@@ -364,4 +385,5 @@ export async function recordFormationEvent(
 
   return { eventRowKey: rowKey, profile };
 }
+
 

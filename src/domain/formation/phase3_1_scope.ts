@@ -54,6 +54,7 @@ export const FormationEventType = {
   FOLLOWUP_UNASSIGNED: "FOLLOWUP_UNASSIGNED",
   FOLLOWUP_CONTACTED: "FOLLOWUP_CONTACTED",
   GROUP_JOINED: "GROUP_JOINED",
+  GROUP_LEFT: "GROUP_LEFT",
   FOLLOWUP_OUTCOME_RECORDED: "FOLLOWUP_OUTCOME_RECORDED",
   NEXT_STEP_SELECTED: "NEXT_STEP_SELECTED",
   INFO_REQUESTED: "INFO_REQUESTED",
@@ -176,6 +177,7 @@ export type FormationEventMetadataByType = {
   BAPTISM_RECORDED: BaptismRecordedMetadata;
   MEMBERSHIP_RECORDED: MembershipRecordedMetadata;
   GROUP_JOINED: { groupId: string; displayName?: string };
+  GROUP_LEFT: { groupId: string };
 };
 
 export type FormationEventMetadata =
@@ -270,6 +272,10 @@ export function validateFormationEvent(input: FormationEventInput): ValidationRe
       if (!md.groupId) return { ok: false, error: "metadata.groupId required for GROUP_JOINED" };
       break;
 
+    case FormationEventType.GROUP_LEFT:
+      if (!md.groupId) return { ok: false, error: "metadata.groupId required for GROUP_LEFT" };
+      break;
+
     case FormationEventType.FOLLOWUP_OUTCOME_RECORDED:
       if (!md.outcome) return { ok: false, error: "metadata.outcome required for FOLLOWUP_OUTCOME_RECORDED" };
       break;
@@ -321,4 +327,8 @@ export function applyFormationDefaults(input: FormationEventInput): Required<Pic
     channel: input.channel ?? "unknown",
   };
 }
+
+
+
+
 

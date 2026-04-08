@@ -62,7 +62,7 @@ export function validateFormationEventEnvelopeV1Strict(body: unknown): Formation
     }
   }
 
-  if (t === "GROUP_JOINED") {
+  if (t === "GROUP_JOINED" || t === "GROUP_LEFT") {
     if (!isNonEmptyString(d.groupId)) {
       throw new Error("GROUP_JOINED requires data.groupId (string)");
     }
@@ -79,3 +79,5 @@ export function looksLikeFormationEnvelopeV1(body: any): boolean {
   if (!body || typeof body !== "object") return false;
   return body.v === 1 || isNonEmptyString(body.eventId) || (body.source && isNonEmptyString(body.source.system));
 }
+
+

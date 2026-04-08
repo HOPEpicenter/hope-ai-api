@@ -62,6 +62,12 @@ export function validateFormationEventEnvelopeV1Strict(body: unknown): Formation
     }
   }
 
+  if (t === "GROUP_JOINED") {
+    if (!isNonEmptyString(d.groupId)) {
+      throw new Error("GROUP_JOINED requires data.groupId (string)");
+    }
+  }
+
   return o as FormationEventEnvelopeV1;
 }
 

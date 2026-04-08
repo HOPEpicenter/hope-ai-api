@@ -242,3 +242,6 @@ Write-Host "[OK] Engagement transition validity invariants"
 
 
 
+
+Write-Host "Running ops followups owner rollup regression..."
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-ops-followups-owners.ps1 -Base $Base

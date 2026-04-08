@@ -171,12 +171,55 @@ opsFollowupsRouter.get("/", async (req, res) => {
     onTrack: items.filter((x) => x.followupUrgency === "ON_TRACK").length,
   };
 
+  const ownersMap = new Map<
+    string,
+    {
+      ownerId: string;
+      total: number;
+      resolved: number;
+      overdue: number;
+      atRisk: number;
+      onTrack: number;
+    }
+  >();
+
+  for (const item of items) {
+    const ownerId = String(item?.assignedTo?.ownerId ?? "").trim();
+    if (!ownerId) continue;
+
+    if (!ownersMap.has(ownerId)) {
+      ownersMap.set(ownerId, {
+        ownerId,
+        total: 0,
+        resolved: 0,
+        overdue: 0,
+        atRisk: 0,
+        onTrack: 0,
+      });
+    }
+
+    const bucket = ownersMap.get(ownerId)!;
+    bucket.total++;
+
+    if (item.followupResolved === true) bucket.resolved++;
+    else if (item.followupUrgency === "OVERDUE") bucket.overdue++;
+    else if (item.followupUrgency === "AT_RISK") bucket.atRisk++;
+    else if (item.followupUrgency === "ON_TRACK") bucket.onTrack++;
+  }
+
+  const owners = Array.from(ownersMap.values()).sort((a, b) => {
+    if (b.total !== a.total) return b.total - a.total;
+    return a.ownerId.localeCompare(b.ownerId);
+  });
+
   return res.json({
     ok: true,
     v: 1,
     assignedTo: assignedToFilter || null,
     includeResolved,
     stats,
+    owners,
     items: items.slice(0, limit),
   });
 });
+

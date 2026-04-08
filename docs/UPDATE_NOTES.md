@@ -380,3 +380,19 @@ Notes:
 ### Parked / not shipped
 - Teams registry
 - Ops followups owner rollup
+
+## 2026-04-08
+
+- ✅ Merged **#545**: added `GROUP_JOINED` formation event with `groups[]` snapshot support and integration summary visibility.
+- ✅ Merged **#546**: added `GROUP_LEFT` formation event with group removal support.
+- ✅ Formation profile now persists group membership through repo-layer JSON serialization (`groupsJson`) while preserving the domain/API shape as `groups[]`.
+- ✅ Added regression coverage:
+  - `scripts/assert-integration-summary-groups.ps1`
+  - `scripts/assert-integration-group-left.ps1`
+- ✅ Verified CI green after both slices.
+- ✅ Verified staging deploy green after both slices.
+
+Notes:
+- Group membership remains additive/minimal for v1.
+- Role-based membership and broader workflow automation remain out of scope for this lane.
+

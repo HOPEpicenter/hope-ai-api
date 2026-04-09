@@ -101,7 +101,7 @@ function TimestampValue({ value }: { value: string | null }) {
 
   return (
     <div>
-      <div style={{ fontWeight: 600, color: "#111827" }}>{formatRelativeTime(value)}</div>
+      <div style={{ fontWeight: 600, color: "#111827" }}>{formatAbsoluteTime(value)}</div>
       <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
         {formatAbsoluteTime(value)}
       </div>
@@ -588,7 +588,7 @@ function VisitorHeaderCard({
           value={
             lastActivityAt ? (
               <div>
-                <div>{formatRelativeTime(lastActivityAt)}</div>
+                <div>{formatAbsoluteTime(lastActivityAt)}</div>
                 <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
                   {formatAbsoluteTime(lastActivityAt)}
                 </div>
@@ -666,7 +666,7 @@ function OutcomeSummaryCard({
 
       <div style={{ display: "grid", gap: 2 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: "#065f46" }}>Recorded</div>
-        <div style={{ color: "#111827", fontWeight: 600 }}>{formatRelativeTime(outcomeAt)}</div>
+        <div style={{ color: "#111827", fontWeight: 600 }}>{formatAbsoluteTime(outcomeAt)}</div>
         <div style={{ fontSize: 12, color: "#4b5563" }}>{formatAbsoluteTime(outcomeAt)}</div>
       </div>
 
@@ -802,7 +802,7 @@ function FollowupTimelineCard({
 
                 {step.value ? (
                   <div style={{ display: "grid", gap: 2 }}>
-                    <div style={{ fontWeight: 600, color: "#111827" }}>{formatRelativeTime(step.value)}</div>
+                    <div style={{ fontWeight: 600, color: "#111827" }}>{formatAbsoluteTime(step.value)}</div>
                     <div style={{ fontSize: 12, color: "#6b7280" }}>{formatAbsoluteTime(step.value)}</div>
                   </div>
                 ) : null}
@@ -918,7 +918,7 @@ function EventTimelineCard({
 
                   {event.happenedAt ? (
                     <div style={{ display: "grid", gap: 2 }}>
-                      <div style={{ fontWeight: 600, color: "#111827" }}>{formatRelativeTime(event.happenedAt)}</div>
+                      <div style={{ fontWeight: 600, color: "#111827" }}>{formatAbsoluteTime(event.happenedAt)}</div>
                       <div style={{ fontSize: 12, color: "#6b7280" }}>{formatAbsoluteTime(event.happenedAt)}</div>
                     </div>
                   ) : (
@@ -1293,6 +1293,7 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 
 
 

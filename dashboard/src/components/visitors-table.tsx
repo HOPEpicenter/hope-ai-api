@@ -9,7 +9,7 @@ import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-ti
 import type { VisitorListItem } from "@/lib/contracts/visitors";
 
 export type VisitorsTableItem = VisitorListItem & {
-  followupState: "Assigned" | "Waiting assignment" | "Contacted";
+  followupState: "Assigned" | "Waiting assignment" | "Contacted" | "Resolved";
   attentionState: "Needs attention" | "Contact made" | null;
   assignedTo: string | null;
   formationMilestones: {
@@ -84,7 +84,11 @@ function FollowupStateBadge({ state }: { state: VisitorsTableItem["followupState
       ? "#fef3c7"
       : state === "Assigned"
         ? "#dbeafe"
-        : "#dcfce7";
+        : state === "Contacted"
+          ? "#dcfce7"
+          : state === "Resolved"
+            ? "#dcfce7"
+            : "#e5e7eb";
 
   return (
     <span
@@ -421,7 +425,7 @@ export function VisitorsTable({
     }
   }
 
-  const waitingAssignmentCount = items.filter((item) => !item.assignedTo).length;
+  const waitingAssignmentCount = items.filter((item) => !item.assignedTo && item.followupState !== "Resolved").length;
 
   const presetItems =
     preset === "my-needs-attention" && myAssignee
@@ -431,11 +435,11 @@ export function VisitorsTable({
             item.assignedTo === myAssignee
         )
       : preset === "waiting-assignment"
-        ? items.filter((item) => !item.assignedTo)
+        ? items.filter((item) => !item.assignedTo && item.followupState !== "Resolved")
         : preset === "assigned-to-me" && myAssignee
           ? items.filter((item) => item.assignedTo === myAssignee)
           : preset === "assigned"
-            ? items.filter((item) => !!item.assignedTo)
+            ? items.filter((item) => !!item.assignedTo && item.followupState !== "Resolved")
             : preset === "contacted"
               ? items.filter((item) => item.followupState === "Contacted")
               : preset === "needs-attention"
@@ -947,3 +951,9 @@ export function VisitorsTable({
     </div>
   );
 }
+
+
+
+
+
+

@@ -54,7 +54,7 @@ export default async function VisitorsPage({
     let attentionState: VisitorsTableItem["attentionState"] = null;
 
     if (profile?.lastFollowupOutcomeAt) {
-      followupState = "Contacted";
+      followupState = "Resolved";
       attentionState = null;
     } else if (profile?.lastFollowupContactedAt) {
       followupState = "Contacted";
@@ -211,4 +211,5 @@ export default async function VisitorsPage({
     </section>
   );
 }
+
 

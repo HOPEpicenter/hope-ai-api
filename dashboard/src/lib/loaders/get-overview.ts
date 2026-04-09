@@ -47,7 +47,7 @@ export async function getOverview(): Promise<OverviewResponse> {
     if (recent.length < 5) {
       recent.push({
         title: visitor.visitorId,
-        subtitle: `${profile?.assignedTo?.ownerId ?? "Unassigned"}`,
+        subtitle: `${profile?.assignedTo ?? "Unassigned"}`,
         href: `/visitors/${visitor.visitorId}?preset=needs-attention`
       });
     }
@@ -80,3 +80,4 @@ export async function getOverview(): Promise<OverviewResponse> {
     recent
   };
 }
+

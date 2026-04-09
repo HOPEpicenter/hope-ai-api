@@ -698,3 +698,16 @@ Operational verification:
 **Current rule**
 - Treat minimal group membership signals as complete unless a real consumer/blocker requires richer group/program/workflow behavior.
 
+
+
+## 2026-04-09 Update
+
+**What landed**
+- ✅ **#548**: /ops/followups owner rollup shipped.
+- ✅ **#549**: owner-filter alignment regression coverage shipped.
+- ✅ **#550**: /ops/followups switched to an event-derived read model for immediate consistency.
+
+**Current rule**
+- Treat ops followups read model as complete unless a real consumer/blocker appears.
+- Keep Teams registry parked.
+

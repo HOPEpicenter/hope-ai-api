@@ -31,6 +31,8 @@ export type VisitorDetailResponse = {
     lastFollowupOutcomeAt?: string | null;
     lastFollowupOutcome?: string | null;
     lastFollowupOutcomeNotes?: string | null;
+    followupStatus?: "none" | "assigned" | "contacted" | "resolved";
+    attentionState?: "needs_attention" | "clear";
     lastEventType?: string | null;
     lastEventAt: string | null;
     updatedAt: string | null;

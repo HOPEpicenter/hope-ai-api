@@ -16,11 +16,14 @@ export default async function VisitorsPage({
 }: {
   searchParams?: Promise<VisitorsPageSearchParams>;
 }) {
-  const [visitors, formationProfiles, resolvedSearchParams] = await Promise.all([
+  const [visitors, resolvedSearchParams] = await Promise.all([
     getVisitors(),
-    getFormationProfiles(),
     searchParams ?? Promise.resolve<VisitorsPageSearchParams>({})
   ]);
+
+  const formationProfiles = await getFormationProfiles(
+    visitors.items.map((visitor) => visitor.visitorId)
+  );
 
   const preset =
     resolvedSearchParams.preset === "my-needs-attention" ||
@@ -38,30 +41,35 @@ export default async function VisitorsPage({
       : "";
 
   const formationProfilesByVisitorId = new Map(
-    formationProfiles.items.map((item) => [item.visitorId, item])
+    formationProfiles.items.map((item) => [item.visitorId, item] as const)
   );
 
   const items: VisitorsTableItem[] = visitors.items.map((visitor) => {
     const profile = formationProfilesByVisitorId.get(visitor.visitorId);
 
     const formationMilestones = {
-      hasSalvation: profile?.lastEventType === "SALVATION_RECORDED",
-      hasBaptism: profile?.lastEventType === "BAPTISM_RECORDED",
-      hasMembership: profile?.lastEventType === "MEMBERSHIP_RECORDED"
+      hasSalvation: false,
+      hasBaptism: false,
+      hasMembership: false
     };
 
-    let followupState: VisitorsTableItem["followupState"] = "Waiting assignment";
+    let followupState: VisitorsTableItem["followupState"] = "Profile unavailable";
     let attentionState: VisitorsTableItem["attentionState"] = null;
 
-    if (profile?.lastFollowupOutcomeAt) {
+    if (!profile) {
+      followupState = "Profile unavailable";
+    } else if (profile.lastFollowupOutcomeAt) {
       followupState = "Resolved";
       attentionState = null;
-    } else if (profile?.lastFollowupContactedAt) {
+    } else if (profile.lastFollowupContactedAt) {
       followupState = "Contacted";
       attentionState = "Contact made";
-    } else if (profile?.assignedTo) {
+    } else if (profile.assignedTo) {
       followupState = "Assigned";
       attentionState = "Needs attention";
+    } else {
+      followupState = "Waiting assignment";
+      attentionState = null;
     }
 
     return {
@@ -211,5 +219,4 @@ export default async function VisitorsPage({
     </section>
   );
 }
-
 

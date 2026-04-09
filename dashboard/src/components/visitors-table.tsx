@@ -9,7 +9,7 @@ import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-ti
 import type { VisitorListItem } from "@/lib/contracts/visitors";
 
 export type VisitorsTableItem = VisitorListItem & {
-  followupState: "Assigned" | "Waiting assignment" | "Contacted" | "Resolved";
+  followupState: "Assigned" | "Waiting assignment" | "Contacted" | "Resolved" | "Profile unavailable";
   attentionState: "Needs attention" | "Contact made" | null;
   assignedTo: string | null;
   formationMilestones: {
@@ -79,6 +79,10 @@ function getFollowupStateRank(state: VisitorsTableItem["followupState"]) {
 }
 
 function FollowupStateBadge({ state }: { state: VisitorsTableItem["followupState"] }) {
+  if (!state) {
+    return <span style={{ color: "#9ca3af" }}>—</span>;
+  }
+
   const background =
     state === "Waiting assignment"
       ? "#fef3c7"
@@ -88,7 +92,7 @@ function FollowupStateBadge({ state }: { state: VisitorsTableItem["followupState
           ? "#dcfce7"
           : state === "Resolved"
             ? "#dcfce7"
-            : "#e5e7eb";
+            : "#f3f4f6";
 
   return (
     <span
@@ -425,7 +429,7 @@ export function VisitorsTable({
     }
   }
 
-  const waitingAssignmentCount = items.filter((item) => !item.assignedTo && item.followupState !== "Resolved").length;
+  const waitingAssignmentCount = items.filter((item) => item.followupState === "Waiting assignment").length;
 
   const presetItems =
     preset === "my-needs-attention" && myAssignee
@@ -435,11 +439,11 @@ export function VisitorsTable({
             item.assignedTo === myAssignee
         )
       : preset === "waiting-assignment"
-        ? items.filter((item) => !item.assignedTo && item.followupState !== "Resolved")
+        ? items.filter((item) => item.followupState === "Waiting assignment")
         : preset === "assigned-to-me" && myAssignee
           ? items.filter((item) => item.assignedTo === myAssignee)
           : preset === "assigned"
-            ? items.filter((item) => !!item.assignedTo && item.followupState !== "Resolved")
+            ? items.filter((item) => item.followupState === "Assigned")
             : preset === "contacted"
               ? items.filter((item) => item.followupState === "Contacted")
               : preset === "needs-attention"
@@ -951,6 +955,8 @@ export function VisitorsTable({
     </div>
   );
 }
+
+
 
 
 

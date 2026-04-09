@@ -379,7 +379,6 @@ Notes:
 
 ### Parked / not shipped
 - Teams registry
-- Ops followups owner rollup
 
 ## 2026-04-08
 
@@ -395,4 +394,14 @@ Notes:
 Notes:
 - Group membership remains additive/minimal for v1.
 - Role-based membership and broader workflow automation remain out of scope for this lane.
+
+
+
+
+## 2026-04-09
+- ✅ Merged **#548**: owner rollup
+- ✅ Merged **#549**: owner filter regression
+- ✅ Merged **#550**: event-derived read model
+- CI green
+- staging green (rerun)
 

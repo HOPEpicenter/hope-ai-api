@@ -425,7 +425,7 @@ Current rule:
 - [x] `/ops/followups` priority queue shipped — #542
 - [x] `/ops/followups` includeResolved + resolved stats shipped — #543
 - [ ] Teams registry
-- [ ] Ops followups owner rollup
+- [x] Ops followups owner rollup — #548
 ## 2026-04-08 Session Closeout
 
 - [x] Merged **#545**: add `GROUP_JOINED` event with formation snapshot + integration summary support
@@ -435,4 +435,15 @@ Current rule:
 - [x] Added regression for group removal
 - [x] Verified CI green
 - [x] Verified staging deploy green
+
+
+
+
+## 2026-04-09 Session Closeout
+- [x] #548 owner rollup
+- [x] #549 owner filter regression
+- [x] #550 event-derived read model
+- [x] CI green
+- [x] staging green
+- [ ] Teams registry (parked)
 

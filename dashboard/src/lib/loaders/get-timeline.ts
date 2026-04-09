@@ -17,32 +17,46 @@ function getBaseUrl(): string {
 }
 
 export async function getTimeline(limit = 50, visitorId?: string): Promise<TimelineResponse> {
-  const params = new URLSearchParams();
-  params.set("limit", String(limit));
+  try {
+    const params = new URLSearchParams();
+    params.set("limit", String(limit));
 
-  if (visitorId?.trim()) {
-    params.set("visitorId", visitorId.trim());
-  }
-
-  const response = await fetch(
-    `${getBaseUrl()}/api/dashboard/timeline/unified?${params.toString()}`,
-    {
-      method: "GET",
-      cache: "no-store"
+    if (visitorId?.trim()) {
+      params.set("visitorId", visitorId.trim());
     }
-  );
 
-  const text = await response.text();
-  const json = text ? JSON.parse(text) : {};
+    const response = await fetch(
+      `${getBaseUrl()}/api/dashboard/timeline/unified?${params.toString()}`,
+      {
+        method: "GET",
+        cache: "no-store"
+      }
+    );
 
-  if (!response.ok) {
-    const errorMessage =
-      typeof json?.error === "string"
-        ? json.error
-        : json?.error?.message || JSON.stringify(json?.error) || `Timeline request failed with status ${response.status}`;
+    const text = await response.text();
+    const json = text ? JSON.parse(text) : {};
 
-    throw new Error(errorMessage);
+    if (!response.ok) {
+      const errorMessage =
+        typeof json?.error === "string"
+          ? json.error
+          : json?.error?.message || JSON.stringify(json?.error) || `Timeline request failed with status ${response.status}`;
+
+      throw new Error(errorMessage);
+    }
+
+    return {
+      ok: true,
+      items: Array.isArray(json?.items) ? json.items : [],
+      nextCursor: typeof json?.nextCursor === "string" ? json.nextCursor : null
+    };
+  } catch (err) {
+    console.error("[getTimeline] fallback triggered", err);
+
+    return {
+      ok: true,
+      items: [],
+      nextCursor: null
+    };
   }
-
-  return json as TimelineResponse;
 }

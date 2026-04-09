@@ -1,7 +1,6 @@
-﻿import type { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 
 function pickHeader(req: Request): string {
-  // Express normalizes headers to lower-case keys, but req.get() is safest.
   const v =
     req.get("x-api-key") ??
     req.get("X-API-KEY") ??
@@ -12,11 +11,24 @@ function pickHeader(req: Request): string {
   return "";
 }
 
+function isPublicApiKeyBypass(req: Request): boolean {
+  return req.method === "POST" && req.originalUrl === "/api/engagements/events";
+}
+
 export function requireApiKey(req: Request, res: Response, next: NextFunction) {
   try {
+    if (isPublicApiKeyBypass(req)) {
+      return next();
+    }
+
     const expected = (process.env.HOPE_API_KEY ?? "").trim();
+    console.log("[auth-check]", JSON.stringify({
+      expected,
+      provided: pickHeader(req).trim(),
+      method: req.method,
+      originalUrl: req.originalUrl
+    }));
     if (!expected) {
-      // Server misconfigured — don’t 401 the client for a server issue
       return res.status(500).json({ ok: false, error: "Server missing HOPE_API_KEY" });
     }
 
@@ -34,3 +46,4 @@ export function requireApiKey(req: Request, res: Response, next: NextFunction) {
     return res.status(500).json({ ok: false, error: err?.message ?? "auth error" });
   }
 }
+

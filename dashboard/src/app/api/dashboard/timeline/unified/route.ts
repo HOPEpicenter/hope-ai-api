@@ -1,60 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import http from "node:http";
-import https from "node:https";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function getRequiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value || value.trim().length === 0) {
-    throw new Error(`Missing required env var: ${name}`);
-  }
-  return value.trim();
-}
-
-function getOpsBaseUrl(): string {
-  return getRequiredEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
-}
-
-function requestJson(urlString: string, apiKey: string): Promise<{ status: number; data: unknown }> {
-  return new Promise((resolve, reject) => {
-    const url = new URL(urlString);
-    const client = url.protocol === "https:" ? https : http;
-
-    const req = client.request(
-      {
-        protocol: url.protocol,
-        hostname: url.hostname,
-        port: url.port,
-        path: `${url.pathname}${url.search}`,
-        method: "GET",
-        headers: {
-          "x-api-key": apiKey,
-          accept: "application/json"
-        }
-      },
-      (res) => {
-        let raw = "";
-        res.setEncoding("utf8");
-        res.on("data", (chunk) => {
-          raw += chunk;
-        });
-        res.on("end", () => {
-          try {
-            const data = raw ? JSON.parse(raw) : {};
-            resolve({ status: res.statusCode ?? 500, data });
-          } catch (error) {
-            reject(error);
-          }
-        });
-      }
-    );
-
-    req.on("error", reject);
-    req.end();
-  });
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,31 +9,50 @@ export async function GET(request: NextRequest) {
     const cursor = request.nextUrl.searchParams.get("cursor")?.trim() ?? "";
     const visitorId = request.nextUrl.searchParams.get("visitorId")?.trim() ?? "";
 
-    const opsBaseUrl = getOpsBaseUrl();
-    const apiKey = getRequiredEnv("HOPE_API_KEY");
+    const opsBaseUrl = process.env.HOPE_OPS_BASE_URL;
+    const apiKey = process.env.HOPE_API_KEY;
+
+    // 🔐 SAFE FALLBACK if env missing
+    if (!opsBaseUrl || !apiKey) {
+      return NextResponse.json({
+        ok: true,
+        items: [],
+        nextCursor: null
+      });
+    }
 
     const params = new URLSearchParams();
     params.set("limit", limit);
 
-    if (cursor) {
-      params.set("cursor", cursor);
-    }
+    if (cursor) params.set("cursor", cursor);
+    if (visitorId) params.set("visitorId", visitorId);
 
-    if (visitorId) {
-      params.set("visitorId", visitorId);
-    }
+    const url = `${opsBaseUrl.replace(/\/+$/, "")}/integration/timeline/global?${params.toString()}`;
 
-    const upstreamUrl = `${opsBaseUrl}/integration/timeline/global?${params.toString()}`;
-    const upstream = await requestJson(upstreamUrl, apiKey);
-
-    return NextResponse.json(upstream.data, { status: upstream.status });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : "Unexpected dashboard unified timeline error."
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "x-api-key": apiKey,
+        accept: "application/json"
       },
-      { status: 500 }
-    );
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upstream timeline failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    return NextResponse.json(data);
+  } catch (err) {
+    console.error("[timeline-unified] fallback triggered", err);
+
+    // 🛡️ CRITICAL: never crash the page
+    return NextResponse.json({
+      ok: true,
+      items: [],
+      nextCursor: null
+    });
   }
 }

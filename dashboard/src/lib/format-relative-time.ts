@@ -1,10 +1,16 @@
+const ABSOLUTE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: "America/New_York"
+});
+
 export function formatAbsoluteTime(value: string | null | undefined) {
   if (!value) return "-";
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
 
-  return date.toLocaleString();
+  return ABSOLUTE_FORMATTER.format(date);
 }
 
 export function formatRelativeTime(value: string | null | undefined, now = new Date()) {

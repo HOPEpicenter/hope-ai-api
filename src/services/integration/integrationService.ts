@@ -287,6 +287,13 @@ return { items: enrichedItems, nextCursor };
     const eng = await this.engagementRepo.readTimeline(visitorId, 1, undefined);
 
     const lastEngagementAt = eng.items?.[0]?.occurredAt ?? null;
+    console.log("[integration-debug]", JSON.stringify({
+      visitorId,
+      lastEngagementAt,
+      engagementItems: eng.items?.length ?? 0,
+      firstEngagement: eng.items?.[0]?.occurredAt ?? null,
+      storage: process.env.STORAGE_CONNECTION_STRING ? "set" : "missing"
+    }));
 
     let lastFormationAt: string | null = null;
 let lastFormationEventType: string | null = null;
@@ -305,7 +312,17 @@ let lastFormationEventType: string | null = null;
         const profile = await getFormationProfile(profiles as any, visitorId);
 
         lastFormationAt = String((profile as any)?.lastEventAt ?? "").trim() || null;
-lastFormationEventType = String((profile as any)?.lastEventType ?? "").trim() || null;
+        lastFormationEventType = String((profile as any)?.lastEventType ?? "").trim() || null;
+        const followupOnlyTypes = new Set([
+          "FOLLOWUP_ASSIGNED",
+          "FOLLOWUP_CONTACTED",
+          "FOLLOWUP_OUTCOME_RECORDED",
+          "FOLLOWUP_UNASSIGNED"
+        ]);
+
+        if (lastFormationEventType && followupOnlyTypes.has(lastFormationEventType)) {
+          lastFormationAt = null;
+        }
 
         const assigneeId = String((profile as any)?.assignedTo ?? "").trim();
         if (assigneeId) {
@@ -429,6 +446,9 @@ lastFormationEventType = String((profile as any)?.lastEventType ?? "").trim() ||
     return { items: enrichedItems, nextCursor };
   }
 }
+
+
+
 
 
 

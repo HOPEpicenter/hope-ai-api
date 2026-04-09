@@ -141,7 +141,7 @@ export function deriveIntegrationSummaryV1(
     needsFollowup = false;
   }
 
-  const lastIntegratedAt = maxIso(input.lastEngagementAt, input.lastFormationAt);
+  const lastIntegratedAt = input.lastEngagementAt ? maxIso(input.lastEngagementAt, input.lastFormationAt) : null;
   const groups = normalizeGroupRefs(input.groups);
   const programs = normalizeProgramRefs(input.programs);
   const workflowRefs = normalizeWorkflowRefs(input.workflows);
@@ -187,3 +187,4 @@ export function deriveIntegrationSummaryV1(
     workflows,
   };
 }
+

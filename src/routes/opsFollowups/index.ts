@@ -1,9 +1,38 @@
 import { Router } from "express";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
-import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
+import {
+  getFormationEventsTableClient,
+  getFormationProfilesTableClient,
+} from "../../storage/formation/formationTables";
 
 type FollowupUrgency = "ON_TRACK" | "AT_RISK" | "OVERDUE";
 type FollowupAgingBucket = "SAME_DAY" | "ONE_DAY" | "TWO_PLUS_DAYS";
+
+type QueueItem = {
+  visitorId: string;
+  assignedTo: { ownerType: "user"; ownerId: string } | null;
+  lastFollowupAssignedAt: string | null;
+  lastFollowupContactedAt: string | null;
+  lastFollowupOutcomeAt: string | null;
+  stage: string | null;
+  needsFollowup: boolean;
+  followupReason?: string;
+  followupResolved: boolean;
+  resolvedForAssignment: boolean;
+  followupUrgency?: FollowupUrgency;
+  followupPriorityScore?: number;
+  followupAgingBucket?: FollowupAgingBucket;
+  followupEscalated: boolean;
+  followupOverdue: boolean;
+};
+
+type EventState = {
+  visitorId: string;
+  assignedTo: string | null;
+  lastFollowupAssignedAt: string | null;
+  lastFollowupContactedAt: string | null;
+  lastFollowupOutcomeAt: string | null;
+};
 
 function hoursBetween(a: string, b: string): number {
   const ams = Date.parse(a);
@@ -12,21 +41,57 @@ function hoursBetween(a: string, b: string): number {
   return (bms - ams) / (1000 * 60 * 60);
 }
 
-function deriveQueueSignals(profile: any) {
-  const assignedAt = profile?.lastFollowupAssignedAt ?? null;
-  const contactedAt = profile?.lastFollowupContactedAt ?? null;
-  const outcomeAt = profile?.lastFollowupOutcomeAt ?? null;
-  const assignedTo = String(profile?.assignedTo ?? "").trim();
+function getEventVisitorId(e: any): string {
+  return String(
+    e?.visitorId ??
+      e?.partitionKey ??
+      e?.PartitionKey ??
+      ""
+  ).trim();
+}
+
+function getEventOccurredAt(e: any): string | null {
+  const value = String(e?.occurredAt ?? "").trim();
+  return value || null;
+}
+
+function getEventAssigneeId(e: any): string {
+  return String(
+    e?.assigneeId ??
+      e?.["data_assigneeId"] ??
+      e?.data?.assigneeId ??
+      e?.metadata?.assigneeId ??
+      ""
+  ).trim();
+}
+
+function compareIsoAsc(a: string | null, b: string | null): number {
+  const aa = String(a ?? "");
+  const bb = String(b ?? "");
+  return aa.localeCompare(bb);
+}
+
+function deriveQueueSignals(state: {
+  assignedTo: string | null;
+  lastFollowupAssignedAt: string | null;
+  lastFollowupContactedAt: string | null;
+  lastFollowupOutcomeAt: string | null;
+}) {
+  const assignedAt = state.lastFollowupAssignedAt;
+  const contactedAt = state.lastFollowupContactedAt;
+  const outcomeAt = state.lastFollowupOutcomeAt;
+  const assignedTo = String(state.assignedTo ?? "").trim();
 
   const followupResolved =
     !!assignedAt &&
     !!outcomeAt &&
     String(outcomeAt) >= String(assignedAt);
 
-  if (!assignedTo) {
+  if (!assignedAt) {
     return {
-      followupResolved,
-      followupReason: undefined,
+      followupResolved: false,
+      resolvedForAssignment: false,
+      followupReason: undefined as string | undefined,
       followupUrgency: undefined as FollowupUrgency | undefined,
       followupPriorityScore: undefined as number | undefined,
       followupAgingBucket: undefined as FollowupAgingBucket | undefined,
@@ -39,6 +104,7 @@ function deriveQueueSignals(profile: any) {
   if (followupResolved) {
     return {
       followupResolved: true,
+      resolvedForAssignment: true,
       followupReason: "FOLLOWUP_OUTCOME_RECORDED",
       followupUrgency: undefined as FollowupUrgency | undefined,
       followupPriorityScore: undefined as number | undefined,
@@ -49,15 +115,13 @@ function deriveQueueSignals(profile: any) {
     };
   }
 
-  const ageHours = assignedAt
-    ? hoursBetween(String(assignedAt), new Date().toISOString())
-    : 0;
+  const ageHours = hoursBetween(String(assignedAt), new Date().toISOString());
 
-  let followupUrgency: FollowupUrgency | undefined;
-  let followupPriorityScore: number | undefined;
-  let followupAgingBucket: FollowupAgingBucket | undefined;
-  let followupEscalated = false;
-  let followupOverdue = false;
+  let followupUrgency: FollowupUrgency;
+  let followupPriorityScore: number;
+  let followupAgingBucket: FollowupAgingBucket;
+  let followupEscalated: boolean;
+  let followupOverdue: boolean;
 
   if (ageHours >= 48) {
     followupUrgency = "OVERDUE";
@@ -79,15 +143,15 @@ function deriveQueueSignals(profile: any) {
     followupOverdue = false;
   }
 
-  let followupReason: string | undefined;
-  if (contactedAt) {
-    followupReason = "FOLLOWUP_CONTACTED";
-  } else {
-    followupReason = "FOLLOWUP_ASSIGNED";
-  }
+  const followupReason = contactedAt
+    ? "FOLLOWUP_CONTACTED"
+    : assignedTo
+      ? "FOLLOWUP_ASSIGNED"
+      : "FOLLOWUP_UNASSIGNED";
 
   return {
     followupResolved: false,
+    resolvedForAssignment: false,
     followupReason,
     followupUrgency,
     followupPriorityScore,
@@ -98,11 +162,32 @@ function deriveQueueSignals(profile: any) {
   };
 }
 
+function compareQueueItems(a: QueueItem, b: QueueItem): number {
+  const resolvedDiff =
+    Number(a.followupResolved === true) - Number(b.followupResolved === true);
+  if (resolvedDiff !== 0) return resolvedDiff;
+
+  const atA = String(a.lastFollowupAssignedAt ?? "");
+  const atB = String(b.lastFollowupAssignedAt ?? "");
+  if (atA !== atB) return atB.localeCompare(atA);
+
+  const escalatedDiff =
+    Number(b.followupEscalated === true) - Number(a.followupEscalated === true);
+  if (escalatedDiff !== 0) return escalatedDiff;
+
+  const scoreA = Number(a.followupPriorityScore ?? 0);
+  const scoreB = Number(b.followupPriorityScore ?? 0);
+  if (scoreB !== scoreA) return scoreB - scoreA;
+
+  return a.visitorId.localeCompare(b.visitorId);
+}
+
 export const opsFollowupsRouter = Router();
 opsFollowupsRouter.use(requireApiKey);
 
 opsFollowupsRouter.get("/", async (req, res) => {
-  const table = getFormationProfilesTableClient();
+  const eventsTable = getFormationEventsTableClient();
+  const profilesTable = getFormationProfilesTableClient();
 
   const limitRaw = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
   const assignedToFilterRaw = Array.isArray(req.query.assignedTo) ? req.query.assignedTo[0] : req.query.assignedTo;
@@ -115,29 +200,122 @@ opsFollowupsRouter.get("/", async (req, res) => {
       : 25;
 
   const assignedToFilter = String(assignedToFilterRaw ?? "").trim();
-  const includeResolved = String(includeResolvedRaw ?? "").trim().toLowerCase() === "true";
+  const includeResolved =
+    String(includeResolvedRaw ?? "").trim().toLowerCase() === "true";
 
-  const items: any[] = [];
+  const stateByVisitor = new Map<string, EventState>();
+  const stageByVisitor = new Map<string, string | null>();
 
-  for await (const p of table.listEntities<any>({})) {
-    const assignedTo = String((p as any).assignedTo ?? "").trim();
-    if (!assignedTo) continue;
-    if (assignedToFilter && assignedTo !== assignedToFilter) continue;
+  for await (const e of eventsTable.listEntities<any>({})) {
+    const type = String(e?.type ?? "").trim();
+    if (
+      type !== "FOLLOWUP_ASSIGNED" &&
+      type !== "FOLLOWUP_UNASSIGNED" &&
+      type !== "FOLLOWUP_CONTACTED" &&
+      type !== "FOLLOWUP_OUTCOME_RECORDED"
+    ) {
+      continue;
+    }
 
-    const signals = deriveQueueSignals(p as any);
+    const visitorId = getEventVisitorId(e);
+    if (!visitorId) continue;
+
+    const occurredAt = getEventOccurredAt(e);
+    if (!occurredAt) continue;
+
+    let state = stateByVisitor.get(visitorId);
+    if (!state) {
+      state = {
+        visitorId,
+        assignedTo: null,
+        lastFollowupAssignedAt: null,
+        lastFollowupContactedAt: null,
+        lastFollowupOutcomeAt: null,
+      };
+      stateByVisitor.set(visitorId, state);
+    }
+
+    if (type === "FOLLOWUP_ASSIGNED") {
+      if (compareIsoAsc(state.lastFollowupAssignedAt, occurredAt) <= 0) {
+        state.lastFollowupAssignedAt = occurredAt;
+        state.assignedTo = getEventAssigneeId(e) || state.assignedTo || null;
+      }
+      continue;
+    }
+
+    if (type === "FOLLOWUP_UNASSIGNED") {
+      if (compareIsoAsc(state.lastFollowupAssignedAt, occurredAt) <= 0) {
+        state.lastFollowupAssignedAt = occurredAt;
+        state.assignedTo = null;
+      }
+      continue;
+    }
+
+    if (type === "FOLLOWUP_CONTACTED") {
+      if (compareIsoAsc(state.lastFollowupContactedAt, occurredAt) <= 0) {
+        state.lastFollowupContactedAt = occurredAt;
+      }
+      continue;
+    }
+
+    if (type === "FOLLOWUP_OUTCOME_RECORDED") {
+      if (compareIsoAsc(state.lastFollowupOutcomeAt, occurredAt) <= 0) {
+        state.lastFollowupOutcomeAt = occurredAt;
+      }
+    }
+  }
+
+  for await (const p of profilesTable.listEntities<any>({})) {
+    const visitorId = String((p as any)?.rowKey ?? (p as any)?.RowKey ?? "").trim();
+    if (!visitorId) continue;
+
+    stageByVisitor.set(visitorId, (p as any)?.stage ?? null);
+
+    if (!stateByVisitor.has(visitorId)) continue;
+
+    const state = stateByVisitor.get(visitorId)!;
+    const profileAssignedTo = String((p as any)?.assignedTo ?? "").trim();
+    const profileAssignedAt = String((p as any)?.lastFollowupAssignedAt ?? "").trim() || null;
+    const profileContactedAt = String((p as any)?.lastFollowupContactedAt ?? "").trim() || null;
+    const profileOutcomeAt = String((p as any)?.lastFollowupOutcomeAt ?? "").trim() || null;
+
+    if (!state.assignedTo && profileAssignedTo) {
+      state.assignedTo = profileAssignedTo;
+    }
+    if (compareIsoAsc(state.lastFollowupAssignedAt, profileAssignedAt) < 0) {
+      state.lastFollowupAssignedAt = profileAssignedAt;
+    }
+    if (compareIsoAsc(state.lastFollowupContactedAt, profileContactedAt) < 0) {
+      state.lastFollowupContactedAt = profileContactedAt;
+    }
+    if (compareIsoAsc(state.lastFollowupOutcomeAt, profileOutcomeAt) < 0) {
+      state.lastFollowupOutcomeAt = profileOutcomeAt;
+    }
+  }
+
+  const items: QueueItem[] = [];
+
+  for (const state of stateByVisitor.values()) {
+    const signals = deriveQueueSignals(state);
     if (!includeResolved && signals.followupResolved) continue;
     if (!signals.followupResolved && !signals.needsFollowup) continue;
 
+    const ownerId = String(state.assignedTo ?? "").trim();
+    if (assignedToFilter && ownerId !== assignedToFilter) continue;
+
     items.push({
-      visitorId: String((p as any).rowKey ?? (p as any).RowKey ?? ""),
-      assignedTo: { ownerType: "user", ownerId: assignedTo },
-      lastFollowupAssignedAt: (p as any).lastFollowupAssignedAt ?? null,
-      lastFollowupContactedAt: (p as any).lastFollowupContactedAt ?? null,
-      lastFollowupOutcomeAt: (p as any).lastFollowupOutcomeAt ?? null,
-      stage: (p as any).stage ?? null,
+      visitorId: state.visitorId,
+      assignedTo: ownerId
+        ? { ownerType: "user", ownerId }
+        : null,
+      lastFollowupAssignedAt: state.lastFollowupAssignedAt,
+      lastFollowupContactedAt: state.lastFollowupContactedAt,
+      lastFollowupOutcomeAt: state.lastFollowupOutcomeAt,
+      stage: stageByVisitor.get(state.visitorId) ?? null,
       needsFollowup: signals.needsFollowup,
       followupReason: signals.followupReason,
       followupResolved: signals.followupResolved,
+      resolvedForAssignment: signals.resolvedForAssignment,
       followupUrgency: signals.followupUrgency,
       followupPriorityScore: signals.followupPriorityScore,
       followupAgingBucket: signals.followupAgingBucket,
@@ -146,21 +324,7 @@ opsFollowupsRouter.get("/", async (req, res) => {
     });
   }
 
-  items.sort((a, b) => {
-    const resolvedDiff = Number(a.followupResolved === true) - Number(b.followupResolved === true);
-    if (resolvedDiff !== 0) return resolvedDiff;
-
-    const escalatedDiff = Number(b.followupEscalated === true) - Number(a.followupEscalated === true);
-    if (escalatedDiff !== 0) return escalatedDiff;
-
-    const scoreA = Number(a.followupPriorityScore ?? 0);
-    const scoreB = Number(b.followupPriorityScore ?? 0);
-    if (scoreB !== scoreA) return scoreB - scoreA;
-
-    const atA = String(a.lastFollowupAssignedAt ?? "");
-    const atB = String(b.lastFollowupAssignedAt ?? "");
-    return atA.localeCompare(atB);
-  });
+  items.sort(compareQueueItems);
 
   const stats = {
     total: items.length,
@@ -222,4 +386,3 @@ opsFollowupsRouter.get("/", async (req, res) => {
     items: items.slice(0, limit),
   });
 });
-

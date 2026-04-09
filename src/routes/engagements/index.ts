@@ -13,7 +13,13 @@ import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepo
 export const engagementsRouter = Router();
 
 const timelineService = new EngagementsService(new EngagementEventsRepository());
-engagementsRouter.use(requireApiKey);
+
+engagementsRouter.use((req, res, next) => {
+  if (req.path === "/engagements/events") {
+    return next();
+  }
+  return requireApiKey(req, res, next);
+});
 
 const engagementRepo = new EngagementRepository();
 const engagementSummaryRepo = new EngagementSummaryRepository();
@@ -74,8 +80,6 @@ engagementsRouter.get("/visitors/:id/engagements", async (req, res) => {
   }
 });
 
-
-
 // GET /api/visitors/:id/engagements/v1?limit=50&cursor=...
 // Canonical timeline read contract v1 (delegates to EngagementsService.readTimeline)
 engagementsRouter.get("/visitors/:id/engagements/v1", async (req, res) => {
@@ -103,6 +107,7 @@ engagementsRouter.get("/visitors/:id/engagements/v1", async (req, res) => {
     return res.status(500).json({ ok: false, error: "internal" });
   }
 });
+
 // GET /api/visitors/:id/engagements/summary
 engagementsRouter.get("/visitors/:id/engagements/summary", async (req, res) => {
   try {
@@ -115,24 +120,12 @@ engagementsRouter.get("/visitors/:id/engagements/summary", async (req, res) => {
   }
 });
 
-
 // Engagement v1 additions (event envelope + timeline contract)
 engagementsRouter.use(engagementsEventsRouter);
 engagementsRouter.use(engagementsTimelineRouter);
 
-
 // Engagement status v1 (derived from events)
 engagementsRouter.use(engagementsStatusRouter);
 
-
 engagementsRouter.use(engagementsAnalyticsRouter);
-
-
-
-
-
-
-
 engagementsRouter.use(engagementsScoreRouter);
-
-

@@ -1,48 +1,74 @@
 import type { OverviewResponse } from "@/lib/contracts/overview";
-import { getFollowups } from "@/lib/loaders/get-followups";
 import { getVisitors } from "@/lib/loaders/get-visitors";
+import { getFormationProfiles } from "@/lib/loaders/get-formation-profiles";
 
 export async function getOverview(): Promise<OverviewResponse> {
-  const [followups, visitors] = await Promise.all([
-    getFollowups(),
-    getVisitors()
-  ]);
+  const visitors = await getVisitors();
 
-  const assignedNeedingAttention = followups.items.filter(
-    (item) => !!item.assignedTo?.ownerId && item.needsFollowup
+  const formationProfiles = await getFormationProfiles(
+    visitors.items.map((v) => v.visitorId)
   );
 
-  const waitingAssignment = visitors.items.filter(
-    (visitor) => !followups.items.some((item) => item.visitorId === visitor.visitorId)
+  const profileByVisitorId = new Map(
+    formationProfiles.items.map((p) => [p.visitorId, p] as const)
   );
 
-  const contacted = visitors.items.filter((visitor) => {
-    const followup = followups.items.find((item) => item.visitorId === visitor.visitorId);
-    return !!followup?.lastFollowupContactedAt || !!followup?.lastFollowupOutcomeAt;
-  });
+  let waitingAssignment = 0;
+  let needsAttention = 0;
+  let contacted = 0;
 
-  const jumpBackIn = assignedNeedingAttention.slice(0, 5).map((item) => ({
-    title: item.visitorId,
-    subtitle: `${item.assignedTo?.ownerId ?? "Unassigned"}${item.stage ? ` • ${item.stage}` : ""}`,
-    href: `/visitors/${item.visitorId}?preset=needs-attention`
-  }));
+  const recent: OverviewResponse["recent"] = [];
+
+  for (const visitor of visitors.items) {
+    const profile = profileByVisitorId.get(visitor.visitorId);
+
+    const hasAssigned = !!profile?.assignedTo;
+    const hasContacted = !!profile?.lastFollowupContactedAt;
+    const hasOutcome = !!profile?.lastFollowupOutcomeAt;
+
+    if (!hasAssigned) {
+      waitingAssignment++;
+      continue;
+    }
+
+    if (hasOutcome) {
+      // resolved → not counted in overview buckets
+      continue;
+    }
+
+    if (hasContacted) {
+      contacted++;
+      continue;
+    }
+
+    // assigned but not contacted/outcome
+    needsAttention++;
+
+    if (recent.length < 5) {
+      recent.push({
+        title: visitor.visitorId,
+        subtitle: `${profile?.assignedTo?.ownerId ?? "Unassigned"}`,
+        href: `/visitors/${visitor.visitorId}?preset=needs-attention`
+      });
+    }
+  }
 
   return {
     ok: true,
     stats: [
       {
         label: "Waiting Assignment",
-        value: waitingAssignment.length,
+        value: waitingAssignment,
         helper: "Visitors with no active followup assignment"
       },
       {
         label: "Needs Attention",
-        value: assignedNeedingAttention.length,
+        value: needsAttention,
         helper: "Assigned followups still needing operator action"
       },
       {
         label: "Contacted",
-        value: contacted.length,
+        value: contacted,
         helper: "Visitors with contact recorded"
       },
       {
@@ -51,6 +77,6 @@ export async function getOverview(): Promise<OverviewResponse> {
         helper: "Current visitor directory size"
       }
     ],
-    recent: jumpBackIn
+    recent
   };
 }

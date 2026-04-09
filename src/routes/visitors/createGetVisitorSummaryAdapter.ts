@@ -46,6 +46,28 @@ export function createGetVisitorSummaryAdapter() {
         formationProfile: formationProfile ?? null
       });
 
+      const followupStatus =
+        formationProfile?.lastFollowupOutcomeAt
+          ? "resolved"
+          : formationProfile?.lastFollowupContactedAt
+            ? "contacted"
+            : formationProfile?.lastFollowupAssignedAt
+              ? "assigned"
+              : "none";
+
+      const attentionState =
+        followupStatus === "none" || followupStatus === "assigned"
+          ? "needs_attention"
+          : "clear";
+
+      const canonicalFormationProfile = formationProfile
+        ? {
+            ...formationProfile,
+            followupStatus,
+            attentionState
+          }
+        : null;
+
       return res.status(200).json({
         ok: true,
         v: 1,
@@ -57,7 +79,7 @@ export function createGetVisitorSummaryAdapter() {
           },
           integration: integrationSummary ?? null,
           formation: {
-            profile: formationProfile ?? null,
+            profile: canonicalFormationProfile,
             milestones: {
               hasSalvation: formationProfile?.lastEventType === "SALVATION_RECORDED",
               hasBaptism: formationProfile?.lastEventType === "BAPTISM_RECORDED",

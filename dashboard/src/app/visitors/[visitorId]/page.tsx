@@ -159,36 +159,6 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function getFollowupStatus(profile: {
-  lastFollowupAssignedAt?: string | null;
-  lastFollowupContactedAt?: string | null;
-  lastFollowupOutcomeAt?: string | null;
-} | null): string {
-  if (!profile) {
-    return "No active followup";
-  }
-
-  if (profile.lastFollowupOutcomeAt) {
-    return "Resolved";
-  }
-
-  if (profile.lastFollowupContactedAt) {
-    return "Contacted";
-  }
-
-  if (profile.lastFollowupAssignedAt) {
-    return "Assigned";
-  }
-
-  return "No active followup";
-}
-
-function getAttentionState(followupStatus: string) {
-  return followupStatus === "No active followup" || followupStatus === "Assigned"
-    ? "Needs attention"
-    : "Clear";
-}
-
 function getLastActivityAt(data: {
   visitor: { updatedAt: string | null };
   formationProfile: {
@@ -997,8 +967,19 @@ export default async function VisitorDetailPage({
   const { visitorId } = await params;
   const { preset, created, existing, assigned, assigneeId, contacted, outcomeRecorded } = await searchParams;
   const data = await getVisitorDetail(visitorId);
-  const followupStatus = getFollowupStatus(data.formationProfile);
-  const attentionState = getAttentionState(followupStatus);
+  const followupStatus =
+    data.formationProfile?.followupStatus === "resolved"
+      ? "Resolved"
+      : data.formationProfile?.followupStatus === "contacted"
+        ? "Contacted"
+        : data.formationProfile?.followupStatus === "assigned"
+          ? "Assigned"
+          : "No active followup";
+
+  const attentionState =
+    data.formationProfile?.attentionState === "needs_attention"
+      ? "Needs attention"
+      : "Clear";
   const lastActivityAt = getLastActivityAt(data);
   const backHref = preset ? `/visitors?preset=${preset}` : "/visitors";
   const queueHref = preset ? `/visitors?preset=${preset}` : null;
@@ -1312,6 +1293,7 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 
 
 

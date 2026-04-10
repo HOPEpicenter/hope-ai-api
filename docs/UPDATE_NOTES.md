@@ -405,3 +405,5 @@ Notes:
 - CI green
 - staging green (rerun)
 
+
+- ✅ Validated followup ownership model end-to-end (staging + regression); confirmed assign/unassign remain distinct canonical events; no unified setter introduced.\n

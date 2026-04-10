@@ -8,5 +8,6 @@ export type VisitorListItem = {
 
 export type VisitorsResponse = {
   ok: boolean;
+  count: number;
   items: VisitorListItem[];
 };

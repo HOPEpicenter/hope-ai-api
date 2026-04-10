@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const baseUrl = requireEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
     const apiKey = requireEnv("HOPE_API_KEY");
 
-    const upstream = await fetch(`${baseUrl}/visitors`, {
+    const upstream = await fetch(`${baseUrl}/api/visitors`, {
       method: "POST",
       headers: {
         "content-type": "application/json",

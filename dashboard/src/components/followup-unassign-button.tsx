@@ -52,7 +52,8 @@ export function FollowupUnassignButton({
           accept: "application/json"
         },
         body: JSON.stringify({
-          visitorId
+          visitorId,
+          assignedToOwnerId
         })
       });
 
@@ -89,3 +90,4 @@ export function FollowupUnassignButton({
     </FollowupRowActionStack>
   );
 }
+

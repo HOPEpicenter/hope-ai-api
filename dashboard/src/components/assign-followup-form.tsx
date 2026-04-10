@@ -83,7 +83,8 @@ export function AssignFollowupForm({
           accept: "application/json"
         },
         body: JSON.stringify({
-          visitorId
+          visitorId,
+          assignedToOwnerId
         })
       });
 
@@ -236,4 +237,5 @@ export function AssignFollowupForm({
     </div>
   );
 }
+
 

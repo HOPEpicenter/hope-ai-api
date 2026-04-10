@@ -13,9 +13,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as {
       visitorId?: unknown;
+      assignedToOwnerId?: unknown;
     };
 
     const visitorId = typeof body.visitorId === "string" ? body.visitorId.trim() : "";
+    const assignedToOwnerId =
+      typeof body.assignedToOwnerId === "string" ? body.assignedToOwnerId.trim() : "";
 
     if (!visitorId) {
       return NextResponse.json({ error: "Visitor ID is required." }, { status: 400 });
@@ -40,7 +43,9 @@ export async function POST(request: NextRequest) {
         source: {
           system: "dashboard"
         },
-        data: {}
+        data: {
+          assignedToOwnerId: assignedToOwnerId || null
+        }
       }),
       cache: "no-store"
     });

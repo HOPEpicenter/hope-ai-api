@@ -711,3 +711,6 @@ Operational verification:
 - Treat ops followups read model as complete unless a real consumer/blocker appears.
 - Keep Teams registry parked.
 
+
+- Followup ownership model validated (Apr 2026): assign/unassign remain distinct domain events; do not unify without a real blocker.
+

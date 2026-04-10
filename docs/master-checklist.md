@@ -447,3 +447,5 @@ Current rule:
 - [x] staging green
 - [ ] Teams registry (parked)
 
+
+- [x] Followup ownership model validated (assign/unassign lifecycle + regression + staging)\n

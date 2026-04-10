@@ -21,7 +21,7 @@ export async function getVisitors(): Promise<VisitorsResponse> {
   const baseUrl = requireEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
   const apiKey = requireEnv("HOPE_API_KEY");
 
-  const response = await fetch(`${baseUrl}/visitors`, {
+  const response = await fetch(`${baseUrl}/api/visitors`, {
     method: "GET",
     headers: {
       "x-api-key": apiKey,
@@ -58,3 +58,6 @@ export async function getVisitors(): Promise<VisitorsResponse> {
     }))
   };
 }
+
+
+

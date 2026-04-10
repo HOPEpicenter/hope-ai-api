@@ -30,9 +30,9 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
   const apiKey = requireEnv("HOPE_API_KEY");
 
   const [visitorData, eventsData, summaryData] = await Promise.all([
-    getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}`, apiKey),
-    getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}/formation/events`, apiKey),
-    getJson(`${baseUrl}/visitors/${encodeURIComponent(visitorId)}/summary`, apiKey)
+    getJson(`${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}`, apiKey),
+    getJson(`${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}/formation/events`, apiKey),
+    getJson(`${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}/summary`, apiKey)
   ]);
 
   const visitor = visitorData?.visitor ?? visitorData;
@@ -106,4 +106,7 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
       .slice(0, 8)
   };
 }
+
+
+
 

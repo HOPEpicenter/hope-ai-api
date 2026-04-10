@@ -2,6 +2,7 @@ import type { VisitorsResponse } from "@/lib/contracts/visitors";
 
 export const mockVisitors: VisitorsResponse = {
   ok: true,
+  count: 3,
   items: [
     {
       visitorId: "visitor-1002",

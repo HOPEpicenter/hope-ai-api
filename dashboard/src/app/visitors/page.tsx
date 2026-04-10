@@ -115,7 +115,7 @@ export default async function VisitorsPage({
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 12 }}>
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
           <div style={{ fontSize: 12, color: "#6b7280" }}>Total Visitors</div>
-          <div style={{ fontSize: 28, fontWeight: 700 }}>{items.length}</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>{visitors.count}</div>
         </div>
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
           <div style={{ fontSize: 12, color: "#6b7280" }}>Waiting Assignment</div>
@@ -213,7 +213,7 @@ export default async function VisitorsPage({
         contactedCount={contactedCount}
         needsAttentionCount={needsAttentionCount}
         myAssignee={MY_ASSIGNEE}
-        allCount={items.length}
+        allCount={visitors.count}
         myNeedsAttentionCount={myNeedsAttentionCount}
       />
     </section>

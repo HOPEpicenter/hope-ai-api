@@ -47,8 +47,14 @@ export async function getVisitors(): Promise<VisitorsResponse> {
     ? candidate as RawVisitorItem[]
     : [];
 
+  const count =
+    typeof data === "object" && data !== null && "count" in data && typeof (data as { count?: unknown }).count === "number"
+      ? (data as { count: number }).count
+      : items.length;
+
   return {
     ok: true,
+    count,
     items: items.map((item) => ({
       visitorId: String(item.visitorId ?? item.id ?? ""),
       name: String(item.name ?? ""),

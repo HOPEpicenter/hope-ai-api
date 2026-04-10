@@ -93,7 +93,7 @@ export async function listVisitorsRecords(input: { limit: number }): Promise<{ i
   });
 
   const items = all.slice(0, limit);
-  return { items, count: items.length };
+  return { items, count: all.length };
 }
 
 export async function createVisitorRecord(input: { name: string; email?: string }): Promise<FunctionCreateVisitorResult> {

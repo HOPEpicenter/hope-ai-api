@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
     const baseUrl = requireEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
     const apiKey = requireEnv("HOPE_API_KEY");
 
+    console.log('UNASSIGN REQUEST', { visitorId, assignedToOwnerId });
+
     const upstream = await fetch(`${baseUrl}/api/formation/events`, {
       method: "POST",
       headers: {
@@ -51,6 +53,7 @@ export async function POST(request: NextRequest) {
     });
 
     const text = await upstream.text();
+    console.log('UNASSIGN RESPONSE', { status: upstream.status, body: text });
     const data = text ? JSON.parse(text) : {};
 
     if (!upstream.ok) {

@@ -85,7 +85,7 @@ async function getFormationProfileByVisitorId(
   visitorId: string
 ): Promise<FormationProfileListItem | null> {
   const response = await fetch(
-    `${baseUrl}/visitors/${encodeURIComponent(visitorId)}/formation/profile`,
+    `${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}/formation/profile`,
     {
       method: "GET",
       headers: {
@@ -139,7 +139,7 @@ export async function getFormationProfiles(visitorIds?: string[]): Promise<Forma
     };
   }
 
-  const response = await fetch(`${baseUrl}/formation/profiles?limit=200`, {
+  const response = await fetch(`${baseUrl}/api/formation/profiles?limit=200`, {
     method: "GET",
     headers: {
       "x-api-key": apiKey,
@@ -167,4 +167,7 @@ export async function getFormationProfiles(visitorIds?: string[]): Promise<Forma
     items
   };
 }
+
+
+
 

@@ -43,7 +43,7 @@ export async function getFollowups(): Promise<FollowupsResponse> {
   const baseUrl = requireEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
   const apiKey = requireEnv("HOPE_API_KEY");
 
-  const response = await fetch(`${baseUrl}/formation/profiles?limit=200`, {
+  const response = await fetch(`${baseUrl}/api/formation/profiles?limit=200`, {
     method: "GET",
     headers: {
       "x-api-key": apiKey,
@@ -135,3 +135,6 @@ export async function getFollowups(): Promise<FollowupsResponse> {
     items
   };
 }
+
+
+

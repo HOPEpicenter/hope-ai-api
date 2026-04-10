@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    const upstream = await fetch(`${opsBaseUrl}/formation/events`, {
+    const upstream = await fetch(`${opsBaseUrl}/api/api/formation/events`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!upstream.ok) {
-      const fallbackMessage = `POST /api/formation/events failed with status ${upstream.status}`;
+      const fallbackMessage = `POST /api/api/api/formation/events failed with status ${upstream.status}`;
 
       const errorMessage =
         typeof data === "object" &&
@@ -84,3 +84,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+

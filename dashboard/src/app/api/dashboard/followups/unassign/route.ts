@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     const baseUrl = requireEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
     const apiKey = requireEnv("HOPE_API_KEY");
 
-    const upstream = await fetch(`${baseUrl}/formation/events`, {
+    const upstream = await fetch(`${baseUrl}/api/api/formation/events`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       const message =
         typeof data?.error === "string"
           ? data.error
-          : `POST /api/formation/events failed with status ${upstream.status}`;
+          : `POST /api/api/api/formation/events failed with status ${upstream.status}`;
 
       return NextResponse.json({ error: message }, { status: upstream.status });
     }
@@ -76,3 +76,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+

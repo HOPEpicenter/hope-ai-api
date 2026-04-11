@@ -236,7 +236,7 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     });
 
     const items = all.slice(0, limit);
-    return { items, count: items.length };
+    return { items, count: all.length };
   }
 
   async upsert(visitor: Visitor): Promise<Visitor> {

@@ -23,6 +23,9 @@ const allowedTypes: FormationEventType[] = [
   "other",
 ];
 import type { EngagementsRepository } from "../../repositories/engagementsRepository";
+import { IntegrationService } from "../../services/integration/integrationService";
+import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
+import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
 function isAllowedType(v: unknown): v is FormationEventType {
   return typeof v === "string" && (allowedTypes as string[]).includes(v);
 }
@@ -38,7 +41,12 @@ function getRequestId(req: any): string | undefined {
 }
 
 export function createOpsRouter(visitorsRepository: VisitorsRepository, formationEventsRepository: FormationEventsRepository, engagementsRepository: EngagementsRepository): Router {
-  const opsRouter = Router();
+    const opsRouter = Router();
+
+  const integrationService = new IntegrationService(
+    new EngagementEventsRepository(),
+    new AzureTableFormationEventsRepository()
+  );
 
   opsRouter.use("/engagements", createEngagementsRouter(engagementsRepository));
 
@@ -228,22 +236,20 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
       throw notFound("Visitor not found.", { visitorId });
     }
 
-    const page = await formationEventsRepository.listByVisitor({
-      visitorId,
-      limit: 1,
-      cursor: undefined,
-    });
+    const page = await integrationService.readIntegratedTimeline(visitorId, 1);
 
     const latest = Array.isArray(page.items) && page.items.length > 0
       ? page.items[0]
       : null;
 
     const followupStatus =
-      latest?.type === "follow_up"
-        ? "pending"
-        : latest?.type === "call" || latest?.type === "message"
+      latest?.type === "FOLLOWUP_OUTCOME_RECORDED"
+        ? "resolved"
+        : latest?.type === "FOLLOWUP_CONTACTED" || latest?.type === "CONTACT_CALL" || latest?.type === "CONTACT_TEXT" || latest?.type === "CONTACT_MEETING"
           ? "contacted"
-          : "none";
+          : latest?.type === "FOLLOWUP_ASSIGNED" || latest?.type === "FOLLOWUP_UNASSIGNED" || latest?.type === "follow_up"
+            ? "pending"
+            : "none";
 
     return res.json({
       requestId: getRequestId(req),

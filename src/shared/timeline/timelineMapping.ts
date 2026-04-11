@@ -79,6 +79,11 @@ export function buildEngagementDisplay(eventType: unknown, notes: unknown): stri
   if (n) return n;
 
   const t = cleanSpaces(safeStr(eventType));
+
+  if (t === "CONTACT_CALL") return "Call logged";
+  if (t === "CONTACT_TEXT") return "Text logged";
+  if (t === "CONTACT_MEETING") return "Meeting logged";
+
   return t ? `${t} (engagement)` : "engagement";
 }
 

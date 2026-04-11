@@ -214,6 +214,51 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
     });
   });
 
+  
+  /**
+   * GET /api/ops/visitors/:vid/dashboard-card
+   *
+   * Minimal UI-ready visitor card (formation-based surface).
+   */
+  opsRouter.get("/visitors/:vid/dashboard-card", async (req, res) => {
+    const { visitorId } = parseVisitorId(req.params);
+
+    const visitor = await visitorsRepository.getById(visitorId);
+    if (!visitor) {
+      throw notFound("Visitor not found.", { visitorId });
+    }
+
+    const page = await formationEventsRepository.listByVisitor({
+      visitorId,
+      limit: 1,
+      cursor: undefined,
+    });
+
+    const latest = Array.isArray(page.items) && page.items.length > 0
+      ? page.items[0]
+      : null;
+
+    const followupStatus =
+      latest?.type === "follow_up"
+        ? "pending"
+        : latest?.type === "call" || latest?.type === "message"
+          ? "contacted"
+          : "none";
+
+    return res.json({
+      requestId: getRequestId(req),
+      visitorId,
+      card: {
+        visitorId,
+        name: visitor.name ?? null,
+        email: visitor.email ?? null,
+        lastActivityAt: latest?.occurredAt ?? null,
+        lastActivitySummary: latest?.summary ?? null,
+        followupStatus,
+      },
+    });
+  });
+
   return opsRouter;
 }
 

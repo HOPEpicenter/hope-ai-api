@@ -89,6 +89,11 @@ function deriveSummary(item: any): string {
   }
 
   if (item.stream === "engagement") {
+  const summary = item.data?.summary;
+  if (typeof summary === "string" && summary.trim().length > 0) {
+    return summary.trim();
+  }
+
   const text = item.data?.text;
   if (typeof text === "string" && text.trim().length > 0) {
     return text.trim();
@@ -98,6 +103,10 @@ function deriveSummary(item: any): string {
   if (typeof notes === "string" && notes.trim().length > 0) {
     return notes.trim();
   }
+
+  if (type === "CONTACT_CALL") return "Call logged";
+  if (type === "CONTACT_TEXT") return "Text logged";
+  if (type === "CONTACT_MEETING") return "Meeting logged";
 
   return type || "engagement event";
 }

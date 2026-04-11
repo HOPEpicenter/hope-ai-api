@@ -299,6 +299,49 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
       followupStatus === "resolved" || followupStatus === "contacted"
         ? "clear"
         : "needs_attention";
+
+    const lastFollowupAssignedAt = Array.isArray(page.items)
+      ? (() => {
+          for (const item of page.items) {
+            if (item?.type === "FOLLOWUP_ASSIGNED") {
+              const at =
+                typeof item?.occurredAt === "string" && item.occurredAt.trim().length > 0
+                  ? item.occurredAt.trim()
+                  : null;
+              if (at) return at;
+            }
+
+            if (item?.type === "FOLLOWUP_UNASSIGNED") {
+              return null;
+            }
+          }
+          return null;
+        })()
+      : null;
+
+    function getAgeHours(value: string | null): number | null {
+      if (!value) return null;
+      const assignedMs = new Date(value).getTime();
+      if (Number.isNaN(assignedMs)) return null;
+
+      const diffMs = Date.now() - assignedMs;
+      if (diffMs < 0) return 0;
+
+      return Math.floor(diffMs / (1000 * 60 * 60));
+    }
+
+    const ageHours = getAgeHours(lastFollowupAssignedAt);
+
+    const followupUrgency =
+      !assignedTo || followupStatus === "resolved" || followupStatus === "contacted"
+        ? null
+        : ageHours !== null && ageHours >= 48
+          ? "OVERDUE"
+          : ageHours !== null && ageHours >= 24
+            ? "AT_RISK"
+            : "ON_TRACK";
+
+    const followupOverdue = followupUrgency === "OVERDUE";
     return res.json({
       requestId: getRequestId(req),
       visitorId,
@@ -311,6 +354,8 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
         followupStatus,
         assignedTo,
         attentionState,
+        followupUrgency,
+        followupOverdue,
         tags: derivedTags,
       },
     });

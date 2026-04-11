@@ -236,11 +236,36 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
       throw notFound("Visitor not found.", { visitorId });
     }
 
-    const page = await integrationService.readIntegratedTimeline(visitorId, 1);
+    const page = await integrationService.readIntegratedTimeline(visitorId, 100);
 
     const latest = Array.isArray(page.items) && page.items.length > 0
       ? page.items[0]
       : null;
+
+    const derivedTags = Array.isArray(page.items)
+      ? (() => {
+          const acc = new Map<string, boolean>();
+
+          for (const item of page.items.slice().reverse()) {
+            const tag =
+              typeof item?.data?.tag === "string"
+                ? item.data.tag.trim()
+                : typeof item?.data?.name === "string"
+                  ? item.data.name.trim()
+                  : "";
+
+            if (!tag) continue;
+
+            if (item.type === "TAG_ADDED") {
+              acc.set(tag, true);
+            } else if (item.type === "TAG_REMOVED") {
+              acc.delete(tag);
+            }
+          }
+
+          return Array.from(acc.keys()).sort((a, b) => a.localeCompare(b));
+        })()
+      : [];
 
     const followupStatus =
       latest?.type === "FOLLOWUP_OUTCOME_RECORDED"
@@ -261,6 +286,7 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
         lastActivityAt: latest?.occurredAt ?? null,
         lastActivitySummary: latest?.summary ?? null,
         followupStatus,
+        tags: derivedTags,
       },
     });
   });

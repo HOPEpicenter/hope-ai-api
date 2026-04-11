@@ -104,9 +104,11 @@ function deriveSummary(item: any): string {
     return notes.trim();
   }
 
-  if (type === "CONTACT_CALL") return "Call logged";
+    if (type === "CONTACT_CALL") return "Call logged";
   if (type === "CONTACT_TEXT") return "Text logged";
   if (type === "CONTACT_MEETING") return "Meeting logged";
+  if (type === "TAG_ADDED") return "Tag added";
+  if (type === "TAG_REMOVED") return "Tag removed";
 
   return type || "engagement event";
 }

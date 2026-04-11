@@ -267,6 +267,25 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
         })()
       : [];
 
+    const assignedTo = Array.isArray(page.items)
+      ? (() => {
+          for (const item of page.items) {
+            if (item?.type === "FOLLOWUP_ASSIGNED") {
+              const id =
+                typeof item?.data?.assigneeId === "string"
+                  ? item.data.assigneeId.trim()
+                  : "";
+              if (id) return id;
+            }
+
+            if (item?.type === "FOLLOWUP_UNASSIGNED") {
+              return null;
+            }
+          }
+          return null;
+        })()
+      : null;
+
     const followupStatus =
       latest?.type === "FOLLOWUP_OUTCOME_RECORDED"
         ? "resolved"
@@ -276,6 +295,10 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
             ? "pending"
             : "none";
 
+    const attentionState =
+      followupStatus === "resolved" || followupStatus === "contacted"
+        ? "clear"
+        : "needs_attention";
     return res.json({
       requestId: getRequestId(req),
       visitorId,
@@ -286,6 +309,8 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
         lastActivityAt: latest?.occurredAt ?? null,
         lastActivitySummary: latest?.summary ?? null,
         followupStatus,
+        assignedTo,
+        attentionState,
         tags: derivedTags,
       },
     });
@@ -293,7 +318,3 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
 
   return opsRouter;
 }
-
-
-
-

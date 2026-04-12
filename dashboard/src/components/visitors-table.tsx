@@ -11,6 +11,7 @@ import type { VisitorListItem } from "@/lib/contracts/visitors";
 export type VisitorsTableItem = VisitorListItem & {
   followupState: "Assigned" | "Waiting assignment" | "Contacted" | "Resolved" | "Profile unavailable";
   attentionState: "Needs attention" | "Contact made" | null;
+  urgencyState: "AT_RISK" | null;
   assignedTo: string | null;
   formationMilestones: {
     hasSalvation: boolean;
@@ -141,6 +142,27 @@ function AttentionBadge({ state }: { state: VisitorsTableItem["attentionState"] 
   );
 }
 
+function UrgencyBadge({ state }: { state: VisitorsTableItem["urgencyState"] }) {
+  if (!state) {
+    return <span style={{ color: "#9ca3af" }}>—</span>;
+  }
+
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        padding: "4px 8px",
+        borderRadius: 9999,
+        fontSize: 12,
+        fontWeight: 700,
+        background: "#fef3c7",
+        color: "#92400e"
+      }}
+    >
+      {state}
+    </span>
+  );
+}
 function MilestoneBadges({
   milestones
 }: {
@@ -690,6 +712,7 @@ export function VisitorsTable({
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 260 }}>Email</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 140 }}>Followup State</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 140 }}>Attention</th>
+              <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 120 }}>Urgency</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 180 }}>Milestones</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 150 }}>Assigned To</th>
               <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb", width: 220 }}>Visitor ID</th>
@@ -753,6 +776,9 @@ export function VisitorsTable({
                   </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
                     <AttentionBadge state={item.attentionState} />
+                  </td>
+                  <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
+                    <UrgencyBadge state={item.urgencyState} />
                   </td>
                   <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "top", textAlign: "left" }}>
                     <MilestoneBadges milestones={item.formationMilestones} />
@@ -955,6 +981,10 @@ export function VisitorsTable({
     </div>
   );
 }
+
+
+
+
 
 
 

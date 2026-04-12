@@ -55,6 +55,7 @@ export default async function VisitorsPage({
 
     let followupState: VisitorsTableItem["followupState"] = "Profile unavailable";
     let attentionState: VisitorsTableItem["attentionState"] = null;
+    let urgencyState: VisitorsTableItem["urgencyState"] = null;
 
     if (!profile) {
       followupState = "Profile unavailable";
@@ -67,15 +68,18 @@ export default async function VisitorsPage({
     } else if (profile.assignedTo) {
       followupState = "Assigned";
       attentionState = "Needs attention";
+      urgencyState = "AT_RISK";
     } else {
       followupState = "Waiting assignment";
       attentionState = null;
+      urgencyState = "AT_RISK";
     }
 
     return {
       ...visitor,
       followupState,
       attentionState,
+      urgencyState,
       assignedTo: profile?.assignedTo ?? null,
       formationMilestones
     };
@@ -219,4 +223,6 @@ export default async function VisitorsPage({
     </section>
   );
 }
+
+
 

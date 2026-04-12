@@ -41,21 +41,26 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     const hasAssigned = items.some((item: any) => item?.type === "FOLLOWUP_ASSIGNED");
 
     const assignedTo = (() => {
-      for (const item of items) {
+      let currentAssignee: string | null = null;
+
+      for (const item of items.slice().reverse()) {
         if (item?.type === "FOLLOWUP_ASSIGNED") {
           const assigneeId =
             typeof item?.data?.assigneeId === "string"
               ? item.data.assigneeId.trim()
               : "";
-          if (assigneeId) return assigneeId;
+          if (assigneeId) {
+            currentAssignee = assigneeId;
+          }
+          continue;
         }
 
         if (item?.type === "FOLLOWUP_UNASSIGNED") {
-          return null;
+          currentAssignee = null;
         }
       }
 
-      return null;
+      return currentAssignee;
     })();
 
     const lastFollowupAssignedAt = (() => {
@@ -140,5 +145,6 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     };
   }
 }
+
 
 

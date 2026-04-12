@@ -29,10 +29,11 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
   const baseUrl = requireEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
   const apiKey = requireEnv("HOPE_API_KEY");
 
-  const [visitorData, eventsData, summaryData] = await Promise.all([
+  const [visitorData, eventsData, summaryData, dashboardCardData] = await Promise.all([
     getJson(`${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}`, apiKey),
     getJson(`${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}/formation/events`, apiKey),
-    getJson(`${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}/summary`, apiKey)
+    getJson(`${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}/summary`, apiKey),
+    getJson(`${baseUrl}/api/visitors/${encodeURIComponent(visitorId)}/dashboard-card`, apiKey)
   ]);
 
   const visitor = visitorData?.visitor ?? visitorData;
@@ -47,6 +48,7 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
   return {
     journey: summaryData?.summary?.journey ?? null,
     engagementTimeline: summaryData?.summary?.engagement?.timelinePreview ?? [],
+    dashboardCard: dashboardCardData?.card ?? null,
 
     ok: true,
     visitor: {
@@ -106,6 +108,7 @@ export async function getVisitorDetail(visitorId: string): Promise<VisitorDetail
       .slice(0, 8)
   };
 }
+
 
 
 

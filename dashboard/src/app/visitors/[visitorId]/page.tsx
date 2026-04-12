@@ -133,6 +133,51 @@ function DetailCard({
   );
 }
 
+function DashboardCardSignals({
+  card
+}: {
+  card:
+    | {
+        visitorId: string;
+        lastActivityAt?: string | null;
+        lastActivitySummary?: string | null;
+        followupStatus?: "none" | "pending" | "assigned" | "contacted" | "resolved";
+      }
+    | null
+    | undefined;
+}) {
+  if (!card) return null;
+
+  const followupLabel =
+    card.followupStatus === "resolved"
+      ? "Resolved"
+      : card.followupStatus === "contacted"
+        ? "Contacted"
+        : card.followupStatus === "assigned" || card.followupStatus === "pending"
+          ? "Assigned"
+          : "No active followup";
+
+  return (
+    <DetailCard title="Dashboard Card Signals">
+      <DetailRow label="Followup" value={followupLabel} />
+      <DetailRow
+        label="Last activity"
+        value={
+          card.lastActivityAt ? (
+            <div>
+              <div style={{ fontWeight: 600, color: "#111827" }}>{formatAbsoluteTime(card.lastActivityAt)}</div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                {card.lastActivitySummary ?? "-"}
+              </div>
+            </div>
+          ) : (
+            "-"
+          )
+        }
+      />
+    </DetailCard>
+  );
+}
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div
@@ -1078,6 +1123,8 @@ export default async function VisitorDetailPage({
 
       <JourneyCard journey={data.journey} />
 
+      <DashboardCardSignals card={data.dashboardCard} />
+
       <FollowupTimelineCard
         assignedAt={data.formationProfile?.lastFollowupAssignedAt ?? null}
         contactedAt={data.formationProfile?.lastFollowupContactedAt ?? null}
@@ -1293,6 +1340,8 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
+
 
 
 

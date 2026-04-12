@@ -40,6 +40,42 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     const hasContacted = items.some((item: any) => item?.type === "FOLLOWUP_CONTACTED");
     const hasAssigned = items.some((item: any) => item?.type === "FOLLOWUP_ASSIGNED");
 
+    const assignedTo = (() => {
+      for (const item of items) {
+        if (item?.type === "FOLLOWUP_ASSIGNED") {
+          const assigneeId =
+            typeof item?.data?.assigneeId === "string"
+              ? item.data.assigneeId.trim()
+              : "";
+          if (assigneeId) return assigneeId;
+        }
+
+        if (item?.type === "FOLLOWUP_UNASSIGNED") {
+          return null;
+        }
+      }
+
+      return null;
+    })();
+
+    const lastFollowupAssignedAt = (() => {
+      for (const item of items) {
+        if (item?.type === "FOLLOWUP_ASSIGNED") {
+          const occurredAt =
+            typeof item?.occurredAt === "string" && item.occurredAt.trim().length > 0
+              ? item.occurredAt.trim()
+              : null;
+          if (occurredAt) return occurredAt;
+        }
+
+        if (item?.type === "FOLLOWUP_UNASSIGNED") {
+          return null;
+        }
+      }
+
+      return null;
+    })();
+
     const followupStatus = hasOutcomeRecorded
       ? "resolved"
       : hasContacted
@@ -47,6 +83,36 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
         : hasAssigned
           ? "pending"
           : "none";
+
+    const attentionState =
+      followupStatus === "resolved" || followupStatus === "contacted"
+        ? "clear"
+        : "needs_attention";
+
+    const getAgeHours = (value: string | null): number | null => {
+      if (!value) return null;
+
+      const assignedMs = new Date(value).getTime();
+      if (Number.isNaN(assignedMs)) return null;
+
+      const diffMs = Date.now() - assignedMs;
+      if (diffMs < 0) return 0;
+
+      return Math.floor(diffMs / (1000 * 60 * 60));
+    };
+
+    const ageHours = getAgeHours(lastFollowupAssignedAt);
+
+    const followupUrgency =
+      !assignedTo || followupStatus === "resolved" || followupStatus === "contacted"
+        ? null
+        : ageHours !== null && ageHours >= 48
+          ? "OVERDUE"
+          : ageHours !== null && ageHours >= 24
+            ? "AT_RISK"
+            : "ON_TRACK";
+
+    const followupOverdue = followupUrgency === "OVERDUE";
 
     context.res = {
       status: 200,
@@ -58,7 +124,11 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
           visitorId,
           lastActivityAt: latest?.occurredAt ?? null,
           lastActivitySummary: latest?.summary ?? null,
-          followupStatus
+          followupStatus,
+          assignedTo,
+          attentionState,
+          followupUrgency,
+          followupOverdue
         }
       }
     };
@@ -70,4 +140,5 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     };
   }
 }
+
 

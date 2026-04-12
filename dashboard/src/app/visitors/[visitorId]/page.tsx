@@ -142,6 +142,10 @@ function DashboardCardSignals({
         lastActivityAt?: string | null;
         lastActivitySummary?: string | null;
         followupStatus?: "none" | "pending" | "assigned" | "contacted" | "resolved";
+        assignedTo?: string | null;
+        attentionState?: "needs_attention" | "clear";
+        followupUrgency?: "ON_TRACK" | "AT_RISK" | "OVERDUE" | null;
+        followupOverdue?: boolean;
       }
     | null
     | undefined;
@@ -157,9 +161,23 @@ function DashboardCardSignals({
           ? "Assigned"
           : "No active followup";
 
+  const attentionLabel =
+    card.attentionState === "needs_attention"
+      ? "Needs attention"
+      : "Clear";
+
+  const urgencyValue = card.followupUrgency
+    ? card.followupOverdue
+      ? `${card.followupUrgency} • Overdue`
+      : card.followupUrgency
+    : "-";
+
   return (
     <DetailCard title="Dashboard Card Signals">
       <DetailRow label="Followup" value={followupLabel} />
+      <DetailRow label="Attention" value={attentionLabel} />
+      <DetailRow label="Assigned to" value={card.assignedTo ?? "-"} />
+      <DetailRow label="Urgency" value={urgencyValue} />
       <DetailRow
         label="Last activity"
         value={
@@ -1340,6 +1358,7 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 
 
 

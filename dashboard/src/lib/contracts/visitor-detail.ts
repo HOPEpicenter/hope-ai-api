@@ -54,5 +54,9 @@ export type VisitorDetailResponse = {
     lastActivityAt?: string | null;
     lastActivitySummary?: string | null;
     followupStatus?: "none" | "pending" | "assigned" | "contacted" | "resolved";
+    assignedTo?: string | null;
+    attentionState?: "needs_attention" | "clear";
+    followupUrgency?: "ON_TRACK" | "AT_RISK" | "OVERDUE" | null;
+    followupOverdue?: boolean;
   } | null;
 };

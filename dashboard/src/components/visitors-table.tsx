@@ -55,6 +55,15 @@ function toTimestamp(value: string | null | undefined) {
   return Number.isNaN(time) ? 0 : time;
 }
 
+function getUrgencyRank(urgencyState: VisitorsTableItem["urgencyState"]) {
+  switch (urgencyState) {
+    case "AT_RISK":
+      return 0;
+    default:
+      return 1;
+  }
+}
+
 function getAttentionRank(attentionState: VisitorsTableItem["attentionState"]) {
   switch (attentionState) {
     case "Needs attention":
@@ -599,6 +608,11 @@ export function VisitorsTable({
   }
 
   const sortedItems = [...filteredItems].sort((a, b) => {
+    const urgencyRankDiff = getUrgencyRank(a.urgencyState) - getUrgencyRank(b.urgencyState);
+    if (urgencyRankDiff !== 0) {
+      return urgencyRankDiff;
+    }
+
     const attentionRankDiff = getAttentionRank(a.attentionState) - getAttentionRank(b.attentionState);
     if (attentionRankDiff !== 0) {
       return attentionRankDiff;
@@ -981,6 +995,8 @@ export function VisitorsTable({
     </div>
   );
 }
+
+
 
 
 

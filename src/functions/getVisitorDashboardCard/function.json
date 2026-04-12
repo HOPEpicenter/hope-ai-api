@@ -1,7 +1,7 @@
 {
   "bindings": [
     {
-      "authLevel": "function",
+      "authLevel": "anonymous",
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
@@ -17,3 +17,4 @@
   "scriptFile": "../dist/functions/getVisitorDashboardCard/index.js",
   "entryPoint": "getVisitorDashboardCard"
 }
+

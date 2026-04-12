@@ -613,6 +613,13 @@ export function VisitorsTable({
       return urgencyRankDiff;
     }
 
+    const mineRankDiff =
+      Number(b.assignedTo === myAssignee && !!myAssignee) -
+      Number(a.assignedTo === myAssignee && !!myAssignee);
+    if (mineRankDiff !== 0) {
+      return mineRankDiff;
+    }
+
     const attentionRankDiff = getAttentionRank(a.attentionState) - getAttentionRank(b.attentionState);
     if (attentionRankDiff !== 0) {
       return attentionRankDiff;
@@ -995,6 +1002,7 @@ export function VisitorsTable({
     </div>
   );
 }
+
 
 
 

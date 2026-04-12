@@ -36,14 +36,17 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
 
     const latest = items[0] ?? null;
 
-    const followupStatus =
-      latest?.type === "FOLLOWUP_OUTCOME_RECORDED"
-        ? "resolved"
-        : latest?.type === "FOLLOWUP_CONTACTED"
+    const hasOutcomeRecorded = items.some((item: any) => item?.type === "FOLLOWUP_OUTCOME_RECORDED");
+    const hasContacted = items.some((item: any) => item?.type === "FOLLOWUP_CONTACTED");
+    const hasAssigned = items.some((item: any) => item?.type === "FOLLOWUP_ASSIGNED");
+
+    const followupStatus = hasOutcomeRecorded
+      ? "resolved"
+      : hasContacted
         ? "contacted"
-        : latest?.type === "FOLLOWUP_ASSIGNED"
-        ? "pending"
-        : "none";
+        : hasAssigned
+          ? "pending"
+          : "none";
 
     context.res = {
       status: 200,
@@ -67,3 +70,4 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     };
   }
 }
+

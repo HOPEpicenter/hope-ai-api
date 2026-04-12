@@ -43,20 +43,20 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     const assignedTo = (() => {
       let currentAssignee: string | null = null;
 
-      for (const item of items.slice().reverse()) {
+      for (const item of items) {
         if (item?.type === "FOLLOWUP_ASSIGNED") {
           const assigneeId =
-            typeof item?.data?.assigneeId === "string"
-              ? item.data.assigneeId.trim()
+            typeof item?.metadata?.data?.assigneeId === "string"
+              ? item.metadata.data.assigneeId.trim()
               : "";
           if (assigneeId) {
-            currentAssignee = assigneeId;
+            return assigneeId;
           }
           continue;
         }
 
         if (item?.type === "FOLLOWUP_UNASSIGNED") {
-          currentAssignee = null;
+          return null;
         }
       }
 
@@ -145,6 +145,7 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     };
   }
 }
+
 
 
 

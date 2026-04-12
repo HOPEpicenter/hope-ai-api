@@ -1119,7 +1119,10 @@ export default async function VisitorDetailPage({
         email={data.visitor.email}
         stage={data.formationProfile?.stage ?? null}
         followupStatus={followupStatus}
-        assignedToOwnerId={getAssignedToOwnerId(data.formationProfile?.assignedTo)}
+        assignedToOwnerId={
+  data.dashboardCard?.assignedTo ??
+  getAssignedToOwnerId(data.formationProfile?.assignedTo)
+}
         lastActivityAt={lastActivityAt}
         attentionState={attentionState}
         backHref={backHref}
@@ -1186,7 +1189,10 @@ export default async function VisitorDetailPage({
           {nextAction.actionKey === "assign" ? (
             <AssignFollowupForm
               visitorId={data.visitor.visitorId}
-              assignedToOwnerId={getAssignedToOwnerId(data.formationProfile?.assignedTo)}
+              assignedToOwnerId={
+  data.dashboardCard?.assignedTo ??
+  getAssignedToOwnerId(data.formationProfile?.assignedTo)
+}
             />
           ) : null}
 
@@ -1229,7 +1235,10 @@ export default async function VisitorDetailPage({
                 {nextAction.actionKey !== "assign" ? (
                   <AssignFollowupForm
                     visitorId={data.visitor.visitorId}
-                    assignedToOwnerId={getAssignedToOwnerId(data.formationProfile?.assignedTo)}
+                    assignedToOwnerId={
+  data.dashboardCard?.assignedTo ??
+  getAssignedToOwnerId(data.formationProfile?.assignedTo)
+}
                   />
                 ) : null}
 
@@ -1358,6 +1367,7 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 
 
 

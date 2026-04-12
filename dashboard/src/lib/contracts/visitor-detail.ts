@@ -49,4 +49,10 @@ export type VisitorDetailResponse = {
     source: string | null;
     notes: string | null;
   }>;
+  dashboardCard?: {
+    visitorId: string;
+    lastActivityAt?: string | null;
+    lastActivitySummary?: string | null;
+    followupStatus?: "none" | "pending" | "assigned" | "contacted" | "resolved";
+  } | null;
 };

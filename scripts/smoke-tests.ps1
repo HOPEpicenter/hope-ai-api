@@ -460,6 +460,19 @@ if ($looksPlaceholder) {
     throw "Engagement E2E failed (exit=$LASTEXITCODE)"
   }
   Write-Host "Engagement E2E OK"
+
+  $journeyPath = Join-Path $PSScriptRoot "smoke-visitor-journey.ps1"
+  if (-not (Test-Path -LiteralPath $journeyPath)) {
+    throw "Missing Journey smoke script: $journeyPath"
+  }
+
+  & pwsh -NoProfile -ExecutionPolicy Bypass -File $journeyPath -BaseUrl $BaseUrl
+  if ($LASTEXITCODE -ne 0) {
+    throw "Journey smoke failed (exit=$LASTEXITCODE)"
+  }
+  Write-Host "Journey smoke OK"
+
+
 }
 
 # OPS followups smoke

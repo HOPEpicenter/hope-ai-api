@@ -1172,6 +1172,7 @@ export default async function VisitorDetailPage({
         assignedToOwnerId={
           assignedToOwnerId
         }
+        followupStatus={followupStatus}
       />
 
       <FollowupTimelineCard
@@ -1395,6 +1396,7 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 
 
 

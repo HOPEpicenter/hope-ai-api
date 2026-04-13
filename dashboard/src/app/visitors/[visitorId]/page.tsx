@@ -133,9 +133,7 @@ function DetailCard({
   );
 }
 
-function DashboardCardSignals({
-  card
-}: {
+function DashboardCardSignals({ card, assignedToOwnerId }: {
   card:
     | {
         visitorId: string;
@@ -149,6 +147,7 @@ function DashboardCardSignals({
       }
     | null
     | undefined;
+  assignedToOwnerId?: string | null;
 }) {
   if (!card) return null;
 
@@ -176,7 +175,7 @@ function DashboardCardSignals({
     <DetailCard title="Dashboard Card Signals">
       <DetailRow label="Followup" value={followupLabel} />
       <DetailRow label="Attention" value={attentionLabel} />
-      <DetailRow label="Assigned to" value={card.assignedTo ?? "-"} />
+      <DetailRow label="Assigned to" value={assignedToOwnerId ?? "-"} />
       <DetailRow label="Urgency" value={urgencyValue} />
       <DetailRow
         label="Last activity"
@@ -1144,7 +1143,13 @@ export default async function VisitorDetailPage({
 
       <JourneyCard journey={data.journey} />
 
-      <DashboardCardSignals card={data.dashboardCard} />
+      <DashboardCardSignals
+        card={data.dashboardCard}
+        assignedToOwnerId={
+          data.dashboardCard?.assignedTo ??
+          getAssignedToOwnerId(data.formationProfile?.assignedTo)
+        }
+      />
 
       <FollowupTimelineCard
         assignedAt={data.formationProfile?.lastFollowupAssignedAt ?? null}
@@ -1367,6 +1372,13 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
+
+
+
+
+
+
 
 
 

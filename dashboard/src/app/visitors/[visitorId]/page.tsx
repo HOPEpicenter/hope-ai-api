@@ -1049,6 +1049,9 @@ export default async function VisitorDetailPage({
         ? "formation-profile"
         : "none";
 
+  const assignedToOwnerId =
+    getAssignedToOwnerId(data.formationProfile?.assignedTo);
+
   const attentionState =
     data.formationProfile?.attentionState === "needs_attention"
       ? "Needs attention"
@@ -1164,8 +1167,7 @@ export default async function VisitorDetailPage({
       <DashboardCardSignals
         card={data.dashboardCard}
         assignedToOwnerId={
-          data.dashboardCard?.assignedTo ??
-          getAssignedToOwnerId(data.formationProfile?.assignedTo)
+          assignedToOwnerId
         }
       />
 
@@ -1390,4 +1392,5 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 

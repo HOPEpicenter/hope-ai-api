@@ -152,11 +152,11 @@ function DashboardCardSignals({ card, assignedToOwnerId }: {
   if (!card) return null;
 
   const followupLabel =
-    card.followupStatus === "resolved"
+    card.lastFollowupOutcomeAt
       ? "Resolved"
-      : card.followupStatus === "contacted"
+      : card.lastFollowupContactedAt
         ? "Contacted"
-        : card.followupStatus === "assigned" || card.followupStatus === "pending"
+        : card.lastFollowupAssignedAt
           ? "Assigned"
           : "No active followup";
 
@@ -1390,6 +1390,8 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
+
 
 
 

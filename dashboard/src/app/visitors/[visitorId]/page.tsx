@@ -1032,17 +1032,25 @@ export default async function VisitorDetailPage({
   const { visitorId } = await params;
   const { preset, created, existing, assigned, assigneeId, contacted, outcomeRecorded } = await searchParams;
   const data = await getVisitorDetail(visitorId);
+  const assignedAt = data.formationProfile?.lastFollowupAssignedAt;
+  const contactedAt = data.formationProfile?.lastFollowupContactedAt;
+  const outcomeAt = data.formationProfile?.lastFollowupOutcomeAt;
+
+  const latest = [assignedAt, contactedAt, outcomeAt]
+    .filter(Boolean)
+    .sort()
+    .pop();
+
   const followupStatus =
-    data.formationProfile?.followupStatus === "resolved"
+    latest === outcomeAt
       ? "Resolved"
-      : data.formationProfile?.followupStatus === "contacted"
+      : latest === contactedAt
         ? "Contacted"
-        : data.formationProfile?.followupStatus === "assigned"
+        : latest === assignedAt
           ? "Assigned"
           : "No active followup";
 
   const assignedToOwnerId =
-    data.dashboardCard?.assignedTo ??
     getAssignedToOwnerId(data.formationProfile?.assignedTo);
 
   const assignedToSource =
@@ -1393,6 +1401,8 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
+
 
 
 

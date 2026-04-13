@@ -1047,13 +1047,6 @@ export default async function VisitorDetailPage({
   const assignedToOwnerId =
     getAssignedToOwnerId(data.formationProfile?.assignedTo);
 
-  const assignedToSource =
-    data.dashboardCard?.assignedTo
-      ? "dashboard-card"
-      : data.formationProfile?.assignedTo
-        ? "formation-profile"
-        : "none";
-
 
   const attentionState =
     data.formationProfile?.attentionState === "needs_attention"
@@ -1143,12 +1136,6 @@ export default async function VisitorDetailPage({
         attentionState={attentionState}
         backHref={backHref}
       />
-
-{process.env.NODE_ENV !== "production" ? (
-  <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
-    owner source: {assignedToSource}
-  </div>
-) : null}
 
 
       <OutcomeSummaryCard
@@ -1396,6 +1383,7 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 
 
 

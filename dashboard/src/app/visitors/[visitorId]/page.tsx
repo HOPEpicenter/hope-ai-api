@@ -141,6 +141,9 @@ function DashboardCardSignals({ card, assignedToOwnerId }: {
         lastActivitySummary?: string | null;
         followupStatus?: "none" | "pending" | "assigned" | "contacted" | "resolved";
         assignedTo?: string | null;
+        lastFollowupAssignedAt?: string | null;
+        lastFollowupContactedAt?: string | null;
+        lastFollowupOutcomeAt?: string | null;
         attentionState?: "needs_attention" | "clear";
         followupUrgency?: "ON_TRACK" | "AT_RISK" | "OVERDUE" | null;
         followupOverdue?: boolean;
@@ -152,11 +155,11 @@ function DashboardCardSignals({ card, assignedToOwnerId }: {
   if (!card) return null;
 
   const followupLabel =
-    card.followupStatus === "resolved"
+    card.lastFollowupOutcomeAt
       ? "Resolved"
-      : card.followupStatus === "contacted"
+      : card.lastFollowupContactedAt
         ? "Contacted"
-        : card.followupStatus === "assigned" || card.followupStatus === "pending"
+        : card.lastFollowupAssignedAt
           ? "Assigned"
           : "No active followup";
 
@@ -1390,6 +1393,9 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
+
+
 
 
 

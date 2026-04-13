@@ -2,6 +2,7 @@ import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { IntegrationService } from "../../services/integration/integrationService";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
+import { createGetVisitorSummaryAdapter } from "../../routes/visitors/createGetVisitorSummaryAdapter";
 
 const integrationService = new IntegrationService(
   new EngagementEventsRepository(),
@@ -31,55 +32,50 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     }
 
     const page = await integrationService.readIntegratedTimeline(visitorId, 20);
-
     const items = Array.isArray(page?.items) ? page.items : [];
-
     const latest = items[0] ?? null;
 
     const hasOutcomeRecorded = items.some((item: any) => item?.type === "FOLLOWUP_OUTCOME_RECORDED");
     const hasContacted = items.some((item: any) => item?.type === "FOLLOWUP_CONTACTED");
     const hasAssigned = items.some((item: any) => item?.type === "FOLLOWUP_ASSIGNED");
 
-    const assignedTo = (() => {
-      let currentAssignee: string | null = null;
-
-      for (const item of items) {
-        if (item?.type === "FOLLOWUP_ASSIGNED") {
-          const assigneeId =
-            typeof item?.metadata?.data?.assigneeId === "string"
-              ? item.metadata.data.assigneeId.trim()
-              : "";
-          if (assigneeId) {
-            return assigneeId;
-          }
-          continue;
+    const getVisitorSummary = createGetVisitorSummaryAdapter();
+    const summaryResponse: any = {
+      status: (code: number) => ({
+        json: (body: any) => {
+          summaryResponse.statusCode = code;
+          summaryResponse.body = body;
+          return summaryResponse;
         }
-
-        if (item?.type === "FOLLOWUP_UNASSIGNED") {
-          return null;
-        }
+      }),
+      json: (body: any) => {
+        summaryResponse.statusCode = 200;
+        summaryResponse.body = body;
+        return summaryResponse;
       }
+    };
 
-      return currentAssignee;
-    })();
+    await getVisitorSummary(
+      { params: { id: visitorId } } as any,
+      summaryResponse as any,
+      (() => {}) as any
+    );
 
-    const lastFollowupAssignedAt = (() => {
-      for (const item of items) {
-        if (item?.type === "FOLLOWUP_ASSIGNED") {
-          const occurredAt =
-            typeof item?.occurredAt === "string" && item.occurredAt.trim().length > 0
-              ? item.occurredAt.trim()
-              : null;
-          if (occurredAt) return occurredAt;
-        }
+    const profile = summaryResponse?.body?.summary?.formation?.profile ?? null;
 
-        if (item?.type === "FOLLOWUP_UNASSIGNED") {
-          return null;
-        }
-      }
+    const assignedToRaw =
+      typeof profile?.assignedTo === "string"
+        ? profile.assignedTo.trim()
+        : typeof profile?.assignedTo?.ownerId === "string"
+          ? profile.assignedTo.ownerId.trim()
+          : "";
 
-      return null;
-    })();
+    const assignedTo = assignedToRaw.length > 0 ? assignedToRaw : null;
+
+    const lastFollowupAssignedAt =
+      typeof profile?.lastFollowupAssignedAt === "string" && profile.lastFollowupAssignedAt.trim().length > 0
+        ? profile.lastFollowupAssignedAt.trim()
+        : null;
 
     const followupStatus = hasOutcomeRecorded
       ? "resolved"
@@ -145,7 +141,3 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     };
   }
 }
-
-
-
-

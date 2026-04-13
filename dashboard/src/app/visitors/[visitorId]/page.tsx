@@ -133,7 +133,7 @@ function DetailCard({
   );
 }
 
-function DashboardCardSignals({ card, assignedToOwnerId }: {
+function DashboardCardSignals({ card, assignedToOwnerId, followupStatus }: {
   card:
     | {
         visitorId: string;
@@ -151,17 +151,11 @@ function DashboardCardSignals({ card, assignedToOwnerId }: {
     | null
     | undefined;
   assignedToOwnerId?: string | null;
+  followupStatus: string;
 }) {
   if (!card) return null;
 
-  const followupLabel =
-    card.lastFollowupOutcomeAt
-      ? "Resolved"
-      : card.lastFollowupContactedAt
-        ? "Contacted"
-        : card.lastFollowupAssignedAt
-          ? "Assigned"
-          : "No active followup";
+  const followupLabel = followupStatus;
 
   const attentionLabel =
     card.attentionState === "needs_attention"
@@ -1401,6 +1395,7 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 
 
 

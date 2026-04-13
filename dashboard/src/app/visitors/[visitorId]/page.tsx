@@ -1038,6 +1038,17 @@ export default async function VisitorDetailPage({
           ? "Assigned"
           : "No active followup";
 
+  const assignedToOwnerId =
+    data.dashboardCard?.assignedTo ??
+    getAssignedToOwnerId(data.formationProfile?.assignedTo);
+
+  const assignedToSource =
+    data.dashboardCard?.assignedTo
+      ? "dashboard-card"
+      : data.formationProfile?.assignedTo
+        ? "formation-profile"
+        : "none";
+
   const attentionState =
     data.formationProfile?.attentionState === "needs_attention"
       ? "Needs attention"
@@ -1084,7 +1095,7 @@ export default async function VisitorDetailPage({
 
       {assigned === "1" ? (
         <SuccessBanner
-          message={`Followup assigned${assigneeId ? ` to ${assigneeId}` : ""}.`}
+          message={`Followup assigned${assigneeId ? ` to ${assigneeId}` : ""}. Ownership updated and reflected below.`}
           backHref={queueHref}
           nextHref={queueHref}
           visitorId={visitorId}
@@ -1126,6 +1137,13 @@ export default async function VisitorDetailPage({
         attentionState={attentionState}
         backHref={backHref}
       />
+
+{process.env.NODE_ENV !== "production" ? (
+  <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
+    owner source: {assignedToSource}
+  </div>
+) : null}
+
 
       <OutcomeSummaryCard
         outcome={data.formationProfile?.lastFollowupOutcome}
@@ -1372,30 +1390,4 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

@@ -141,6 +141,9 @@ function DashboardCardSignals({ card, assignedToOwnerId }: {
         lastActivitySummary?: string | null;
         followupStatus?: "none" | "pending" | "assigned" | "contacted" | "resolved";
         assignedTo?: string | null;
+        lastFollowupAssignedAt?: string | null;
+        lastFollowupContactedAt?: string | null;
+        lastFollowupOutcomeAt?: string | null;
         attentionState?: "needs_attention" | "clear";
         followupUrgency?: "ON_TRACK" | "AT_RISK" | "OVERDUE" | null;
         followupOverdue?: boolean;
@@ -1390,6 +1393,7 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 
 
 

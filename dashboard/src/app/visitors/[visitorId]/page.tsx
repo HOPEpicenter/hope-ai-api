@@ -1049,8 +1049,6 @@ export default async function VisitorDetailPage({
         ? "formation-profile"
         : "none";
 
-  const assignedToOwnerId =
-    getAssignedToOwnerId(data.formationProfile?.assignedTo);
 
   const attentionState =
     data.formationProfile?.attentionState === "needs_attention"
@@ -1392,5 +1390,7 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
+
 
 

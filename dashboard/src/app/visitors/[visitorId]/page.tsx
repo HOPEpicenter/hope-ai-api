@@ -466,7 +466,7 @@ function VisitorHeaderCard({
   followupStatus: string;
   assignedToOwnerId: string | null | undefined;
   lastActivityAt: string | null;
-  attentionState: "Needs attention" | "Clear";
+  attentionState: "Needs attention" | "Contact made" | "Clear";
   backHref: string;
 }) {
   const statusBackground =
@@ -1388,4 +1388,5 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 

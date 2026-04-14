@@ -26,6 +26,10 @@ import { NextVisitorLink } from "@/components/next-visitor-link";
 import { getVisitorDetail } from "@/lib/loaders/get-visitor-detail";
 import { TimelineList } from "@/components/timeline-list";
 import { formatAbsoluteTime, formatRelativeTime } from "@/lib/format-relative-time";
+import {
+  getCanonicalAttentionState,
+  getCanonicalFollowupStatus
+} from "@/lib/followup-utils";
 
 function SuccessBanner({
   message,
@@ -1038,25 +1042,16 @@ export default async function VisitorDetailPage({
   const contactedAt = data.formationProfile?.lastFollowupContactedAt;
   const outcomeAt = data.formationProfile?.lastFollowupOutcomeAt;
 
-  const followupStatus =
+  const followupStatus = getCanonicalFollowupStatus({
+    assignedAt,
+    contactedAt,
     outcomeAt
-      ? "Resolved"
-      : contactedAt
-        ? "Contacted"
-        : assignedAt
-          ? "Assigned"
-          : "No active followup";
+  });
 
   const assignedToOwnerId =
     getAssignedToOwnerId(data.formationProfile?.assignedTo);
 
-
-  const attentionState =
-    followupStatus === "Assigned"
-      ? "Needs attention"
-      : followupStatus === "Contacted"
-        ? "Contact made"
-        : "Clear";
+  const attentionState = getCanonicalAttentionState(followupStatus);
   const lastActivityAt = getLastActivityAt(data);
   const backHref = preset ? `/visitors?preset=${preset}` : "/visitors";
   const queueHref = preset ? `/visitors?preset=${preset}` : null;
@@ -1388,5 +1383,4 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
-
 

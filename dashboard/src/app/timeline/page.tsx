@@ -25,7 +25,7 @@ export default async function TimelinePage({ searchParams }: TimelinePageProps) 
   const visitorId = params?.visitorId?.trim() || undefined;
   const returnTo = params?.returnTo ?? undefined;
 
-  const data = await getTimeline(limit, visitorId);
+  const data = await getTimeline(undefined, visitorId);
 
   return (
     <TimelinePageClient
@@ -37,4 +37,5 @@ export default async function TimelinePage({ searchParams }: TimelinePageProps) 
     />
   );
 }
+
 

@@ -163,7 +163,7 @@ function DashboardCardSignals({ card, assignedToOwnerId, followupStatus }: {
 
   const attentionLabel =
     followupStatus === "Assigned"
-      ? "Needs attention"
+      ? "Action needed"
       : followupStatus === "Contacted"
         ? "Contact made"
         : "Clear";
@@ -470,7 +470,7 @@ function VisitorHeaderCard({
   followupStatus: string;
   assignedToOwnerId: string | null | undefined;
   lastActivityAt: string | null;
-  attentionState: "Needs attention" | "Contact made" | "Clear";
+  attentionState: "Action needed" | "Contact made" | "Clear";
   backHref: string;
 }) {
   const statusBackground =
@@ -592,7 +592,7 @@ function VisitorHeaderCard({
         <HeaderChip
           label="Attention"
           value={
-            attentionState === "Needs attention" ? (
+            attentionState === "Action needed" ? (
               <Link
                 href="#action-zone"
                 style={{

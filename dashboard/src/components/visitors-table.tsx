@@ -10,7 +10,7 @@ import type { VisitorListItem } from "@/lib/contracts/visitors";
 
 export type VisitorsTableItem = VisitorListItem & {
   followupState: "Assigned" | "Waiting assignment" | "Contacted" | "Resolved" | "Profile unavailable";
-  attentionState: "Needs attention" | "Contact made" | null;
+  attentionState: "Action needed" | "Contact made" | null;
   urgencyState: "AT_RISK" | null;
   assignedTo: string | null;
   formationMilestones: {
@@ -66,7 +66,7 @@ function getUrgencyRank(urgencyState: VisitorsTableItem["urgencyState"]) {
 
 function getAttentionRank(attentionState: VisitorsTableItem["attentionState"]) {
   switch (attentionState) {
-    case "Needs attention":
+    case "Action needed":
       return 0;
     case "Contact made":
       return 1;
@@ -126,8 +126,8 @@ function AttentionBadge({ state }: { state: VisitorsTableItem["attentionState"] 
     return <span style={{ color: "#9ca3af" }}>—</span>;
   }
 
-  const background = state === "Needs attention" ? "#fee2e2" : "#e0f2fe";
-  const color = state === "Needs attention" ? "#991b1b" : "#0c4a6e";
+  const background = state === "Action needed" ? "#fee2e2" : "#e0f2fe";
+  const color = state === "Action needed" ? "#991b1b" : "#0c4a6e";
 
   const badgeStyle = {
     display: "inline-block",
@@ -140,7 +140,7 @@ function AttentionBadge({ state }: { state: VisitorsTableItem["attentionState"] 
     textDecoration: "none"
   } as const;
 
-  if (state !== "Needs attention") {
+  if (state !== "Action needed") {
     return <span style={badgeStyle}>{state}</span>;
   }
 
@@ -466,7 +466,7 @@ export function VisitorsTable({
     preset === "my-needs-attention" && myAssignee
       ? items.filter(
           (item) =>
-            item.attentionState === "Needs attention" &&
+            item.attentionState === "Action needed" &&
             item.assignedTo === myAssignee
         )
       : preset === "waiting-assignment"
@@ -478,7 +478,7 @@ export function VisitorsTable({
             : preset === "contacted"
               ? items.filter((item) => item.followupState === "Contacted")
               : preset === "needs-attention"
-                ? items.filter((item) => item.attentionState === "Needs attention")
+                ? items.filter((item) => item.attentionState === "Action needed")
                 : items;
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -744,7 +744,7 @@ export function VisitorsTable({
           <tbody>
             {sortedItems.map((item) => {
               const rowStyle =
-                item.attentionState === "Needs attention"
+                item.attentionState === "Action needed"
                   ? { background: "#fffbeb", boxShadow: "inset 4px 0 0 #f59e0b" }
                   : undefined;
 
@@ -1002,18 +1002,4 @@ export function VisitorsTable({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

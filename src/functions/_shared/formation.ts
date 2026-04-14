@@ -1,4 +1,3 @@
-
 function normalizeAssignedTo(input: any): string | null {
   if (input === null || input === undefined) return null;
 
@@ -47,6 +46,7 @@ export type FunctionFormationProfileEntity = {
   lastFollowupOutcomeNotes?: string;
   lastNextStepAt?: string;
   lastPrayerRequestedAt?: string;
+  groupsJson?: string;
   [k: string]: any;
 };
 
@@ -91,6 +91,36 @@ function requireNonEmptyString(value: unknown, fieldName: string): string {
   return text;
 }
 
+function serializeGroups(entity: any): any {
+  if (Array.isArray(entity?.groups)) {
+    const { groups, ...rest } = entity;
+    return {
+      ...rest,
+      groupsJson: JSON.stringify(groups),
+    };
+  }
+
+  return entity;
+}
+
+function deserializeGroups(entity: any): any {
+  if (entity && typeof entity.groupsJson === "string") {
+    try {
+      return {
+        ...entity,
+        groups: JSON.parse(entity.groupsJson),
+      };
+    } catch {
+      return {
+        ...entity,
+        groups: [],
+      };
+    }
+  }
+
+  return entity;
+}
+
 const SUPPORTED_FORMATION_EVENT_TYPES = new Set([
   "FOLLOWUP_ASSIGNED",
   "FOLLOWUP_UNASSIGNED",
@@ -99,7 +129,9 @@ const SUPPORTED_FORMATION_EVENT_TYPES = new Set([
   "NEXT_STEP_SELECTED",
   "SALVATION_RECORDED",
   "BAPTISM_RECORDED",
-  "MEMBERSHIP_RECORDED"
+  "MEMBERSHIP_RECORDED",
+  "GROUP_JOINED",
+  "GROUP_LEFT",
 ]);
 
 function validateFormationEventEnvelopeV1Strict(body: unknown): {
@@ -137,6 +169,10 @@ function validateFormationEventEnvelopeV1Strict(body: unknown): {
 
   if (type === "NEXT_STEP_SELECTED") {
     requireNonEmptyString(data.nextStep, "data.nextStep");
+  }
+
+  if (type === "GROUP_JOINED" || type === "GROUP_LEFT") {
+    requireNonEmptyString(data.groupId, "data.groupId");
   }
 
   return {
@@ -237,7 +273,8 @@ function toComparableProfileState(profile: FunctionFormationProfileEntity | null
     lastFollowupOutcome: profile.lastFollowupOutcome ?? null,
     lastFollowupOutcomeNotes: profile.lastFollowupOutcomeNotes ?? null,
     lastNextStepAt: profile.lastNextStepAt ?? null,
-    lastPrayerRequestedAt: profile.lastPrayerRequestedAt ?? null
+    lastPrayerRequestedAt: profile.lastPrayerRequestedAt ?? null,
+    groups: Array.isArray((profile as any).groups) ? (profile as any).groups : null,
   };
 
   return JSON.stringify(comparable);
@@ -308,12 +345,12 @@ export async function getFormationProfileByVisitorId(
 ): Promise<FunctionFormationProfileEntity | null> {
   try {
     const entity = await table.getEntity<FunctionFormationProfileEntity>("VISITOR", visitorId);
-    return {
+    return deserializeGroups({
       ...entity,
       partitionKey: "VISITOR",
       rowKey: visitorId,
       visitorId
-    };
+    });
   } catch (err: any) {
     const code = Number(err?.statusCode ?? err?.status ?? 0);
     if (code === 404) {
@@ -505,7 +542,6 @@ export async function recordFormationEventV1(body: unknown): Promise<{
     } catch (err: any) {
       const code = Number(err?.statusCode ?? err?.status ?? 0);
 
-      // 409 = already exists; treat as idempotent success
       if (code === 409) {
         existingEvent = eventEntity;
       } else {
@@ -545,7 +581,6 @@ export async function recordFormationEventV1(body: unknown): Promise<{
     };
   }
 
-
   const profile: FunctionFormationProfileEntity = {
     ...(existingProfile ?? {}),
     partitionKey: "VISITOR",
@@ -559,6 +594,47 @@ export async function recordFormationEventV1(body: unknown): Promise<{
     profile.lastEventType = type;
     profile.lastEventAt = occurredAt;
     (profile as any).lastEventId = eventId;
+  }
+
+  if (type === "GROUP_JOINED") {
+    const groupId = String(data.groupId ?? "").trim();
+    const displayName = String(data.displayName ?? "").trim();
+
+    const currentGroups = Array.isArray((profile as any).groups)
+      ? [...(profile as any).groups]
+      : [];
+
+    const existingIndex = currentGroups.findIndex(
+      (g: any) => String(g?.groupId ?? "").trim() === groupId
+    );
+
+    const nextGroup =
+      existingIndex >= 0
+        ? {
+            ...currentGroups[existingIndex],
+            groupId,
+            ...(displayName ? { displayName } : {})
+          }
+        : {
+            groupId,
+            ...(displayName ? { displayName } : {})
+          };
+
+    (profile as any).groups =
+      existingIndex >= 0
+        ? currentGroups.map((g: any, i: number) => (i === existingIndex ? nextGroup : g))
+        : [...currentGroups, nextGroup];
+  }
+
+  if (type === "GROUP_LEFT") {
+    const groupId = String(data.groupId ?? "").trim();
+    const currentGroups = Array.isArray((profile as any).groups)
+      ? [...(profile as any).groups]
+      : [];
+
+    (profile as any).groups = currentGroups.filter(
+      (g: any) => String(g?.groupId ?? "").trim() !== groupId
+    );
   }
 
   if (type === "FOLLOWUP_ASSIGNED") {
@@ -577,7 +653,6 @@ export async function recordFormationEventV1(body: unknown): Promise<{
   if (type === "FOLLOWUP_UNASSIGNED") {
     if (shouldAdvance) {
       profile.assignedTo = null;
-      // stage unchanged on FOLLOWUP_UNASSIGNED
     }
   }
 
@@ -624,7 +699,7 @@ export async function recordFormationEventV1(body: unknown): Promise<{
 
   if (projectionChanged) {
     profile.updatedAt = new Date().toISOString();
-    await profilesTable.upsertEntity(profile as any, "Merge");
+    await profilesTable.upsertEntity(serializeGroups(profile) as any, "Merge");
   }
 
   logFormationEventDecision({
@@ -647,9 +722,6 @@ export async function recordFormationEventV1(body: unknown): Promise<{
     profile
   };
 }
-
-
-
 
 function parseMetadataJson(value: unknown): any {
   if (typeof value !== "string" || value.trim() === "") {
@@ -742,7 +814,8 @@ export async function listFormationProfiles(
     "lastFollowupOutcome",
     "lastFollowupOutcomeNotes",
     "lastNextStepAt",
-    "lastPrayerRequestedAt"
+    "lastPrayerRequestedAt",
+    "groupsJson"
   ];
 
   const matched: FunctionFormationProfileEntity[] = [];
@@ -750,7 +823,7 @@ export async function listFormationProfiles(
   for await (const entity of table.listEntities<any>({
     queryOptions: { filter, select }
   })) {
-    const profile: FunctionFormationProfileEntity = {
+    const profile = deserializeGroups({
       partitionKey: "VISITOR",
       rowKey: entity.rowKey ?? entity.RowKey,
       visitorId: entity.visitorId ?? entity.rowKey ?? entity.RowKey,
@@ -769,8 +842,9 @@ export async function listFormationProfiles(
       lastFollowupOutcome: entity.lastFollowupOutcome,
       lastFollowupOutcomeNotes: entity.lastFollowupOutcomeNotes,
       lastNextStepAt: entity.lastNextStepAt,
-      lastPrayerRequestedAt: entity.lastPrayerRequestedAt
-    };
+      lastPrayerRequestedAt: entity.lastPrayerRequestedAt,
+      groupsJson: entity.groupsJson
+    }) as FunctionFormationProfileEntity;
 
     if (!matchesProfileFilters(profile, input)) {
       continue;
@@ -790,4 +864,3 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
-

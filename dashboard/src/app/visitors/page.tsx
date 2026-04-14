@@ -3,6 +3,10 @@ import { CreateVisitorForm } from "@/components/create-visitor-form";
 import { VisitorsTable, type VisitorsTableItem } from "@/components/visitors-table";
 import { getFormationProfiles } from "@/lib/loaders/get-formation-profiles";
 import { getVisitors } from "@/lib/loaders/get-visitors";
+import {
+  getCanonicalAttentionState,
+  getCanonicalFollowupStatus
+} from "@/lib/followup-utils";
 
 const MY_ASSIGNEE = (process.env.NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE ?? "").trim();
 
@@ -53,31 +57,32 @@ export default async function VisitorsPage({
       hasMembership: false
     };
 
-    let followupState: VisitorsTableItem["followupState"] = "Profile unavailable";
-    let attentionState: VisitorsTableItem["attentionState"] = null;
-    let urgencyState: VisitorsTableItem["urgencyState"] = null;
+    const followupStatus = getCanonicalFollowupStatus({
+      assignedAt: profile?.lastFollowupAssignedAt,
+      contactedAt: profile?.lastFollowupContactedAt,
+      outcomeAt: profile?.lastFollowupOutcomeAt
+    });
 
-    if (!profile) {
-      followupState = "Profile unavailable";
-    } else if (profile.lastFollowupOutcomeAt) {
-      followupState = "Resolved";
-      attentionState = null;
-    } else if (profile.lastFollowupContactedAt) {
-      followupState = "Contacted";
-      attentionState = "Contact made";
-    } else if (profile.assignedTo) {
-      followupState = "Assigned";
-      attentionState = "Needs attention";
-      urgencyState = "AT_RISK";
-    } else {
-      followupState = "Waiting assignment";
-      attentionState = null;
-      urgencyState = "AT_RISK";
-    }
+    const rawAttentionState = getCanonicalAttentionState(followupStatus);
+
+    const attentionState: VisitorsTableItem["attentionState"] =
+      rawAttentionState === "Clear" ? null : rawAttentionState;
+
+    const tableFollowupState: VisitorsTableItem["followupState"] =
+      !profile
+        ? "Profile unavailable"
+        : followupStatus === "No active followup"
+          ? "Waiting assignment"
+          : followupStatus;
+
+    const urgencyState: VisitorsTableItem["urgencyState"] =
+      tableFollowupState === "Assigned" || tableFollowupState === "Waiting assignment"
+        ? "AT_RISK"
+        : null;
 
     return {
       ...visitor,
-      followupState,
+      followupState: tableFollowupState,
       attentionState,
       urgencyState,
       assignedTo: profile?.assignedTo ?? null,
@@ -223,6 +228,4 @@ export default async function VisitorsPage({
     </section>
   );
 }
-
-
 

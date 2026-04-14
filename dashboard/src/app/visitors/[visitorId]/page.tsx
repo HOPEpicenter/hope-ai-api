@@ -379,7 +379,7 @@ function getNextAction(
   return {
     title: "Next action: assign followup",
     body: "This visitor does not have an active assigned followup yet.",
-    tone: "warning" as const,
+    tone: "secondary" as const,
     actionKey: "assign" as const
   };
 }
@@ -391,7 +391,7 @@ function NextActionCard({
 }: {
   title: string;
   body: string;
-  tone: "primary" | "warning" | "success";
+  tone: "primary" | "warning" | "success" | "secondary";
 }) {
   const palette =
     tone === "success"
@@ -401,16 +401,22 @@ function NextActionCard({
           eyebrow: "#065f46"
         }
       : tone === "warning"
-        ? {
-            background: "#fffbeb",
-            border: "#fde68a",
-            eyebrow: "#92400e"
-          }
-        : {
-            background: "#eff6ff",
-            border: "#bfdbfe",
-            eyebrow: "#1d4ed8"
-          };
+          ? {
+              background: "#fffbeb",
+              border: "#fde68a",
+              eyebrow: "#92400e"
+            }
+          : tone === "secondary"
+            ? {
+                background: "#f3f4f6",
+                border: "#d1d5db",
+                eyebrow: "#374151"
+              }
+            : {
+                background: "#eff6ff",
+                border: "#bfdbfe",
+                eyebrow: "#1d4ed8"
+              };
 
   return (
     <div
@@ -1383,6 +1389,13 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
+
+
+
+
+
+
 
 
 

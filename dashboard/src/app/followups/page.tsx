@@ -82,7 +82,7 @@ function QueueLegendCard() {
         >
           <div style={{ fontWeight: 700, color: "#1d4ed8" }}>Contact made</div>
           <div style={{ fontSize: 13, color: "#4b5563" }}>
-            Contact was recorded, but the final followup outcome is still not recorded.
+            Contact was recorded, but the follow-up stays open until a final outcome is recorded.
           </div>
         </div>
 
@@ -119,7 +119,7 @@ export default async function FollowupsPage() {
           Assigned visitors who still need follow-up attention.
         </p>
         <p style={{ marginTop: 0, color: "#6b7280", fontSize: 14 }}>
-          Contact updates queue activity, but follow-up outcome is what resolves and removes an item.
+          Contact updates queue activity, but contact alone does not complete a follow-up. Record an outcome to resolve it and remove it from this queue.
         </p>
       </div>
 
@@ -137,7 +137,7 @@ export default async function FollowupsPage() {
         <SummaryCard
           label="Contact Made"
           value={contactMadeCount}
-          hint="Contact was recorded, but the final outcome is still not recorded."
+          hint="Contact was recorded, but the follow-up stays open until a final outcome is recorded."
         />
       </div>
 
@@ -147,3 +147,4 @@ export default async function FollowupsPage() {
     </section>
   );
 }
+

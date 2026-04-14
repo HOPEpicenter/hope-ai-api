@@ -5,7 +5,7 @@ export type CanonicalFollowupStatus =
   | "No active followup";
 
 export type CanonicalAttentionState =
-  | "Needs attention"
+  | "Action needed"
   | "Contact made"
   | "Clear";
 
@@ -33,7 +33,7 @@ export function getCanonicalAttentionState(
   followupStatus: CanonicalFollowupStatus
 ): CanonicalAttentionState {
   if (followupStatus === "Assigned") {
-    return "Needs attention";
+    return "Action needed";
   }
 
   if (followupStatus === "Contacted") {
@@ -42,3 +42,4 @@ export function getCanonicalAttentionState(
 
   return "Clear";
 }
+

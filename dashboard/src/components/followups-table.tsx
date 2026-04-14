@@ -907,7 +907,7 @@ if (selectedVisitorId === item.visitorId) {
                               display: "inline-block"
                             }}
                           />
-                          Needs attention
+                          Action needed
                         </div>
                       ) : null}
 

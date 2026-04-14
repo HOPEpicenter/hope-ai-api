@@ -420,7 +420,7 @@ export function FollowupsTableClient({ items }: Props) {
         : normalizedSearch.length === 0 && queueFilter === "action-needed" && ageFilter === "48h+"
           ? "Stale 48h+"
           : normalizedSearch.length === 0 && attentionFilter === "needs-attention"
-            ? "Needs attention"
+            ? "Action needed"
             : null;
 
   const hasActiveFilters =
@@ -673,7 +673,7 @@ export function FollowupsTableClient({ items }: Props) {
             <PresetButton active={normalizedSearch.length === 0 && queueFilter === "action-needed" && ageFilter === "48h+" && stageFilter === "all" && outcomeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="Stale 48h+" onClick={applyStale48Preset} />
             <PresetButton
               active={normalizedSearch.length === 0 && attentionFilter === "needs-attention" && queueFilter === "all" && ageFilter === "all" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && sort === "oldest-assigned"}
-              label="Needs attention"
+              label="Action needed"
               onClick={() => {
                 const next = attentionFilter === "needs-attention" ? "all" : "needs-attention";
 
@@ -892,7 +892,7 @@ export function FollowupsTableClient({ items }: Props) {
                   cursor: "pointer"
                 }}
               >
-                Needs attention ×
+                Action needed ×
               </button>
             ) : null}
 

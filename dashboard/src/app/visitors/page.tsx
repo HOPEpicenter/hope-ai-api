@@ -93,11 +93,11 @@ export default async function VisitorsPage({
   const waitingAssignmentCount = items.filter((x) => x.followupState === "Waiting assignment").length;
   const assignedCount = items.filter((x) => x.followupState === "Assigned").length;
   const contactedCount = items.filter((x) => x.followupState === "Contacted").length;
-  const needsAttentionCount = items.filter((x) => x.attentionState === "Needs attention").length;
+  const needsAttentionCount = items.filter((x) => x.attentionState === "Action needed").length;
   const myNeedsAttentionCount =
     MY_ASSIGNEE.length > 0
       ? items.filter(
-          (x) => x.attentionState === "Needs attention" && x.assignedTo === MY_ASSIGNEE
+          (x) => x.attentionState === "Action needed" && x.assignedTo === MY_ASSIGNEE
         ).length
       : 0;
   const assignedToMeCount =

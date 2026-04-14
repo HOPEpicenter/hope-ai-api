@@ -17,6 +17,27 @@ type AttentionFilter = "all" | "needs-attention";
 
 const MY_ASSIGNEE = (process.env.NEXT_PUBLIC_FOLLOWUPS_MY_ASSIGNEE ?? "").trim();
 
+function getQueueContextHint(assigneeFilter: string) {
+  if (assigneeFilter === "me" || (MY_ASSIGNEE && assigneeFilter === MY_ASSIGNEE)) {
+    return {
+      title: "Showing my queue",
+      message: "This view is focused on followups currently assigned to you."
+    };
+  }
+
+  if (assigneeFilter === "all") {
+    return {
+      title: "Showing all open followups",
+      message: "This view includes all currently open assigned followups."
+    };
+  }
+
+  return {
+    title: "Showing filtered queue",
+    message: "This view is narrowed to a specific assignee or filter combination."
+  };
+}
+
 function toTimestamp(value: string | null | undefined, fallback: number) {
   if (!value) return fallback;
   const time = new Date(value).getTime();
@@ -359,6 +380,8 @@ export function FollowupsTableClient({ items }: Props) {
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
+
+  const queueContextHint = getQueueContextHint(assigneeFilter);
 
   const filteredItems = useMemo(() => {
     const filtered = items.filter((item) => {
@@ -705,6 +728,23 @@ export function FollowupsTableClient({ items }: Props) {
           ) : (
             <span style={{ color: "#6b7280" }}>No filters applied</span>
           )}
+
+          <div
+            style={{
+              fontSize: 12,
+              color: "#4b5563",
+              background: "#f9fafb",
+              border: "1px solid #e5e7eb",
+              borderRadius: 10,
+              padding: "8px 10px",
+              display: "grid",
+              gap: 2
+            }}
+          >
+            <div style={{ fontWeight: 700, color: "#111827" }}>{queueContextHint.title}</div>
+            <div>{queueContextHint.message}</div>
+          </div>
+
         </div>
 
         {hasActiveFilters ? (

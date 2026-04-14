@@ -379,7 +379,7 @@ function getNextAction(
   return {
     title: "Next action: assign followup",
     body: "This visitor does not have an active assigned followup yet.",
-    tone: "warning" as const,
+    tone: "secondary" as const,
     actionKey: "assign" as const
   };
 }
@@ -1383,6 +1383,8 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
+
 
 
 

@@ -158,9 +158,11 @@ function DashboardCardSignals({ card, assignedToOwnerId, followupStatus }: {
   const followupLabel = followupStatus;
 
   const attentionLabel =
-    card.attentionState === "needs_attention"
+    followupStatus === "Assigned"
       ? "Needs attention"
-      : "Clear";
+      : followupStatus === "Contacted"
+        ? "Contact made"
+        : "Clear";
 
   const urgencyValue = card.followupUrgency
     ? card.followupOverdue
@@ -1036,17 +1038,12 @@ export default async function VisitorDetailPage({
   const contactedAt = data.formationProfile?.lastFollowupContactedAt;
   const outcomeAt = data.formationProfile?.lastFollowupOutcomeAt;
 
-  const latest = [assignedAt, contactedAt, outcomeAt]
-    .filter(Boolean)
-    .sort()
-    .pop();
-
   const followupStatus =
-    latest === outcomeAt
+    outcomeAt
       ? "Resolved"
-      : latest === contactedAt
+      : contactedAt
         ? "Contacted"
-        : latest === assignedAt
+        : assignedAt
           ? "Assigned"
           : "No active followup";
 
@@ -1055,9 +1052,11 @@ export default async function VisitorDetailPage({
 
 
   const attentionState =
-    data.formationProfile?.attentionState === "needs_attention"
+    followupStatus === "Assigned"
       ? "Needs attention"
-      : "Clear";
+      : followupStatus === "Contacted"
+        ? "Contact made"
+        : "Clear";
   const lastActivityAt = getLastActivityAt(data);
   const backHref = preset ? `/visitors?preset=${preset}` : "/visitors";
   const queueHref = preset ? `/visitors?preset=${preset}` : null;
@@ -1389,22 +1388,4 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

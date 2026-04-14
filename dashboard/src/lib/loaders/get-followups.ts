@@ -1,4 +1,7 @@
 import type { FollowupsResponse } from "@/lib/contracts/followups";
+import {
+  getCanonicalFollowupStatus
+} from "@/lib/followup-utils";
 
 type RawFormationProfile = {
   visitorId?: unknown;
@@ -107,16 +110,19 @@ export async function getFollowups(): Promise<FollowupsResponse> {
         return null;
       }
 
-      const resolvedForAssignment =
-        outcomeAtMs !== null && outcomeAtMs >= assignedAtMs;
+      const followupStatus = getCanonicalFollowupStatus({
+        assignedAt: lastFollowupAssignedAt,
+        contactedAt: lastFollowupContactedAt,
+        outcomeAt: lastFollowupOutcomeAt
+      });
+
+      const resolvedForAssignment = followupStatus === "Resolved";
 
       if (resolvedForAssignment) {
         return null;
       }
 
-      const needsFollowup =
-        contactedAtMs === null ||
-        (contactedAtMs !== null && assignedAtMs > contactedAtMs);
+      const needsFollowup = followupStatus === "Assigned";
 
       return {
         visitorId,

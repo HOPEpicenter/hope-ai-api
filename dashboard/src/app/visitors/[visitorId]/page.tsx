@@ -35,13 +35,13 @@ function SuccessBanner({
   message,
   backHref,
   nextHref,
-  visitorId,
+  nextVisitorId,
   preset
 }: {
   message: string;
   backHref: string | null;
   nextHref: string | null;
-  visitorId: string;
+  nextVisitorId: string | null;
   preset: string | null | undefined;
 }) {
   return (
@@ -76,8 +76,8 @@ function SuccessBanner({
           {nextHref ? (
             preset ? (
               <NextVisitorLink
-                visitorId={visitorId}
-                preset={preset}
+                nextVisitorId={nextVisitorId}
+                  preset={preset}
               />
             ) : (
               <Link
@@ -1055,6 +1055,7 @@ export default async function VisitorDetailPage({
   const lastActivityAt = getLastActivityAt(data);
   const backHref = preset ? `/visitors?preset=${preset}` : "/visitors";
   const queueHref = preset ? `/visitors?preset=${preset}` : null;
+  const nextVisitorId: string | null = null;
   const nextAction = getNextAction(
     followupStatus,
     getAssignedToOwnerId(data.formationProfile?.assignedTo)
@@ -1097,8 +1098,8 @@ export default async function VisitorDetailPage({
           message={`Followup assigned${assigneeId ? ` to ${assigneeId}` : ""}. Ownership updated and reflected below.`}
           backHref={queueHref}
           nextHref={queueHref}
-          visitorId={visitorId}
-          preset={preset}
+          nextVisitorId={nextVisitorId}
+                  preset={preset}
         />
       ) : null}
 
@@ -1107,8 +1108,8 @@ export default async function VisitorDetailPage({
           message="Followup contact recorded."
           backHref={queueHref}
           nextHref={queueHref}
-          visitorId={visitorId}
-          preset={preset}
+          nextVisitorId={nextVisitorId}
+                  preset={preset}
         />
       ) : null}
 
@@ -1117,8 +1118,8 @@ export default async function VisitorDetailPage({
           message="Followup outcome recorded successfully."
           backHref={queueHref}
           nextHref={queueHref}
-          visitorId={visitorId}
-          preset={preset}
+          nextVisitorId={nextVisitorId}
+                  preset={preset}
         />
       ) : null}
 
@@ -1383,4 +1384,8 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
+
+
+
 

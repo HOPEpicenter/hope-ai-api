@@ -37,16 +37,18 @@ function getFollowupAgeHours(value: string | null | undefined): number | null {
 function matchesSearch(item: FollowupItem, query: string) {
   if (!query) return true;
 
-  const haystack = [
-    item.visitorId,
-    item.assignedTo?.ownerId ?? "",
-    item.stage ?? "",
-    item.lastFollowupOutcome ?? ""
-  ]
-    .join(" ")
-    .toLowerCase();
+  const q = query.trim().toLowerCase();
 
-  return haystack.includes(query);
+  const fields = [
+    item.visitorId,
+    item.assignedTo?.ownerId,
+    item.stage,
+    item.lastFollowupOutcome
+  ];
+
+  return fields
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(q));
 }
 
 function matchesQueueFilter(item: FollowupItem, filter: QueueFilter) {
@@ -565,19 +567,21 @@ export function FollowupsTableClient({ items }: Props) {
     }
   }
 
-  const currentFollowupsUrl =
-    typeof window !== "undefined"
-      ? (() => {
-          const params = new URLSearchParams(searchParams.toString());
+  const currentFollowupsUrl = (() => {
+    const params = new URLSearchParams();
 
-          const scroll = getScrollPosition();
-          if (scroll > 0) {
-            params.set("returnScroll", String(scroll));
-          }
+    if (search.trim()) { params.set("q", search.trim()); }
+    if (queueFilter !== "all") { params.set("queue", queueFilter); }
+    if (ageFilter !== "all") { params.set("age", ageFilter); }
+    if (stageFilter !== "all") { params.set("stage", stageFilter); }
+    if (outcomeFilter !== "all") { params.set("outcome", outcomeFilter); }
+    if (assigneeFilter !== "all") { params.set("assignee", assigneeFilter); }
+    if (attentionFilter !== "all") { params.set("attention", attentionFilter); }
+    if (sort !== "oldest-assigned") { params.set("sort", sort); }
 
-          return `${pathname}${params.toString() ? `?${params.toString()}` : ""}`;
-        })()
-      : pathname;
+    const qs = params.toString();
+    return qs ? `${pathname}?${qs}` : pathname;
+  })();
 
   return (
     <section style={{ display: "grid", gap: 12 }}>
@@ -1242,5 +1246,4 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
-
 

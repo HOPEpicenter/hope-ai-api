@@ -43,26 +43,43 @@ export async function getFollowups(): Promise<FollowupsResponse> {
   const baseUrl = requireEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
   const apiKey = requireEnv("HOPE_API_KEY");
 
-  const response = await fetch(`${baseUrl}/api/formation/profiles?limit=200`, {
-    method: "GET",
-    headers: {
-      "x-api-key": apiKey,
-      accept: "application/json"
-    },
-    cache: "no-store"
-  });
+  const allProfiles: RawFormationProfile[] = [];
+  let cursor: string | null = null;
 
-  if (!response.ok) {
-    throw new Error(`GET /api/formation/profiles failed with status ${response.status}`);
+  for (let i = 0; i < 10; i++) {
+    const url = cursor
+      ? `${baseUrl}/api/formation/profiles?cursor=${encodeURIComponent(cursor)}`
+      : `${baseUrl}/api/formation/profiles`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "x-api-key": apiKey,
+        accept: "application/json"
+      },
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      throw new Error(`GET /api/formation/profiles failed with status ${response.status}`);
+    }
+
+    const data = (await response.json()) as RawFormationProfilesResponse & { cursor?: string };
+
+    if (data.ok !== true || !Array.isArray(data.items)) {
+      throw new Error("Invalid /api/formation/profiles response shape");
+    }
+
+    allProfiles.push(...(data.items as RawFormationProfile[]));
+
+    if (!data.cursor) {
+      break;
+    }
+
+    cursor = data.cursor;
   }
 
-  const data = (await response.json()) as RawFormationProfilesResponse;
-
-  if (data.ok !== true || !Array.isArray(data.items)) {
-    throw new Error("Invalid /api/formation/profiles response shape");
-  }
-
-  const items = (data.items as RawFormationProfile[])
+  const items = allProfiles
     .map((profile) => {
       const visitorId =
         typeof profile.visitorId === "string" && profile.visitorId.trim().length > 0
@@ -135,6 +152,4 @@ export async function getFollowups(): Promise<FollowupsResponse> {
     items
   };
 }
-
-
 

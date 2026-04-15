@@ -91,3 +91,5 @@ get*/
 post*/
 !src/functions/get*/
 !src/functions/post*/
+
+tmp-*.csv

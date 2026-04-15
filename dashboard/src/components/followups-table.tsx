@@ -65,25 +65,27 @@ function toTimestamp(value: string | null | undefined, fallback = Number.MAX_SAF
 
 function Badge({
   needsFollowup,
+  followupState,
   queueFilter,
   onQueueSelect
 }: {
   needsFollowup: boolean;
+  followupState: "action-needed" | "contact-made" | "done" | "unassigned";
   queueFilter: "all" | "action-needed" | "contact-made";
   onQueueSelect: (value: "action-needed" | "contact-made") => void;
 }) {
-  const value = needsFollowup ? "action-needed" : "contact-made";
+  const value: "action-needed" | "contact-made" = followupState === "contact-made" ? "contact-made" : "action-needed";
 
-  const style: CSSProperties = {
-    display: "inline-block",
-    padding: "4px 8px",
-    borderRadius: 9999,
-    fontSize: 12,
-    fontWeight: 600,
-    background: needsFollowup ? "#fef3c7" : "#dcfce7",
-    color: "#111827",
+  const style = {
     border: queueFilter === value ? "1px solid #111827" : "1px solid transparent",
-    cursor: "pointer"
+    background: needsFollowup ? "#fef3c7" : "#dbeafe",
+    color: needsFollowup ? "#92400e" : "#1d4ed8",
+    borderRadius: 9999,
+    padding: "6px 10px",
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: "pointer",
+    whiteSpace: "nowrap" as const
   };
 
   return (
@@ -92,7 +94,11 @@ function Badge({
       onClick={() => onQueueSelect(value)}
       style={style}
     >
-      {needsFollowup ? "Action needed" : "Contact made"}
+      {followupState === "action-needed"
+        ? "Action needed"
+        : followupState === "contact-made"
+        ? "Contact made"
+        : ""}
     </button>
   );
 }
@@ -793,6 +799,7 @@ if (selectedVisitorId === item.visitorId) {
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   <Badge
                     needsFollowup={item.needsFollowup}
+                    followupState={item.followupState}
                     queueFilter={queueFilter}
                     onQueueSelect={onQueueSelect}
                   />
@@ -951,4 +958,10 @@ if (selectedVisitorId === item.visitorId) {
     </div>
   );
 }
+
+
+
+
+
+
 

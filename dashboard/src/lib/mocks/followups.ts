@@ -12,7 +12,8 @@ export const mockFollowups: FollowupsResponse = {
       lastFollowupOutcome: null,
       resolvedForAssignment: false,
       stage: "CONNECTED",
-      needsFollowup: true
+      needsFollowup: true,
+      followupState: "action-needed"
     },
     {
       visitorId: "visitor-1002",
@@ -23,9 +24,11 @@ export const mockFollowups: FollowupsResponse = {
       lastFollowupOutcome: null,
       resolvedForAssignment: false,
       stage: "NEW",
-      needsFollowup: false
+      needsFollowup: false,
+      followupState: "contact-made"
     }
   ]
 };
+
 
 

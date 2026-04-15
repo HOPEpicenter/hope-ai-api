@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { getHopeBaseUrl } from "@/lib/server/hope-env";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Visitor ID is required." }, { status: 400 });
     }
 
-    const baseUrl = requireEnv("HOPE_OPS_BASE_URL").replace(/\/+$/, "");
+    const baseUrl = getHopeBaseUrl();
     const apiKey = requireEnv("HOPE_API_KEY");
     const upstream = await fetch(`${baseUrl}/api/formation/events`, {
       method: "POST",
@@ -75,6 +76,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+
+
 
 
 

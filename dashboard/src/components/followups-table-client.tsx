@@ -473,7 +473,96 @@ export function FollowupsTableClient({ items }: Props) {
     });
   }
 
-  function applyMinePreset() {
+  function applyOverduePreset() {
+  setSearch("");
+  setQueueFilter("action-needed");
+  setAgeFilter("72h+");
+  setStageFilter("all");
+  setOutcomeFilter("all");
+  setAssigneeFilter("all");
+  setAttentionFilter("all");
+  setSort("oldest-assigned");
+
+  updateUrl({
+    q: "",
+    queue: "action-needed",
+    age: "72h+",
+    stage: "all",
+    outcome: "all",
+    assignee: "all",
+    attention: "all",
+    sort: "oldest-assigned"
+  });
+}
+
+function applyAtRiskPreset() {
+  setSearch("");
+  setQueueFilter("action-needed");
+  setAgeFilter("48h+");
+  setStageFilter("all");
+  setOutcomeFilter("all");
+  setAssigneeFilter("all");
+  setAttentionFilter("all");
+  setSort("oldest-assigned");
+
+  updateUrl({
+    q: "",
+    queue: "action-needed",
+    age: "48h+",
+    stage: "all",
+    outcome: "all",
+    assignee: "all",
+    attention: "all",
+    sort: "oldest-assigned"
+  });
+}
+
+function applyWatchPreset() {
+  setSearch("");
+  setQueueFilter("action-needed");
+  setAgeFilter("24h+");
+  setStageFilter("all");
+  setOutcomeFilter("all");
+  setAssigneeFilter("all");
+  setAttentionFilter("all");
+  setSort("oldest-assigned");
+
+  updateUrl({
+    q: "",
+    queue: "action-needed",
+    age: "24h+",
+    stage: "all",
+    outcome: "all",
+    assignee: "all",
+    attention: "all",
+    sort: "oldest-assigned"
+  });
+}
+
+function applyMyOverduePreset() {
+  if (!MY_ASSIGNEE) return;
+
+  setSearch("");
+  setQueueFilter("action-needed");
+  setAgeFilter("72h+");
+  setStageFilter("all");
+  setOutcomeFilter("all");
+  setAssigneeFilter(MY_ASSIGNEE);
+  setAttentionFilter("all");
+  setSort("oldest-assigned");
+
+  updateUrl({
+    q: "",
+    queue: "action-needed",
+    age: "72h+",
+    stage: "all",
+    outcome: "all",
+    assignee: MY_ASSIGNEE,
+    attention: "all",
+    sort: "oldest-assigned"
+  });
+}
+function applyMinePreset() {
     if (!MY_ASSIGNEE) return;
     setSearch("");
     setQueueFilter("action-needed");
@@ -686,9 +775,11 @@ export function FollowupsTableClient({ items }: Props) {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <PresetButton active={normalizedSearch.length === 0 && !mineActive && queueFilter === "all" && ageFilter === "all" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="All" onClick={applyAllPreset} />
-            <PresetButton active={normalizedSearch.length === 0 && mineActive && queueFilter === "action-needed" && ageFilter === "all" && stageFilter === "all" && outcomeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="My Followups" onClick={applyMinePreset} disabled={!MY_ASSIGNEE} />
-            <PresetButton active={normalizedSearch.length === 0 && queueFilter === "action-needed" && ageFilter === "48h+" && stageFilter === "all" && outcomeFilter === "all" && attentionFilter === "all" && sort === "oldest-assigned"} label="Stale 48h+" onClick={applyStale48Preset} />
-            <PresetButton
+            <PresetButton active={normalizedSearch.length === 0 && mineActive && queueFilter === "action-needed" && ageFilter === "all"} label="My Followups" onClick={applyMinePreset} disabled={!MY_ASSIGNEE} />
+            <PresetButton active={queueFilter === "action-needed" && ageFilter === "72h+"} label="Overdue" onClick={applyOverduePreset} />
+            <PresetButton active={queueFilter === "action-needed" && ageFilter === "48h+"} label="At Risk" onClick={applyAtRiskPreset} />
+            <PresetButton active={queueFilter === "action-needed" && ageFilter === "24h+"} label="Watch" onClick={applyWatchPreset} />
+            <PresetButton active={mineActive && queueFilter === "action-needed" && ageFilter === "72h+"} label="My Overdue" onClick={applyMyOverduePreset} disabled={!MY_ASSIGNEE} />            <PresetButton
               active={normalizedSearch.length === 0 && attentionFilter === "needs-attention" && queueFilter === "all" && ageFilter === "all" && stageFilter === "all" && outcomeFilter === "all" && assigneeFilter === "all" && sort === "oldest-assigned"}
               label="Action needed"
               onClick={() => {
@@ -1303,6 +1394,9 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
+
+
+
 
 
 

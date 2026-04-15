@@ -52,21 +52,21 @@ export function CreateVisitorForm() {
         })
       });
 
-      const data = (await response.json()) as CreateVisitorResponse;
+      const data = (await response.json().catch(() => null)) as CreateVisitorResponse | null;
 
       if (!response.ok) {
-        throw new Error(data.error || `POST /api/visitors failed with status ${response.status}`);
+        throw new Error(data?.error || `POST /api/visitors failed with status ${response.status}`);
       }
 
-      const visitorId = typeof data.visitorId === "string" ? data.visitorId : "";
+      const visitorId = typeof data?.visitorId === "string" ? data.visitorId : "";
 
       if (!visitorId) {
         throw new Error("POST /api/visitors returned no visitorId");
       }
 
-      if (data.created) {
+      if (data?.created) {
         router.push(`/visitors/${visitorId}?created=1`);
-      } else if (data.existing) {
+      } else if (data?.existing) {
         router.push(`/visitors/${visitorId}?existing=1`);
       } else {
         router.push(`/visitors/${visitorId}`);
@@ -184,3 +184,7 @@ export function CreateVisitorForm() {
     </div>
   );
 }
+
+
+
+

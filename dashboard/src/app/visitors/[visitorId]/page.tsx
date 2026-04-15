@@ -738,7 +738,7 @@ function OutcomeSummaryCard({
       <div style={{ display: "grid", gap: 2 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: "#065f46" }}>Recorded</div>
         <div style={{ color: "#111827", fontWeight: 600 }}>{formatAbsoluteTime(outcomeAt)}</div>
-        <div style={{ fontSize: 12, color: "#4b5563" }}>{formatAbsoluteTime(outcomeAt)}</div>
+        <div style={{ fontSize: 12, color: "#4b5563" }}>{formatRelativeTime(outcomeAt)}</div>
       </div>
 
       {outcomeNotes ? (
@@ -874,7 +874,7 @@ function FollowupTimelineCard({
                 {step.value ? (
                   <div style={{ display: "grid", gap: 2 }}>
                     <div style={{ fontWeight: 600, color: "#111827" }}>{formatAbsoluteTime(step.value)}</div>
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>{formatAbsoluteTime(step.value)}</div>
+                    <div style={{ fontSize: 12, color: "#6b7280" }}>{formatRelativeTime(step.value)}</div>
                   </div>
                 ) : null}
               </div>
@@ -990,7 +990,7 @@ function EventTimelineCard({
                   {event.happenedAt ? (
                     <div style={{ display: "grid", gap: 2 }}>
                       <div style={{ fontWeight: 600, color: "#111827" }}>{formatAbsoluteTime(event.happenedAt)}</div>
-                      <div style={{ fontSize: 12, color: "#6b7280" }}>{formatAbsoluteTime(event.happenedAt)}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>{formatRelativeTime(event.happenedAt)}</div>
                     </div>
                   ) : (
                     <div style={{ color: "#6b7280" }}>No timestamp available.</div>
@@ -1041,6 +1041,15 @@ export default async function VisitorDetailPage({
   const assignedAt = data.formationProfile?.lastFollowupAssignedAt;
   const contactedAt = data.formationProfile?.lastFollowupContactedAt;
   const outcomeAt = data.formationProfile?.lastFollowupOutcomeAt;
+
+  const dedupedFormationEvents = Array.from(
+    new Map(
+      (data.formationEvents ?? []).map((event) => [
+        `${event.type ?? ""}|${event.happenedAt ?? ""}|${event.summary ?? ""}`,
+        event
+      ])
+    ).values()
+  );
 
   const followupStatus = getCanonicalFollowupStatus({
     assignedAt,
@@ -1170,7 +1179,7 @@ export default async function VisitorDetailPage({
         outcome={data.formationProfile?.lastFollowupOutcome ?? null}
       />
 
-      <EventTimelineCard events={data.formationEvents} />
+      <EventTimelineCard events={dedupedFormationEvents} />
 
       <div style={{ display: "grid", gap: 12 }}>
         <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>Engagement Timeline</h2>
@@ -1384,4 +1393,6 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
+
 

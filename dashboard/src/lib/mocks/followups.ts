@@ -13,7 +13,9 @@ export const mockFollowups: FollowupsResponse = {
       resolvedForAssignment: false,
       stage: "CONNECTED",
       needsFollowup: true,
-      followupState: "action-needed"
+      followupState: "action-needed",
+      ageBucket: "72h+",
+      urgency: "OVERDUE"
     },
     {
       visitorId: "visitor-1002",
@@ -25,10 +27,9 @@ export const mockFollowups: FollowupsResponse = {
       resolvedForAssignment: false,
       stage: "NEW",
       needsFollowup: false,
-      followupState: "contact-made"
+      followupState: "contact-made",
+      ageBucket: "72h+",
+      urgency: "OVERDUE"
     }
   ]
 };
-
-
-

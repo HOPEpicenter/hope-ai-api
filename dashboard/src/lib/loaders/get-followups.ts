@@ -26,6 +26,39 @@ function getBaseUrl(): string {
   return `https://${url.replace(/\/+$/, "")}`;
 }
 
+function getAgeHours(value: string | null | undefined): number | null {
+  if (!value) return null;
+
+  const assignedMs = new Date(value).getTime();
+  if (Number.isNaN(assignedMs)) return null;
+
+  const diffMs = Date.now() - assignedMs;
+  if (diffMs < 0) return 0;
+
+  return diffMs / (1000 * 60 * 60);
+}
+
+function getAgeBucket(hours: number | null): "<24h" | "24-48h" | "48-72h" | "72h+" {
+  if (hours === null) return "<24h";
+  if (hours >= 72) return "72h+";
+  if (hours >= 48) return "48-72h";
+  if (hours >= 24) return "24-48h";
+  return "<24h";
+}
+
+function getUrgency(bucket: "<24h" | "24-48h" | "48-72h" | "72h+"): "ON_TRACK" | "WATCH" | "AT_RISK" | "OVERDUE" {
+  switch (bucket) {
+    case "72h+":
+      return "OVERDUE";
+    case "48-72h":
+      return "AT_RISK";
+    case "24-48h":
+      return "WATCH";
+    default:
+      return "ON_TRACK";
+  }
+}
+
 function toFollowupsResponse(raw: RawFormationProfilesResponse): FollowupsResponse {
   return {
     ok: !!raw.ok,
@@ -48,12 +81,18 @@ function toFollowupsResponse(raw: RawFormationProfilesResponse): FollowupsRespon
           ? "action-needed"
           : "unassigned";
 
+      const ageHours = getAgeHours(item.lastFollowupAssignedAt ?? null);
+      const ageBucket = getAgeBucket(ageHours);
+      const urgency = getUrgency(ageBucket);
+
       return {
         visitorId: item.visitorId,
         assignedTo: assignedOwnerId ? { ownerType: "user" as const, ownerId: assignedOwnerId } : null,
         stage: item.stage ?? null,
         needsFollowup: followupState === "action-needed",
         followupState,
+        ageBucket,
+        urgency,
         lastFollowupAssignedAt: item.lastFollowupAssignedAt ?? null,
         lastFollowupContactedAt: item.lastFollowupContactedAt ?? null,
         lastFollowupOutcomeAt: item.lastFollowupOutcomeAt ?? null,
@@ -77,6 +116,3 @@ export async function getFollowups(): Promise<FollowupsResponse> {
   const data = (await response.json()) as RawFormationProfilesResponse;
   return toFollowupsResponse(data);
 }
-
-
-

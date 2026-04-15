@@ -26,7 +26,7 @@ export default async function VisitorsPage({
   ]);
 
   const formationProfiles = await getFormationProfiles(
-    visitors.items.map((visitor) => visitor.visitorId)
+    visitors.items.map((visitor: (typeof visitors.items)[number]) => visitor.visitorId)
   );
 
   const preset =
@@ -48,7 +48,7 @@ export default async function VisitorsPage({
     formationProfiles.items.map((item) => [item.visitorId, item] as const)
   );
 
-  const items: VisitorsTableItem[] = visitors.items.map((visitor) => {
+  const items: VisitorsTableItem[] = visitors.items.map((visitor: (typeof visitors.items)[number]) => {
     const profile = formationProfilesByVisitorId.get(visitor.visitorId);
 
     const formationMilestones = {
@@ -228,4 +228,5 @@ export default async function VisitorsPage({
     </section>
   );
 }
+
 

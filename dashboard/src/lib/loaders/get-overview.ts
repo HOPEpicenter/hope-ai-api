@@ -6,7 +6,7 @@ export async function getOverview(): Promise<OverviewResponse> {
   const visitors = await getVisitors();
 
   const formationProfiles = await getFormationProfiles(
-    visitors.items.map((v) => v.visitorId)
+    visitors.items.map((v: (typeof visitors.items)[number]) => v.visitorId)
   );
 
   const profileByVisitorId = new Map(
@@ -80,4 +80,5 @@ export async function getOverview(): Promise<OverviewResponse> {
     recent
   };
 }
+
 

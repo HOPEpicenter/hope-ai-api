@@ -37,13 +37,23 @@ function toFollowupsResponse(raw: RawFormationProfilesResponse): FollowupsRespon
 
       const hasOutcome = !!item.lastFollowupOutcomeAt;
       const hasContacted = !!item.lastFollowupContactedAt;
-      const needsFollowup = !!assignedOwnerId && !hasOutcome;
+      const isAssigned = !!assignedOwnerId;
+
+      const followupState =
+        hasOutcome
+          ? "done"
+          : hasContacted
+          ? "contact-made"
+          : isAssigned
+          ? "action-needed"
+          : "unassigned";
 
       return {
         visitorId: item.visitorId,
         assignedTo: assignedOwnerId ? { ownerType: "user" as const, ownerId: assignedOwnerId } : null,
         stage: item.stage ?? null,
-        needsFollowup,
+        needsFollowup: followupState === "action-needed",
+        followupState,
         lastFollowupAssignedAt: item.lastFollowupAssignedAt ?? null,
         lastFollowupContactedAt: item.lastFollowupContactedAt ?? null,
         lastFollowupOutcomeAt: item.lastFollowupOutcomeAt ?? null,
@@ -67,5 +77,6 @@ export async function getFollowups(): Promise<FollowupsResponse> {
   const data = (await response.json()) as RawFormationProfilesResponse;
   return toFollowupsResponse(data);
 }
+
 
 

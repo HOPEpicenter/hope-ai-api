@@ -92,7 +92,11 @@ function Badge({
       onClick={() => onQueueSelect(value)}
       style={style}
     >
-      {needsFollowup ? "Action needed" : "Contact made"}
+      {item.followupState === "action-needed"
+  ? "Action needed"
+  : item.followupState === "contact-made"
+  ? "Contact made"
+  : ""}
     </button>
   );
 }
@@ -951,4 +955,6 @@ if (selectedVisitorId === item.visitorId) {
     </div>
   );
 }
+
+
 

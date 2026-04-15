@@ -11,10 +11,13 @@ export type FollowupItem = {
   resolvedForAssignment: boolean;
   stage: string | null;
   needsFollowup: boolean;
+  followupState: "action-needed" | "contact-made" | "done" | "unassigned";
 };
 
 export type FollowupsResponse = {
   ok: boolean;
   items: FollowupItem[];
 };
+
+
 

@@ -74,8 +74,7 @@ function matchesSearch(item: FollowupItem, query: string) {
 
 function matchesQueueFilter(item: FollowupItem, filter: QueueFilter) {
   if (filter === "all") return true;
-  if (filter === "action-needed") return item.needsFollowup;
-  return !item.needsFollowup;
+  return item.followupState === filter;
 }
 
 function matchesAttentionFilter(item: FollowupItem, filter: AttentionFilter) {
@@ -118,8 +117,15 @@ function sortItems(items: FollowupItem[], sort: SortOption) {
   const sorted = [...items];
 
   sorted.sort((a, b) => {
-    if (a.needsFollowup !== b.needsFollowup) {
-      return a.needsFollowup ? -1 : 1;
+    const priority = {
+      "action-needed": 0,
+      "contact-made": 1,
+      "done": 2,
+      "unassigned": 3
+    };
+
+    if (priority[a.followupState] !== priority[b.followupState]) {
+      return priority[a.followupState] - priority[b.followupState];
     }
 
     if (sort === "oldest-assigned") {
@@ -1286,4 +1292,6 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
+
+
 

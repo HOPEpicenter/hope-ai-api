@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getHopeBaseUrl } from "@/lib/server/hope-env";
 
 function getRequiredEnv(name: string): string {
   const value = process.env[name];
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "visitorId is required." }, { status: 400 });
     }
 
-    const opsBaseUrl = getRequiredEnv("HOPE_OPS_BASE_URL").replace(/\/$/, "");
+    const opsBaseUrl = getHopeBaseUrl();
     const apiKey = getRequiredEnv("HOPE_API_KEY");
 
     const payload = {
@@ -84,6 +85,9 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+
+
 
 
 

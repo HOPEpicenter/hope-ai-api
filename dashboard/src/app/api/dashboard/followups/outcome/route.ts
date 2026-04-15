@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getHopeBaseUrl } from "@/lib/server/hope-env";
 
 const OUTCOME_MAP: Record<string, string> = {
   CONNECTED: "connected",
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Valid outcome is required." }, { status: 400 });
     }
 
-    const opsBaseUrl = getRequiredEnv("HOPE_OPS_BASE_URL").replace(/\/$/, "");
+    const opsBaseUrl = getHopeBaseUrl();
     const apiKey = getRequiredEnv("HOPE_API_KEY");
 
     const payload = {
@@ -104,6 +105,9 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+
+
 
 
 

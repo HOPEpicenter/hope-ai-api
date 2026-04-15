@@ -1045,7 +1045,7 @@ export default async function VisitorDetailPage({
   const dedupedFormationEvents = Array.from(
     new Map(
       (data.formationEvents ?? []).map((event) => [
-        `${event.type ?? ""}|${event.happenedAt ?? ""}|${event.summary ?? ""}`,
+        `${event.eventType ?? ""}|${event.happenedAt ?? ""}|${event.notes ?? ""}`,
         event
       ])
     ).values()
@@ -1393,6 +1393,7 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 
 
 

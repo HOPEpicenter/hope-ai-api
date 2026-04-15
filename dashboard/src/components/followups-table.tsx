@@ -680,6 +680,7 @@ lastFocusContext.current = contextKey;
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Stage</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Status</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Age</th>
+            <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Urgency</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Assigned</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Contact</th>
             <th style={{ textAlign: "left", padding: 12, borderBottom: "1px solid #e5e7eb" }}>Last Outcome</th>
@@ -812,6 +813,44 @@ if (selectedVisitorId === item.visitorId) {
                     onAgeSelect={onAgeSelect}
                     hydrated={hydrated}
                   />
+                </td>
+                <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "4px 8px",
+                      borderRadius: 9999,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      background:
+                        item.urgency === "OVERDUE"
+                          ? "#fef2f2"
+                          : item.urgency === "AT_RISK"
+                          ? "#fff7ed"
+                          : item.urgency === "WATCH"
+                          ? "#fffbeb"
+                          : "#f3f4f6",
+                      color:
+                        item.urgency === "OVERDUE"
+                          ? "#b91c1c"
+                          : item.urgency === "AT_RISK"
+                          ? "#c2410c"
+                          : item.urgency === "WATCH"
+                          ? "#a16207"
+                          : "#374151",
+                      border:
+                        item.urgency === "OVERDUE"
+                          ? "1px solid #fecaca"
+                          : item.urgency === "AT_RISK"
+                          ? "1px solid #fdba74"
+                          : item.urgency === "WATCH"
+                          ? "1px solid #fde68a"
+                          : "1px solid #d1d5db"
+                    }}
+                  >
+                    {item.urgency}
+                  </span>
                 </td>
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   <LastAssignedButton
@@ -958,6 +997,9 @@ if (selectedVisitorId === item.visitorId) {
     </div>
   );
 }
+
+
+
 
 
 

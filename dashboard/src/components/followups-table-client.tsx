@@ -117,15 +117,26 @@ function sortItems(items: FollowupItem[], sort: SortOption) {
   const sorted = [...items];
 
   sorted.sort((a, b) => {
-    const priority = {
+    const statePriority = {
       "action-needed": 0,
       "contact-made": 1,
       "done": 2,
       "unassigned": 3
-    };
+    } as const;
 
-    if (priority[a.followupState] !== priority[b.followupState]) {
-      return priority[a.followupState] - priority[b.followupState];
+    const urgencyPriority = {
+      OVERDUE: 0,
+      AT_RISK: 1,
+      WATCH: 2,
+      ON_TRACK: 3
+    } as const;
+
+    if (statePriority[a.followupState] !== statePriority[b.followupState]) {
+      return statePriority[a.followupState] - statePriority[b.followupState];
+    }
+
+    if (urgencyPriority[a.urgency] !== urgencyPriority[b.urgency]) {
+      return urgencyPriority[a.urgency] - urgencyPriority[b.urgency];
     }
 
     if (sort === "oldest-assigned") {
@@ -1292,6 +1303,7 @@ export function FollowupsTableClient({ items }: Props) {
     </section>
   );
 }
+
 
 
 

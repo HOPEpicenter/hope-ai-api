@@ -92,11 +92,11 @@ function Badge({
       onClick={() => onQueueSelect(value)}
       style={style}
     >
-      {item.followupState === "action-needed"
-  ? "Action needed"
-  : item.followupState === "contact-made"
-  ? "Contact made"
-  : ""}
+      {followupState === "action-needed"
+        ? "Action needed"
+        : followupState === "contact-made"
+        ? "Contact made"
+        : ""}
     </button>
   );
 }
@@ -797,6 +797,7 @@ if (selectedVisitorId === item.visitorId) {
                 <td style={{ padding: 12, borderBottom: "1px solid #e5e7eb", verticalAlign: "middle" }}>
                   <Badge
                     needsFollowup={item.needsFollowup}
+                    followupState={item.followupState}
                     queueFilter={queueFilter}
                     onQueueSelect={onQueueSelect}
                   />
@@ -955,6 +956,8 @@ if (selectedVisitorId === item.visitorId) {
     </div>
   );
 }
+
+
 
 
 

@@ -224,8 +224,8 @@ export function FollowupsTableClient({ items }: Props) {
   const searchParams = useSearchParams();
 
   const initialSearch = searchParams.get("q") ?? "";
-  const initialQueueFilter = (searchParams.get("queue") as QueueFilter | null) ?? "all";
-  const initialAgeFilter = (searchParams.get("age") as AgeFilter | null) ?? "all";
+  const initialQueueFilter = (searchParams.get("queue") as QueueFilter | null) ?? "action-needed";
+  const initialAgeFilter = (searchParams.get("age") as AgeFilter | null) ?? "72h+";
   const initialStageFilter = (searchParams.get("stage") as StageFilter | null) ?? "all";
   const initialSort = (searchParams.get("sort") as SortOption | null) ?? "oldest-assigned";
   const initialAssigneeFilter = searchParams.get("assignee") ?? "all";
@@ -432,12 +432,21 @@ export function FollowupsTableClient({ items }: Props) {
   const activePresetLabel =
     normalizedSearch.length === 0 &&
     !mineActive &&
-    queueFilter === "all" &&
-    ageFilter === "all" &&
+    queueFilter === "action-needed" &&
+    ageFilter === "72h+" &&
     stageFilter === "all" &&
     outcomeFilter === "all" &&
     assigneeFilter === "all" &&
     attentionFilter === "all"
+      ? "Overdue"
+    : normalizedSearch.length === 0 &&
+      !mineActive &&
+      queueFilter === "all" &&
+      ageFilter === "all" &&
+      stageFilter === "all" &&
+      outcomeFilter === "all" &&
+      assigneeFilter === "all" &&
+      attentionFilter === "all"
       ? "All"
       : normalizedSearch.length === 0 && mineActive && queueFilter === "action-needed"
         ? "My Followups"
@@ -1401,6 +1410,8 @@ function applyMinePreset() {
     </section>
   );
 }
+
+
 
 
 

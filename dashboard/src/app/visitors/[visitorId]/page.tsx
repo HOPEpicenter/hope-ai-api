@@ -107,7 +107,7 @@ function TimestampValue({ value }: { value: string | null }) {
     <div>
       <div style={{ fontWeight: 600, color: "#111827" }}>{formatAbsoluteTime(value)}</div>
       <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-        {formatAbsoluteTime(value)}
+        {formatRelativeTime(value)}
       </div>
     </div>
   );
@@ -176,7 +176,7 @@ function DashboardCardSignals({ card, assignedToOwnerId, followupStatus }: {
 
   return (
     <DetailCard title="Dashboard Card Signals">
-      <DetailRow label="Followup" value={followupLabel} />
+      <DetailRow label="Followup Status" value={followupLabel} />
       <DetailRow label="Attention" value={attentionLabel} />
       <DetailRow label="Assigned to" value={assignedToOwnerId ?? "-"} />
       <DetailRow label="Urgency" value={urgencyValue} />
@@ -367,7 +367,7 @@ function getNextAction(
   if (followupStatus === "Contacted") {
     return {
       title: "Next action: record outcome",
-      body: "Contact is already recorded. Add the outcome to close the loop clearly.",
+      body: "Contact is recorded. Record the final outcome to close the loop.",
       tone: "primary" as const,
       actionKey: "outcome" as const
     };
@@ -496,7 +496,7 @@ function VisitorHeaderCard({
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "start" }}>
         <div style={{ display: "grid", gap: 8 }}>
           <Link href={backHref} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}>
-            ← Back to Visitors
+            ← Back to queue
           </Link>
 
           <div style={{ display: "grid", gap: 6 }}>
@@ -587,8 +587,8 @@ function VisitorHeaderCard({
         }}
       >
         <HeaderChip label="Email" value={email ?? "-"} />
-        <HeaderChip label="Stage" value={<StageBadge stage={stage ?? null} />} />
-        <HeaderChip label="Followup" value={followupStatus} />
+        <HeaderChip label="Journey Stage" value={<StageBadge stage={stage ?? null} />} />
+        <HeaderChip label="Followup Status" value={followupStatus} />
         <HeaderChip
           label="Attention"
           value={
@@ -1304,7 +1304,7 @@ export default async function VisitorDetailPage({
                 label="Row Key"
                 value={<span style={{ fontFamily: "monospace" }}>{data.formationProfile.rowKey}</span>}
               />
-              <DetailRow label="Stage" value={<StageBadge stage={data.formationProfile.stage} />} />
+              <DetailRow label="Journey Stage" value={<StageBadge stage={data.formationProfile.stage} />} />
               <DetailRow label="Last Event Type" value={data.formationProfile.lastEventType ?? "-"} />
               <DetailRow label="Last Event At" value={<TimestampValue value={data.formationProfile.lastEventAt} />} />
               <DetailRow label="Profile Updated" value={<TimestampValue value={data.formationProfile.updatedAt} />} />
@@ -1384,8 +1384,4 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
-
-
-
-
 

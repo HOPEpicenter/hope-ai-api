@@ -9,6 +9,7 @@ type RawFormationProfilesResponse = {
     lastFollowupAssignedAt?: string | null;
     lastFollowupContactedAt?: string | null;
     lastFollowupOutcomeAt?: string | null;
+    lastFollowupOutcome?: string | null;
   }>;
   cursor?: string;
 };
@@ -96,8 +97,8 @@ function toFollowupsResponse(raw: RawFormationProfilesResponse): FollowupsRespon
         lastFollowupAssignedAt: item.lastFollowupAssignedAt ?? null,
         lastFollowupContactedAt: item.lastFollowupContactedAt ?? null,
         lastFollowupOutcomeAt: item.lastFollowupOutcomeAt ?? null,
-        lastFollowupOutcome: null,
-        resolvedForAssignment: hasOutcome || hasContacted
+        lastFollowupOutcome: item.lastFollowupOutcome ?? null,
+        resolvedForAssignment: hasOutcome
       };
     })
   };
@@ -116,3 +117,5 @@ export async function getFollowups(): Promise<FollowupsResponse> {
   const data = (await response.json()) as RawFormationProfilesResponse;
   return toFollowupsResponse(data);
 }
+
+

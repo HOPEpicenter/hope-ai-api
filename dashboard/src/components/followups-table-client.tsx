@@ -82,6 +82,13 @@ function matchesAttentionFilter(item: FollowupItem, filter: AttentionFilter) {
   return item.needsFollowup;
 }
 
+function getAgeBucket(hours: number | null): "24h+" | "48h+" | "72h+" | "fresh" {
+  if (hours === null) return "fresh";
+  if (hours >= 72) return "72h+";
+  if (hours >= 48) return "48h+";
+  if (hours >= 24) return "24h+";
+  return "fresh";
+}
 function matchesAgeFilter(item: FollowupItem, filter: AgeFilter) {
   if (filter === "all") return true;
 
@@ -166,11 +173,11 @@ function sortItems(items: FollowupItem[], sort: SortOption) {
   return sorted;
 }
 
-function countAgedItems(items: FollowupItem[], minimumHours: number) {
+function countAgedItems(items: FollowupItem[], bucket: "24h+" | "48h+" | "72h+") {
   return items.filter((item) => {
     if (!item.needsFollowup) return false;
     const hours = getFollowupAgeHours(item.lastFollowupAssignedAt);
-    return hours !== null && hours >= minimumHours;
+    return getAgeBucket(hours) === bucket;
   }).length;
 }
 
@@ -416,9 +423,9 @@ export function FollowupsTableClient({ items }: Props) {
     return sortItems(filtered, sort);
   }, [items, normalizedSearch, queueFilter, ageFilter, stageFilter, outcomeFilter, assigneeFilter, attentionFilter, sort]);
 
-  const aged24Count = useMemo(() => countAgedItems(items, 24), [items]);
-  const aged48Count = useMemo(() => countAgedItems(items, 48), [items]);
-  const aged72Count = useMemo(() => countAgedItems(items, 72), [items]);
+  const aged24Count = useMemo(() => countAgedItems(items, "24h+"), [items]);
+  const aged48Count = useMemo(() => countAgedItems(items, "48h+"), [items]);
+  const aged72Count = useMemo(() => countAgedItems(items, "72h+"), [items]);
 
   const mineActive = assigneeFilter !== "all" && assigneeFilter === MY_ASSIGNEE;
 
@@ -1394,6 +1401,9 @@ function applyMinePreset() {
     </section>
   );
 }
+
+
+
 
 
 

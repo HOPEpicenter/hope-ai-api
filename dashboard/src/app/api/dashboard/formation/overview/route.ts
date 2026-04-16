@@ -37,14 +37,13 @@ export async function GET() {
       process.env.OPS_API_KEY?.trim() ||
       null;
 
-    const headers = apiKey
-      ? {
-          "x-api-key": apiKey,
-          accept: "application/json",
-        }
-      : {
-          accept: "application/json",
-        };
+    const headers: Record<string, string> = {
+      accept: "application/json",
+    };
+
+    if (apiKey) {
+      headers["x-api-key"] = apiKey;
+    }
 
     if (!opsBaseUrl) {
       return NextResponse.json({
@@ -79,7 +78,6 @@ export async function GET() {
     const recent = toItems(recentJson);
     const last24h = toItems(last24hJson);
 
-
     return NextResponse.json({
       ok: true,
       recentItems: recent,
@@ -103,6 +101,3 @@ export async function GET() {
     });
   }
 }
-
-
-

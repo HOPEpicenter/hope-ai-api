@@ -27,9 +27,23 @@ export default async function TimelinePage({ searchParams }: TimelinePageProps) 
 
   const activity = await getGlobalActivity(limit);
 
-  const items = visitorId
+  const items = (visitorId
     ? activity.items.filter((item) => item.visitorId === visitorId)
-    : activity.items;
+    : activity.items
+  )
+    .filter(
+      (item) =>
+        typeof item.occurredAt === "string" &&
+        item.occurredAt.trim().length > 0
+    )
+    .map((item) => ({
+      ...item,
+      occurredAt: item.occurredAt as string,
+      type:
+        typeof item.type === "string" && item.type.trim().length > 0
+          ? item.type
+          : "UNKNOWN"
+    }));
 
   return (
     <TimelinePageClient

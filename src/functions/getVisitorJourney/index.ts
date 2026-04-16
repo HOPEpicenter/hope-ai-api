@@ -11,10 +11,7 @@ import { AzureTableFormationEventsRepository } from "../../repositories/formatio
 const ENGAGEMENT_TABLE = process.env.ENGAGEMENT_EVENTS_TABLE || "devEngagementEvents";
 const FORMATION_PROFILES_TABLE = process.env.FORMATION_PROFILES_TABLE || "devFormationProfiles";
 
-const integrationService = new IntegrationService(
-  new EngagementEventsRepository(),
-  new AzureTableFormationEventsRepository()
-);
+const integrationService = new IntegrationService(new EngagementEventsRepository());
 
 function getEngagementTable(): TableClient {
   const conn = getConnString();
@@ -76,6 +73,7 @@ export async function getVisitorJourney(context: any, req: any): Promise<void> {
     }
   };
 }
+
 
 
 

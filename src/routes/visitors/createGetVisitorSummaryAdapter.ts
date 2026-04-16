@@ -9,10 +9,7 @@ import { getFormationProfile } from "../../storage/formation/formationProfilesRe
 
 const engagementSummaryRepo = new EngagementSummaryRepository();
 
-const integrationService = new IntegrationService(
-  new EngagementEventsRepository(),
-  new AzureTableFormationEventsRepository()
-);
+const integrationService = new IntegrationService(new EngagementEventsRepository());
 
 export function createGetVisitorSummaryAdapter() {
   return async function getVisitorSummary(req: Request, res: Response, next: NextFunction) {
@@ -94,3 +91,4 @@ export function createGetVisitorSummaryAdapter() {
     }
   };
 }
+

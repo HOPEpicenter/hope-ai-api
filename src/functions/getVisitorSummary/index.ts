@@ -13,10 +13,7 @@ const formationEventsRepo = new AzureTableFormationEventsRepository();
 
 const engagementsService = new EngagementsService(engagementEventsRepo);
 
-const integrationService = new IntegrationService(
-  new EngagementEventsRepository(),
-  new AzureTableFormationEventsRepository()
-);
+const integrationService = new IntegrationService(new EngagementEventsRepository());
 
 export async function getVisitorSummary(context: any, req: any): Promise<void> {
   try {
@@ -103,3 +100,4 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
     };
   }
 }
+

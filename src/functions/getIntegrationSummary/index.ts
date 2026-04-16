@@ -1,5 +1,7 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
-import { readIntegrationSummaryByVisitorId } from "../_shared/integration";
+import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
+import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
+import { IntegrationService } from "../../services/integration/integrationService";
 
 export async function getIntegrationSummary(context: any, req: any): Promise<any> {
   try {
@@ -21,7 +23,9 @@ export async function getIntegrationSummary(context: any, req: any): Promise<any
       };
     }
 
-    const summary = await readIntegrationSummaryByVisitorId(visitorId);
+    const service = new IntegrationService(new EngagementEventsRepository());
+
+    const summary = await service.readIntegrationSummary(visitorId);
 
     return {
       status: 200,
@@ -42,3 +46,4 @@ export async function getIntegrationSummary(context: any, req: any): Promise<any
     };
   }
 }
+

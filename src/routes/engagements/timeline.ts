@@ -8,10 +8,7 @@ import { IntegrationService } from "../../services/integration/integrationServic
 export const engagementsTimelineRouter = Router();
 
 const service = new EngagementsService(new EngagementEventsRepository());
-const integratedTimelineService = new IntegrationService(
-  new EngagementEventsRepository(),
-  new AzureTableFormationEventsRepository(),
-);
+const integratedTimelineService = new IntegrationService(new EngagementEventsRepository());
 
 engagementsTimelineRouter.get("/engagements/timeline", async (req, res, next) => {
   try {
@@ -103,3 +100,5 @@ engagementsTimelineRouter.get("/engagements/:visitorId/timeline", async (req, re
     return next(err);
   }
 });
+
+

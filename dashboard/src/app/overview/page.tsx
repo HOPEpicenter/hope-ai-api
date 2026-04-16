@@ -63,7 +63,7 @@ export default async function OverviewPage() {
           <div style={{ display: "grid", gap: 12 }}>
             {data.recent.map((item) => (
               <Link
-                key={item.href}
+                key={`${item.href}-${item.title}-${item.timestamp ?? "no-time"}`}
                 href={item.href}
                 style={{
                   display: "block",
@@ -102,3 +102,5 @@ export default async function OverviewPage() {
     </section>
   );
 }
+
+

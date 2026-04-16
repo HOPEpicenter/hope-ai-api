@@ -115,3 +115,55 @@ export async function listFormationEventsByVisitor(
 function escapeOData(value: string): string {
   return value.replace(/'/g, "''");
 }
+
+export async function listRecentFormationEvents(
+  table: any,
+  options?: {
+    limit?: number;
+    since?: string;
+  }
+): Promise<any[]> {
+  const limitRaw = Number(options?.limit ?? 10);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, limitRaw)) : 10;
+  const since = typeof options?.since === "string" && options.since.trim().length > 0
+    ? options.since.trim()
+    : null;
+
+  const items: any[] = [];
+
+  for await (const entity of table.listEntities()) {
+    const occurredAt =
+      typeof entity?.occurredAt === "string" && entity.occurredAt.trim().length > 0
+        ? entity.occurredAt.trim()
+        : null;
+
+    if (since && occurredAt && occurredAt < since) {
+      continue;
+    }
+
+    items.push(entity);
+  }
+
+  items.sort((a, b) => {
+    const aOccurredAt =
+      typeof a?.occurredAt === "string" && a.occurredAt.trim().length > 0
+        ? a.occurredAt.trim()
+        : "";
+    const bOccurredAt =
+      typeof b?.occurredAt === "string" && b.occurredAt.trim().length > 0
+        ? b.occurredAt.trim()
+        : "";
+
+    if (aOccurredAt !== bOccurredAt) {
+      return aOccurredAt < bOccurredAt ? 1 : -1;
+    }
+
+    const aRowKey = typeof a?.rowKey === "string" ? a.rowKey : "";
+    const bRowKey = typeof b?.rowKey === "string" ? b.rowKey : "";
+
+    if (aRowKey === bRowKey) return 0;
+    return aRowKey < bRowKey ? 1 : -1;
+  });
+
+  return items.slice(0, limit);
+}

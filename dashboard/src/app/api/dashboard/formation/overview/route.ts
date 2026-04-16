@@ -1,13 +1,59 @@
 import { NextResponse } from "next/server";
 
+function getOpsBaseUrl(): string | null {
+  const value =
+    process.env.HOPE_OPS_BASE_URL?.trim() ||
+    process.env.OPS_BASE_URL?.trim() ||
+    null;
+
+  return value ? value.replace(/\/+$/, "") : null;
+}
+
+async function readJsonSafe(response: Response) {
+  const text = await response.text();
+  if (!text || text.trim().length === 0) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function toItems(payload: any): any[] {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+}
+
 export async function GET() {
   try {
-    const opsBaseUrl = process.env.OPS_BASE_URL;
+    const opsBaseUrl = getOpsBaseUrl();
+
+    const apiKey =
+      process.env.HOPE_API_KEY?.trim() ||
+      process.env.OPS_API_KEY?.trim() ||
+      null;
+
+    const headers = apiKey
+      ? {
+          "x-api-key": apiKey,
+          accept: "application/json",
+        }
+      : {
+          accept: "application/json",
+        };
 
     if (!opsBaseUrl) {
       return NextResponse.json({
-        recent: [],
-        last24h: { formationEvents: 0, nextSteps: 0 },
+        ok: true,
+        recentItems: [],
+        metrics: {
+          formationEvents24h: 0,
+          nextStepsSelected24h: 0,
+        },
       });
     }
 
@@ -17,36 +63,46 @@ export async function GET() {
     const last24hUrl = `${opsBaseUrl}/_ops/formation/recent-events?limit=100&since=${encodeURIComponent(since24h)}`;
 
     const [recentRes, last24hRes] = await Promise.all([
-      fetch(recentUrl, { cache: "no-store" }),
-      fetch(last24hUrl, { cache: "no-store" }),
+      fetch(recentUrl, { cache: "no-store", headers }),
+      fetch(last24hUrl, { cache: "no-store", headers }),
     ]);
 
     if (!recentRes.ok || !last24hRes.ok) {
       throw new Error("Upstream formation fetch failed");
     }
 
-    const recentJson = await recentRes.json();
-    const last24hJson = await last24hRes.json();
+    const [recentJson, last24hJson] = await Promise.all([
+      readJsonSafe(recentRes),
+      readJsonSafe(last24hRes),
+    ]);
 
-    const recent = Array.isArray(recentJson) ? recentJson : recentJson.items ?? [];
-    const last24h = Array.isArray(last24hJson) ? last24hJson : last24hJson.items ?? [];
+    const recent = toItems(recentJson);
+    const last24h = toItems(last24hJson);
+
 
     return NextResponse.json({
-      recent,
-      last24h: {
-        formationEvents: last24h.length,
-        nextSteps: last24h.filter((e: any) => e?.type === "NEXT_STEP_SELECTED").length,
+      ok: true,
+      recentItems: recent,
+      metrics: {
+        formationEvents24h: last24h.length,
+        nextStepsSelected24h: last24h.filter(
+          (e: any) => e?.type === "NEXT_STEP_SELECTED"
+        ).length,
       },
     });
   } catch (err) {
     console.error("[formation-overview] fallback triggered", err);
 
     return NextResponse.json({
-      recent: [],
-      last24h: {
-        formationEvents: 0,
-        nextSteps: 0,
+      ok: false,
+      recentItems: [],
+      metrics: {
+        formationEvents24h: 0,
+        nextStepsSelected24h: 0,
       },
     });
   }
 }
+
+
+

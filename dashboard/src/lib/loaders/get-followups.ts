@@ -11,20 +11,23 @@ type RawFormationProfilesResponse = {
     lastFollowupOutcomeAt?: string | null;
     lastFollowupOutcome?: string | null;
   }>;
-  cursor?: string;
+  cursor?: string | null;
 };
 
-function getBaseUrl(): string {
-  const url =
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.VERCEL_URL?.trim() ||
-    "http://127.0.0.1:3000";
-
-  if (url.startsWith("http://") || url.startsWith("https://")) {
-    return url.replace(/\/+$/, "");
+function getHopeBaseUrl(): string {
+  const value = process.env.HOPE_BASE_URL?.trim();
+  if (!value) {
+    throw new Error("Missing HOPE_BASE_URL");
   }
+  return value.replace(/\/+$/, "");
+}
 
-  return `https://${url.replace(/\/+$/, "")}`;
+function getApiKey(): string {
+  const value = process.env.HOPE_API_KEY?.trim();
+  if (!value) {
+    throw new Error("Missing HOPE_API_KEY");
+  }
+  return value;
 }
 
 function getAgeHours(value: string | null | undefined): number | null {
@@ -61,36 +64,40 @@ function getUrgency(bucket: "<24h" | "24-48h" | "48-72h" | "72h+"): "ON_TRACK" |
 }
 
 function toFollowupsResponse(raw: RawFormationProfilesResponse): FollowupsResponse {
-  return {
-    ok: !!raw.ok,
-    items: raw.items.map((item) => {
+  const items = raw.items
+    .map((item) => {
       const assignedOwnerId =
         typeof item.assignedTo === "string"
-          ? item.assignedTo
-          : item.assignedTo?.ownerId ?? null;
+          ? item.assignedTo.trim()
+          : item.assignedTo?.ownerId?.trim?.() ?? "";
 
-      const hasOutcome = !!item.lastFollowupOutcomeAt;
+      const hasAssignee = assignedOwnerId.length > 0;
+      const hasAssignedAt = !!item.lastFollowupAssignedAt;
       const hasContacted = !!item.lastFollowupContactedAt;
-      const isAssigned = !!assignedOwnerId;
+      const hasOutcome = !!item.lastFollowupOutcomeAt;
 
-      const followupState =
-        hasOutcome
-          ? "done"
-          : hasContacted
-          ? "contact-made"
-          : isAssigned
-          ? "action-needed"
-          : "unassigned";
+      if (!item.visitorId || !hasAssignedAt) {
+        return null;
+      }
+
+      const resolvedForAssignment = hasOutcome;
+
+      if (resolvedForAssignment) {
+        return null;
+      }
 
       const ageHours = getAgeHours(item.lastFollowupAssignedAt ?? null);
       const ageBucket = getAgeBucket(ageHours);
       const urgency = getUrgency(ageBucket);
+      const followupState: "contact-made" | "action-needed" = hasContacted ? "contact-made" : "action-needed";
 
       return {
         visitorId: item.visitorId,
-        assignedTo: assignedOwnerId ? { ownerType: "user" as const, ownerId: assignedOwnerId } : null,
+        assignedTo: hasAssignee
+          ? { ownerType: "user" as const, ownerId: assignedOwnerId }
+          : null,
         stage: item.stage ?? null,
-        needsFollowup: followupState === "action-needed",
+        needsFollowup: !hasContacted,
         followupState,
         ageBucket,
         urgency,
@@ -98,24 +105,31 @@ function toFollowupsResponse(raw: RawFormationProfilesResponse): FollowupsRespon
         lastFollowupContactedAt: item.lastFollowupContactedAt ?? null,
         lastFollowupOutcomeAt: item.lastFollowupOutcomeAt ?? null,
         lastFollowupOutcome: item.lastFollowupOutcome ?? null,
-        resolvedForAssignment: hasOutcome
+        resolvedForAssignment
       };
     })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+
+  return {
+    ok: !!raw.ok,
+    items
   };
 }
 
 export async function getFollowups(): Promise<FollowupsResponse> {
-  const response = await fetch(`${getBaseUrl()}/api/dashboard/followups?limit=200`, {
+  const response = await fetch(`${getHopeBaseUrl()}/api/formation/profiles?limit=200`, {
     method: "GET",
-    cache: "no-store"
+    cache: "no-store",
+    headers: {
+      "x-api-key": getApiKey()
+    }
   });
 
   if (!response.ok) {
-    throw new Error(`GET /api/dashboard/followups failed with status ${response.status}`);
+    throw new Error(`GET /api/formation/profiles failed with status ${response.status}`);
   }
 
   const data = (await response.json()) as RawFormationProfilesResponse;
   return toFollowupsResponse(data);
 }
-
 

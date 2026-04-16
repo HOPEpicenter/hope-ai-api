@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { getTableClient } from "./tableClient";
+import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 
 export type FunctionVisitor = {
   visitorId: string;
@@ -50,6 +51,7 @@ function toVisitor(entity: VisitorEntity): FunctionVisitor {
 
 export async function getVisitorById(visitorId: string): Promise<FunctionVisitor | null> {
   const table = getTableClient(TABLE);
+  await ensureTableExists(table);
 
   try {
     const entity = await table.getEntity<VisitorEntity>(VISITOR_PK, visitorId);
@@ -66,6 +68,7 @@ export async function getVisitorById(visitorId: string): Promise<FunctionVisitor
 
 export async function listVisitorsRecords(input: { limit: number }): Promise<{ items: FunctionVisitor[]; count: number }> {
   const table = getTableClient(TABLE);
+  await ensureTableExists(table);
   const limit = Math.max(1, Math.min(input?.limit ?? 25, 200));
   const scanCap = 500;
 
@@ -98,6 +101,7 @@ export async function listVisitorsRecords(input: { limit: number }): Promise<{ i
 
 export async function createVisitorRecord(input: { name: string; email?: string }): Promise<FunctionCreateVisitorResult> {
   const table = getTableClient(TABLE);
+  await ensureTableExists(table);
   const id = randomUUID();
   const now = nowIso();
 
@@ -215,3 +219,4 @@ export async function createVisitorRecord(input: { name: string; email?: string 
     created: true
   };
 }
+

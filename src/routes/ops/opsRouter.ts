@@ -43,10 +43,7 @@ function getRequestId(req: any): string | undefined {
 export function createOpsRouter(visitorsRepository: VisitorsRepository, formationEventsRepository: FormationEventsRepository, engagementsRepository: EngagementsRepository): Router {
     const opsRouter = Router();
 
-  const integrationService = new IntegrationService(
-    new EngagementEventsRepository(),
-    new AzureTableFormationEventsRepository()
-  );
+  const integrationService = new IntegrationService(new EngagementEventsRepository());
 
   opsRouter.use("/engagements", createEngagementsRouter(engagementsRepository));
 
@@ -363,3 +360,4 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
 
   return opsRouter;
 }
+

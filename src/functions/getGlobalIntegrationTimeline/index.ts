@@ -20,10 +20,7 @@ export async function getGlobalIntegrationTimeline(context: any, req: any): Prom
         ? req.query.cursor.trim()
         : undefined;
 
-    const service = new IntegrationService(
-      new EngagementEventsRepository(),
-      new AzureTableFormationEventsRepository()
-    );
+    const service = new IntegrationService(new EngagementEventsRepository());
 
     const page = await service.readGlobalIntegratedTimeline(limit, cursor);
 
@@ -45,3 +42,4 @@ export async function getGlobalIntegrationTimeline(context: any, req: any): Prom
     };
   }
 }
+

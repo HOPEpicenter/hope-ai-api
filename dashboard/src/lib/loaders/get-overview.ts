@@ -1,84 +1,75 @@
 import type { OverviewResponse } from "@/lib/contracts/overview";
-import { getVisitors } from "@/lib/loaders/get-visitors";
-import { getFormationProfiles } from "@/lib/loaders/get-formation-profiles";
+import { getGlobalActivity } from "./get-global-activity";
 
 export async function getOverview(): Promise<OverviewResponse> {
-  const visitors = await getVisitors();
+  try {
+    const activity = await getGlobalActivity(20);
 
-  const formationProfiles = await getFormationProfiles(
-    visitors.items.map((v: (typeof visitors.items)[number]) => v.visitorId)
-  );
+    const engagementCount = activity.items.filter((item) => item.stream === "engagement").length;
+    const formationCount = activity.items.filter((item) => item.stream === "formation").length;
+    const distinctVisitors = new Set(
+      activity.items
+        .map((item) => item.visitorId)
+        .filter((value) => typeof value === "string" && value.trim().length > 0)
+    ).size;
 
-  const profileByVisitorId = new Map(
-    formationProfiles.items.map((p) => [p.visitorId, p] as const)
-  );
-
-  let waitingAssignment = 0;
-  let needsAttention = 0;
-  let contacted = 0;
-
-  const recent: OverviewResponse["recent"] = [];
-
-  for (const visitor of visitors.items) {
-    const profile = profileByVisitorId.get(visitor.visitorId);
-
-    const hasAssigned = !!profile?.assignedTo;
-    const hasContacted = !!profile?.lastFollowupContactedAt;
-    const hasOutcome = !!profile?.lastFollowupOutcomeAt;
-
-    if (!hasAssigned) {
-      waitingAssignment++;
-      continue;
-    }
-
-    if (hasOutcome) {
-      // resolved → not counted in overview buckets
-      continue;
-    }
-
-    if (hasContacted) {
-      contacted++;
-      continue;
-    }
-
-    // assigned but not contacted/outcome
-    needsAttention++;
-
-    if (recent.length < 5) {
-      recent.push({
-        title: visitor.visitorId,
-        subtitle: `${profile?.assignedTo ?? "Unassigned"}`,
-        href: `/visitors/${visitor.visitorId}?preset=needs-attention`
-      });
-    }
+    return {
+      ok: true,
+      stats: [
+        {
+          label: "Recent Activity",
+          value: activity.items.length,
+          helper: "Latest integrated events"
+        },
+        {
+          label: "Engagement Events",
+          value: engagementCount,
+          helper: "Recent engagement signals"
+        },
+        {
+          label: "Formation Events",
+          value: formationCount,
+          helper: "Recent formation movement"
+        },
+        {
+          label: "Visitors Touched",
+          value: distinctVisitors,
+          helper: "Visitors in recent activity"
+        }
+      ],
+      recent: activity.items.slice(0, 5).map((item) => ({
+        title: item.summary,
+        subtitle: `${item.stream} • visitor ${item.visitorId}`,
+        timestamp: item.occurredAt,
+        href: `/visitors/${encodeURIComponent(item.visitorId)}`
+      }))
+    };
+  } catch {
+    return {
+      ok: false,
+      stats: [
+        {
+          label: "Recent Activity",
+          value: 0,
+          helper: "Latest integrated events"
+        },
+        {
+          label: "Engagement Events",
+          value: 0,
+          helper: "Recent engagement signals"
+        },
+        {
+          label: "Formation Events",
+          value: 0,
+          helper: "Recent formation movement"
+        },
+        {
+          label: "Visitors Touched",
+          value: 0,
+          helper: "Visitors in recent activity"
+        }
+      ],
+      recent: []
+    };
   }
-
-  return {
-    ok: true,
-    stats: [
-      {
-        label: "Waiting Assignment",
-        value: waitingAssignment,
-        helper: "Visitors with no active followup assignment"
-      },
-      {
-        label: "Needs Attention",
-        value: needsAttention,
-        helper: "Assigned followups still needing operator action"
-      },
-      {
-        label: "Contacted",
-        value: contacted,
-        helper: "Visitors with contact recorded"
-      },
-      {
-        label: "Visitors",
-        value: visitors.items.length,
-        helper: "Current visitor directory size"
-      }
-    ],
-    recent
-  };
 }
-
-

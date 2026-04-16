@@ -11,10 +11,7 @@ export const integrationRouter = Router();
 // Scope auth to /integration only
 integrationRouter.use("/integration", requireApiKey);
 
-const service = new IntegrationService(
-  new EngagementEventsRepository(),
-  new AzureTableFormationEventsRepository()
-);
+const service = new IntegrationService(new EngagementEventsRepository());
 
 integrationRouter.get("/integration/timeline", async (req, res, next) => {
   try {
@@ -95,3 +92,4 @@ integrationRouter.get("/integration/timeline/global", async (req, res, next) => 
     return next(err);
   }
 });
+

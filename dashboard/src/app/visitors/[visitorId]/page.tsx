@@ -1182,7 +1182,12 @@ export default async function VisitorDetailPage({
       <EventTimelineCard events={dedupedFormationEvents} />
 
       <div style={{ display: "grid", gap: 12 }}>
-        <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>Engagement Timeline</h2>
+        <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>
+          Activity Timeline
+        </h2>
+        <div style={{ fontSize: 14, color: "#6b7280" }}>
+          Combined engagement and formation activity for this visitor.
+        </div>
         <TimelineList items={data.engagementTimeline ?? []} />
       </div>
 
@@ -1393,6 +1398,7 @@ export default async function VisitorDetailPage({
     </section>
   );
 }
+
 
 
 

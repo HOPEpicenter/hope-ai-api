@@ -1,17 +1,8 @@
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
-import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
-import { FormationEventsRepository } from "../../repositories/formationEventsRepository";
-import { mergeTimelines } from "../../domain/integration/mergeTimelines.v1";
+import { getFormationEventsTableClient, getFormationProfilesTableClient } from "../../storage/formation/formationTables";
 import { listFormationEventsByVisitor } from "../../storage/formation/formationEventsRepo";
-import { getFormationEventsTableClient } from "../../storage/formation/formationTables";
+import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
-import {
-  decodeIntegrationCursorV1,
-  encodeIntegrationCursorV1,
-  type IntegrationAfterV1,
-} from "../../contracts/integrationTimelineCursor.v1";
-import { encodeCursorV1 } from "../../contracts/timeline.v1";
 import { deriveIntegrationSummaryV1 } from "../../domain/integration/deriveIntegrationSummary.v1";
 
 export type IntegratedTimelinePageV1 = {
@@ -19,346 +10,134 @@ export type IntegratedTimelinePageV1 = {
   nextCursor: string | null;
 };
 
-function cmpDesc(a: string, b: string): number {
-  if (a === b) return 0;
-  return a > b ? -1 : 1; // DESC
+function compareNewestFirst(a: any, b: any): number {
+  const ao = String(a?.occurredAt ?? "");
+  const bo = String(b?.occurredAt ?? "");
+  if (ao !== bo) return ao > bo ? -1 : 1;
+
+  const ae = String(a?.eventId ?? "");
+  const be = String(b?.eventId ?? "");
+  if (ae === be) return 0;
+  return ae > be ? -1 : 1;
 }
 
-function tieKey(item: any): string {
-  return `${String(item.stream ?? "")}:${String(item.eventId ?? "")}`;
-}
+function summaryForItem(item: any): string {
+  const type = String(item?.type ?? "").trim();
 
-function compareItemsNewestFirst(a: any, b: any): number {
-  const t = cmpDesc(String(a.occurredAt ?? ""), String(b.occurredAt ?? ""));
-  if (t !== 0) return t;
-
-  const ta = tieKey(a);
-  const tb = tieKey(b);
-  if (ta === tb) return 0;
-  return ta < tb ? -1 : 1;
-}
-
-function isOlderThanAfter(item: any, after: IntegrationAfterV1): boolean {
-  const itemTime = String(item.occurredAt ?? "");
-  const afterTime = after.occurredAt;
-
-  if (itemTime !== afterTime) {
-    // strictly older timestamps (ISO strings compare lexicographically)
-    return itemTime < afterTime;
-  }
-
-  // same timestamp: strictly after the cursor in tie order
-  const itemTie = tieKey(item);
-  const afterTie = `${after.stream}:${after.eventId}`;
-  return itemTie > afterTie;
-}
-
-function padLeft(s: string, width: number): string {
-  return s.length >= width ? s : "0".repeat(width - s.length) + s;
-}
-
-function invMillis(ms: number, width: number, max: number): string {
-  const inv = max - ms;
-  return padLeft(String(inv), width);
-}
-
-// Engagement RowKey format: invMillis15|eventId
-function engagementRowKey(occurredAtIso: string, eventId: string): string {
-  const ms = Date.parse(occurredAtIso);
-  const inv15 = invMillis(ms, 15, 253402300799999);
-  return `${inv15}|${eventId}`;
-}
-
-// Formation RowKey prefix: invMillis13_uuid (cursor is base64(rowKey))
-function formationInvPrefix(occurredAtIso: string): string {
-  const ms = Date.parse(occurredAtIso);
-  return invMillis(ms, 13, 9999999999999);
-}
-
-function toBase64(s: string): string {
-  return Buffer.from(s, "utf8").toString("base64");
-}
-
-
-function deriveSummary(item: any): string {
-  const type = String(item.type ?? "").trim();
-
-  if (item.stream === "formation") {
+  if (item?.stream === "formation") {
+    if (typeof item?.data?.summary === "string" && item.data.summary.trim().length > 0) {
+      return item.data.summary.trim();
+    }
     if (type === "FOLLOWUP_ASSIGNED") return "Followup assigned";
+    if (type === "FOLLOWUP_CONTACTED") return "Followup contacted";
+    if (type === "FOLLOWUP_OUTCOME_RECORDED") return "Followup outcome recorded";
+    if (type === "FOLLOWUP_UNASSIGNED") return "Followup unassigned";
     return type || "formation event";
   }
 
-  if (item.stream === "engagement") {
-  const summary = item.data?.summary;
-  if (typeof summary === "string" && summary.trim().length > 0) {
-    return summary.trim();
+  if (item?.stream === "engagement") {
+    const data = item?.data ?? {};
+    if (typeof data.summary === "string" && data.summary.trim().length > 0) return data.summary.trim();
+    if (typeof data.text === "string" && data.text.trim().length > 0) return data.text.trim();
+    if (typeof data.notes === "string" && data.notes.trim().length > 0) return data.notes.trim();
+
+    if (type === "status.transition") {
+      const to = typeof data.to === "string" ? data.to.trim() : "";
+      return to ? `Status -> ${to}` : "Status transition";
+    }
+
+    return type || "engagement event";
   }
 
-  const text = item.data?.text;
-  if (typeof text === "string" && text.trim().length > 0) {
-    return text.trim();
-  }
-
-  const notes = item.data?.notes ?? item.notes;
-  if (typeof notes === "string" && notes.trim().length > 0) {
-    return notes.trim();
-  }
-
-    if (type === "CONTACT_CALL") return "Call logged";
-  if (type === "CONTACT_TEXT") return "Text logged";
-  if (type === "CONTACT_MEETING") return "Meeting logged";
-  if (type === "TAG_ADDED") return "Tag added";
-  if (type === "TAG_REMOVED") return "Tag removed";
-
-  return type || "engagement event";
+  return type || "event";
 }
 
-  return "event";
+function toFormationTimelineItem(visitorId: string, event: any) {
+  return {
+    eventId: event?.rowKey,
+    visitorId,
+    type: event?.type,
+    occurredAt: event?.occurredAt,
+    stream: "formation" as const,
+    data: event
+  };
+}
+
+function toEngagementTimelineItem(event: any) {
+  return {
+    ...event,
+    stream: "engagement" as const,
+    data: event?.data ?? {}
+  };
+}
+
+function enrichTimelineItems(items: any[]) {
+  return items.map((item) => ({
+    ...item,
+    summary: summaryForItem(item),
+    data: item?.data ?? {}
+  }));
 }
 
 export class IntegrationService {
-  constructor(
-    private engagementRepo: EngagementEventsRepository,
-    private formationRepo: FormationEventsRepository,
-  ) {}
+  constructor(private readonly engagementRepo: EngagementEventsRepository) {}
 
   async readIntegratedTimeline(
     visitorId: string,
     limit: number,
-    cursor?: string,
+    _cursor?: string
   ): Promise<IntegratedTimelinePageV1> {
-    const safeLimit = Math.max(1, Math.min(200, limit || 50));
+    const safeLimit = Math.max(1, Math.min(200, Number(limit || 50)));
 
-    let after: IntegrationAfterV1 | undefined;
-    if (cursor) {
-      const decoded = decodeIntegrationCursorV1(cursor);
-      if (decoded.visitorId !== visitorId)
-        throw new Error("Cursor visitorId mismatch");
-      after = decoded.after;
-    }
+    const engagementPage = await this.engagementRepo.readTimeline(visitorId, safeLimit, undefined);
 
-    const perStream = Math.min(200, Math.max(50, safeLimit * 5));
+    const eventsTable = getFormationEventsTableClient();
+    await ensureTableExists(eventsTable);
 
-    let engagementCursorForRepo: string | undefined;
-    let formationCursorForRepo: string | undefined;
-
-    if (after) {
-      // Engagement per-stream cursor:
-      // - If after.stream is engagement: start after that exact engagement rowKey.
-      // - If after.stream is formation: skip ALL engagement items at that same timestamp.
-      //   Use "~" sentinel at same invMillis15 (since "~" sorts after typical event ids).
-      if (after.stream === "engagement") {
-        // Exact mapping: engagement cursor is the durable RowKey format (invMillis15|eventId)
-        const engagementAfterRowKey = engagementRowKey(
-          after.occurredAt,
-          String(after.eventId),
-        );
-
-        engagementCursorForRepo = encodeCursorV1({
-          visitorId,
-          after: engagementAfterRowKey,
-        });
-      } else {
-        // Cross-stream translation:
-        // When the integration cursor is a FORMATION item, we still need to advance the engagement stream.
-        // We do this by computing the engagement RowKey at the same occurredAt using a HIGH eventId suffix,
-        // so "RowKey gt after" returns strictly older engagement items.
-        const engInvPrefix = engagementRowKey(after.occurredAt, "~").split(
-          "|",
-        )[0];
-        const engagementAfterRowKey = `${engInvPrefix}|~`;
-
-        engagementCursorForRepo = encodeCursorV1({
-          visitorId,
-          after: engagementAfterRowKey,
-        });
-      }
-
-      // Formation per-stream cursor:
-      // - If after.stream is formation: start after that exact formation rowKey (= eventId).
-      // - If after.stream is engagement: include ALL formation items at that same timestamp.
-      //   Use inv13 + "_" sentinel so RowKey gt inv13_ includes inv13_uuid.
-      const formationAfterRowKey =
-        after.stream === "formation"
-          ? String(after.eventId)
-          : `${formationInvPrefix(after.occurredAt)}_`;
-
-      formationCursorForRepo = toBase64(formationAfterRowKey);
-    }
-
-    const engagementPage = await this.engagementRepo.readTimeline(
-      visitorId,
-      perStream,
-      engagementCursorForRepo,
-    );
-
-    const storageConnectionString = process.env.STORAGE_CONNECTION_STRING;
-if (!storageConnectionString) throw new Error("Missing STORAGE_CONNECTION_STRING");
-
-const eventsTable = getFormationEventsTableClient(storageConnectionString);
-await ensureTableExists(eventsTable);
-
-// cursor should be a formation RowKey (older-than paging)
-const fetchLimit = perStream + 1;
-
-// Decode integration’s base64(rowKey) per-stream cursor into a real RowKey for storage
-const formationBeforeRowKey = formationCursorForRepo
-  ? Buffer.from(String(formationCursorForRepo), "base64").toString("utf8")
-  : undefined;
-
-// cursor should be a formation RowKey (older-than paging)
-const formationAscAll = await listFormationEventsByVisitor(eventsTable as any, visitorId, {
-  limit: fetchLimit,
-  beforeRowKey: formationBeforeRowKey,
-});
-// Keep the newest perStream from the ascending list
-const formationAscSlice = formationAscAll.slice(-perStream);
-
-// Convert to newest-first items for merge/sort
-const formationItems = formationAscSlice
-  .slice()
-  .reverse()
-  .map((e: any) => ({
-    v: 1,
-    eventId: e.id ?? e.eventId ?? e.rowKey,
-    visitorId: e.visitorId ?? visitorId,
-    type: e.type,
-    occurredAt: e.occurredAt,
-    source: { system: "formation" },
-    data: e.metadata ? { metadata: e.metadata } : undefined,
-  }));
-
-// nextCursor should be the oldest rowKey returned (so we can page older-than it)
-const formationPage = {
-  items: formationItems,
-  nextCursor: formationAscSlice.length > 0 ? (formationAscSlice[0] as any).rowKey : null,
-};
-const merged = mergeTimelines(
-      engagementPage.items ?? [],
-      formationPage.items ?? [],
-    );
-    merged.sort(compareItemsNewestFirst);
-
-    const FOLLOWUP_MIRROR_TYPES = new Set([
-      "FOLLOWUP_ASSIGNED",
-      "FOLLOWUP_CONTACTED",
-      "FOLLOWUP_OUTCOME_RECORDED",
-      "FOLLOWUP_UNASSIGNED"
-    ]);
-
-    const engagementKeys = new Set(
-      merged
-        .filter((it: any) => it.stream === "engagement")
-        .map((it: any) => `${it.occurredAt}|${it.type}`)
-    );
-
-    const dedupedMerged = merged.filter((it: any) => {
-      if (
-        it.stream === "formation" &&
-        typeof it.type === "string" &&
-        FOLLOWUP_MIRROR_TYPES.has(it.type)
-      ) {
-        const key = `${it.occurredAt}|${it.type}`;
-        return !engagementKeys.has(key);
-      }
-      return true;
+    const formationAscAll = await listFormationEventsByVisitor(eventsTable as any, visitorId, {
+      limit: 500
     });
 
-    const filtered = after
-      ? dedupedMerged.filter((it) => isOlderThanAfter(it, after))
-      : dedupedMerged;
+    const formationItems = formationAscAll
+      .slice()
+      .reverse()
+      .map((event: any) => toFormationTimelineItem(visitorId, event));
 
-    const pagePlus = filtered.slice(0, safeLimit + 1);
-    const pageItems = pagePlus.slice(0, safeLimit);
-    const hasMore = pagePlus.length > safeLimit;
-    const nextCursor =
-      hasMore && pageItems.length > 0
-        ? encodeIntegrationCursorV1({
-            v: 1,
-            visitorId,
-            after: {
-              occurredAt: String(pageItems[pageItems.length - 1].occurredAt),
-              stream: pageItems[pageItems.length - 1].stream,
-              eventId: String(pageItems[pageItems.length - 1].eventId),
-            },
-          })
-        : null;
+    const engagementItems = (engagementPage.items ?? []).map((event: any) => toEngagementTimelineItem(event));
 
-    const enrichedItems = pageItems.map((it) => ({
-  ...it,
-  summary: deriveSummary(it)
-}));
+    const merged = enrichTimelineItems(
+      [...engagementItems, ...formationItems].sort(compareNewestFirst)
+    );
 
-return { items: enrichedItems, nextCursor };
+    return {
+      items: merged.slice(0, safeLimit),
+      nextCursor: null
+    };
   }
+
   async readIntegrationSummary(visitorId: string) {
-    // Read-only derived view: no new writes, no persistence.
-    // Engagement timestamp comes from engagement events.
-    // Formation truth comes from the Formation Profile snapshot.
-    const eng = await this.engagementRepo.readTimeline(visitorId, 1, undefined);
+    const engagementPage = await this.engagementRepo.readTimeline(visitorId, 1, undefined);
+    const lastEngagementAt = engagementPage.items?.[0]?.occurredAt ?? null;
 
-    const lastEngagementAt = eng.items?.[0]?.occurredAt ?? null;
-    console.log("[integration-debug]", JSON.stringify({
-      visitorId,
-      lastEngagementAt,
-      engagementItems: eng.items?.length ?? 0,
-      firstEngagement: eng.items?.[0]?.occurredAt ?? null,
-      storage: process.env.STORAGE_CONNECTION_STRING ? "set" : "missing"
-    }));
+    const profilesTable = getFormationProfilesTableClient();
+    await ensureTableExists(profilesTable);
 
-    let lastFormationAt: string | null = null;
-let lastFormationEventType: string | null = null;
-    let assignedTo: { ownerType: "user" | "team"; ownerId: string; displayName?: string } | undefined;
-    let lastFollowupAssignedAt: string | null = null;
-    let lastFollowupContactedAt: string | null = null;
-    let lastFollowupOutcomeAt: string | null = null;
-    let groups: unknown = undefined;
-    let programs: unknown = undefined;
-    let workflows: unknown = undefined;
+    const profile = await getFormationProfile(profilesTable as any, visitorId);
 
-    try {
-      const cs = process.env.STORAGE_CONNECTION_STRING;
-      if (cs) {
-        const profiles = getFormationProfilesTableClient(cs);
-        const profile = await getFormationProfile(profiles as any, visitorId);
+    let lastFormationAt = String((profile as any)?.lastEventAt ?? "").trim() || null;
 
-        lastFormationAt = String((profile as any)?.lastEventAt ?? "").trim() || null;
-        lastFormationEventType = String((profile as any)?.lastEventType ?? "").trim() || null;
-        const followupOnlyTypes = new Set([
-          "FOLLOWUP_ASSIGNED",
-          "FOLLOWUP_CONTACTED",
-          "FOLLOWUP_OUTCOME_RECORDED",
-          "FOLLOWUP_UNASSIGNED"
-        ]);
+    const assignedToUserIdRaw = String((profile as any)?.assignedTo ?? "").trim();
+    const assignedToUserId = assignedToUserIdRaw || null;
 
-        if (lastFormationEventType && followupOnlyTypes.has(lastFormationEventType)) {
-          lastFormationAt = null;
-        }
+    const lastFollowupAssignedAt = (profile as any)?.lastFollowupAssignedAt ?? null;
+    const lastFollowupContactedAt = (profile as any)?.lastFollowupContactedAt ?? null;
+    const lastFollowupOutcomeAt = (profile as any)?.lastFollowupOutcomeAt ?? null;
 
-        const assigneeId = String((profile as any)?.assignedTo ?? "").trim();
-        if (assigneeId) {
-          assignedTo = { ownerType: "user", ownerId: assigneeId };
-        }
-
-        lastFollowupAssignedAt = (profile as any)?.lastFollowupAssignedAt ?? null;
-        lastFollowupContactedAt = (profile as any)?.lastFollowupContactedAt ?? null;
-        lastFollowupOutcomeAt = (profile as any)?.lastFollowupOutcomeAt ?? null;
-
-        groups = (profile as any)?.groups;
-        programs = (profile as any)?.programs;
-        workflows = (profile as any)?.workflows;
-      }
-    } catch {
-      // swallow: summary should still work even if profile table is missing
-    }
-
-    const assignedToUserId =
-      assignedTo && typeof (assignedTo as any).ownerId === "string"
-        ? String((assignedTo as any).ownerId).trim()
-        : null;
+    const groups = (profile as any)?.groups;
+    const programs = (profile as any)?.programs;
+    const workflows = (profile as any)?.workflows;
 
     return deriveIntegrationSummaryV1({
-
       visitorId,
       lastEngagementAt,
       lastFormationAt,
@@ -368,100 +147,49 @@ let lastFormationEventType: string | null = null;
       lastFollowupOutcomeAt,
       groups,
       programs,
-      workflows,
+      workflows
     });
   }
 
-  async readGlobalIntegratedTimeline(
-    limit: number,
-    cursor?: string,
-  ): Promise<IntegratedTimelinePageV1> {
-    const safeLimit = Math.max(1, Math.min(200, limit || 50));
-    const perStream = Math.min(200, Math.max(50, safeLimit * 5));
+  async readGlobalIntegratedTimeline(limit: number, _cursor?: string): Promise<IntegratedTimelinePageV1> {
+    const safeLimit = Math.max(1, Math.min(200, Number(limit || 50)));
 
-    let after: IntegrationAfterV1 | undefined;
-    if (cursor) {
-      const decoded = decodeIntegrationCursorV1(cursor);
-      after = decoded.after;
-    }
-
-    const storageConnectionString = process.env.STORAGE_CONNECTION_STRING;
-    if (!storageConnectionString) throw new Error("Missing STORAGE_CONNECTION_STRING");
-
-    const eventsTable = getFormationEventsTableClient(storageConnectionString);
+    const eventsTable = getFormationEventsTableClient();
     await ensureTableExists(eventsTable);
 
     const formationEntities: any[] = [];
-    for await (const e of (eventsTable as any).listEntities()) {
-      formationEntities.push(e);
-      if (formationEntities.length >= perStream) break;
+    for await (const entity of (eventsTable as any).listEntities()) {
+      formationEntities.push(entity);
+      if (formationEntities.length >= 200) break;
     }
 
-    const formationItems = formationEntities.map((e: any) => ({
-      v: 1,
-      eventId: e.id ?? e.eventId ?? e.rowKey,
-      visitorId: e.visitorId,
-      type: e.type,
-      occurredAt: e.occurredAt,
-      stream: "formation",
-      source: { system: "formation" },
-      data: e.metadata ? { metadata: e.metadata } : undefined,
-    }));
-    // Collect unique visitorIds from formation events
-    const visitorIds = Array.from(
-      new Set(formationItems.map((f: any) => f.visitorId).filter(Boolean))
+    const formationItems = formationEntities.map((event: any) =>
+      toFormationTimelineItem(event?.visitorId, event)
     );
 
-    // Pull engagement events per visitor
-    const engagementResults = await Promise.all(
-      visitorIds.map((visitorId) =>
-        this.engagementRepo.readTimeline(
-          visitorId,
-          Math.ceil(perStream / Math.max(visitorIds.length, 1)),
-          undefined
-        )
+    const visitorIds = Array.from(
+      new Set(
+        formationItems
+          .map((item) => String(item?.visitorId ?? "").trim())
+          .filter((id) => id.length > 0)
       )
     );
 
-    const engagementItems = engagementResults.flatMap((r) => r.items ?? []);
+    const engagementPages = await Promise.all(
+      visitorIds.map((visitorId) => this.engagementRepo.readTimeline(visitorId, 20, undefined))
+    );
 
-    const merged = mergeTimelines(engagementItems, formationItems);
-    merged.sort(compareItemsNewestFirst);
+    const engagementItems = engagementPages.flatMap((page) =>
+      (page.items ?? []).map((event: any) => toEngagementTimelineItem(event))
+    );
 
-    const filtered = after
-      ? merged.filter((it) => isOlderThanAfter(it, after))
-      : merged;
+    const merged = enrichTimelineItems(
+      [...engagementItems, ...formationItems].sort(compareNewestFirst)
+    );
 
-    const pagePlus = filtered.slice(0, safeLimit + 1);
-    const pageItems = pagePlus.slice(0, safeLimit);
-    const hasMore = pagePlus.length > safeLimit;
-
-    const nextCursor =
-      hasMore && pageItems.length > 0
-        ? encodeIntegrationCursorV1({
-            v: 1,
-            visitorId: "global",
-            after: {
-              occurredAt: String(pageItems[pageItems.length - 1].occurredAt),
-              stream: pageItems[pageItems.length - 1].stream,
-              eventId: String(pageItems[pageItems.length - 1].eventId),
-            },
-          })
-        : null;
-
-    const enrichedItems = pageItems.map((it) => ({
-      ...it,
-      summary: deriveSummary(it)
-    }));
-
-    return { items: enrichedItems, nextCursor };
+    return {
+      items: merged.slice(0, safeLimit),
+      nextCursor: null
+    };
   }
 }
-
-
-
-
-
-
-
-

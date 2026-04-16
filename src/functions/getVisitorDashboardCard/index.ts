@@ -4,10 +4,7 @@ import { EngagementEventsRepository } from "../../repositories/engagementEventsR
 import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
 import { createGetVisitorSummaryAdapter } from "../../routes/visitors/createGetVisitorSummaryAdapter";
 
-const integrationService = new IntegrationService(
-  new EngagementEventsRepository(),
-  new AzureTableFormationEventsRepository()
-);
+const integrationService = new IntegrationService(new EngagementEventsRepository());
 
 export async function getVisitorDashboardCard(context: any, req: any): Promise<void> {
   try {
@@ -141,3 +138,4 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     };
   }
 }
+

@@ -3,10 +3,7 @@ import { EngagementEventsRepository } from "../../repositories/engagementEventsR
 import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
 import { IntegrationService } from "../../services/integration/integrationService";
 
-const service = new IntegrationService(
-  new EngagementEventsRepository(),
-  new AzureTableFormationEventsRepository(),
-);
+const service = new IntegrationService(new EngagementEventsRepository());
 
 function parseLimit(value: unknown, fallback = 50): number {
   const n = typeof value === "string" ? Number(value) : fallback;
@@ -63,3 +60,4 @@ export async function getVisitorEngagementTimeline(context: any, req: any): Prom
     };
   }
 }
+

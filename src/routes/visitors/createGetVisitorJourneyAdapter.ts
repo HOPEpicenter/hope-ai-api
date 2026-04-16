@@ -6,10 +6,7 @@ import { AzureTableFormationEventsRepository } from "../../repositories/formatio
 import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
 import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
 
-const integrationService = new IntegrationService(
-  new EngagementEventsRepository(),
-  new AzureTableFormationEventsRepository()
-);
+const integrationService = new IntegrationService(new EngagementEventsRepository());
 
 export function createGetVisitorJourneyAdapter() {
   return async function getVisitorJourney(req: Request, res: Response, next: NextFunction) {
@@ -76,3 +73,4 @@ export function createGetVisitorJourneyAdapter() {
     }
   };
 }
+

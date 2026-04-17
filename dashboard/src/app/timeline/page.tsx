@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { TimelinePageClient } from "@/components/timeline-page-client";
-import { getGlobalActivity } from "@/lib/loaders/get-global-activity";
+import { getTimeline } from "@/lib/loaders/get-timeline";
 
 type TimelinePageProps = {
   searchParams?: Promise<{
@@ -23,12 +23,12 @@ export default async function TimelinePage({ searchParams }: TimelinePageProps) 
   const limit = clampLimit(params?.limit);
   const returnTo = params?.returnTo ?? undefined;
 
-  const activity = await getGlobalActivity(limit);
+  const timeline = await getTimeline(limit);
 
   return (
     <TimelinePageClient
-      initialItems={activity.items}
-      initialNextCursor={activity.nextCursor ?? null}
+      initialItems={timeline.items}
+      initialNextCursor={timeline.nextCursor ?? null}
       initialPageSize={limit}
       initialVisitorId={null}
       returnTo={returnTo ?? null}

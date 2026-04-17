@@ -10,6 +10,11 @@ export type IntegratedTimelinePageV1 = {
   nextCursor: string | null;
 };
 
+type ActivityFeedInputs = {
+  engagementItems: any[];
+  formationItems: any[];
+};
+
 function compareNewestFirst(a: any, b: any): number {
   const ao = String(a?.occurredAt ?? "");
   const bo = String(b?.occurredAt ?? "");
@@ -79,16 +84,129 @@ function enrichTimelineItems(items: any[]) {
   }));
 }
 
+function normalizeActivityFamily(item: any): string {
+  const type = String(item?.type ?? "").trim();
+  const summary = String(item?.summary ?? summaryForItem(item) ?? "").trim().toLowerCase();
+
+  if (type === "NEXT_STEP_SELECTED") return "next_step_selected";
+  if (type === "status.transition") return "status_transition";
+  if (type === "note.add") return "note_add";
+
+  if (type.startsWith("FOLLOWUP_")) return type.toLowerCase();
+
+  if (summary.includes("followup assigned")) return "followup_assigned";
+  if (summary.includes("followup contacted")) return "followup_contacted";
+  if (summary.includes("followup outcome")) return "followup_outcome_recorded";
+  if (summary.includes("followup unassigned")) return "followup_unassigned";
+
+  return type.toLowerCase() || "unknown";
+}
+
+function shouldSkipDedupe(item: any): boolean {
+  const family = normalizeActivityFamily(item);
+  return family === "next_step_selected" ||
+    family === "status_transition" ||
+    family === "note_add";
+}
+
+function dedupeMergedActivityItems(items: any[]): any[] {
+  const seen = new Set<string>();
+  const result: any[] = [];
+
+  for (const item of items) {
+    if (shouldSkipDedupe(item)) {
+      result.push(item);
+      continue;
+    }
+
+    const visitorId = String(item?.visitorId ?? "").trim();
+    const occurredAt = String(item?.occurredAt ?? "").trim();
+    const family = normalizeActivityFamily(item);
+    const summary = String(item?.summary ?? summaryForItem(item) ?? "").trim().toLowerCase();
+
+    const key = [
+      visitorId,
+      occurredAt,
+      family,
+      summary
+    ].join("|");
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push(item);
+  }
+
+  return result;
+}
 export class IntegrationService {
   constructor(private readonly engagementRepo: EngagementEventsRepository) {}
 
-  async readIntegratedTimeline(
-    visitorId: string,
-    limit: number,
-    _cursor?: string
-  ): Promise<IntegratedTimelinePageV1> {
-    const safeLimit = Math.max(1, Math.min(200, Number(limit || 50)));
+  async readIntegratedTimeline(visitorId: string, limit: number, cursor?: string) {
+    return this.getActivityFeed({ visitorId, limit, cursor });
+  }
 
+  async readGlobalIntegratedTimeline(limit: number, cursor?: string) {
+    return this.getActivityFeed({ limit, cursor });
+  }
+
+  private async getActivityFeed(opts: {
+    visitorId?: string;
+    limit: number;
+    cursor?: string;
+  }): Promise<IntegratedTimelinePageV1> {
+    const safeLimit = Math.max(1, Math.min(200, Number(opts.limit || 50)));
+
+    const inputs = opts.visitorId
+      ? await this.fetchVisitorActivityInputs(opts.visitorId, safeLimit)
+      : await this.fetchGlobalActivityInputs();
+
+        let merged = this.buildMergedActivityItems(inputs);
+
+    if (opts.cursor) {
+      const [cAt, cId] = opts.cursor.split("|");
+
+      merged = merged.filter((item) => {
+        if (!item?.occurredAt || !item?.eventId) return false;
+
+        if (item.occurredAt < cAt) return true;
+        if (item.occurredAt > cAt) return false;
+
+        // same timestamp → compare eventId
+        return item.eventId < cId;
+      });
+    }
+
+    const pageItems = merged.slice(0, safeLimit);
+
+    const nextCursor =
+      merged.length > safeLimit
+        ? (() => {
+            const last = pageItems[pageItems.length - 1];
+            return last ? `${last.occurredAt}|${last.eventId}` : null;
+          })()
+        : null;
+
+    return {
+      items: pageItems,
+      nextCursor
+    };
+  }
+
+  private buildMergedActivityItems(inputs: ActivityFeedInputs): any[] {
+    const merged = enrichTimelineItems(
+      [...inputs.engagementItems, ...inputs.formationItems].sort(compareNewestFirst)
+    );
+
+    return dedupeMergedActivityItems(merged);
+  }
+
+  private async fetchVisitorActivityInputs(
+    visitorId: string,
+    safeLimit: number
+  ): Promise<ActivityFeedInputs> {
     const engagementPage = await this.engagementRepo.readTimeline(visitorId, safeLimit, undefined);
 
     const eventsTable = getFormationEventsTableClient();
@@ -103,15 +221,49 @@ export class IntegrationService {
       .reverse()
       .map((event: any) => toFormationTimelineItem(visitorId, event));
 
-    const engagementItems = (engagementPage.items ?? []).map((event: any) => toEngagementTimelineItem(event));
-
-    const merged = enrichTimelineItems(
-      [...engagementItems, ...formationItems].sort(compareNewestFirst)
+    const engagementItems = (engagementPage.items ?? []).map((event: any) =>
+      toEngagementTimelineItem(event)
     );
 
     return {
-      items: merged.slice(0, safeLimit),
-      nextCursor: null
+      engagementItems,
+      formationItems
+    };
+  }
+
+  private async fetchGlobalActivityInputs(): Promise<ActivityFeedInputs> {
+    const eventsTable = getFormationEventsTableClient();
+    await ensureTableExists(eventsTable);
+
+    const formationEntities: any[] = [];
+    for await (const entity of (eventsTable as any).listEntities()) {
+      formationEntities.push(entity);
+      if (formationEntities.length >= 200) break;
+    }
+
+    const formationItems = formationEntities.map((event: any) =>
+      toFormationTimelineItem(event?.visitorId, event)
+    );
+
+    const visitorIds = Array.from(
+      new Set(
+        formationItems
+          .map((item) => String(item?.visitorId ?? "").trim())
+          .filter((id) => id.length > 0)
+      )
+    );
+
+    const engagementPages = await Promise.all(
+      visitorIds.map((visitorId) => this.engagementRepo.readTimeline(visitorId, 20, undefined))
+    );
+
+    const engagementItems = engagementPages.flatMap((page) =>
+      (page.items ?? []).map((event: any) => toEngagementTimelineItem(event))
+    );
+
+    return {
+      engagementItems,
+      formationItems
     };
   }
 
@@ -150,46 +302,9 @@ export class IntegrationService {
       workflows
     });
   }
-
-  async readGlobalIntegratedTimeline(limit: number, _cursor?: string): Promise<IntegratedTimelinePageV1> {
-    const safeLimit = Math.max(1, Math.min(200, Number(limit || 50)));
-
-    const eventsTable = getFormationEventsTableClient();
-    await ensureTableExists(eventsTable);
-
-    const formationEntities: any[] = [];
-    for await (const entity of (eventsTable as any).listEntities()) {
-      formationEntities.push(entity);
-      if (formationEntities.length >= 200) break;
-    }
-
-    const formationItems = formationEntities.map((event: any) =>
-      toFormationTimelineItem(event?.visitorId, event)
-    );
-
-    const visitorIds = Array.from(
-      new Set(
-        formationItems
-          .map((item) => String(item?.visitorId ?? "").trim())
-          .filter((id) => id.length > 0)
-      )
-    );
-
-    const engagementPages = await Promise.all(
-      visitorIds.map((visitorId) => this.engagementRepo.readTimeline(visitorId, 20, undefined))
-    );
-
-    const engagementItems = engagementPages.flatMap((page) =>
-      (page.items ?? []).map((event: any) => toEngagementTimelineItem(event))
-    );
-
-    const merged = enrichTimelineItems(
-      [...engagementItems, ...formationItems].sort(compareNewestFirst)
-    );
-
-    return {
-      items: merged.slice(0, safeLimit),
-      nextCursor: null
-    };
-  }
 }
+
+
+
+
+

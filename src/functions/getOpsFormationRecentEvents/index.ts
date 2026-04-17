@@ -1,182 +1,52 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
-import {
-  getFormationEventsTableClient,
-  listFormationEventsByVisitorId
-} from "../_shared/formation";
-
-function normalizeQueryIso(value: unknown, fieldName: string): string | undefined {
-  const text = String(value ?? "").trim();
-  if (!text) {
-    return undefined;
-  }
-
-  const isoUtcPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?Z$/;
-  if (!isoUtcPattern.test(text)) {
-    throw new Error(fieldName + " must be a valid UTC ISO timestamp ending in Z");
-  }
-
-  const parsed = new Date(text);
-  if (Number.isNaN(parsed.getTime())) {
-    throw new Error(fieldName + " must be a valid ISO timestamp");
-  }
-
-  return parsed.toISOString();
-}
-
-function tryParseJson(value: unknown): unknown {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-}
-
-function toOpsFormationEvent(item: any): Record<string, unknown> {
-  return {
-    id: item.idempotencyKey ?? null,
-    rowKey: item.rowKey ?? null,
-    visitorId: item.visitorId ?? null,
-    type: item.type ?? null,
-    occurredAt: item.occurredAt ?? null,
-    recordedAt: item.recordedAt ?? null,
-    channel: item.channel ?? null,
-    summary: item.summary ?? null,
-    metadata: tryParseJson(item.metadata)
-  };
-}
-
-async function listRecentFormationEvents(table: any, options: {
-  limit: number;
-  beforeRowKey?: string;
-  sinceOccurredAt?: string;
-  untilOccurredAt?: string;
-}): Promise<any[]> {
-  const formationTypes = new Set([
-    "NEXT_STEP_SELECTED"
-  ]);
-
-  const filterParts: string[] = [];
-
-  if (options.beforeRowKey) {
-    filterParts.push(`RowKey lt '${String(options.beforeRowKey).replace(/'/g, "''")}'`);
-  }
-
-  if (options.sinceOccurredAt) {
-    filterParts.push(`occurredAt ge '${String(options.sinceOccurredAt).replace(/'/g, "''")}'`);
-  }
-
-  if (options.untilOccurredAt) {
-    filterParts.push(`occurredAt le '${String(options.untilOccurredAt).replace(/'/g, "''")}'`);
-  }
-
-  const filter = filterParts.length ? filterParts.join(" and ") : undefined;
-  const results: any[] = [];
-
-  const entities = table.listEntities({
-    queryOptions: {
-      filter
-    }
-  });
-
-  for await (const entity of entities) {
-    const type = String(entity?.type ?? "").trim();
-    if (!formationTypes.has(type)) {
-      continue;
-    }
-
-    results.push(entity);
-
-    if (results.length >= options.limit) {
-      break;
-    }
-  }
-
-  return results;
-}
+import { getFormationEventsTableClient } from "../../storage/formation/formationTables";
+import { listRecentFormationEvents } from "../../storage/formation/formationEventsRepo";
+import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 
 export async function getOpsFormationRecentEvents(context: any, req: any): Promise<void> {
-  const auth = requireApiKeyForFunction(req);
-  if (!auth.ok) {
-    return;
-  }
-
-  const visitorId = String(req?.query?.visitorId ?? "").trim() || undefined;
-  const rawLimit = Number(req?.query?.limit ?? 20);
-  const limit = Math.max(1, Math.min(rawLimit || 20, 100));
-  const beforeRowKey = String(req?.query?.before ?? "").trim() || undefined;
-
   try {
-    const sinceOccurredAt = normalizeQueryIso(req?.query?.since, "since");
-    const untilOccurredAt = normalizeQueryIso(req?.query?.until, "until");
-
-    if (sinceOccurredAt && untilOccurredAt && sinceOccurredAt > untilOccurredAt) {
+    const auth = requireApiKeyForFunction(req);
+    if (!auth.ok) {
       context.res = {
-        status: 400,
-        body: { ok: false, error: "since must be less than or equal to until" }
+        status: auth.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: auth.body
       };
       return;
     }
 
+    const limitRaw = Number(req?.query?.limit ?? 10);
+    const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, limitRaw)) : 10;
+    const since =
+      typeof req?.query?.since === "string" && req.query.since.trim().length > 0
+        ? req.query.since.trim()
+        : undefined;
+
     const table = getFormationEventsTableClient();
+    await ensureTableExists(table);
 
-    const items = visitorId
-      ? await listFormationEventsByVisitorId(table, {
-          visitorId,
-          limit,
-          beforeRowKey,
-          sinceOccurredAt,
-          untilOccurredAt
-        } as any)
-      : await listRecentFormationEvents(table, {
-          limit,
-          beforeRowKey,
-          sinceOccurredAt,
-          untilOccurredAt
-        });
-
-    const unique = new Map<string, any>();
-for (const item of items) {
-  const key = String(item?.rowKey ?? "");
-  if (!unique.has(key)) {
-    unique.set(key, item);
-  }
-}
-
-const shapedItems = Array.from(unique.values()).map(toOpsFormationEvent);
-    const nextCursor = items.length >= limit ? items[items.length - 1]?.rowKey ?? null : null;
+    const items = await listRecentFormationEvents(table as any, {
+      limit,
+      since
+    });
 
     context.res = {
       status: 200,
+      headers: { "content-type": "application/json; charset=utf-8" },
       body: {
         ok: true,
-        visitorId: visitorId ?? null,
-        count: shapedItems.length,
-        nextCursor,
-        sinceOccurredAt: sinceOccurredAt ?? null,
-        untilOccurredAt: untilOccurredAt ?? null,
-        items: shapedItems
+        items
       }
     };
   } catch (err: any) {
-    const message = String(err?.message ?? err ?? "Unknown error");
-    const isValidationError =
-      message.includes("must be a valid UTC ISO timestamp ending in Z") ||
-      message.includes("must be a valid ISO timestamp");
-
+    context.log.error(err?.message ?? err);
     context.res = {
-      status: isValidationError ? 400 : 500,
+      status: 500,
+      headers: { "content-type": "application/json; charset=utf-8" },
       body: {
         ok: false,
-        error: message
+        error: err?.message ?? "FAILED_TO_LOAD_RECENT_FORMATION_EVENTS"
       }
     };
   }
 }
-
-
-
-

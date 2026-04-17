@@ -23,7 +23,7 @@ export default async function TimelinePage({ searchParams }: TimelinePageProps) 
   const limit = clampLimit(params?.limit);
   const returnTo = params?.returnTo ?? undefined;
 
-  const timeline = await getTimeline(limit);
+  const timeline = await getTimeline(String(limit));
 
   return (
     <TimelinePageClient
@@ -35,3 +35,4 @@ export default async function TimelinePage({ searchParams }: TimelinePageProps) 
     />
   );
 }
+

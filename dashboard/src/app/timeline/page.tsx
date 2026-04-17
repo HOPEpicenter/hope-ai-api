@@ -6,7 +6,6 @@ import { getGlobalActivity } from "@/lib/loaders/get-global-activity";
 type TimelinePageProps = {
   searchParams?: Promise<{
     limit?: string;
-    visitorId?: string;
     returnTo?: string;
   }>;
 };
@@ -22,35 +21,16 @@ function clampLimit(value?: string): number {
 export default async function TimelinePage({ searchParams }: TimelinePageProps) {
   const params = searchParams ? await searchParams : undefined;
   const limit = clampLimit(params?.limit);
-  const visitorId = params?.visitorId?.trim() || undefined;
   const returnTo = params?.returnTo ?? undefined;
 
   const activity = await getGlobalActivity(limit);
 
-  const items = (visitorId
-    ? activity.items.filter((item) => item.visitorId === visitorId)
-    : activity.items
-  )
-    .filter(
-      (item) =>
-        typeof item.occurredAt === "string" &&
-        item.occurredAt.trim().length > 0
-    )
-    .map((item) => ({
-      ...item,
-      occurredAt: item.occurredAt as string,
-      type:
-        typeof item.type === "string" && item.type.trim().length > 0
-          ? item.type
-          : "UNKNOWN"
-    }));
-
   return (
     <TimelinePageClient
-      initialItems={items}
+      initialItems={activity.items}
       initialNextCursor={activity.nextCursor ?? null}
       initialPageSize={limit}
-      initialVisitorId={visitorId ?? null}
+      initialVisitorId={null}
       returnTo={returnTo ?? null}
     />
   );

@@ -1,12 +1,11 @@
 export const dynamic = "force-dynamic";
 
 import { TimelinePageClient } from "@/components/timeline-page-client";
-import { getGlobalActivity } from "@/lib/loaders/get-global-activity";
+import { getTimeline } from "@/lib/loaders/get-timeline";
 
 type TimelinePageProps = {
   searchParams?: Promise<{
     limit?: string;
-    visitorId?: string;
     returnTo?: string;
   }>;
 };
@@ -22,36 +21,18 @@ function clampLimit(value?: string): number {
 export default async function TimelinePage({ searchParams }: TimelinePageProps) {
   const params = searchParams ? await searchParams : undefined;
   const limit = clampLimit(params?.limit);
-  const visitorId = params?.visitorId?.trim() || undefined;
   const returnTo = params?.returnTo ?? undefined;
 
-  const activity = await getGlobalActivity(limit);
-
-  const items = (visitorId
-    ? activity.items.filter((item) => item.visitorId === visitorId)
-    : activity.items
-  )
-    .filter(
-      (item) =>
-        typeof item.occurredAt === "string" &&
-        item.occurredAt.trim().length > 0
-    )
-    .map((item) => ({
-      ...item,
-      occurredAt: item.occurredAt as string,
-      type:
-        typeof item.type === "string" && item.type.trim().length > 0
-          ? item.type
-          : "UNKNOWN"
-    }));
+  const timeline = await getTimeline(String(limit));
 
   return (
     <TimelinePageClient
-      initialItems={items}
-      initialNextCursor={activity.nextCursor ?? null}
+      initialItems={timeline.items}
+      initialNextCursor={timeline.nextCursor ?? null}
       initialPageSize={limit}
-      initialVisitorId={visitorId ?? null}
+      initialVisitorId={null}
       returnTo={returnTo ?? null}
     />
   );
 }
+

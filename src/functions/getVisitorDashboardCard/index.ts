@@ -1,7 +1,6 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { IntegrationService } from "../../services/integration/integrationService";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
 import { createGetVisitorSummaryAdapter } from "../../routes/visitors/createGetVisitorSummaryAdapter";
 
 const integrationService = new IntegrationService(new EngagementEventsRepository());
@@ -35,6 +34,20 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     const hasOutcomeRecorded = items.some((item: any) => item?.type === "FOLLOWUP_OUTCOME_RECORDED");
     const hasContacted = items.some((item: any) => item?.type === "FOLLOWUP_CONTACTED");
     const hasAssigned = items.some((item: any) => item?.type === "FOLLOWUP_ASSIGNED");
+
+    // ✅ FIXED LOGIC
+    const followupStatus = hasOutcomeRecorded
+      ? "resolved"
+      : hasAssigned
+        ? hasContacted
+          ? "contact_made"
+          : "action_needed"
+        : "none";
+
+    const attentionState =
+      followupStatus === "resolved"
+        ? "clear"
+        : "needs_attention";
 
     const getVisitorSummary = createGetVisitorSummaryAdapter();
     const summaryResponse: any = {
@@ -74,19 +87,6 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
         ? profile.lastFollowupAssignedAt.trim()
         : null;
 
-    const followupStatus = hasOutcomeRecorded
-      ? "resolved"
-      : hasContacted
-        ? "contacted"
-        : hasAssigned
-          ? "pending"
-          : "none";
-
-    const attentionState =
-      followupStatus === "resolved" || followupStatus === "contacted"
-        ? "clear"
-        : "needs_attention";
-
     const getAgeHours = (value: string | null): number | null => {
       if (!value) return null;
 
@@ -102,7 +102,7 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     const ageHours = getAgeHours(lastFollowupAssignedAt);
 
     const followupUrgency =
-      !assignedTo || followupStatus === "resolved" || followupStatus === "contacted"
+      !assignedTo || followupStatus === "resolved"
         ? null
         : ageHours !== null && ageHours >= 48
           ? "OVERDUE"
@@ -138,4 +138,3 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     };
   }
 }
-

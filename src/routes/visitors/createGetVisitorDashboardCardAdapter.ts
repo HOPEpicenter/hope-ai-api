@@ -6,62 +6,40 @@ export function createGetVisitorDashboardCardAdapter(integrationService: Integra
     const visitorId = String(req.params.id ?? "").trim();
 
     const page = await integrationService.readIntegratedTimeline(visitorId, 100);
+    const items = Array.isArray(page.items) ? page.items : [];
 
-    const latest = Array.isArray(page.items) && page.items.length > 0
-      ? page.items[0]
-      : null;
+    const latest = items.length > 0 ? items[0] : null;
 
-    const derivedTags = Array.isArray(page.items)
-      ? (() => {
-          const acc = new Map<string, boolean>();
+    const hasOutcome = items.some(i => i?.type === "FOLLOWUP_OUTCOME_RECORDED");
+    const hasContact = items.some(i => i?.type === "FOLLOWUP_CONTACTED");
+    const hasAssigned = items.some(i => i?.type === "FOLLOWUP_ASSIGNED");
 
-          for (const item of page.items.slice().reverse()) {
-            const tag =
-              typeof item?.data?.tag === "string"
-                ? item.data.tag.trim()
-                : typeof item?.data?.name === "string"
-                  ? item.data.name.trim()
-                  : "";
-
-            if (!tag) continue;
-
-            if (item.type === "TAG_ADDED") acc.set(tag, true);
-            if (item.type === "TAG_REMOVED") acc.delete(tag);
-          }
-
-          return Array.from(acc.keys()).sort((a, b) => a.localeCompare(b));
-        })()
-      : [];
-
-    const assignedTo = Array.isArray(page.items)
-      ? (() => {
-          for (const item of page.items) {
-            if (item?.type === "FOLLOWUP_ASSIGNED") {
-              const id =
-                typeof item?.data?.assigneeId === "string"
-                  ? item.data.assigneeId.trim()
-                  : "";
-              if (id) return id;
-            }
-            if (item?.type === "FOLLOWUP_UNASSIGNED") return null;
-          }
-          return null;
-        })()
-      : null;
-
-    const followupStatus =
-      latest?.type === "FOLLOWUP_OUTCOME_RECORDED"
-        ? "resolved"
-        : latest?.type === "FOLLOWUP_CONTACTED"
-          ? "contacted"
-          : latest?.type === "FOLLOWUP_ASSIGNED"
-            ? "pending"
-            : "none";
+    // ✅ FIXED LOGIC
+    const followupStatus = hasOutcome
+      ? "resolved"
+      : hasAssigned
+        ? hasContact
+          ? "contact_made"
+          : "action_needed"
+        : "none";
 
     const attentionState =
-      followupStatus === "resolved" || followupStatus === "contacted"
+      followupStatus === "resolved"
         ? "clear"
         : "needs_attention";
+
+    const assignedTo = (() => {
+      for (const item of items) {
+        if (item?.type === "FOLLOWUP_ASSIGNED") {
+          const id = typeof item?.data?.assigneeId === "string"
+            ? item.data.assigneeId.trim()
+            : "";
+          if (id) return id;
+        }
+        if (item?.type === "FOLLOWUP_UNASSIGNED") return null;
+      }
+      return null;
+    })();
 
     return res.json({
       visitorId,
@@ -71,8 +49,7 @@ export function createGetVisitorDashboardCardAdapter(integrationService: Integra
         lastActivitySummary: latest?.summary ?? null,
         followupStatus,
         assignedTo,
-        attentionState,
-        tags: derivedTags
+        attentionState
       }
     });
   };

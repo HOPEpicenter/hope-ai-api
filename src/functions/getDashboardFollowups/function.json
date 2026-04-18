@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getDashboardFollowups/index.js",
+  "entryPoint": "getDashboardFollowups",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "dashboard/followups"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

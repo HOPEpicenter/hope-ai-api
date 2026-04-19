@@ -449,3 +449,15 @@ Current rule:
 
 
 - [x] Followup ownership model validated (assign/unassign lifecycle + regression + staging)\n
+
+## 2026-04-18 — Dashboard followup alignment closeout
+
+- [x] Align Visitors and Followups to shared followup queue semantics
+- [x] Centralize followup normalization
+- [x] Move normalized followup derivation into loader boundary
+- [x] Align Visitors labels with Followups terminology
+- [x] Add Visitors quick filters: My Action Needed, At Risk, Overdue
+- [x] Add counts to Visitors quick filters
+- [x] Add visual priority styling to Visitors quick filters
+- [x] Verify local production build passes
+- [x] Deploy latest dashboard changes to production

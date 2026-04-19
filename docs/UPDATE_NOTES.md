@@ -408,3 +408,23 @@ Notes:
 
 - ✅ Validated followup ownership model end-to-end (staging + regression); confirmed assign/unassign remain distinct canonical events; no unified setter introduced.\n
 
+
+## 2026-04-18 22:22 — Dashboard/backend followup alignment shipped
+
+Summary:
+- aligned Visitors and Followups to the same backend followup queue semantics
+- centralized followup normalization
+- moved normalized followup derivation into the loader boundary
+- aligned Visitors labels with Followups language
+- added Visitors quick filters for My Action Needed, At Risk, and Overdue
+- added counts and visual priority styling to those quick filters
+
+Backend / dashboard outcome:
+- Visitors and Followups now share one followup source-of-truth model
+- followup semantics are normalized once and reused across operator surfaces
+- dashboard/operator flow is now materially more consistent and production-safe
+
+Status:
+- shipped to production
+- build passing
+- dashboard/operator flow aligned to current followup queue source of truth

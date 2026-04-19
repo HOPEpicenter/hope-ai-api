@@ -714,3 +714,12 @@ Operational verification:
 
 - Followup ownership model validated (Apr 2026): assign/unassign remain distinct domain events; do not unify without a real blocker.
 
+
+## 2026-04-18 — Dashboard operator flow status
+
+Current shipped state:
+- Visitors and Followups now share one followup semantics model
+- followup normalization is centralized and consumed through the loader boundary
+- operator-facing labels are aligned across Visitors and Followups
+- Visitors now includes quick-priority operator presets for My Action Needed, At Risk, and Overdue
+- current dashboard/followup alignment work should be treated as stable unless a real blocker appears

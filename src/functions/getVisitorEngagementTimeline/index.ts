@@ -1,7 +1,7 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
 import { IntegrationService } from "../../services/integration/integrationService";
+import { normalizeTimelineItem } from "../../lib/timeline/normalize-timeline-item";
 
 const service = new IntegrationService(new EngagementEventsRepository());
 
@@ -40,6 +40,10 @@ export async function getVisitorEngagementTimeline(context: any, req: any): Prom
 
     const page = await service.readIntegratedTimeline(visitorId, limit, cursor);
 
+    const normalizedItems = (page.items ?? []).map((item: any) =>
+      normalizeTimelineItem(item)
+    );
+
     context.res = {
       status: 200,
       headers: { "content-type": "application/json; charset=utf-8" },
@@ -48,7 +52,8 @@ export async function getVisitorEngagementTimeline(context: any, req: any): Prom
         visitorId,
         limit,
         nextCursor: page.nextCursor ?? null,
-        items: page.items ?? []
+        items: page.items ?? [],
+        normalizedItems
       }
     };
   } catch (err: any) {
@@ -60,4 +65,3 @@ export async function getVisitorEngagementTimeline(context: any, req: any): Prom
     };
   }
 }
-

@@ -1,6 +1,7 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { IntegrationService } from "../../services/integration/integrationService";
+import { normalizeTimelineItem } from "../../lib/timeline/normalize-timeline-item";
 
 export async function getIntegrationTimeline(context: any, req: any): Promise<void> {
   try {
@@ -37,6 +38,10 @@ export async function getIntegrationTimeline(context: any, req: any): Promise<vo
       nextCursor: page?.nextCursor ?? null
     }));
 
+    const normalizedItems = (page.items ?? []).map((item: any) =>
+      normalizeTimelineItem(item)
+    );
+
     context.res = {
       status: 200,
       headers: { "content-type": "application/json; charset=utf-8" },
@@ -44,6 +49,7 @@ export async function getIntegrationTimeline(context: any, req: any): Promise<vo
         ok: true,
         visitorId,
         items: page.items,
+        normalizedItems,
         nextCursor: page.nextCursor ?? null
       }
     };

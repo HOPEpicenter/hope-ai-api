@@ -84,6 +84,27 @@ export class EngagementEventsRepository {
     };
 
     await table.createEntity(entity);
+
+// --- Global Timeline Write (engagement - repository level) ---
+try {
+  const { GlobalTimelineRepository } = await import("../repositories/globalTimelineRepository");
+  const repo = new GlobalTimelineRepository();
+
+  await repo.append({
+    eventId: evt.eventId,
+    visitorId: evt.visitorId,
+    stream: "engagement",
+    type: evt.type,
+    occurredAt: evt.occurredAt,
+    summary: null,
+    source: evt?.source?.system ?? null,
+    raw: evt
+  });
+} catch (err: any) {
+  console.error("globalTimeline append failed (engagement repo)", err);
+  throw new Error(`globalTimeline append failed (engagement repo): ${String(err?.message ?? err)}`);
+}
+// --- End Global Timeline Write ---
   }
 
   async readTimeline(
@@ -169,3 +190,4 @@ export class EngagementEventsRepository {
     };
   }
 }
+

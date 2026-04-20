@@ -350,8 +350,9 @@ try {
     source: typeof input.channel === "string" ? input.channel : null,
     raw: eventEntity
   });
-} catch (err) {
+} catch (err: any) {
   console.error("globalTimeline append failed", err);
+  throw new Error(`globalTimeline append failed: ${String(err?.message ?? err)}`);
 }
 // --- End Global Timeline Write ---
 
@@ -405,6 +406,7 @@ try {
 
   return { eventRowKey: rowKey, profile };
 }
+
 
 
 

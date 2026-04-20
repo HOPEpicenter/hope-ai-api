@@ -71,5 +71,10 @@ if (@($rLarge.items).Count -lt 40) {
   throw "Expected at least 40 items for limit=50"
 }
 
-Write-Host "OK: large page (limit=50) passed."
+$streamsLarge = @($rLarge.items | ForEach-Object { [string]$_.stream })
+Assert-True ($streamsLarge -contains "formation") "missing formation events in limit=50 page"
+Assert-True ($streamsLarge -contains "engagement") "missing engagement events in limit=50 page"
+
+Write-Host "OK: large page (limit=50) passed." -ForegroundColor Green
+
 

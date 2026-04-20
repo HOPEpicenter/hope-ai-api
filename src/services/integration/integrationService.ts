@@ -254,7 +254,7 @@ export class IntegrationService {
     );
 
     const engagementPages = await Promise.all(
-      visitorIds.map((visitorId) => this.engagementRepo.readTimeline(visitorId, 20, undefined))
+      visitorIds.map((visitorId) => this.engagementRepo.readTimeline(visitorId, 50, undefined))
     );
 
     const engagementItems = engagementPages.flatMap((page) =>
@@ -303,6 +303,7 @@ export class IntegrationService {
     });
   }
 }
+
 
 
 

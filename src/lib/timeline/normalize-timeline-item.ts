@@ -6,7 +6,7 @@ type TimelineLike = {
   type?: string | null;
   eventType?: string | null;
   summary?: string | null;
-  source?: string | null;
+  source?: any;
   happenedAt?: string | null;
   occurredAt?: string | null;
   recordedAt?: string | null;
@@ -15,6 +15,18 @@ type TimelineLike = {
   actor?: string | null;
   by?: string | null;
 };
+
+function getSourceString(item: any): string {
+  if (typeof item?.source === "string") return item.source;
+
+  if (item?.source && typeof item.source === "object") {
+    if (typeof item.source.system === "string") {
+      return item.source.system;
+    }
+  }
+
+  return "";
+}
 
 function getBestTimestamp(item: TimelineLike): string | null {
   return (
@@ -32,18 +44,18 @@ function getEventType(item: TimelineLike): string {
 }
 
 function getKind(item: TimelineLike): NormalizedTimelineItem["kind"] {
-  const source = (item.source ?? "").toLowerCase();
+  const source = getSourceString(item).toLowerCase();
   const eventType = getEventType(item).toLowerCase();
 
   if (source.includes("engagement") || eventType.startsWith("note") || eventType.startsWith("tag")) {
     return "engagement";
   }
 
-  if (source.includes("formation") || eventType.includes("SALVATION") || eventType.includes("BAPTISM") || eventType.includes("MEMBERSHIP")) {
+  if (source.includes("formation") || eventType.includes("salvation") || eventType.includes("baptism") || eventType.includes("membership")) {
     return "formation";
   }
 
-  if (source.includes("integration") || eventType.includes("FOLLOWUP") || eventType.includes("GROUP_")) {
+  if (source.includes("integration") || eventType.includes("followup") || eventType.includes("group_")) {
     return "integration";
   }
 
@@ -59,8 +71,7 @@ export function normalizeTimelineItem(item: TimelineLike): NormalizedTimelineIte
     happenedAt: getBestTimestamp(item),
     summary: item.summary?.trim() || getEventType(item),
     actor: item.actor ?? item.by ?? null,
-    source: item.source ?? "unknown",
+    source: getSourceString(item) || "unknown",
     raw: item
   };
 }
-

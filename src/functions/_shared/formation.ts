@@ -10,6 +10,7 @@ function normalizeAssignedTo(input: any): string | null {
 }
 import { TableClient } from "@azure/data-tables";
 import { getConnString } from "./tableClient";
+import { GlobalTimelineRepository } from "../../repositories/globalTimelineRepository";
 
 export type FunctionFormationEventEntity = {
   partitionKey: string;
@@ -539,6 +540,26 @@ export async function recordFormationEventV1(body: unknown): Promise<{
 
     try {
       await eventsTable.createEntity(eventEntity);
+
+// --- Global Timeline Write (formation v1 path) ---
+try {
+  const repo = new GlobalTimelineRepository();
+
+  await repo.append({
+    eventId: eventEntity.idempotencyKey ?? eventEntity.id,
+    visitorId: eventEntity.visitorId,
+    stream: "formation",
+    type: eventEntity.type,
+    occurredAt: eventEntity.occurredAt,
+    summary: eventEntity.summary ?? null,
+    source: typeof eventEntity.channel === "string" ? eventEntity.channel : null,
+    raw: eventEntity
+  });
+} catch (err: any) {
+  console.error("globalTimeline append failed (v1 path)", err);
+  throw new Error(`globalTimeline append failed (v1 path): ${String(err?.message ?? err)}`);
+}
+// --- End Global Timeline Write ---
     } catch (err: any) {
       const code = Number(err?.statusCode ?? err?.status ?? 0);
 
@@ -864,3 +885,7 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
+
+
+
+

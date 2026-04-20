@@ -1,7 +1,8 @@
 import { getTableClient } from "../storage/tableClient";
 import { ensureTableExists } from "../shared/storage/ensureTableExists";
 
-const TABLE_NAME = "globalTimeline";
+export const GLOBAL_TIMELINE_TABLE =
+  process.env.GLOBAL_TIMELINE_TABLE || "devGlobalTimeline";
 
 export type GlobalTimelineEntity = {
   partitionKey: string;
@@ -47,7 +48,7 @@ function buildRowKey(item: {
 
 export class GlobalTimelineRepository {
   private async getTable() {
-    const table = await getTableClient(TABLE_NAME);
+    const table = await getTableClient(GLOBAL_TIMELINE_TABLE);
     await ensureTableExists(table);
     return table;
   }
@@ -118,3 +119,4 @@ export class GlobalTimelineRepository {
     };
   }
 }
+

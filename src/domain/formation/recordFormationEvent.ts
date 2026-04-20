@@ -21,6 +21,7 @@ import {
   upsertFormationProfile,
 } from "../../storage/formation/formationProfilesRepo";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
+import { GlobalTimelineRepository } from "../../repositories/globalTimelineRepository";
 
 /**
  * Formation event recorder (Phase 3)
@@ -335,6 +336,25 @@ export async function recordFormationEvent(
   }
   await insertFormationEvent(eventsTable, eventEntity);
 
+// --- Global Timeline Write (formation) ---
+try {
+  const globalTimelineRepo = new GlobalTimelineRepository();
+
+  await globalTimelineRepo.append({
+    eventId,
+    visitorId: input.visitorId,
+    stream: "formation",
+    type: input.type,
+    occurredAt,
+    summary: null,
+    source: typeof input.channel === "string" ? input.channel : null,
+    raw: eventEntity
+  });
+} catch (err) {
+  console.error("globalTimeline append failed", err);
+}
+// --- End Global Timeline Write ---
+
   // Update snapshot based on the event
   applyProfileTouchpoint(profile, input.type, occurredAt, input.metadata);
 
@@ -385,5 +405,7 @@ export async function recordFormationEvent(
 
   return { eventRowKey: rowKey, profile };
 }
+
+
 
 

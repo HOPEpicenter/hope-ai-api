@@ -54,3 +54,22 @@ if ($null -ne $r1.nextCursor -and $r1.nextCursor -ne "") {
 }
 
 Write-Host "OK: global unified timeline regression passed." -ForegroundColor Green
+
+
+Write-Host "=== ASSERT: Large page (limit=50) ==="
+
+$rLarge = Invoke-RestMethod `
+  -Method GET `
+  -Uri "$ApiBaseUrl/integration/timeline/global?limit=50" `
+  -Headers $headers
+
+if (-not $rLarge.ok) {
+  throw "Expected ok=true for limit=50"
+}
+
+if (@($rLarge.items).Count -lt 40) {
+  throw "Expected at least 40 items for limit=50"
+}
+
+Write-Host "OK: large page (limit=50) passed."
+

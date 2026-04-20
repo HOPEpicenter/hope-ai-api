@@ -189,10 +189,28 @@ export class IntegrationService {
           })()
         : null;
 
-    return {
+    const legacyResult = {
       items: pageItems,
       nextCursor
     };
+
+    // --- Shadow read from global timeline store ---
+    try {
+      const { GlobalTimelineRepository } = await import("../../repositories/globalTimelineRepository");
+      const repo = new GlobalTimelineRepository();
+
+      const shadow = await repo.read(safeLimit, opts.cursor);
+
+      console.log("timeline_shadow_compare", {
+        legacyCount: legacyResult.items.length,
+        shadowCount: shadow.items.length
+      });
+    } catch (err) {
+      console.error("timeline shadow read failed", err);
+    }
+    // --- End shadow read ---
+
+    return legacyResult;
   }
 
   private buildMergedActivityItems(inputs: ActivityFeedInputs): any[] {
@@ -303,6 +321,8 @@ export class IntegrationService {
     });
   }
 }
+
+
 
 
 

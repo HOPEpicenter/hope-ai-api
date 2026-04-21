@@ -151,13 +151,13 @@ function Assert-HighRiskUrgentItem($Item, [string]$VisitorId) {
   Assert-Equal $Item.priorityReason "high_risk_needs_followup" "Expected priorityReason=high_risk_needs_followup."
 }
 
-function Assert-LowRiskLowPriorityItem($Item, [string]$VisitorId) {
+function Assert-LowRiskNormalPriorityItem($Item, [string]$VisitorId) {
   if (-not $Item) { throw "Expected visitorId=$VisitorId to exist in /ops/followups." }
   Assert-Equal $Item.engagementRiskLevel "low" "Expected engagementRiskLevel=low."
   Assert-True ($null -ne $Item.engagementRiskScore) "Expected engagementRiskScore to be present."
   Assert-True ([int]$Item.engagementRiskScore -lt 30) "Expected engagementRiskScore < 30 for low-risk followup item."
-  Assert-Equal $Item.priorityBand "low" "Expected priorityBand=low."
-  Assert-Equal $Item.priorityReason "low_risk" "Expected priorityReason=low_risk."
+  Assert-Equal $Item.priorityBand "normal" "Expected priorityBand=normal for low-risk item that still needs followup."
+  Assert-Equal $Item.priorityReason "needs_followup" "Expected priorityReason=needs_followup for low-risk item that still needs followup."
 }
 
 # 1) Fresh /ops/followups must be healthy/authenticated
@@ -257,7 +257,7 @@ $fuPriority = GetFollowups
 $primaryPriorityItem = GetFollowupItem -Items $fuPriority.items -VisitorId $primaryVisitorId
 $secondaryPriorityItem = GetFollowupItem -Items $fuPriority.items -VisitorId $secondaryVisitorId
 Assert-HighRiskUrgentItem -Item $primaryPriorityItem -VisitorId $primaryVisitorId
-Assert-LowRiskLowPriorityItem -Item $secondaryPriorityItem -VisitorId $secondaryVisitorId
+Assert-LowRiskNormalPriorityItem -Item $secondaryPriorityItem -VisitorId $secondaryVisitorId
 
 $primaryIndex = GetFollowupItemIndex -Items $fuPriority.items -VisitorId $primaryVisitorId
 $secondaryIndex = GetFollowupItemIndex -Items $fuPriority.items -VisitorId $secondaryVisitorId

@@ -166,7 +166,11 @@ function Assert-LowRiskNormalPriorityItem($Item, [string]$VisitorId) {
   Assert-Equal $Item.engagementRiskLevel "low" "Expected engagementRiskLevel=low."
   Assert-Equal $Item.priorityBand "normal" "Expected priorityBand=normal for low-risk item that still needs followup."
   if ($Item.stage -eq "Guest") {
-    Assert-Equal $Item.priorityReason "guest_needs_followup" "Expected priorityReason=guest_needs_followup for Guest low-risk item that still needs followup."
+    if ($Item.followupReason -eq "FOLLOWUP_CONTACTED") {
+      Assert-Equal $Item.priorityReason "guest_contacted_needs_followup" "Expected priorityReason=guest_contacted_needs_followup for Guest low-risk contacted item that still needs followup."
+    } else {
+      Assert-Equal $Item.priorityReason "guest_needs_followup" "Expected priorityReason=guest_needs_followup for Guest low-risk item that still needs followup."
+    }
   } else {
     Assert-Equal $Item.priorityReason "needs_followup" "Expected priorityReason=needs_followup for low-risk item that still needs followup."
   }
@@ -385,5 +389,6 @@ foreach ($visitorId in $cleanupVisitorIds) {
 }
 
 Write-Host "[assert-ops-followups] OK: followups lifecycle + ordering invariants regression passed." -ForegroundColor Green
+
 
 

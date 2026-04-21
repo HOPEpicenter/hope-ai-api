@@ -162,9 +162,18 @@ function Assert-HighRiskUrgentItem($Item, [string]$VisitorId) {
 
 function Assert-LowRiskNormalPriorityItem($Item, [string]$VisitorId) {
   if (-not $Item) { throw "Expected visitorId=$VisitorId to exist in /ops/followups." }
+
   Assert-Equal $Item.visitorId $VisitorId "Expected low-risk item visitorId to match."
   Assert-Equal $Item.engagementRiskLevel "low" "Expected engagementRiskLevel=low."
+  Assert-True ($null -ne $Item.engagementRiskScore) "Expected engagementRiskScore to be present."
+  Assert-True ([int]$Item.engagementRiskScore -lt 30) "Expected engagementRiskScore < 30 for low-risk followup item."
+
   Assert-Equal $Item.priorityBand "normal" "Expected priorityBand=normal for low-risk item that still needs followup."
+
+  Assert-True (-not [string]::IsNullOrWhiteSpace([string]$Item.lastActivityAt)) "Expected lastActivityAt to be present."
+  Assert-Equal $Item.lastFormationEventType $Item.followupReason "Expected lastFormationEventType to reflect current followup reason."
+  Assert-True (-not [string]::IsNullOrWhiteSpace([string]$Item.lastFormationEventAt)) "Expected lastFormationEventAt to be present."
+
   if ($Item.stage -eq "Guest") {
     if ($Item.followupReason -eq "FOLLOWUP_CONTACTED") {
       Assert-Equal $Item.priorityReason "guest_contacted_needs_followup" "Expected priorityReason=guest_contacted_needs_followup for Guest low-risk contacted item that still needs followup."
@@ -389,6 +398,7 @@ foreach ($visitorId in $cleanupVisitorIds) {
 }
 
 Write-Host "[assert-ops-followups] OK: followups lifecycle + ordering invariants regression passed." -ForegroundColor Green
+
 
 
 

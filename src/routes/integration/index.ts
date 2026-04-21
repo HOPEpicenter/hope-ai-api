@@ -10,7 +10,7 @@ import { GlobalTimelineRepository } from "../../repositories/globalTimelineRepos
 export const integrationRouter = Router();
 
 // Scope auth to /integration only
-integrationRouter.use("/integration", requireApiKey);
+integrationRouter.use(requireApiKey);
 
 const service = new IntegrationService(new EngagementEventsRepository());
 
@@ -121,6 +121,13 @@ integrationRouter.get("/integration/timeline/global", async (req, res, next) => 
     return next(err);
   }
 });
+
+
+
+
+
+
+
 
 
 

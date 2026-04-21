@@ -196,19 +196,21 @@ export class IntegrationService {
 
     let shadowResult: IntegratedTimelinePageV1 | null = null;
 
-    // --- Shadow read from global timeline store ---
-    try {
-      const { GlobalTimelineRepository } = await import("../../repositories/globalTimelineRepository");
-      const repo = new GlobalTimelineRepository();
+    // --- Shadow read from global timeline store (global endpoint only) ---
+    if (!opts.visitorId) {
+      try {
+        const { GlobalTimelineRepository } = await import("../../repositories/globalTimelineRepository");
+        const repo = new GlobalTimelineRepository();
 
-      shadowResult = await repo.read(safeLimit, opts.cursor);
+        shadowResult = await repo.read(safeLimit, opts.cursor);
 
-      console.log("timeline_shadow_compare", {
-        legacyCount: legacyResult.items.length,
-        shadowCount: shadowResult.items.length
-      });
-    } catch (err) {
-      console.error("timeline shadow read failed", err);
+        console.log("timeline_shadow_compare", {
+          legacyCount: legacyResult.items.length,
+          shadowCount: shadowResult.items.length
+        });
+      } catch (err) {
+        console.error("timeline shadow read failed", err);
+      }
     }
     // --- End shadow read ---
 
@@ -323,6 +325,7 @@ export class IntegrationService {
     });
   }
 }
+
 
 
 

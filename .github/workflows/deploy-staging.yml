@@ -93,10 +93,24 @@ jobs:
           Write-Host "Deploying via Azure Functions Core Tools publish..."
           Write-Host "APP=$app"
 
-          func azure functionapp publish $app --no-build --javascript
+          $published = $false
+          for ($attempt = 1; $attempt -le 2; $attempt++) {
+            Write-Host "func publish attempt $attempt/2 ..."
+            func azure functionapp publish $app --no-build --javascript
 
-          if ($LASTEXITCODE -ne 0) {
-            throw "func publish deployment failed."
+            if ($LASTEXITCODE -eq 0) {
+              $published = $true
+              break
+            }
+
+            if ($attempt -lt 2) {
+              Write-Host "func publish failed on attempt $attempt. Waiting 15 seconds before retry..."
+              Start-Sleep -Seconds 15
+            }
+          }
+
+          if (-not $published) {
+            throw "func publish deployment failed after retry."
           }
 
           Write-Host "func publish command completed."
@@ -115,5 +129,6 @@ jobs:
           if (-not $ok) {
             throw "Post-deploy health check failed after retries."
           }
+
 
 

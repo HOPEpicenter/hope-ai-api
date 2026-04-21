@@ -216,3 +216,54 @@ Notes:
 - Stable ordering guaranteed
 - Shadow comparison available via debugShadow=1
 
+
+## Engagement Risk
+
+### GET /api/engagements/risk
+
+Returns an engagement risk / drift view derived from the existing engagement score pipeline.
+
+Query Parameters:
+- visitorId (required)
+- windowDays (optional, default 14)
+
+Response shape:
+{
+  "ok": true,
+  "v": 1,
+  "visitorId": "string",
+  "windowDays": 14,
+  "riskLevel": "low | medium | high",
+  "riskScore": 0,
+  "signals": [],
+  "recommendedAction": "string",
+  "engagement": {
+    "engaged": true,
+    "lastEngagedAt": "string | null",
+    "daysSinceLastEngagement": 0,
+    "engagementCount": 0,
+    "score": 0,
+    "scoreReasons": [],
+    "needsFollowup": false
+  }
+}
+
+## Ops Followups Queue
+
+### GET /ops/followups
+
+Queue items now include:
+
+- engagementRiskLevel
+- engagementRiskScore
+- priorityBand
+- priorityReason
+
+Queue ordering now considers:
+
+1. unresolved before resolved
+2. latest assigned timestamp
+3. escalated status
+4. engagement risk score
+5. legacy followup SLA score
+6. visitorId tie-break

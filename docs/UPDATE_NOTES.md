@@ -1,3 +1,36 @@
+## 2026-04-21 — Engagement Intelligence + Ops Queue Priority
+
+### Summary
+Completed the end-to-end engagement intelligence slice and connected it to operator-facing surfaces.
+
+### Shipped
+- Added GET /api/engagements/risk
+- Surfaced engagement risk into visitor summary
+- Surfaced risk + priority into dashboard card
+- Added shared - Added shared readEngagementRiskV1 reader
+- Added shared deriveFollowupPriority helper
+- Enriched /ops/followups queue items with:
+  - nengagementRiskLevel
+  - nengagementRiskScore
+  - priorityBand
+  - priorityReason
+- Updated queue prioritization to consider engagement risk before legacy SLA score
+
+### Validation
+- scripts/assert-engagement-risk.ps1
+- scripts/assert-visitor-risk-surface.ps1
+- scripts/assert-followup-priority.ps1
+- scripts/assert-followup-queue-priority.ps1
+- scripts/smoke-visitor-engagements-e2e.ps1
+
+### Outcome
+The system now supports:
+- engagement score
+- engagement risk / drift
+- visitor summary + dashboard risk surfaces
+- followup priority signals
+- ops queue enrichment using behavioral risk
+
 ## 2026-04-21 — Integration Cutover Stabilization (PR #655)
 
 ### Summary
@@ -445,4 +478,6 @@ Status:
 - shipped to production
 - build passing
 - dashboard/operator flow aligned to current followup queue source of truth
+
+
 

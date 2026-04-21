@@ -475,3 +475,18 @@ Current rule:
 - [x] Global endpoint:
       GET /api/integration/timeline/global
 
+
+## ENGAGEMENT INTELLIGENCE (COMPLETED)
+
+- [x] Add engagement risk / drift endpoint
+- [x] Add shared engagement risk reader
+- [x] Surface engagement risk in visitor summary
+- [x] Surface risk + priority in dashboard card
+- [x] Add shared followup priority helper
+- [x] Enrich ops followup queue with engagement risk
+- [x] Sort followup queue using engagement risk before legacy SLA score
+- [x] Add regression assert for engagement risk
+- [x] Add regression assert for visitor risk surface
+- [x] Add regression assert for followup priority surface
+- [x] Add regression assert for followup queue priority
+

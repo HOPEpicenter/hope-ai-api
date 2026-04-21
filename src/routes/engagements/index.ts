@@ -6,6 +6,7 @@ import { engagementsAnalyticsRouter } from "./analytics";
 import { engagementsScoreRouter } from "./score";
 import { engagementsEventsRouter } from "./events";
 import { engagementsTimelineRouter } from "./timeline";
+import { engagementsRiskRouter } from "./risk";
 import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { EngagementRepository } from "../../storage/engagementRepository";
 import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepository";
@@ -123,9 +124,11 @@ engagementsRouter.get("/visitors/:id/engagements/summary", async (req, res) => {
 // Engagement v1 additions (event envelope + timeline contract)
 engagementsRouter.use(engagementsEventsRouter);
 engagementsRouter.use(engagementsTimelineRouter);
+engagementsRouter.use(engagementsRiskRouter);
 
 // Engagement status v1 (derived from events)
 engagementsRouter.use(engagementsStatusRouter);
 
 engagementsRouter.use(engagementsAnalyticsRouter);
 engagementsRouter.use(engagementsScoreRouter);
+

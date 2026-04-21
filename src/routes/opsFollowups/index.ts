@@ -374,6 +374,15 @@ opsFollowupsRouter.get("/", async (req, res) => {
       riskScore = risk.riskScore;
       priorityBand = priority.priorityBand;
       priorityReason = priority.priorityReason;
+
+      const stage = formationProfileByVisitor.get(state.visitorId)?.stage ?? null;
+      if (
+        priorityBand === "normal" &&
+        priorityReason === "needs_followup" &&
+        stage === "Guest"
+      ) {
+        priorityReason = "guest_needs_followup";
+      }
     } catch {
       // fail safe: queue still returns even if enrichment fails
     }
@@ -472,6 +481,7 @@ opsFollowupsRouter.get("/", async (req, res) => {
     items: items.slice(0, limit),
   });
 });
+
 
 
 

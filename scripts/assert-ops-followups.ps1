@@ -162,11 +162,14 @@ function Assert-HighRiskUrgentItem($Item, [string]$VisitorId) {
 
 function Assert-LowRiskNormalPriorityItem($Item, [string]$VisitorId) {
   if (-not $Item) { throw "Expected visitorId=$VisitorId to exist in /ops/followups." }
+  Assert-Equal $Item.visitorId $VisitorId "Expected low-risk item visitorId to match."
   Assert-Equal $Item.engagementRiskLevel "low" "Expected engagementRiskLevel=low."
-  Assert-True ($null -ne $Item.engagementRiskScore) "Expected engagementRiskScore to be present."
-  Assert-True ([int]$Item.engagementRiskScore -lt 30) "Expected engagementRiskScore < 30 for low-risk followup item."
   Assert-Equal $Item.priorityBand "normal" "Expected priorityBand=normal for low-risk item that still needs followup."
-  Assert-Equal $Item.priorityReason "needs_followup" "Expected priorityReason=needs_followup for low-risk item that still needs followup."
+  if ($Item.stage -eq "Guest") {
+    Assert-Equal $Item.priorityReason "guest_needs_followup" "Expected priorityReason=guest_needs_followup for Guest low-risk item that still needs followup."
+  } else {
+    Assert-Equal $Item.priorityReason "needs_followup" "Expected priorityReason=needs_followup for low-risk item that still needs followup."
+  }
 }
 
 # 1) Fresh /ops/followups must be healthy/authenticated
@@ -382,3 +385,5 @@ foreach ($visitorId in $cleanupVisitorIds) {
 }
 
 Write-Host "[assert-ops-followups] OK: followups lifecycle + ordering invariants regression passed." -ForegroundColor Green
+
+

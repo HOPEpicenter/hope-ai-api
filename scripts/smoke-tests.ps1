@@ -383,9 +383,6 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-integration-
 pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-formation-snapshot-invariants.ps1" -BaseUrl $BaseUrl -ApiKey $ApiKey
 if ($LASTEXITCODE -ne 0) { throw "Formation snapshot invariants failed (exit=$LASTEXITCODE)" }
 
-  # Ops followups regression (auth + projection)
-  pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-ops-followups.ps1" -BaseUrl $BaseUrl
-if ($LASTEXITCODE -ne 0) { throw "Cross-stream cursor boundary regression failed (exit=$LASTEXITCODE)" }
 Write-Host "OK: Cross-stream cursor boundary regression OK"
 
 Write-Host "Timeline page1 OK (nextCursor present)"
@@ -491,5 +488,6 @@ Write-Host "Followups regression OK"
 
 Write-Host "SMOKE TESTS PASSED"
 exit 0
+
 
 

@@ -4,6 +4,7 @@ import {
   getFormationEventsTableClient,
   getFormationProfilesTableClient,
 } from "../../storage/formation/formationTables";
+import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import { deriveFollowupPriority } from "../../services/followups/deriveFollowupPriority";
 import { deriveEngagementRiskV1 } from "../../domain/engagement/deriveEngagementRisk.v1";
 import { computeEngagementScoreV1 } from "../../domain/engagement/computeEngagementScore.v1";
@@ -20,6 +21,8 @@ type QueueItem = {
   lastFollowupContactedAt: string | null;
   lastFollowupOutcomeAt: string | null;
   stage: string | null;
+  lastFormationEventType?: string | null;
+  lastFormationEventAt?: string | null;
   needsFollowup: boolean;
   followupReason?: string;
   followupResolved: boolean;
@@ -202,6 +205,8 @@ opsFollowupsRouter.use(requireApiKey);
 opsFollowupsRouter.get("/", async (req, res) => {
   const eventsTable = getFormationEventsTableClient();
   const profilesTable = getFormationProfilesTableClient();
+  await ensureTableExists(eventsTable as any);
+  await ensureTableExists(profilesTable as any);
   const engagementService = new EngagementsService(new EngagementEventsRepository());
 
   const limitRaw = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
@@ -219,7 +224,7 @@ opsFollowupsRouter.get("/", async (req, res) => {
     String(includeResolvedRaw ?? "").trim().toLowerCase() === "true";
 
   const stateByVisitor = new Map<string, EventState>();
-  const stageByVisitor = new Map<string, string | null>();
+  const formationProfileByVisitor = new Map<string, { stage: string | null; lastFormationEventType: string | null; lastFormationEventAt: string | null }>();
 
   for await (const e of eventsTable.listEntities<any>({})) {
     const type = String(e?.type ?? "").trim();
@@ -284,7 +289,11 @@ opsFollowupsRouter.get("/", async (req, res) => {
     const visitorId = String((p as any)?.rowKey ?? (p as any)?.RowKey ?? "").trim();
     if (!visitorId) continue;
 
-    stageByVisitor.set(visitorId, (p as any)?.stage ?? null);
+    formationProfileByVisitor.set(visitorId, {
+      stage: (p as any)?.stage ?? null,
+      lastFormationEventType: (p as any)?.lastEventType ?? null,
+      lastFormationEventAt: (p as any)?.lastEventAt ?? null,
+    });
 
     if (!stateByVisitor.has(visitorId)) continue;
 
@@ -377,7 +386,9 @@ opsFollowupsRouter.get("/", async (req, res) => {
       lastFollowupAssignedAt: state.lastFollowupAssignedAt,
       lastFollowupContactedAt: state.lastFollowupContactedAt,
       lastFollowupOutcomeAt: state.lastFollowupOutcomeAt,
-      stage: stageByVisitor.get(state.visitorId) ?? null,
+      stage: formationProfileByVisitor.get(state.visitorId)?.stage ?? null,
+      lastFormationEventType: formationProfileByVisitor.get(state.visitorId)?.lastFormationEventType ?? null,
+      lastFormationEventAt: formationProfileByVisitor.get(state.visitorId)?.lastFormationEventAt ?? null,
       needsFollowup: signals.needsFollowup,
       followupReason: signals.followupReason,
       followupResolved: signals.followupResolved,
@@ -461,6 +472,9 @@ opsFollowupsRouter.get("/", async (req, res) => {
     items: items.slice(0, limit),
   });
 });
+
+
+
 
 
 

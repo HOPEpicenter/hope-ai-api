@@ -194,23 +194,27 @@ export class IntegrationService {
       nextCursor
     };
 
-    // --- Shadow read from global timeline store ---
-    try {
-      const { GlobalTimelineRepository } = await import("../../repositories/globalTimelineRepository");
-      const repo = new GlobalTimelineRepository();
+    let shadowResult: IntegratedTimelinePageV1 | null = null;
 
-      const shadow = await repo.read(safeLimit, opts.cursor);
+    // --- Shadow read from global timeline store (global endpoint only) ---
+    if (!opts.visitorId) {
+      try {
+        const { GlobalTimelineRepository } = await import("../../repositories/globalTimelineRepository");
+        const repo = new GlobalTimelineRepository();
 
-      console.log("timeline_shadow_compare", {
-        legacyCount: legacyResult.items.length,
-        shadowCount: shadow.items.length
-      });
-    } catch (err) {
-      console.error("timeline shadow read failed", err);
+        shadowResult = await repo.read(safeLimit, opts.cursor);
+
+        console.log("timeline_shadow_compare", {
+          legacyCount: legacyResult.items.length,
+          shadowCount: shadowResult.items.length
+        });
+      } catch (err) {
+        console.error("timeline shadow read failed", err);
+      }
     }
     // --- End shadow read ---
 
-    return legacyResult;
+    return shadowResult && shadowResult.items.length > 0 ? shadowResult : legacyResult;
   }
 
   private buildMergedActivityItems(inputs: ActivityFeedInputs): any[] {
@@ -321,6 +325,9 @@ export class IntegrationService {
     });
   }
 }
+
+
+
 
 
 

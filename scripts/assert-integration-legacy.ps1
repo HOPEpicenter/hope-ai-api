@@ -89,8 +89,18 @@ function Invoke-HttpJson {
   }
 }
 
+function Normalize-OccurredAtKey($value) {
+  if ($null -eq $value) { return "" }
+
+  if ($value -is [datetime]) {
+    return $value.ToUniversalTime().ToString("o")
+  }
+
+  return [string]$value
+}
+
 function Make-StableKey([pscustomobject]$evt) {
-  return ("{0}|{1}" -f [string]$evt.occurredAt, [string]$evt.eventId)
+  return ("{0}|{1}" -f (Normalize-OccurredAtKey $evt.occurredAt), [string]$evt.eventId)
 }
 
 # -------------------- Main --------------------
@@ -191,4 +201,5 @@ Assert-True ($le.Json.formation.v -eq 1)  "Legacy export formation.v expected 1"
 Assert-True ($le.Json.integration.v -eq 1) "Legacy export integration.v expected 1"
 
 Write-Host "OK: Integration timeline + Legacy export assertions passed."
+
 

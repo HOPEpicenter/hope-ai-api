@@ -153,6 +153,7 @@ if ($opsHealth -and $opsHealth.Status -eq 404 -and $apiHealth -and $apiHealth.St
   }
 }
 
-throw ("Unable to validate remote host. /ops/health => {0}; /api/health => {1}" -f $opsHealth.Status, $(if ($apiHealth) { $apiHealth.Status } else { "not checked" }))
+throw ("Unable to validate remote host after retries. /ops/health => {0}; /api/health => {1}" -f ($(if ($opsHealth) { $opsHealth.Status } else { "n/a" })), ($(if ($apiHealth) { $apiHealth.Status } else { "not checked" })))
+
 
 

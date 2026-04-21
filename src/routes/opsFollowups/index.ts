@@ -4,6 +4,11 @@ import {
   getFormationEventsTableClient,
   getFormationProfilesTableClient,
 } from "../../storage/formation/formationTables";
+import { deriveFollowupPriority } from "../../services/followups/deriveFollowupPriority";
+import { deriveEngagementRiskV1 } from "../../domain/engagement/deriveEngagementRisk.v1";
+import { computeEngagementScoreV1 } from "../../domain/engagement/computeEngagementScore.v1";
+import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
+import { EngagementsService } from "../../services/engagements/engagementsService";
 
 type FollowupUrgency = "ON_TRACK" | "AT_RISK" | "OVERDUE";
 type FollowupAgingBucket = "SAME_DAY" | "ONE_DAY" | "TWO_PLUS_DAYS";
@@ -24,6 +29,10 @@ type QueueItem = {
   followupAgingBucket?: FollowupAgingBucket;
   followupEscalated: boolean;
   followupOverdue: boolean;
+  engagementRiskLevel?: string | null;
+  engagementRiskScore?: number | null;
+  priorityBand?: string | null;
+  priorityReason?: string | null;
 };
 
 type EventState = {
@@ -175,6 +184,10 @@ function compareQueueItems(a: QueueItem, b: QueueItem): number {
     Number(b.followupEscalated === true) - Number(a.followupEscalated === true);
   if (escalatedDiff !== 0) return escalatedDiff;
 
+  const riskA = Number((a as any).engagementRiskScore ?? 0);
+  const riskB = Number((b as any).engagementRiskScore ?? 0);
+  if (riskB !== riskA) return riskB - riskA;
+
   const scoreA = Number(a.followupPriorityScore ?? 0);
   const scoreB = Number(b.followupPriorityScore ?? 0);
   if (scoreB !== scoreA) return scoreB - scoreA;
@@ -188,6 +201,7 @@ opsFollowupsRouter.use(requireApiKey);
 opsFollowupsRouter.get("/", async (req, res) => {
   const eventsTable = getFormationEventsTableClient();
   const profilesTable = getFormationProfilesTableClient();
+  const engagementService = new EngagementsService(new EngagementEventsRepository());
 
   const limitRaw = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
   const assignedToFilterRaw = Array.isArray(req.query.assignedTo) ? req.query.assignedTo[0] : req.query.assignedTo;
@@ -303,6 +317,57 @@ opsFollowupsRouter.get("/", async (req, res) => {
     const ownerId = String(state.assignedTo ?? "").trim();
     if (assignedToFilter && ownerId !== assignedToFilter) continue;
 
+    let riskLevel: string | null = null;
+    let riskScore: number | null = null;
+    let priorityBand: string | null = null;
+    let priorityReason: string | null = null;
+
+    try {
+      
+      const MAX_EVENTS = 500;
+      const PAGE_SIZE = 100;
+
+      const all: any[] = [];
+      let cursor: string | undefined = undefined;
+
+      while (all.length < MAX_EVENTS) {
+        const page = await engagementService.readTimeline(state.visitorId, PAGE_SIZE, cursor);
+        all.push(...(page.items ?? []));
+        if (!page.nextCursor) break;
+        cursor = page.nextCursor;
+      }
+
+      const score = computeEngagementScoreV1({
+        events: all,
+        windowDays: 14
+      });
+
+      const risk = deriveEngagementRiskV1({
+        visitorId: state.visitorId,
+        windowDays: 14,
+        engaged: score.engaged,
+        lastEngagedAt: score.lastEngagedAt,
+        daysSinceLastEngagement: score.daysSinceLastEngagement,
+        engagementCount: score.engagementCount,
+        score: score.score,
+        scoreReasons: score.scoreReasons,
+        needsFollowup: score.needsFollowup
+      });
+
+      const priority = deriveFollowupPriority({
+        needsFollowup: signals.needsFollowup,
+        riskLevel: risk.riskLevel,
+        riskScore: risk.riskScore
+      });
+
+      riskLevel = risk.riskLevel;
+      riskScore = risk.riskScore;
+      priorityBand = priority.priorityBand;
+      priorityReason = priority.priorityReason;
+    } catch {
+      // fail safe: queue still returns even if enrichment fails
+    }
+
     items.push({
       visitorId: state.visitorId,
       assignedTo: ownerId
@@ -321,6 +386,10 @@ opsFollowupsRouter.get("/", async (req, res) => {
       followupAgingBucket: signals.followupAgingBucket,
       followupEscalated: signals.followupEscalated,
       followupOverdue: signals.followupOverdue,
+      engagementRiskLevel: riskLevel,
+      engagementRiskScore: riskScore,
+      priorityBand: priorityBand,
+      priorityReason: priorityReason,
     });
   }
 
@@ -386,3 +455,9 @@ opsFollowupsRouter.get("/", async (req, res) => {
     items: items.slice(0, limit),
   });
 });
+
+
+
+
+
+

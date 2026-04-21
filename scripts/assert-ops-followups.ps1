@@ -1,6 +1,6 @@
 # scripts/assert-ops-followups.ps1
 # Regression: OPS followups projection stays healthy + reflects formation followup lifecycle,
-# engagement-risk enrichment, and deterministic risk-based ordering.
+# engagement-risk enrichment, and deterministic ordering invariants.
 # PowerShell 7+.
 
 [CmdletBinding()]
@@ -100,6 +100,15 @@ function GetFollowupItemIndex([object[]]$Items, [string]$VisitorId) {
     }
   }
   return -1
+}
+
+function Assert-VisitorSortsBefore([object[]]$Items, [string]$FirstVisitorId, [string]$SecondVisitorId, [string]$Message) {
+  $firstIndex = GetFollowupItemIndex -Items $Items -VisitorId $FirstVisitorId
+  $secondIndex = GetFollowupItemIndex -Items $Items -VisitorId $SecondVisitorId
+
+  Assert-True ($firstIndex -ge 0) ("Expected visitorId={0} to be present. {1}" -f $FirstVisitorId, $Message)
+  Assert-True ($secondIndex -ge 0) ("Expected visitorId={0} to be present. {1}" -f $SecondVisitorId, $Message)
+  Assert-True ($firstIndex -lt $secondIndex) $Message
 }
 
 function New-Visitor([string]$FirstName, [string]$LastName, [string]$Prefix) {
@@ -237,7 +246,7 @@ if (-not $itemC.assignedTo -or $itemC.assignedTo.ownerId -ne "ops-user-1") {
 }
 Assert-HighRiskUrgentItem -Item $itemC -VisitorId $primaryVisitorId
 
-# 7) Create a second visitor with recent engagement so risk is low, then prove ordering tie-break uses engagement risk.
+# 7) Risk tie-break: same assigned timestamp, same assignee, same escalation state, different risk
 Write-Host "[assert-ops-followups] POST /api/visitors (secondary low-risk visitor) ..."
 $secondaryVisitorId = New-Visitor -FirstName "Ops" -LastName "FollowupsLow" -Prefix "ops-followups-low"
 
@@ -258,30 +267,118 @@ $primaryPriorityItem = GetFollowupItem -Items $fuPriority.items -VisitorId $prim
 $secondaryPriorityItem = GetFollowupItem -Items $fuPriority.items -VisitorId $secondaryVisitorId
 Assert-HighRiskUrgentItem -Item $primaryPriorityItem -VisitorId $primaryVisitorId
 Assert-LowRiskNormalPriorityItem -Item $secondaryPriorityItem -VisitorId $secondaryVisitorId
+Assert-VisitorSortsBefore -Items $fuPriority.items -FirstVisitorId $primaryVisitorId -SecondVisitorId $secondaryVisitorId -Message "Expected high-risk followup item to sort ahead of low-risk item when assigned timestamps match."
 
-$primaryIndex = GetFollowupItemIndex -Items $fuPriority.items -VisitorId $primaryVisitorId
-$secondaryIndex = GetFollowupItemIndex -Items $fuPriority.items -VisitorId $secondaryVisitorId
-Assert-True ($primaryIndex -ge 0) "Expected primary high-risk visitor to be present for ordering assertion."
-Assert-True ($secondaryIndex -ge 0) "Expected secondary low-risk visitor to be present for ordering assertion."
-Assert-True ($primaryIndex -lt $secondaryIndex) "Expected high-risk followup item to sort ahead of low-risk item when assigned timestamps match."
+# 8) Assigned timestamp dominance: newer assignment should outrank older assignment even when risk is lower
+Write-Host "[assert-ops-followups] POST /api/visitors (assignedAt dominance pair) ..."
+$olderHighRiskVisitorId = New-Visitor -FirstName "Ops" -LastName "AssignedOlderHigh" -Prefix "ops-followups-older-high"
+$newerLowRiskVisitorId = New-Visitor -FirstName "Ops" -LastName "AssignedNewerLow" -Prefix "ops-followups-newer-low"
 
-# 8) Record FOLLOWUP_OUTCOME_RECORDED for primary visitor then ensure it is resolved (no longer present)
-Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_OUTCOME_RECORDED (primary) ..."
-$outcomeAt = $now.AddSeconds(5).ToString("o")
-Add-FormationEvent -VisitorId $primaryVisitorId -Type "FOLLOWUP_OUTCOME_RECORDED" -OccurredAt $outcomeAt -Metadata @{ outcome = "connected" }
+Write-Host "[assert-ops-followups] POST /api/engagements/events (newer low-risk visitor recent signals) ..."
+$newerLowRiskNoteAt = $now.AddMinutes(-4).ToString("o")
+$newerLowRiskStatusAt = $now.AddMinutes(-1).ToString("o")
+Add-EngagementEvent -VisitorId $newerLowRiskVisitorId -Type "note.add" -OccurredAt $newerLowRiskNoteAt -Data @{ text = "recent note for assignedAt ordering" }
+Add-EngagementEvent -VisitorId $newerLowRiskVisitorId -Type "status.transition" -OccurredAt $newerLowRiskStatusAt -Data @{ from = "new"; to = "engaged"; reason = "assignedAt ordering" }
 
-# 9) Record FOLLOWUP_OUTCOME_RECORDED for secondary visitor so the regression cleans up both seeded items
-Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_OUTCOME_RECORDED (secondary) ..."
-$secondaryOutcomeAt = $now.AddSeconds(6).ToString("o")
-Add-FormationEvent -VisitorId $secondaryVisitorId -Type "FOLLOWUP_OUTCOME_RECORDED" -OccurredAt $secondaryOutcomeAt -Metadata @{ outcome = "scheduled" }
+$olderAssignedAt = $now.AddSeconds(10).ToString("o")
+$newerAssignedAt = $now.AddSeconds(11).ToString("o")
+
+Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_ASSIGNED (older high-risk visitor) ..."
+Add-FormationEvent -VisitorId $olderHighRiskVisitorId -Type "FOLLOWUP_ASSIGNED" -OccurredAt $olderAssignedAt -Metadata @{ assigneeId = "ops-user-1" }
+
+Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_ASSIGNED (newer low-risk visitor) ..."
+Add-FormationEvent -VisitorId $newerLowRiskVisitorId -Type "FOLLOWUP_ASSIGNED" -OccurredAt $newerAssignedAt -Metadata @{ assigneeId = "ops-user-1" }
+
+Start-Sleep -Milliseconds 250
+
+Write-Host "[assert-ops-followups] GET /ops/followups (assignedAt dominance check) ..."
+$fuAssigned = GetFollowups
+$olderHighRiskItem = GetFollowupItem -Items $fuAssigned.items -VisitorId $olderHighRiskVisitorId
+$newerLowRiskItem = GetFollowupItem -Items $fuAssigned.items -VisitorId $newerLowRiskVisitorId
+Assert-HighRiskUrgentItem -Item $olderHighRiskItem -VisitorId $olderHighRiskVisitorId
+Assert-LowRiskNormalPriorityItem -Item $newerLowRiskItem -VisitorId $newerLowRiskVisitorId
+Assert-VisitorSortsBefore -Items $fuAssigned.items -FirstVisitorId $newerLowRiskVisitorId -SecondVisitorId $olderHighRiskVisitorId -Message "Expected newer assignment to sort ahead of older assignment even when newer item has lower engagement risk."
+
+# 9) Final visitorId tie-break: identical assignedAt, identical risk, identical queue state
+Write-Host "[assert-ops-followups] POST /api/visitors (visitorId tie-break pair) ..."
+$tieVisitorAId = New-Visitor -FirstName "Ops" -LastName "TieA" -Prefix "ops-followups-tie-a"
+$tieVisitorBId = New-Visitor -FirstName "Ops" -LastName "TieB" -Prefix "ops-followups-tie-b"
+
+$tieAssignedAt = $now.AddSeconds(12).ToString("o")
+
+Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_ASSIGNED (visitorId tie-break pair) ..."
+Add-FormationEvent -VisitorId $tieVisitorAId -Type "FOLLOWUP_ASSIGNED" -OccurredAt $tieAssignedAt -Metadata @{ assigneeId = "ops-user-1" }
+Add-FormationEvent -VisitorId $tieVisitorBId -Type "FOLLOWUP_ASSIGNED" -OccurredAt $tieAssignedAt -Metadata @{ assigneeId = "ops-user-1" }
+
+Start-Sleep -Milliseconds 250
+
+Write-Host "[assert-ops-followups] GET /ops/followups (visitorId tie-break check) ..."
+$fuTie = GetFollowups
+$tieVisitorAItem = GetFollowupItem -Items $fuTie.items -VisitorId $tieVisitorAId
+$tieVisitorBItem = GetFollowupItem -Items $fuTie.items -VisitorId $tieVisitorBId
+Assert-HighRiskUrgentItem -Item $tieVisitorAItem -VisitorId $tieVisitorAId
+Assert-HighRiskUrgentItem -Item $tieVisitorBItem -VisitorId $tieVisitorBId
+
+$expectedTieFirstVisitorId = $tieVisitorAId
+$expectedTieSecondVisitorId = $tieVisitorBId
+if ([string]::CompareOrdinal($tieVisitorAId, $tieVisitorBId) -gt 0) {
+  $expectedTieFirstVisitorId = $tieVisitorBId
+  $expectedTieSecondVisitorId = $tieVisitorAId
+}
+
+Assert-VisitorSortsBefore -Items $fuTie.items -FirstVisitorId $expectedTieFirstVisitorId -SecondVisitorId $expectedTieSecondVisitorId -Message "Expected visitorId lexical order to act as the final tie-break when queue items are otherwise identical."
+
+# 10) Timestamp precision edge: 1 ms later assignment should sort first when all else is equal
+Write-Host "[assert-ops-followups] POST /api/visitors (millisecond precision pair) ..."
+$msEarlierVisitorId = New-Visitor -FirstName "Ops" -LastName "MsEarlier" -Prefix "ops-followups-ms-earlier"
+$msLaterVisitorId = New-Visitor -FirstName "Ops" -LastName "MsLater" -Prefix "ops-followups-ms-later"
+
+$msEarlierAssignedAt = $now.AddSeconds(13).ToString("o")
+$msLaterAssignedAt = $now.AddSeconds(13).AddMilliseconds(1).ToString("o")
+
+Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_ASSIGNED (millisecond precision pair) ..."
+Add-FormationEvent -VisitorId $msEarlierVisitorId -Type "FOLLOWUP_ASSIGNED" -OccurredAt $msEarlierAssignedAt -Metadata @{ assigneeId = "ops-user-1" }
+Add-FormationEvent -VisitorId $msLaterVisitorId -Type "FOLLOWUP_ASSIGNED" -OccurredAt $msLaterAssignedAt -Metadata @{ assigneeId = "ops-user-1" }
+
+Start-Sleep -Milliseconds 250
+
+Write-Host "[assert-ops-followups] GET /ops/followups (millisecond precision check) ..."
+$fuMs = GetFollowups
+$msEarlierItem = GetFollowupItem -Items $fuMs.items -VisitorId $msEarlierVisitorId
+$msLaterItem = GetFollowupItem -Items $fuMs.items -VisitorId $msLaterVisitorId
+Assert-HighRiskUrgentItem -Item $msEarlierItem -VisitorId $msEarlierVisitorId
+Assert-HighRiskUrgentItem -Item $msLaterItem -VisitorId $msLaterVisitorId
+Assert-VisitorSortsBefore -Items $fuMs.items -FirstVisitorId $msLaterVisitorId -SecondVisitorId $msEarlierVisitorId -Message "Expected assignment ordering to respect millisecond timestamp precision."
+
+# 11) Resolve all seeded visitors so the regression cleans up after itself
+$cleanupVisitorIds = @(
+  $primaryVisitorId,
+  $secondaryVisitorId,
+  $olderHighRiskVisitorId,
+  $newerLowRiskVisitorId,
+  $tieVisitorAId,
+  $tieVisitorBId,
+  $msEarlierVisitorId,
+  $msLaterVisitorId
+)
+
+$cleanupBase = $now.AddSeconds(20)
+for ($i = 0; $i -lt $cleanupVisitorIds.Count; $i++) {
+  $visitorId = $cleanupVisitorIds[$i]
+  $cleanupAt = $cleanupBase.AddSeconds($i).ToString("o")
+  Write-Host ("[assert-ops-followups] POST /api/formation/events FOLLOWUP_OUTCOME_RECORDED ({0}) ..." -f $visitorId)
+  Add-FormationEvent -VisitorId $visitorId -Type "FOLLOWUP_OUTCOME_RECORDED" -OccurredAt $cleanupAt -Metadata @{ outcome = "resolved_by_regression" }
+}
 
 Start-Sleep -Milliseconds 250
 
 Write-Host "[assert-ops-followups] GET /ops/followups (after outcomes) ..."
 $fuO = GetFollowups
-$itemPrimaryOutcome = GetFollowupItem -Items $fuO.items -VisitorId $primaryVisitorId
-$itemSecondaryOutcome = GetFollowupItem -Items $fuO.items -VisitorId $secondaryVisitorId
-if ($itemPrimaryOutcome) { throw "Expected visitorId=$primaryVisitorId to be resolved and not present after outcome." }
-if ($itemSecondaryOutcome) { throw "Expected visitorId=$secondaryVisitorId to be resolved and not present after outcome." }
+foreach ($visitorId in $cleanupVisitorIds) {
+  $resolvedItem = GetFollowupItem -Items $fuO.items -VisitorId $visitorId
+  if ($resolvedItem) {
+    throw "Expected visitorId=$visitorId to be resolved and not present after outcome."
+  }
+}
 
-Write-Host "[assert-ops-followups] OK: followups lifecycle + risk enrichment regression passed." -ForegroundColor Green
+Write-Host "[assert-ops-followups] OK: followups lifecycle + ordering invariants regression passed." -ForegroundColor Green

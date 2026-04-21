@@ -3,13 +3,14 @@ import type { Request, Response, NextFunction } from "express";
 import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepository";
 import { IntegrationService } from "../../services/integration/integrationService";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
+import { EngagementsService } from "../../services/engagements/engagementsService";
+import { readEngagementRiskV1 } from "../../services/engagements/readEngagementRisk";
 import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
 import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
 
 const engagementSummaryRepo = new EngagementSummaryRepository();
-
 const integrationService = new IntegrationService(new EngagementEventsRepository());
+const engagementsService = new EngagementsService(new EngagementEventsRepository());
 
 export function createGetVisitorSummaryAdapter() {
   return async function getVisitorSummary(req: Request, res: Response, next: NextFunction) {
@@ -31,8 +32,9 @@ export function createGetVisitorSummaryAdapter() {
 
       const profilesTable = getFormationProfilesTableClient(storageConnectionString);
 
-      const [engagementSummary, integrationSummary, timelinePage, formationProfile] = await Promise.all([
+      const [engagementSummary, engagementRisk, integrationSummary, timelinePage, formationProfile] = await Promise.all([
         engagementSummaryRepo.get(visitorId),
+        readEngagementRiskV1(engagementsService, visitorId, 14),
         integrationService.readIntegrationSummary(visitorId),
         integrationService.readIntegratedTimeline(visitorId, 5),
         getFormationProfile(profilesTable as any, visitorId)
@@ -72,6 +74,7 @@ export function createGetVisitorSummaryAdapter() {
         summary: {
           engagement: {
             summary: engagementSummary ?? null,
+            risk: engagementRisk,
             timelinePreview: timelinePage?.items ?? []
           },
           integration: integrationSummary ?? null,
@@ -83,7 +86,7 @@ export function createGetVisitorSummaryAdapter() {
               hasMembership: formationProfile?.lastEventType === "MEMBERSHIP_RECORDED"
             }
           },
-          journey: journey
+          journey
         },
       });
     } catch (err) {
@@ -91,4 +94,3 @@ export function createGetVisitorSummaryAdapter() {
     }
   };
 }
-

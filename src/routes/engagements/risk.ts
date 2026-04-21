@@ -1,8 +1,7 @@
 import { Router } from "express";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { EngagementsService } from "../../services/engagements/engagementsService";
-import { computeEngagementScoreV1 } from "../../domain/engagement/computeEngagementScore.v1";
-import { deriveEngagementRiskV1 } from "../../domain/engagement/deriveEngagementRisk.v1";
+import { readEngagementRiskV1 } from "../../services/engagements/readEngagementRisk";
 
 export const engagementsRiskRouter = Router();
 
@@ -24,37 +23,7 @@ engagementsRiskRouter.get("/engagements/risk", async (req, res, next) => {
       });
     }
 
-    const MAX_EVENTS = 2000;
-    const PAGE_SIZE = 250;
-
-    const all: any[] = [];
-    let cursor: string | undefined = undefined;
-
-    while (all.length < MAX_EVENTS) {
-      const page = await service.readTimeline(visitorId, PAGE_SIZE, cursor);
-      all.push(...(page.items ?? []));
-
-      if (!page.nextCursor) break;
-      cursor = page.nextCursor;
-    }
-
-    const score = computeEngagementScoreV1({
-      events: all as any,
-      windowDays
-    });
-
-    const risk = deriveEngagementRiskV1({
-      visitorId,
-      windowDays,
-      engaged: score.engaged,
-      lastEngagedAt: score.lastEngagedAt,
-      daysSinceLastEngagement: score.daysSinceLastEngagement,
-      engagementCount: score.engagementCount,
-      score: score.score,
-      scoreReasons: score.scoreReasons,
-      needsFollowup: score.needsFollowup
-    });
-
+    const risk = await readEngagementRiskV1(service, visitorId, windowDays);
     return res.status(200).json(risk);
   } catch (err) {
     return next(err);

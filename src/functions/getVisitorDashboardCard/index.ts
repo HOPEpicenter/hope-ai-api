@@ -35,7 +35,6 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     const hasContacted = items.some((item: any) => item?.type === "FOLLOWUP_CONTACTED");
     const hasAssigned = items.some((item: any) => item?.type === "FOLLOWUP_ASSIGNED");
 
-    // ✅ FIXED LOGIC
     const followupStatus = hasOutcomeRecorded
       ? "resolved"
       : hasAssigned
@@ -72,6 +71,7 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     );
 
     const profile = summaryResponse?.body?.summary?.formation?.profile ?? null;
+    const risk = summaryResponse?.body?.summary?.engagement?.risk ?? null;
 
     const assignedToRaw =
       typeof profile?.assignedTo === "string"
@@ -126,7 +126,11 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
           assignedTo,
           attentionState,
           followupUrgency,
-          followupOverdue
+          followupOverdue,
+          riskLevel: risk?.riskLevel ?? null,
+          riskScore: risk?.riskScore ?? null,
+          needsFollowup: risk?.engagement?.needsFollowup ?? null,
+          recommendedAction: risk?.recommendedAction ?? null
         }
       }
     };

@@ -3,6 +3,7 @@ import { IntegrationService } from "../../services/integration/integrationServic
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { EngagementsService } from "../../services/engagements/engagementsService";
 import { readEngagementRiskV1 } from "../../services/engagements/readEngagementRisk";
+import { deriveFollowupPriority } from "../../services/followups/deriveFollowupPriority";
 
 const engagementsService = new EngagementsService(new EngagementEventsRepository());
 
@@ -45,6 +46,11 @@ export function createGetVisitorDashboardCardAdapter(integrationService: Integra
     })();
 
     const risk = await readEngagementRiskV1(engagementsService, visitorId, 14);
+    const priority = deriveFollowupPriority({
+      needsFollowup: risk.engagement.needsFollowup,
+      riskLevel: risk.riskLevel,
+      riskScore: risk.riskScore
+    });
 
     return res.json({
       visitorId,
@@ -58,8 +64,12 @@ export function createGetVisitorDashboardCardAdapter(integrationService: Integra
         riskLevel: risk.riskLevel,
         riskScore: risk.riskScore,
         needsFollowup: risk.engagement.needsFollowup,
-        recommendedAction: risk.recommendedAction
+        recommendedAction: risk.recommendedAction,
+        priorityBand: priority.priorityBand,
+        priorityScore: priority.priorityScore,
+        priorityReason: priority.priorityReason
       }
     });
   };
 }
+

@@ -2,6 +2,7 @@ import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { IntegrationService } from "../../services/integration/integrationService";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { createGetVisitorSummaryAdapter } from "../../routes/visitors/createGetVisitorSummaryAdapter";
+import { deriveFollowupPriority } from "../../services/followups/deriveFollowupPriority";
 
 const integrationService = new IntegrationService(new EngagementEventsRepository());
 
@@ -72,6 +73,11 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
 
     const profile = summaryResponse?.body?.summary?.formation?.profile ?? null;
     const risk = summaryResponse?.body?.summary?.engagement?.risk ?? null;
+    const priority = deriveFollowupPriority({
+      needsFollowup: risk?.engagement?.needsFollowup ?? null,
+      riskLevel: risk?.riskLevel ?? null,
+      riskScore: risk?.riskScore ?? null
+    });
 
     const assignedToRaw =
       typeof profile?.assignedTo === "string"
@@ -130,7 +136,10 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
           riskLevel: risk?.riskLevel ?? null,
           riskScore: risk?.riskScore ?? null,
           needsFollowup: risk?.engagement?.needsFollowup ?? null,
-          recommendedAction: risk?.recommendedAction ?? null
+          recommendedAction: risk?.recommendedAction ?? null,
+          priorityBand: priority.priorityBand,
+          priorityScore: priority.priorityScore,
+          priorityReason: priority.priorityReason
         }
       }
     };

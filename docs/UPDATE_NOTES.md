@@ -1,3 +1,20 @@
+## 2026-04-21 — Integration Cutover Stabilization (PR #655)
+
+### Summary
+Stabilized global timeline cutover and fixed cross-scope data contamination.
+
+### Changes
+- Scoped shadow reads to global endpoint only
+- Fixed routing for integration endpoints
+- Restored correct ordering behavior
+- Stabilized tie ordering in asserts
+- Verified global timeline parity
+
+### Outcome
+- Visitor timeline returns correct scoped data
+- Global timeline validated and production-ready
+- All integration asserts passing
+
 ## 2026-04-01
 
 - ✅ Merged **#490**: added GET /api/integration/timeline/global (global unified timeline).
@@ -428,3 +445,4 @@ Status:
 - shipped to production
 - build passing
 - dashboard/operator flow aligned to current followup queue source of truth
+

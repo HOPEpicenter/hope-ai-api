@@ -461,3 +461,17 @@ Current rule:
 - [x] Add visual priority styling to Visitors quick filters
 - [x] Verify local production build passes
 - [x] Deploy latest dashboard changes to production
+
+## GLOBAL TIMELINE (COMPLETED CORE)
+
+- [x] Global timeline store created
+- [x] Formation events written to global store
+- [x] Engagement events written to global store
+- [x] Shadow read implemented
+- [x] Shadow parity validated (debugShadow)
+- [x] Cursor-based pagination working
+- [x] Tie ordering validated via asserts
+- [x] Visitor timeline protected from global shadow reads
+- [x] Global endpoint:
+      GET /api/integration/timeline/global
+

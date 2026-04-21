@@ -191,3 +191,28 @@ Visitor summary includes:
 - integration summary
 - formation profile
 - formation milestone flags
+
+## Global Timeline
+
+### GET /api/integration/timeline/global
+
+Returns unified cross-stream timeline (formation + engagement).
+
+Query Parameters:
+- limit (number, default 50)
+- cursor (string, optional)
+- debugShadow (optional, for parity debugging)
+
+Response:
+{
+  ok: true,
+  items: [...],
+  nextCursor: string | null
+}
+
+Notes:
+- Uses global timeline store
+- Cursor-based pagination supported
+- Stable ordering guaranteed
+- Shadow comparison available via debugShadow=1
+

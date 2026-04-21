@@ -475,20 +475,21 @@ if ($looksPlaceholder) {
 
 }
 
-# OPS followups smoke
-$fuPath = Join-Path $PSScriptRoot "smoke-followups.ps1"
+# OPS followups regression (promoted from smoke)
+$fuPath = Join-Path $PSScriptRoot "assert-ops-followups.ps1"
 if (-not (Test-Path -LiteralPath $fuPath)) {
-  throw "Missing followups smoke script: $fuPath"
+  throw "Missing followups regression script: $fuPath"
 }
 
 Write-Host ""
-Write-Host "== Followups (OPS) ==" -ForegroundColor Cyan
-& pwsh -NoProfile -ExecutionPolicy Bypass -File $fuPath -BaseUrl $BaseUrl
+Write-Host "== Followups (OPS regression) ==" -ForegroundColor Cyan
+& pwsh -NoProfile -ExecutionPolicy Bypass -File $fuPath -BaseUrl $BaseUrl -ApiKey $ApiKey
 if ($LASTEXITCODE -ne 0) {
-  throw "Followups smoke failed (exit=$LASTEXITCODE)"
+  throw "Followups regression failed (exit=$LASTEXITCODE)"
 }
-Write-Host "Followups smoke OK"
+Write-Host "Followups regression OK"
 
 Write-Host "SMOKE TESTS PASSED"
 exit 0
+
 

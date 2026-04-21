@@ -2,17 +2,14 @@ import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepository";
 import { IntegrationService } from "../../services/integration/integrationService";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
 import { EngagementsService } from "../../services/engagements/engagementsService";
+import { readEngagementRiskV1 } from "../../services/engagements/readEngagementRisk";
 import { getFormationProfilesTableClient, getFormationProfileByVisitorId } from "../_shared/formation";
 import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1";
 
 const engagementSummaryRepo = new EngagementSummaryRepository();
 const engagementEventsRepo = new EngagementEventsRepository();
-const formationEventsRepo = new AzureTableFormationEventsRepository();
-
 const engagementsService = new EngagementsService(engagementEventsRepo);
-
 const integrationService = new IntegrationService(new EngagementEventsRepository());
 
 export async function getVisitorSummary(context: any, req: any): Promise<void> {
@@ -43,12 +40,14 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
     const [
       engagementSummary,
       engagementStatus,
+      engagementRisk,
       integrationSummary,
       timelinePage,
       formationProfile
     ] = await Promise.all([
       engagementSummaryRepo.get(visitorId),
       engagementsService.getCurrentStatus(visitorId),
+      readEngagementRiskV1(engagementsService, visitorId, 14),
       integrationService.readIntegrationSummary(visitorId),
       integrationService.readIntegratedTimeline(visitorId, 5),
       getFormationProfileByVisitorId(table, visitorId)
@@ -76,6 +75,7 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
             status: engagementStatus?.status ?? null,
             lastChangedAt: engagementStatus?.lastChangedAt ?? null,
             lastEventId: engagementStatus?.lastEventId ?? null,
+            risk: engagementRisk,
             timelinePreview: safeTimelineItems
           },
           integration: integrationSummary ?? null,
@@ -100,4 +100,3 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
     };
   }
 }
-

@@ -1,5 +1,10 @@
 import type { Request, Response } from "express";
 import { IntegrationService } from "../../services/integration/integrationService";
+import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
+import { EngagementsService } from "../../services/engagements/engagementsService";
+import { readEngagementRiskV1 } from "../../services/engagements/readEngagementRisk";
+
+const engagementsService = new EngagementsService(new EngagementEventsRepository());
 
 export function createGetVisitorDashboardCardAdapter(integrationService: IntegrationService) {
   return async function getVisitorDashboardCard(req: Request, res: Response) {
@@ -7,14 +12,12 @@ export function createGetVisitorDashboardCardAdapter(integrationService: Integra
 
     const page = await integrationService.readIntegratedTimeline(visitorId, 100);
     const items = Array.isArray(page.items) ? page.items : [];
-
     const latest = items.length > 0 ? items[0] : null;
 
     const hasOutcome = items.some(i => i?.type === "FOLLOWUP_OUTCOME_RECORDED");
     const hasContact = items.some(i => i?.type === "FOLLOWUP_CONTACTED");
     const hasAssigned = items.some(i => i?.type === "FOLLOWUP_ASSIGNED");
 
-    // ✅ FIXED LOGIC
     const followupStatus = hasOutcome
       ? "resolved"
       : hasAssigned
@@ -41,6 +44,8 @@ export function createGetVisitorDashboardCardAdapter(integrationService: Integra
       return null;
     })();
 
+    const risk = await readEngagementRiskV1(engagementsService, visitorId, 14);
+
     return res.json({
       visitorId,
       card: {
@@ -49,7 +54,11 @@ export function createGetVisitorDashboardCardAdapter(integrationService: Integra
         lastActivitySummary: latest?.summary ?? null,
         followupStatus,
         assignedTo,
-        attentionState
+        attentionState,
+        riskLevel: risk.riskLevel,
+        riskScore: risk.riskScore,
+        needsFollowup: risk.engagement.needsFollowup,
+        recommendedAction: risk.recommendedAction
       }
     });
   };

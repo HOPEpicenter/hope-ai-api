@@ -80,10 +80,39 @@ Write-Host ("ApiKey : len={0} last4={1}" -f $ApiKey.Length, ($ApiKey.Substring([
 
 $headers = @{ "x-api-key" = $ApiKey }
 
-$opsHealth = Invoke-Probe -Url "$BaseUrl/ops/health" -Headers $headers
+$deadline = (Get-Date).AddSeconds(120)
+$opsHealth = $null
 $apiHealth = $null
 
-if ($opsHealth.Status -eq 200) {
+while ((Get-Date) -lt $deadline) {
+  $opsHealth = Invoke-Probe -Url "$BaseUrl/ops/health" -Headers $headers
+
+  if ($opsHealth.Status -eq 200) {
+    break
+  }
+
+  if ($opsHealth.Status -eq 404) {
+    $apiHealth = Invoke-Probe -Url "$BaseUrl/api/health"
+    if ($apiHealth.Status -eq 200) {
+      break
+    }
+  }
+
+  if ($opsHealth.Status -in @(401,403)) {
+    throw ("Remote smoke auth failed against {0} (HTTP {1}). Check HOPE_API_KEY." -f $opsHealth.Url, $opsHealth.Status)
+  }
+
+  if ($apiHealth -and $apiHealth.Status -in @(401,403)) {
+    throw ("Remote smoke auth failed against {0} (HTTP {1}). Check HOPE_API_KEY." -f $apiHealth.Url, $apiHealth.Status)
+  }
+
+  Write-Host ("Waiting for remote health... ops={0} api={1}" -f `
+    ($(if ($opsHealth) { $opsHealth.Status } else { "n/a" })), `
+    ($(if ($apiHealth) { $apiHealth.Status } else { "n/a" }))) -ForegroundColor DarkYellow
+  Start-Sleep -Seconds 5
+}
+
+if ($opsHealth -and $opsHealth.Status -eq 200) {
   Write-Host ""
   Write-Host "OPS host detected via /ops/health" -ForegroundColor Green
 
@@ -98,8 +127,7 @@ if ($opsHealth.Status -eq 200) {
   exit 0
 }
 
-if ($opsHealth.Status -eq 404) {
-  $apiHealth = Invoke-Probe -Url "$BaseUrl/api/health"
+if ($opsHealth -and $opsHealth.Status -eq 404 -and $apiHealth -and $apiHealth.Status -eq 200) {
   if ($apiHealth.Status -eq 200) {
     Write-Host ""
     Write-Host "API-only Functions host detected via /api/health" -ForegroundColor Yellow
@@ -126,3 +154,5 @@ if ($opsHealth.Status -eq 404) {
 }
 
 throw ("Unable to validate remote host. /ops/health => {0}; /api/health => {1}" -f $opsHealth.Status, $(if ($apiHealth) { $apiHealth.Status } else { "not checked" }))
+
+

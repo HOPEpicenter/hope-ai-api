@@ -33,6 +33,7 @@ type QueueItem = {
   engagementRiskScore?: number | null;
   priorityBand?: string | null;
   priorityReason?: string | null;
+  lastActivityAt?: string | null;
 };
 
 type EventState = {
@@ -390,6 +391,11 @@ opsFollowupsRouter.get("/", async (req, res) => {
       engagementRiskScore: riskScore,
       priorityBand: priorityBand,
       priorityReason: priorityReason,
+      lastActivityAt: [
+        state.lastFollowupOutcomeAt,
+        state.lastFollowupContactedAt,
+        state.lastFollowupAssignedAt
+      ].filter(Boolean).sort().pop() ?? null,
     });
   }
 
@@ -455,6 +461,10 @@ opsFollowupsRouter.get("/", async (req, res) => {
     items: items.slice(0, limit),
   });
 });
+
+
+
+
 
 
 

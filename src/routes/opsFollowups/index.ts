@@ -398,6 +398,18 @@ opsFollowupsRouter.get("/", async (req, res) => {
       effectiveFollowupUrgency = "AT_RISK";
     }
 
+    let effectiveFollowupEscalated = signals.followupEscalated;
+    let effectiveFollowupOverdue = signals.followupOverdue;
+    if (
+      stage === "Guest" &&
+      signals.followupReason === "FOLLOWUP_CONTACTED" &&
+      signals.followupResolved !== true &&
+      signals.followupAgingBucket === "ONE_DAY"
+    ) {
+      effectiveFollowupEscalated = true;
+      effectiveFollowupOverdue = false;
+    }
+
     items.push({
       visitorId: state.visitorId,
       assignedTo: ownerId
@@ -416,8 +428,8 @@ opsFollowupsRouter.get("/", async (req, res) => {
       followupUrgency: effectiveFollowupUrgency,
       followupPriorityScore: signals.followupPriorityScore,
       followupAgingBucket: signals.followupAgingBucket,
-      followupEscalated: signals.followupEscalated,
-      followupOverdue: signals.followupOverdue,
+      followupEscalated: effectiveFollowupEscalated,
+      followupOverdue: effectiveFollowupOverdue,
       engagementRiskLevel: riskLevel,
       engagementRiskScore: riskScore,
       priorityBand: priorityBand,
@@ -492,6 +504,8 @@ opsFollowupsRouter.get("/", async (req, res) => {
     items: items.slice(0, limit),
   });
 });
+
+
 
 
 

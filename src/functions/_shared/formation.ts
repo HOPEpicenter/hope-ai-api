@@ -47,6 +47,7 @@ export type FunctionFormationProfileEntity = {
   lastFollowupOutcomeNotes?: string;
   lastNextStepAt?: string;
   lastPrayerRequestedAt?: string;
+  displayName?: string;
   groupsJson?: string;
   [k: string]: any;
 };
@@ -275,6 +276,7 @@ function toComparableProfileState(profile: FunctionFormationProfileEntity | null
     lastFollowupOutcomeNotes: profile.lastFollowupOutcomeNotes ?? null,
     lastNextStepAt: profile.lastNextStepAt ?? null,
     lastPrayerRequestedAt: profile.lastPrayerRequestedAt ?? null,
+    displayName: profile.displayName ?? null,
     groups: Array.isArray((profile as any).groups) ? (profile as any).groups : null,
   };
 
@@ -621,6 +623,10 @@ try {
     const groupId = String(data.groupId ?? "").trim();
     const displayName = String(data.displayName ?? "").trim();
 
+    if (displayName) {
+      profile.displayName = displayName;
+    }
+
     const currentGroups = Array.isArray((profile as any).groups)
       ? [...(profile as any).groups]
       : [];
@@ -662,6 +668,11 @@ try {
     const assigneeId = normalizeAssignedTo(data.assigneeId);
     if (!assigneeId) {
       throw new Error("FOLLOWUP_ASSIGNED requires data.assigneeId (string)");
+    }
+
+    const displayName = String(data.displayName ?? "").trim();
+    if (displayName) {
+      profile.displayName = displayName;
     }
 
     if (shouldAdvanceTouchpointAt(profile.lastFollowupAssignedAt, occurredAt)) {
@@ -836,6 +847,7 @@ export async function listFormationProfiles(
     "lastFollowupOutcomeNotes",
     "lastNextStepAt",
     "lastPrayerRequestedAt",
+    "displayName",
     "groupsJson"
   ];
 
@@ -865,6 +877,7 @@ export async function listFormationProfiles(
       lastFollowupOutcomeNotes: entity.lastFollowupOutcomeNotes,
       lastNextStepAt: entity.lastNextStepAt,
       lastPrayerRequestedAt: entity.lastPrayerRequestedAt,
+      displayName: entity.displayName,
       groupsJson: entity.groupsJson
     }) as FunctionFormationProfileEntity;
 

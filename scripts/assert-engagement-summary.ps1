@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
   # Accept what the CI runner passes today
   [Parameter(Mandatory = $false)]
@@ -163,7 +163,7 @@ if (-not (Wait-ForHealth -OpsBase $OpsBase -TimeoutSeconds $HealthTimeoutSeconds
 $engBase = "$OpsBase/engagements"
 Write-Info "[assert-engagement-summary] Probing engagements endpoint: GET $engBase"
 
-$probe = Invoke-HttpJson -Method GET -Uri $engBase
+$probe = Invoke-HttpJson -Method GET -Uri "${engBase}?visitorId=probe"
 if (Is-MissingEndpoint -Response $probe) {
   Write-Info "SKIP: /ops/engagements is not implemented yet (HTTP 404)."
   exit 0
@@ -183,13 +183,19 @@ $visitorResp = Invoke-HttpJson -Method POST -Uri ("{0}/visitors" -f $OpsBase) -B
   email = $visitorEmail
 }
 
+$visitorId = $visitorResp.Json.visitorId
+if (-not $visitorId) {
+  Write-Fail "FAIL: visitorId missing from create response."
+  exit 1
+}
+
 if (-not $visitorResp.Ok) {
   Write-Fail ("FAIL: Visitor creation failed. Status={0} Body={1}" -f $visitorResp.StatusCode, ($visitorResp.BodyText | ForEach-Object { $_ }))
   exit 1
 }
 
 # Minimal summary check without guessing schema
-$summaryUrl = "$engBase/summary"
+$summaryUrl = "${engBase}/summary?visitorId=$visitorId"
 Write-Info "[assert-engagement-summary] Fetching summary: GET $summaryUrl"
 
 $summaryResp = Invoke-HttpJson -Method GET -Uri $summaryUrl

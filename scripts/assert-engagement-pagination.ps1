@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
   [Parameter(Mandatory = $false)]
   [string]$BaseUrl = $env:HOPE_AI_API_BASE_URL,
@@ -220,7 +220,7 @@ $engBaseUrl = "$BaseUrl/ops/engagements"
 # Attempt engagement creation (inside safe HTTP wrapper; no stack traces)
 Write-Info "Attempting engagement create: POST $engBaseUrl"
 
-$engBody = @{}
+$engBody = @{ kind = "test_engagement" }
 if (-not [string]::IsNullOrWhiteSpace($visitorId)) { $engBody.visitorId = $visitorId }
 
 $engCreate = Invoke-HttpJson -Method POST -Uri $engBaseUrl -Body $engBody
@@ -239,7 +239,7 @@ Write-Info "Engagement create returned success (2xx). Continuing to minimal pagi
 
 # Minimal pagination validation:
 # We only do a small GET that should be safe even if server ignores query params.
-$list1Url = "$engBaseUrl?limit=1"
+$list1Url = "${engBaseUrl}?visitorId=$visitorId&limit=1"
 Write-Info "Listing engagements (page 1): GET $list1Url"
 
 $list1 = Invoke-HttpJson -Method GET -Uri $list1Url
@@ -267,7 +267,7 @@ $token = Try-GetContinuationToken -Json $list1.Json
 if ($null -ne $token) {
   $tokenName = $token.Name
   $tokenVal  = $token.Value
-  $list2Url  = "$engBaseUrl?limit=1&$tokenName=$([uri]::EscapeDataString($tokenVal))"
+  $list2Url  = "${engBaseUrl}?visitorId=$visitorId&limit=1&$tokenName=$([uri]::EscapeDataString($tokenVal))"
 
   Write-Info "Listing engagements (page 2 via $tokenName): GET $list2Url"
   $list2 = Invoke-HttpJson -Method GET -Uri $list2Url

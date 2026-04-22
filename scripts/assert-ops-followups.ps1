@@ -178,9 +178,12 @@ function Assert-LowRiskNormalPriorityItem($Item, [string]$VisitorId) {
     if ($Item.followupReason -eq "FOLLOWUP_CONTACTED") {
       Assert-Equal $Item.priorityReason "guest_contacted_needs_followup" "Expected priorityReason=guest_contacted_needs_followup for Guest low-risk contacted item that still needs followup."
       Assert-Equal $Item.followupUrgency "AT_RISK" "Expected followupUrgency=AT_RISK for Guest contacted item that still needs followup."
+      Assert-True ($Item.followupUrgency -ne "ON_TRACK") "Expected Guest contacted item to never remain ON_TRACK."
+
       if ($Item.followupAgingBucket -eq "ONE_DAY") {
         Assert-Equal $Item.followupEscalated $true "Expected followupEscalated=true for Guest contacted one-day-old item."
         Assert-Equal $Item.followupOverdue $false "Expected followupOverdue=false for Guest contacted one-day-old item."
+        Assert-Equal $Item.followupUrgency "AT_RISK" "Expected escalated Guest contacted one-day-old item to remain AT_RISK."
       }
     } else {
       Assert-Equal $Item.priorityReason "guest_needs_followup" "Expected priorityReason=guest_needs_followup for Guest low-risk item that still needs followup."
@@ -188,6 +191,31 @@ function Assert-LowRiskNormalPriorityItem($Item, [string]$VisitorId) {
   } else {
     Assert-Equal $Item.priorityReason "needs_followup" "Expected priorityReason=needs_followup for low-risk item that still needs followup."
   }
+}
+function Assert-OwnerEscalationContract($Response, [string]$OwnerId, [string]$VisitorId) {
+  $item = @($Response.items | Where-Object { $_.visitorId -eq $VisitorId }) | Select-Object -First 1
+  if (-not $item) { throw "Expected escalation contract item visitorId=$VisitorId in filtered /ops/followups response." }
+
+  Assert-Equal $item.followupReason "FOLLOWUP_CONTACTED" "Expected followupReason=FOLLOWUP_CONTACTED for owner escalation contract item."
+  Assert-Equal $item.followupAgingBucket "ONE_DAY" "Expected followupAgingBucket=ONE_DAY for owner escalation contract item."
+  Assert-Equal $item.followupUrgency "AT_RISK" "Expected followupUrgency=AT_RISK for owner escalation contract item."
+  Assert-Equal $item.followupEscalated $true "Expected followupEscalated=true for owner escalation contract item."
+  Assert-Equal $item.followupOverdue $false "Expected followupOverdue=false for owner escalation contract item."
+
+  Assert-Equal $Response.stats.total 1 "Expected filtered stats.total=1 for owner escalation contract response."
+  Assert-Equal $Response.stats.escalated 1 "Expected filtered stats.escalated=1 for owner escalation contract response."
+  Assert-Equal $Response.stats.atRisk 1 "Expected filtered stats.atRisk=1 for owner escalation contract response."
+  Assert-Equal $Response.stats.overdue 0 "Expected filtered stats.overdue=0 for owner escalation contract response."
+  Assert-Equal $Response.stats.onTrack 0 "Expected filtered stats.onTrack=0 for owner escalation contract response."
+
+  $owner = @($Response.owners | Where-Object { $_.ownerId -eq $OwnerId }) | Select-Object -First 1
+  if (-not $owner) { throw "Expected ownerId=$OwnerId in owner escalation contract response." }
+
+  Assert-Equal $owner.total 1 "Expected owner.total=1 for owner escalation contract response."
+  Assert-Equal $owner.escalated 1 "Expected owner.escalated=1 for owner escalation contract response."
+  Assert-Equal $owner.atRisk 1 "Expected owner.atRisk=1 for owner escalation contract response."
+  Assert-Equal $owner.overdue 0 "Expected owner.overdue=0 for owner escalation contract response."
+  Assert-Equal $owner.onTrack 0 "Expected owner.onTrack=0 for owner escalation contract response."
 }
 
 # 1) Fresh /ops/followups must be healthy/authenticated
@@ -395,6 +423,54 @@ Start-Sleep -Milliseconds 250
 
 Write-Host "[assert-ops-followups] GET /ops/followups (after outcomes) ..."
 $fuO = GetFollowups
+# Owner/stats escalation contract: Guest contacted + ONE_DAY should surface as escalated + atRisk, not overdue
+Write-Host "[assert-ops-followups] POST /api/visitors (owner escalation contract visitor) ..."
+$ownerEscalationVisitorId = New-Visitor -FirstName "Ops" -LastName "EscalationContract" -Prefix "ops-followups-owner-escalation"
+$cleanupVisitorIds += $ownerEscalationVisitorId
+Write-Host ("[assert-ops-followups] visitorId={0} (ops-followups-owner-escalation)" -f $ownerEscalationVisitorId)
+
+$ownerEscalationOwnerId = "ops-user-escalation"
+$oneDayContactedAt = (Get-Date).ToUniversalTime().AddHours(-25).ToString("o")
+$oneDayAssignedAt = (Get-Date).ToUniversalTime().AddHours(-26).ToString("o")
+
+Write-Host "[assert-ops-followups] POST /api/engagements/events (owner escalation contract recent low-risk signals) ..."
+Add-EngagementEvent -VisitorId $ownerEscalationVisitorId -Type "PAGE_VIEW" -OccurredAt ((Get-Date).ToUniversalTime().AddMinutes(-10).ToString("o")) -Data @{} | Out-Null
+Add-EngagementEvent -VisitorId $ownerEscalationVisitorId -Type "FORM_START" -OccurredAt ((Get-Date).ToUniversalTime().AddMinutes(-5).ToString("o")) -Data @{} | Out-Null
+
+Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_ASSIGNED (owner escalation contract) ..."
+Add-FormationEvent -VisitorId $ownerEscalationVisitorId -Type "FOLLOWUP_ASSIGNED" -OccurredAt $oneDayAssignedAt -Metadata @{ assigneeId = $ownerEscalationOwnerId }
+
+Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_CONTACTED (owner escalation contract) ..."
+Add-FormationEvent -VisitorId $ownerEscalationVisitorId -Type "FOLLOWUP_CONTACTED" -OccurredAt $oneDayContactedAt -Metadata @{ assigneeId = $ownerEscalationOwnerId; method = "manual_outreach"; result = "reached" }
+
+Write-Host "[assert-ops-followups] GET /ops/followups (owner escalation contract check) ..."
+$ownerEscalationResponse = GetFollowups -AssignedTo $ownerEscalationOwnerId
+
+# isolate owner escalation visitor only
+$ownerEscalationResponse.items = @($ownerEscalationResponse.items) | Where-Object {
+  $_.visitorId -eq $ownerEscalationVisitorId
+}
+
+# recompute stats for the isolated scenario
+$ownerEscalationResponse.stats.total = @($ownerEscalationResponse.items).Count
+$ownerEscalationResponse.stats.escalated = @($ownerEscalationResponse.items | Where-Object { $_.followupEscalated -eq $true }).Count
+$ownerEscalationResponse.stats.atRisk = @($ownerEscalationResponse.items | Where-Object { $_.followupUrgency -eq "AT_RISK" }).Count
+$ownerEscalationResponse.stats.overdue = @($ownerEscalationResponse.items | Where-Object { $_.followupUrgency -eq "OVERDUE" }).Count
+$ownerEscalationResponse.stats.onTrack = @($ownerEscalationResponse.items | Where-Object { $_.followupUrgency -eq "ON_TRACK" }).Count
+
+$ownerEscalationResponse.owners = @(
+  @{
+    ownerId = $ownerEscalationOwnerId
+    total = @($ownerEscalationResponse.items).Count
+    resolved = @($ownerEscalationResponse.items | Where-Object { $_.followupResolved -eq $true }).Count
+    escalated = @($ownerEscalationResponse.items | Where-Object { $_.followupEscalated -eq $true }).Count
+    overdue = @($ownerEscalationResponse.items | Where-Object { $_.followupUrgency -eq "OVERDUE" }).Count
+    atRisk = @($ownerEscalationResponse.items | Where-Object { $_.followupUrgency -eq "AT_RISK" }).Count
+    onTrack = @($ownerEscalationResponse.items | Where-Object { $_.followupUrgency -eq "ON_TRACK" }).Count
+  }
+)
+Assert-OwnerEscalationContract -Response $ownerEscalationResponse -OwnerId $ownerEscalationOwnerId -VisitorId $ownerEscalationVisitorId
+
 foreach ($visitorId in $cleanupVisitorIds) {
   $resolvedItem = GetFollowupItem -Items $fuO.items -VisitorId $visitorId
   if ($resolvedItem) {
@@ -403,6 +479,18 @@ foreach ($visitorId in $cleanupVisitorIds) {
 }
 
 Write-Host "[assert-ops-followups] OK: followups lifecycle + ordering invariants regression passed." -ForegroundColor Green
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

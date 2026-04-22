@@ -840,6 +840,7 @@ export async function listFormationProfiles(
   ];
 
   const matched: FunctionFormationProfileEntity[] = [];
+  let hasMore = false
 
   for await (const entity of table.listEntities<any>({
     queryOptions: { filter, select }
@@ -873,18 +874,23 @@ export async function listFormationProfiles(
 
     matched.push(profile);
 
-    if (matched.length >= limit) {
+    if (matched.length > limit) {
+      hasMore = true
       break;
     }
   }
 
-  const nextCursor = matched.length > 0 ? matched[matched.length - 1].rowKey : null;
+  const items = hasMore ? matched.slice(0, limit) : matched;
+  const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].rowKey : null;
 
   return {
-    items: matched,
+    items,
     cursor: nextCursor
   };
 }
+
+
+
 
 
 

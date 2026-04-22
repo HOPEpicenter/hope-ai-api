@@ -417,6 +417,55 @@ if (@($fuFiltered.owners).Count -ne 1) {
 
 Assert-Equal $fuFiltered.owners[0].ownerId $filterOwnerId "Expected owners[0] to match assignedTo filter."
 Assert-Equal $fuFiltered.owners[0].total 1 "Expected owner total=1 in filtered response."
+# 10c) Pagination contract: limit + cursor
+Write-Host "[assert-ops-followups] GET /ops/followups (pagination contract) ..."
+
+$limit = 2
+
+# page 1
+$fuPage1 = GetJson "$OpsBase/followups?limit=$limit"
+
+if ($null -eq $fuPage1.ok -or -not $fuPage1.ok) {
+  throw "Expected pagination response ok=true (page 1)."
+}
+
+if (@($fuPage1.items).Count -ne $limit) {
+  throw "Expected $limit items on page 1, got $(@($fuPage1.items).Count)."
+}
+
+if (-not $fuPage1.nextCursor) {
+  throw "Expected nextCursor to be present on page 1."
+}
+
+$page1VisitorIds = @($fuPage1.items | ForEach-Object { $_.visitorId })
+
+# page 2
+$cursor = $fuPage1.nextCursor
+$fuPage2 = GetJson "$OpsBase/followups?limit=$limit&cursor=$cursor"
+
+if ($null -eq $fuPage2.ok -or -not $fuPage2.ok) {
+  throw "Expected pagination response ok=true (page 2)."
+}
+
+if (@($fuPage2.items).Count -eq 0) {
+  throw "Expected page 2 to return items."
+}
+
+$page2VisitorIds = @($fuPage2.items | ForEach-Object { $_.visitorId })
+
+foreach ($id in $page1VisitorIds) {
+  if ($page2VisitorIds -contains $id) {
+    throw "Pagination overlap detected: visitorId=$id appears in both page 1 and page 2."
+  }
+}
+
+if ($fuPage1.stats.total -le $limit) {
+  throw "Expected stats.total to exceed page size when pagination is active."
+}
+
+if ($fuPage2.cursor -eq $fuPage1.cursor) {
+  throw "Expected cursor to advance between page 1 and page 2."
+}
 # 11) Resolve all seeded visitors so the regression cleans up after itself
 $cleanupVisitorIds = @(
   $primaryVisitorId,
@@ -449,6 +498,7 @@ foreach ($visitorId in $cleanupVisitorIds) {
 }
 
 Write-Host "[assert-ops-followups] OK: followups lifecycle + ordering invariants regression passed." -ForegroundColor Green
+
 
 
 

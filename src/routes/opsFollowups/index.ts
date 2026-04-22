@@ -387,6 +387,17 @@ opsFollowupsRouter.get("/", async (req, res) => {
       // fail safe: queue still returns even if enrichment fails
     }
 
+    const stage = formationProfileByVisitor.get(state.visitorId)?.stage ?? null;
+    let effectiveFollowupUrgency = signals.followupUrgency;
+    if (
+      stage === "Guest" &&
+      signals.followupReason === "FOLLOWUP_CONTACTED" &&
+      signals.followupResolved !== true &&
+      signals.followupUrgency === "ON_TRACK"
+    ) {
+      effectiveFollowupUrgency = "AT_RISK";
+    }
+
     items.push({
       visitorId: state.visitorId,
       assignedTo: ownerId
@@ -402,7 +413,7 @@ opsFollowupsRouter.get("/", async (req, res) => {
       followupReason: signals.followupReason,
       followupResolved: signals.followupResolved,
       resolvedForAssignment: signals.resolvedForAssignment,
-      followupUrgency: signals.followupUrgency,
+      followupUrgency: effectiveFollowupUrgency,
       followupPriorityScore: signals.followupPriorityScore,
       followupAgingBucket: signals.followupAgingBucket,
       followupEscalated: signals.followupEscalated,
@@ -481,6 +492,9 @@ opsFollowupsRouter.get("/", async (req, res) => {
     items: items.slice(0, limit),
   });
 });
+
+
+
 
 
 

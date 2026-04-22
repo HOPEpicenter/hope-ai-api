@@ -212,6 +212,7 @@ opsFollowupsRouter.get("/", async (req, res) => {
 
   const limitRaw = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
   const assignedToFilterRaw = Array.isArray(req.query.assignedTo) ? req.query.assignedTo[0] : req.query.assignedTo;
+  const visitorIdFilterRaw = Array.isArray(req.query.visitorId) ? req.query.visitorId[0] : req.query.visitorId;
   const includeResolvedRaw = Array.isArray(req.query.includeResolved) ? req.query.includeResolved[0] : req.query.includeResolved;
 
   const parsedLimit = Number(limitRaw);
@@ -221,6 +222,7 @@ opsFollowupsRouter.get("/", async (req, res) => {
       : 25;
 
   const assignedToFilter = String(assignedToFilterRaw ?? "").trim();
+  const visitorIdFilter = String(visitorIdFilterRaw ?? "").trim();
   const includeResolved =
     String(includeResolvedRaw ?? "").trim().toLowerCase() === "true";
 
@@ -429,13 +431,18 @@ opsFollowupsRouter.get("/", async (req, res) => {
 
   items.sort(compareQueueItems);
 
+  const filteredItems = items.filter((item) => {
+    if (visitorIdFilter && item.visitorId !== visitorIdFilter) return false;
+    return true;
+  });
+
   const stats = {
-    total: items.length,
-    resolved: items.filter((x) => x.followupResolved === true).length,
-    escalated: items.filter((x) => x.followupEscalated === true).length,
-    overdue: items.filter((x) => x.followupUrgency === "OVERDUE").length,
-    atRisk: items.filter((x) => x.followupUrgency === "AT_RISK").length,
-    onTrack: items.filter((x) => x.followupUrgency === "ON_TRACK").length,
+    total: filteredItems.length,
+    resolved: filteredItems.filter((x) => x.followupResolved === true).length,
+    escalated: filteredItems.filter((x) => x.followupEscalated === true).length,
+    overdue: filteredItems.filter((x) => x.followupUrgency === "OVERDUE").length,
+    atRisk: filteredItems.filter((x) => x.followupUrgency === "AT_RISK").length,
+    onTrack: filteredItems.filter((x) => x.followupUrgency === "ON_TRACK").length,
   };
 
   const ownersMap = new Map<
@@ -450,7 +457,7 @@ opsFollowupsRouter.get("/", async (req, res) => {
     }
   >();
 
-  for (const item of items) {
+  for (const item of filteredItems) {
     const ownerId = String(item?.assignedTo?.ownerId ?? "").trim();
     if (!ownerId) continue;
 
@@ -483,12 +490,19 @@ opsFollowupsRouter.get("/", async (req, res) => {
     ok: true,
     v: 1,
     assignedTo: assignedToFilter || null,
+    visitorId: visitorIdFilter || null,
     includeResolved,
     stats,
     owners,
-    items: items.slice(0, limit),
+    items: filteredItems.slice(0, limit),
   });
 });
+
+
+
+
+
+
 
 
 

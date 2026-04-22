@@ -432,7 +432,19 @@ opsFollowupsRouter.get("/", async (req, res) => {
   items.sort(compareQueueItems);
 
   const filteredItems = items.filter((item) => {
-    if (visitorIdFilter && item.visitorId !== visitorIdFilter) return false;
+    if (visitorIdFilter && item.visitorId !== visitorIdFilter) {
+      return false;
+    }
+
+    const itemOwnerId = String(item.assignedTo?.ownerId ?? "").trim();
+    if (assignedToFilter && itemOwnerId !== assignedToFilter) {
+      return false;
+    }
+
+    if (!includeResolved && item.followupResolved === true) {
+      return false;
+    }
+
     return true;
   });
 
@@ -497,6 +509,7 @@ opsFollowupsRouter.get("/", async (req, res) => {
     items: filteredItems.slice(0, limit),
   });
 });
+
 
 
 

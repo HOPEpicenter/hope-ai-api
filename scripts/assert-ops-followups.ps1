@@ -374,6 +374,49 @@ Assert-HighRiskUrgentItem -Item $msEarlierItem -VisitorId $msEarlierVisitorId
 Assert-HighRiskUrgentItem -Item $msLaterItem -VisitorId $msLaterVisitorId
 Assert-VisitorSortsBefore -Items $fuMs.items -FirstVisitorId $msLaterVisitorId -SecondVisitorId $msEarlierVisitorId -Message "Expected assignment ordering to respect millisecond timestamp precision."
 
+# 10b) Combined filter contract: assignedTo + visitorId + includeResolved
+Write-Host "[assert-ops-followups] GET /ops/followups (combined filter contract) ..."
+
+# pick a known active visitor assigned to ops-user-1
+$filterVisitorId = $primaryVisitorId
+$filterOwnerId = "ops-user-1"
+
+$fuFiltered = GetJson "$OpsBase/followups?assignedTo=$filterOwnerId&visitorId=$filterVisitorId&includeResolved=false"
+
+# 1) contract shape
+if ($null -eq $fuFiltered.ok -or -not $fuFiltered.ok) {
+  throw "Expected filtered followups response ok=true."
+}
+
+# 2) exactly one item (this visitor)
+if (@($fuFiltered.items).Count -ne 1) {
+  throw "Expected exactly 1 item for combined filter, got $(@($fuFiltered.items).Count)."
+}
+
+$item = $fuFiltered.items[0]
+
+# 3) correct visitor
+Assert-Equal $item.visitorId $filterVisitorId "Expected filtered item to match visitorId filter."
+
+# 4) correct owner
+Assert-Equal $item.assignedTo.ownerId $filterOwnerId "Expected filtered item to match assignedTo filter."
+
+# 5) unresolved only
+if ($item.followupResolved -eq $true) {
+  throw "Expected filtered item to be unresolved when includeResolved=false."
+}
+
+# 6) stats aligned with filtered dataset
+Assert-Equal $fuFiltered.stats.total 1 "Expected stats.total=1 for combined filter."
+Assert-Equal $fuFiltered.stats.resolved 0 "Expected stats.resolved=0 for combined filter."
+
+# 7) owners aligned with filtered dataset
+if (@($fuFiltered.owners).Count -ne 1) {
+  throw "Expected exactly 1 owner in filtered response."
+}
+
+Assert-Equal $fuFiltered.owners[0].ownerId $filterOwnerId "Expected owners[0] to match assignedTo filter."
+Assert-Equal $fuFiltered.owners[0].total 1 "Expected owner total=1 in filtered response."
 # 11) Resolve all seeded visitors so the regression cleans up after itself
 $cleanupVisitorIds = @(
   $primaryVisitorId,
@@ -406,6 +449,7 @@ foreach ($visitorId in $cleanupVisitorIds) {
 }
 
 Write-Host "[assert-ops-followups] OK: followups lifecycle + ordering invariants regression passed." -ForegroundColor Green
+
 
 
 

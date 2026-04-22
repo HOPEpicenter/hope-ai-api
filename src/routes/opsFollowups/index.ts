@@ -223,7 +223,12 @@ opsFollowupsRouter.get("/", async (req, res) => {
 
   const assignedToFilter = String(assignedToFilterRaw ?? "").trim();
   const visitorIdFilter = String(visitorIdFilterRaw ?? "").trim();
-  const includeResolved =
+    const sortByRaw = Array.isArray(req.query.sortBy) ? req.query.sortBy[0] : req.query.sortBy;
+  const sortDirRaw = Array.isArray(req.query.sortDir) ? req.query.sortDir[0] : req.query.sortDir;
+
+  const sortBy = String(sortByRaw ?? "").trim();
+  const sortDir = String(sortDirRaw ?? "").trim().toLowerCase() === "asc" ? "asc" : "desc";
+const includeResolved =
     String(includeResolvedRaw ?? "").trim().toLowerCase() === "true";
 
   const stateByVisitor = new Map<string, EventState>();
@@ -429,7 +434,32 @@ opsFollowupsRouter.get("/", async (req, res) => {
     });
   }
 
-  items.sort(compareQueueItems);
+    if (!sortBy) {
+    items.sort(compareQueueItems);
+  } else {
+    items.sort((a, b) => {
+      let result = 0;
+
+      if (sortBy === "assignedAt") {
+        result = String(a.lastFollowupAssignedAt ?? "").localeCompare(String(b.lastFollowupAssignedAt ?? ""));
+      }       else if (sortBy === "urgency") {
+        const urgencyRank: Record<string, number> = {
+          OVERDUE: 3,
+          AT_RISK: 2,
+          ON_TRACK: 1,
+        };
+        result =
+          (urgencyRank[a.followupUrgency ?? ""] ?? 0) -
+          (urgencyRank[b.followupUrgency ?? ""] ?? 0);
+      } else if (sortBy === "risk") {
+        result = Number(a.engagementRiskScore ?? 0) - Number(b.engagementRiskScore ?? 0);
+      } else if (sortBy === "lastActivityAt") {
+        result = String(a.lastActivityAt ?? "").localeCompare(String(b.lastActivityAt ?? ""));
+      }
+
+      return sortDir === "asc" ? result : -result;
+    });
+  }
 
   const filteredItems = items.filter((item) => {
     if (visitorIdFilter && item.visitorId !== visitorIdFilter) {
@@ -509,6 +539,9 @@ opsFollowupsRouter.get("/", async (req, res) => {
     items: filteredItems.slice(0, limit),
   });
 });
+
+
+
 
 
 

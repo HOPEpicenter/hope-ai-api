@@ -71,7 +71,7 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
 
       return {
         visitorId: p.visitorId,
-        name: p.visitorId,
+        name: (p.displayName && String(p.displayName).trim()) ? String(p.displayName).trim() : p.visitorId,
         email: null,
         assignedTo: p.assignedTo,
         followupState,
@@ -105,3 +105,5 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
     };
   }
 }
+
+

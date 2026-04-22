@@ -16,8 +16,8 @@ export function createEngagementsRouter(engagementsRepository: EngagementsReposi
       const kindClean = kind.trim();
       const metadata = (req.body && typeof req.body === "object") ? req.body.metadata : undefined;
 
-      if (!visitorId) return res.status(404).json({ ok: false, error: "NOT_IMPLEMENTED" });
-      if (!kind) return res.status(404).json({ ok: false, error: "NOT_IMPLEMENTED" });
+      if (!visitorId) return res.status(400).json({ ok: false, error: "VISITOR_ID_REQUIRED" });
+      if (!kind) return res.status(400).json({ ok: false, error: "KIND_REQUIRED" });
 
       const created = await engagementsRepository.create({ visitorId, kind: kind.trim(), occurredAt, metadata });
       return res.status(201).json({ ok: true, ...created });
@@ -34,7 +34,7 @@ export function createEngagementsRouter(engagementsRepository: EngagementsReposi
       const limitRaw = typeof req.query.limit === "string" ? req.query.limit : "";
       const limit = Math.max(1, Math.min(parseInt(limitRaw || "10", 10) || 10, 200));
 
-      if (!visitorId) return res.status(404).json({ ok: false, error: "NOT_IMPLEMENTED" });
+      if (!visitorId) return res.status(400).json({ ok: false, error: "VISITOR_ID_REQUIRED" });
 
       const { items, count } = await engagementsRepository.list({ visitorId, limit });
       return res.status(200).json({ ok: true, visitorId, items, count, limit });
@@ -51,7 +51,7 @@ export function createEngagementsRouter(engagementsRepository: EngagementsReposi
       const limitRaw = typeof req.query.limit === "string" ? req.query.limit : "";
       const limit = Math.max(1, Math.min(parseInt(limitRaw || "200", 10) || 200, 1000));
 
-      if (!visitorId) return res.status(404).json({ ok: false, error: "NOT_IMPLEMENTED" });
+      if (!visitorId) return res.status(400).json({ ok: false, error: "VISITOR_ID_REQUIRED" });
 
       const summary = await engagementsRepository.summary({ visitorId, limit });
       return res.status(200).json({ ok: true, ...summary });

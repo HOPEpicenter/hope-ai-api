@@ -211,6 +211,7 @@ opsFollowupsRouter.get("/", async (req, res) => {
   const engagementService = new EngagementsService(new EngagementEventsRepository());
 
   const limitRaw = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
+  const cursorRaw = Array.isArray(req.query.cursor) ? req.query.cursor[0] : req.query.cursor;
   const assignedToFilterRaw = Array.isArray(req.query.assignedTo) ? req.query.assignedTo[0] : req.query.assignedTo;
   const visitorIdFilterRaw = Array.isArray(req.query.visitorId) ? req.query.visitorId[0] : req.query.visitorId;
   const includeResolvedRaw = Array.isArray(req.query.includeResolved) ? req.query.includeResolved[0] : req.query.includeResolved;
@@ -220,6 +221,12 @@ opsFollowupsRouter.get("/", async (req, res) => {
     Number.isFinite(parsedLimit) && parsedLimit > 0
       ? Math.min(parsedLimit, 100)
       : 25;
+
+  const parsedCursor = Number(cursorRaw);
+  const cursor =
+    Number.isFinite(parsedCursor) && parsedCursor >= 0
+      ? parsedCursor
+      : 0;
 
   const assignedToFilter = String(assignedToFilterRaw ?? "").trim();
   const visitorIdFilter = String(visitorIdFilterRaw ?? "").trim();
@@ -432,17 +439,32 @@ const includeResolved =
         state.lastFollowupAssignedAt
       ].filter(Boolean).sort().pop() ?? null,
     });
-  }
+  }  const filteredItems = items.filter((item) => {
+    if (visitorIdFilter && item.visitorId !== visitorIdFilter) {
+      return false;
+    }
 
-    if (!sortBy) {
-    items.sort(compareQueueItems);
+    const itemOwnerId = String(item.assignedTo?.ownerId ?? "").trim();
+    if (assignedToFilter && itemOwnerId !== assignedToFilter) {
+      return false;
+    }
+
+    if (!includeResolved && item.followupResolved === true) {
+      return false;
+    }
+
+    return true;
+  });
+
+  if (!sortBy) {
+    filteredItems.sort(compareQueueItems);
   } else {
-    items.sort((a, b) => {
+    filteredItems.sort((a, b) => {
       let result = 0;
 
       if (sortBy === "assignedAt") {
         result = String(a.lastFollowupAssignedAt ?? "").localeCompare(String(b.lastFollowupAssignedAt ?? ""));
-      }       else if (sortBy === "urgency") {
+      } else if (sortBy === "urgency") {
         const urgencyRank: Record<string, number> = {
           OVERDUE: 3,
           AT_RISK: 2,
@@ -461,22 +483,11 @@ const includeResolved =
     });
   }
 
-  const filteredItems = items.filter((item) => {
-    if (visitorIdFilter && item.visitorId !== visitorIdFilter) {
-      return false;
-    }
-
-    const itemOwnerId = String(item.assignedTo?.ownerId ?? "").trim();
-    if (assignedToFilter && itemOwnerId !== assignedToFilter) {
-      return false;
-    }
-
-    if (!includeResolved && item.followupResolved === true) {
-      return false;
-    }
-
-    return true;
-  });
+  const pagedItems = filteredItems.slice(cursor, cursor + limit);
+  const nextCursor =
+    cursor + limit < filteredItems.length
+      ? String(cursor + limit)
+      : null;
 
   const stats = {
     total: filteredItems.length,
@@ -532,13 +543,20 @@ const includeResolved =
     ok: true,
     v: 1,
     assignedTo: assignedToFilter || null,
+    cursor: String(cursor),
     visitorId: visitorIdFilter || null,
     includeResolved,
+    nextCursor,
     stats,
     owners,
-    items: filteredItems.slice(0, limit),
+    items: pagedItems,
   });
 });
+
+
+
+
+
 
 
 

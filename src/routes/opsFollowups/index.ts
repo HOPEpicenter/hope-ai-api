@@ -8,6 +8,7 @@ import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import { deriveFollowupPriority } from "../../services/followups/deriveFollowupPriority";
 import { deriveEngagementRiskV1 } from "../../domain/engagement/deriveEngagementRisk.v1";
 import { computeEngagementScoreV1 } from "../../domain/engagement/computeEngagementScore.v1";
+import { deriveFormationState } from "../../ops/formationState";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { EngagementsService } from "../../services/engagements/engagementsService";
 
@@ -375,40 +376,24 @@ opsFollowupsRouter.get("/", async (req, res) => {
       priorityBand = priority.priorityBand;
       priorityReason = priority.priorityReason;
 
-      const stage = formationProfileByVisitor.get(state.visitorId)?.stage ?? null;
-      if (priorityBand === "normal" && stage === "Guest") {
-        if (signals.followupReason === "FOLLOWUP_CONTACTED") {
-          priorityReason = "guest_contacted_needs_followup";
-        } else if (priorityReason === "needs_followup") {
-          priorityReason = "guest_needs_followup";
-        }
-      }
+      const formationState = deriveFormationState({
+        profile: formationProfileByVisitor.get(state.visitorId),
+        signals,
+        priorityBand,
+        priorityReason
+      });
+
+      priorityReason = formationState.priorityReason ?? null;
     } catch {
       // fail safe: queue still returns even if enrichment fails
     }
 
-    const stage = formationProfileByVisitor.get(state.visitorId)?.stage ?? null;
-    let effectiveFollowupUrgency = signals.followupUrgency;
-    if (
-      stage === "Guest" &&
-      signals.followupReason === "FOLLOWUP_CONTACTED" &&
-      signals.followupResolved !== true &&
-      signals.followupUrgency === "ON_TRACK"
-    ) {
-      effectiveFollowupUrgency = "AT_RISK";
-    }
-
-    let effectiveFollowupEscalated = signals.followupEscalated;
-    let effectiveFollowupOverdue = signals.followupOverdue;
-    if (
-      stage === "Guest" &&
-      signals.followupReason === "FOLLOWUP_CONTACTED" &&
-      signals.followupResolved !== true &&
-      signals.followupAgingBucket === "ONE_DAY"
-    ) {
-      effectiveFollowupEscalated = true;
-      effectiveFollowupOverdue = false;
-    }
+    const formationState = deriveFormationState({
+      profile: formationProfileByVisitor.get(state.visitorId),
+      signals,
+      priorityBand,
+      priorityReason
+    });
 
     items.push({
       visitorId: state.visitorId,
@@ -418,22 +403,22 @@ opsFollowupsRouter.get("/", async (req, res) => {
       lastFollowupAssignedAt: state.lastFollowupAssignedAt,
       lastFollowupContactedAt: state.lastFollowupContactedAt,
       lastFollowupOutcomeAt: state.lastFollowupOutcomeAt,
-      stage: formationProfileByVisitor.get(state.visitorId)?.stage ?? null,
-      lastFormationEventType: formationProfileByVisitor.get(state.visitorId)?.lastFormationEventType ?? null,
-      lastFormationEventAt: formationProfileByVisitor.get(state.visitorId)?.lastFormationEventAt ?? null,
+      stage: formationState.stage,
+      lastFormationEventType: formationState.lastFormationEventType,
+      lastFormationEventAt: formationState.lastFormationEventAt,
       needsFollowup: signals.needsFollowup,
       followupReason: signals.followupReason,
       followupResolved: signals.followupResolved,
       resolvedForAssignment: signals.resolvedForAssignment,
-      followupUrgency: effectiveFollowupUrgency,
+      followupUrgency: formationState.effectiveFollowupUrgency,
       followupPriorityScore: signals.followupPriorityScore,
       followupAgingBucket: signals.followupAgingBucket,
-      followupEscalated: effectiveFollowupEscalated,
-      followupOverdue: effectiveFollowupOverdue,
+      followupEscalated: formationState.effectiveFollowupEscalated,
+      followupOverdue: signals.followupOverdue,
       engagementRiskLevel: riskLevel,
       engagementRiskScore: riskScore,
       priorityBand: priorityBand,
-      priorityReason: priorityReason,
+      priorityReason: formationState.priorityReason,
       lastActivityAt: [
         state.lastFollowupOutcomeAt,
         state.lastFollowupContactedAt,
@@ -504,6 +489,14 @@ opsFollowupsRouter.get("/", async (req, res) => {
     items: items.slice(0, limit),
   });
 });
+
+
+
+
+
+
+
+
 
 
 

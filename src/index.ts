@@ -71,6 +71,8 @@ app.use("/ops", createOpsRouter(visitorsRepository, formationEventsRepository, e
 app.use("/ops/followups", opsFollowupsRouter);
 // Public API routes
 app.use("/api/visitors", visitorsRouter(visitorsRepository));
+// TEMP parity alias for CI + smoke tests
+app.use("/visitors", visitorsRouter(visitorsRepository));
 app.use("/api", formationEventsRouter);
 app.use("/api", formationRouter);
 app.use("/api", followupQueueRouter);

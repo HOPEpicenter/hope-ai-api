@@ -178,7 +178,12 @@ try {
   }
 
   Write-Host ""
-  Write-Host "[local-backend] All local backend checks passed."
+  Write-Host "=== Ops followups owner rollup regression ==="
+$Base = $BaseUrl.Replace("/api", "")
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-ops-followups-owners.ps1 -Base $Base
+if ($LASTEXITCODE -ne 0) { throw "assert-ops-followups-owners.ps1 failed" }
+Write-Host "[OK] Ops followups owner rollup regression"
+Write-Host "[local-backend] All local backend checks passed."
 
 Write-Host "=== Invalid first transition invariant ==="
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-engagement-transition-invalid-first-transition.ps1
@@ -243,5 +248,4 @@ Write-Host "[OK] Engagement transition validity invariants"
 
 
 
-Write-Host "Running ops followups owner rollup regression..."
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-ops-followups-owners.ps1 -Base $Base
+

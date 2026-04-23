@@ -52,6 +52,22 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
   });
 
   opsRouter.post("/visitors", async (req, res) => {
+  // GET /ops/visitors (list)
+  opsRouter.get("/visitors", async (req, res) => {
+    const limit = parseLimit(req.query, 5);
+
+    const page = await visitorsRepository.list({
+      limit,
+    });
+
+    res.json({
+      requestId: getRequestId(req),
+      limit,
+      count: page.count,
+      items: page.items,
+    });
+  });
+
     const body = parseCreateVisitorBody(req.body);
 
     const visitor = await visitorsRepository.create({

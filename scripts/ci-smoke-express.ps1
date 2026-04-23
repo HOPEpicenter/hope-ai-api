@@ -242,9 +242,7 @@ if ([string]::IsNullOrWhiteSpace($visitorId)) {
 Write-Host ("GET {0}/visitors/{1}" -f $workingBase, $visitorId)
 
 $get = Invoke-HttpJson -Method GET -Uri ("{0}/visitors/{1}" -f $workingBase, $visitorId)
-if ($get.StatusCode -eq 404) {
-  Write-Host ("SKIP: GET /visitors/{0} returned 404 (read-after-write not reliable yet in this phase)." -f $visitorId)
-} elseif (-not $get.Ok) {
+if (-not $get.Ok) {
   Write-Host ("FAIL: GET /visitors/{0} failed. Status={1} Body={2}" -f $visitorId, $get.StatusCode, ($get.BodyText | ForEach-Object { $_ }))
   exit 1
 }

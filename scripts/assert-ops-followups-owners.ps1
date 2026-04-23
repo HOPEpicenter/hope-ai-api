@@ -75,7 +75,7 @@ Post-FormationEvent -visitorId $visitorC -type "FOLLOWUP_ASSIGNED" -data @{
   assigneeId = $owner2Id
 } -occurredAt $now.AddHours(-2)
 
-$result = Invoke-RestMethod -ErrorAction Stop -Method Get -Uri "$Base/ops/followups?includeResolved=true&limit=100" -Headers $headers
+$result = Invoke-RestMethod -ErrorAction Stop -Method Get -Uri "$Base/api/ops/followups?includeResolved=true&limit=100" -Headers $headers
 
 if ($result.ok -ne $true) { throw "Expected ok=true from /ops/followups." }
 if ($null -eq $result.owners) { throw "Expected owners rollup to exist." }

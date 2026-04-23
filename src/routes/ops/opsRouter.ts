@@ -143,6 +143,20 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
     }
   });
 
+  opsRouter.get("/visitors/:vid", async (req, res) => {
+    const { visitorId } = parseVisitorId(req.params);
+
+    const visitor = await visitorsRepository.getById(visitorId);
+    if (!visitor) {
+      throw notFound("Visitor not found.", { visitorId });
+    }
+
+    res.json({
+      requestId: getRequestId(req),
+      visitorId,
+      visitor,
+    });
+  });
   opsRouter.get("/visitors/:vid/dashboard", async (req, res) => {
     const { visitorId } = parseVisitorId(req.params);
 

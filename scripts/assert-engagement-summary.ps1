@@ -165,8 +165,8 @@ Write-Info "[assert-engagement-summary] Probing engagements endpoint: GET $engBa
 
 $probe = Invoke-HttpJson -Method GET -Uri "${engBase}?visitorId=probe"
 if (Is-MissingEndpoint -Response $probe) {
-  Write-Info "SKIP: /ops/engagements is not implemented yet (HTTP 404)."
-  exit 0
+  Write-Fail "FAIL: /ops/engagements returned 404 but is now required."
+  exit 1
 }
 if (-not $probe.Ok) {
   Write-Fail ("FAIL: /ops/engagements probe failed. Status={0} Body={1}" -f $probe.StatusCode, ($probe.BodyText | ForEach-Object { $_ }))

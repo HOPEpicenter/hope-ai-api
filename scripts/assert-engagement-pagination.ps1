@@ -124,7 +124,7 @@ function Wait-ForHealth {
 
 function Is-MissingEndpoint {
   param([pscustomobject]$Response)
-  # Confirmed current behavior: /ops/engagements returns 404 when not implemented
+  # /ops/engagements is now required; 404 is a failure signal.
   if ($Response -and $Response.StatusCode -eq 404) { return $true }
   return $false
 }
@@ -214,7 +214,7 @@ if ([string]::IsNullOrWhiteSpace($visitorId)) {
   Write-Info "Visitor created. visitorId=$visitorId"
 }
 
-# Probe engagements endpoint (current known state: 404 => NOT IMPLEMENTED)
+# Probe engagements endpoint (required to exist)
 $engBaseUrl = "$BaseUrl/ops/engagements"
 
 # Attempt engagement creation (inside safe HTTP wrapper; no stack traces)
@@ -226,8 +226,8 @@ if (-not [string]::IsNullOrWhiteSpace($visitorId)) { $engBody.visitorId = $visit
 $engCreate = Invoke-HttpJson -Method POST -Uri $engBaseUrl -Body $engBody
 
 if (Is-MissingEndpoint -Response $engCreate) {
-  Write-Info "SKIP: /ops/engagements is not implemented yet (HTTP 404)."
-  exit 0
+  Write-Fail "FAIL: /ops/engagements returned 404 but is now required."
+  exit 1
 }
 
 if (-not $engCreate.Ok) {
@@ -245,8 +245,8 @@ Write-Info "Listing engagements (page 1): GET $list1Url"
 $list1 = Invoke-HttpJson -Method GET -Uri $list1Url
 
 if (Is-MissingEndpoint -Response $list1) {
-  Write-Info "SKIP: /ops/engagements is not implemented yet (HTTP 404)."
-  exit 0
+  Write-Fail "FAIL: /ops/engagements returned 404 but is now required."
+  exit 1
 }
 
 if (-not $list1.Ok) {

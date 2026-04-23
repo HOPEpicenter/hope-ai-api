@@ -6,8 +6,8 @@ param(
 if ([string]::IsNullOrWhiteSpace($BaseUrl)) { throw "BaseUrl is required." }
 # --- Phase gate: skip Phase 3 asserts unless explicitly enabled ---
 if ($env:HOPE_RUN_PHASE3_ASSERTS -ne "1") {
-  Write-Host "SKIP: Phase 3 assertions disabled. Set HOPE_RUN_PHASE3_ASSERTS=1 to enable." -ForegroundColor Yellow
-  exit 0
+  Write-Host "FAIL: Phase 3 assertions are required but HOPE_RUN_PHASE3_ASSERTS is not enabled." -ForegroundColor Red
+  exit 1
 }
 $ErrorActionPreference = "Stop"
 

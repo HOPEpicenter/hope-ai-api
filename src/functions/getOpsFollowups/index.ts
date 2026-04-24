@@ -123,7 +123,11 @@ export default async function (context: any, req: any): Promise<void> {
 
     context.res = {
       status: 200,
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "X-HOPE-Surface": "ops-only",
+        "X-HOPE-Product-Use": "Use /api/formation/profiles for dashboard/product followup views."
+      },
       body: {
         ok: true,
         items,
@@ -149,7 +153,11 @@ export default async function (context: any, req: any): Promise<void> {
   } catch (err: any) {
     context.res = {
       status: 500,
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "X-HOPE-Surface": "ops-only",
+        "X-HOPE-Product-Use": "Use /api/formation/profiles for dashboard/product followup views."
+      },
       body: { ok: false, error: err?.message ?? "ops_followups_error" }
     };
   }

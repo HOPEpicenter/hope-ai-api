@@ -751,3 +751,10 @@ Current shipped state:
 **Rule**
 - Backend invariants should PASS or FAIL; do not reintroduce skip paths for implemented behavior.
 - Dashboard work should remain a thin display/testing layer over hardened `/api/*` surfaces unless a real blocker requires backend changes.
+
+## 2026-04-24 — Ops followups scope guardrail
+
+- `/ops/followups` and `/api/ops/followups` remain supported ops-only read/projection surfaces.
+- Product/dashboard follow-up views should use `/api/formation/profiles` and derive display rows there.
+- Do not delete `/ops/followups` while regression scripts and ops tooling still depend on it.
+- Do not evolve `/ops/followups` for dashboard/product needs; keep it stable for operational queue/reporting use only.

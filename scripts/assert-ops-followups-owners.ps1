@@ -1,6 +1,6 @@
 param(
-  [string]$ApiBase = "http://127.0.0.1:3000/api",
-[string]$OpsBase = "http://127.0.0.1:3000/ops"
+  [string]$ApiBase = "http://127.0.0.1:7071/api",
+[string]$OpsBase = "http://127.0.0.1:7071/api/ops"
 )
 
 $ErrorActionPreference = "Stop"

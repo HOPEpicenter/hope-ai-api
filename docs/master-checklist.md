@@ -500,4 +500,4 @@ Current rule:
 - [x] Add regression assert for visitor risk surface
 - [x] Add regression assert for followup priority surface
 - [x] Add regression assert for followup queue priority
-
+- [x] Backend hardening closeout complete: unified runner self-contained, ops followups normalized, Engagement E2E skip removed — #700-#704

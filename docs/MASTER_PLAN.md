@@ -758,3 +758,12 @@ Current shipped state:
 - Product/dashboard follow-up views should use `/api/formation/profiles` and derive display rows there.
 - Do not delete `/ops/followups` while regression scripts and ops tooling still depend on it.
 - Do not evolve `/ops/followups` for dashboard/product needs; keep it stable for operational queue/reporting use only.
+
+## 2026-04-24 — Backend hardening final closeout
+
+- Merged #700/#701: added and corrected the unified backend runner so scripts/run-backend-all.ps1 is self-contained.
+- Merged #702/#703: marked /ops/followups as ops-only and normalized followups usage away from /api/ops/followups.
+- Merged #704: removed the Engagement E2E skip path so smoke/E2E coverage fails loudly instead of silently skipping.
+- Current trusted local backend verification command:
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-backend-all.ps1`
+- Current backend posture: strict gates, no known stale SKIP paths except intentional/non-backend legacy cases, clean /api product vs /ops tooling boundary.

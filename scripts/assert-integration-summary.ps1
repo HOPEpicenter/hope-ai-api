@@ -4,8 +4,8 @@ param(
 
 # --- Phase gate: skip Phase 4 asserts unless explicitly enabled ---
 if ($env:HOPE_RUN_PHASE4_ASSERTS -ne "1") {
-  Write-Host "SKIP: Phase 4 assertions disabled. Set HOPE_RUN_PHASE4_ASSERTS=1 to enable." -ForegroundColor Yellow
-  exit 0
+  Write-Host "FAIL: Phase 4 assertions are required but HOPE_RUN_PHASE4_ASSERTS is not enabled." -ForegroundColor Red
+  exit 1
 }
 
 $ErrorActionPreference = "Stop"

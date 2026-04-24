@@ -204,6 +204,8 @@ export const opsFollowupsRouter = Router();
 opsFollowupsRouter.use(requireApiKey);
 
 opsFollowupsRouter.get("/", async (req, res) => {
+  res.setHeader("X-HOPE-Surface", "ops-only");
+  res.setHeader("X-HOPE-Product-Use", "Use /api/formation/profiles for dashboard/product followup views.");
   const eventsTable = getFormationEventsTableClient();
   const profilesTable = getFormationProfilesTableClient();
   await ensureTableExists(eventsTable as any);

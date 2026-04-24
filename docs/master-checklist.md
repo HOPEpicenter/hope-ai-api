@@ -1,3 +1,14 @@
+## 2026-04-24 Backend hardening closeout
+
+- [x] `/ops/engagements` create/list/summary required and covered by focused assertions — #687, #692
+- [x] `/api/ops/followups` owner rollup implemented and regression-covered — #688
+- [x] `/ops/visitors` create/read/list parity enforced in Express smoke — #689, #690, #691, #697
+- [x] Phase 3 formation pagination gate enforced — #693
+- [x] Phase 3 formation idempotency gate enforced — #694
+- [x] Phase 3 auth scoping gate enforced — #695
+- [x] Phase 4 integration summary gate enforced — #696
+- [x] Formation profiles list checks enforced without dev-storage paging flakiness — #698
+- [x] Stale backend `SKIP:` paths removed; remaining engagement E2E skip is local secret-gated only.
 
 ### 2026-04-01 — Global unified timeline
 
@@ -207,7 +218,7 @@
 - [x] Public formation profile snapshot works: GET /api/visitors/:id/formation/profile
 - [x] Regression/assert coverage now includes formation milestones v1, snapshot invariants, tie-break behavior, and idempotency
 - [x] Define formation milestones/events and derivations (docs/formation-milestones-v1.md + assert script)
-- [x] Track journey steps in an auditable way (prefer derive from events) — COMPLETE (2026-04-06, #524).
+- [x] Track journey steps in an auditable way (derived from events, read-only) — COMPLETE (2026-04-06, #524).
 
 ## Cross-cutting — Auth scoping (COMPLETED)
 

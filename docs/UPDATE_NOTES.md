@@ -479,5 +479,30 @@ Status:
 - build passing
 - dashboard/operator flow aligned to current followup queue source of truth
 
+## 2026-04-24 — Backend hardening + assertion enforcement
 
+Completed backend stabilization and regression hardening pass:
 
+- `/ops/followups`
+  - owner rollup contract implemented and regression-covered
+  - strict owner counters: `total`, `resolved`, `overdue`, `atRisk`, `onTrack`
+
+- `/ops/engagements`
+  - create/list/summary behavior verified
+  - stale "not implemented" skip paths removed from focused asserts
+
+- `/ops/visitors`
+  - create/read/list parity enforced in Express smoke
+  - visitor read-after-write is now a required smoke assertion
+
+- Phase 3/4 assertions
+  - formation pagination now required
+  - formation idempotency now required
+  - auth scoping now required
+  - integration summary now required
+  - formation profiles list checks now strict while avoiding dev-storage paging flakiness
+
+Result:
+- backend smoke/assert layer now reflects current implementation truth
+- implemented backend behavior should fail loudly instead of silently skipping
+- dashboard should remain API-backed and should not invent state models

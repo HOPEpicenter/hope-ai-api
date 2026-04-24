@@ -83,7 +83,15 @@ export class EngagementEventsRepository {
       dataJson: safeJsonStringify(evt.data ?? {}),
     };
 
-    await table.createEntity(entity);
+    try {
+  await table.createEntity(entity);
+} catch (err: any) {
+  if (err?.statusCode === 409) {
+    // idempotency hit → ignore duplicate
+  } else {
+    throw err;
+  }
+}
 
 // --- Global Timeline Write (engagement - repository level) ---
 try {

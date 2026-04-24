@@ -27,10 +27,30 @@ export async function postEngagementEvent(context: any, req: any): Promise<void>
       return;
     }
 
-        await service.appendEvent(parsed.value);
+    const evt = parsed.value;
+
+    // --- DOMAIN SAFETY GUARDS ---
+    if (!evt.visitorId || typeof evt.visitorId !== "string" || evt.visitorId.trim() === "") {
+      throw new Error("visitorId must be a non-empty string");
+    }
+
+    if (!evt.type || typeof evt.type !== "string" || evt.type.trim() === "") {
+      throw new Error("type must be a non-empty string");
+    }
+
+    const occurredAtDate = new Date(evt.occurredAt);
+    if (isNaN(occurredAtDate.getTime())) {
+      throw new Error("occurredAt must be valid ISO datetime");
+    }
+
+    const now = Date.now();
+    if (occurredAtDate.getTime() > now + 5 * 60 * 1000) {
+      throw new Error("occurredAt cannot be in the future");
+    }
+
+    await service.appendEvent(evt);
 
     // Bridge: engagement → formation
-    const evt = parsed.value;
     const type = String(evt.type ?? "").trim();
 
     const formationTypes = [
@@ -70,7 +90,3 @@ export async function postEngagementEvent(context: any, req: any): Promise<void>
     };
   }
 }
-
-
-
-

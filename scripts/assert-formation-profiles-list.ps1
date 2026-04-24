@@ -157,11 +157,16 @@ if ($out1.items[0].visitorId -ne $visitorId) { throw "Expected visitorId match o
 # 2) stage filter
 Write-Host "[assert-formation-profiles-list] GET /formation/profiles (stage=Connected)..."
 if ($usingDevStorage) {
-  # On Azurite, just ensure endpoint responds and shape is valid (do not require finding a specific visitor).
   $out2 = Invoke-RestMethod -Method Get -Uri "$ApiBase/formation/profiles?stage=Connected&limit=10" -Headers $headers
   if (-not $out2.ok) { throw "Expected ok=true (stage filter)" }
   if ($null -eq $out2.items) { throw "Expected items array (stage filter)" }
-  Write-Host "[assert-formation-profiles-list] SKIP: stage paging presence assert on dev storage." -ForegroundColor Yellow
+
+  $fast2 = Invoke-RestMethod -Method Get -Uri "$ApiBase/formation/profiles?visitorId=$visitorId" -Headers $headers
+  if (-not $fast2.ok) { throw "Expected ok=true (visitorId fast path for stage verification)" }
+  if (($fast2.items | Measure-Object).Count -ne 1) { throw "Expected exactly 1 item for visitorId fast path (stage verification)." }
+
+  $stage = $fast2.items[0].stage
+  if ($stage -ne "Connected") { throw "Expected stage=Connected after NEXT_STEP_SELECTED; got stage=$stage" }
 } else {
   # On real storage, paging presence can be flaky/non-deterministic (large lists, ordering/cursor semantics).
   # Keep the endpoint check, but validate deterministically via visitorId fast-path.
@@ -183,7 +188,13 @@ if ($usingDevStorage) {
   $out3 = Invoke-RestMethod -Method Get -Uri "$ApiBase/formation/profiles?assignedTo=ops-user-1&limit=10" -Headers $headers
   if (-not $out3.ok) { throw "Expected ok=true (assignedTo filter)" }
   if ($null -eq $out3.items) { throw "Expected items array (assignedTo filter)" }
-  Write-Host "[assert-formation-profiles-list] SKIP: assignedTo paging presence assert on dev storage." -ForegroundColor Yellow
+
+  $fast3 = Invoke-RestMethod -Method Get -Uri "$ApiBase/formation/profiles?visitorId=$visitorId" -Headers $headers
+  if (-not $fast3.ok) { throw "Expected ok=true (visitorId fast path for assignedTo verification)" }
+  if (($fast3.items | Measure-Object).Count -ne 1) { throw "Expected exactly 1 item for visitorId fast path (assignedTo verification)." }
+
+  $assignee = $fast3.items[0].assignedTo
+  if ($assignee -ne "ops-user-1") { throw "Expected assignedTo=ops-user-1 after FOLLOWUP_ASSIGNED; got assignedTo=$assignee" }
 } else {
   # On real storage, paging presence can be flaky/non-deterministic. Validate deterministically via fast-path.
   $out3 = Invoke-RestMethod -Method Get -Uri "$ApiBase/formation/profiles?assignedTo=ops-user-1&limit=10" -Headers $headers

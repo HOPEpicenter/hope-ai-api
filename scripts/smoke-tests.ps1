@@ -441,22 +441,16 @@ $looksPlaceholder =
   ($keyLower.Contains("your key")) -or
   ($keyLower -eq "your dev key")
 
-if ($looksPlaceholder) {
-  if ($ci) {
-    throw "HOPE_API_KEY is missing/placeholder in CI. Provide a real key for Engagement E2E."
-  }
-  Write-Host "SKIP: Engagement E2E (set HOPE_API_KEY to run locally)" -ForegroundColor Yellow
-} else {
-  $e2ePath = Join-Path $PSScriptRoot "smoke-visitor-engagements-e2e.ps1"
-  if (-not (Test-Path -LiteralPath $e2ePath)) {
-    throw "Missing Engagement E2E script: $e2ePath"
-  }
+$e2ePath = Join-Path $PSScriptRoot "smoke-visitor-engagements-e2e.ps1"
+if (-not (Test-Path -LiteralPath $e2ePath)) {
+  throw "Missing Engagement E2E script: $e2ePath"
+}
 
-  & pwsh -NoProfile -ExecutionPolicy Bypass -File $e2ePath -BaseUrl $BaseUrl
-  if ($LASTEXITCODE -ne 0) {
-    throw "Engagement E2E failed (exit=$LASTEXITCODE)"
-  }
-  Write-Host "Engagement E2E OK"
+& pwsh -NoProfile -ExecutionPolicy Bypass -File $e2ePath -BaseUrl $BaseUrl
+if ($LASTEXITCODE -ne 0) {
+  throw "Engagement E2E failed (exit=$LASTEXITCODE)"
+}
+Write-Host "Engagement E2E OK"
 
   $journeyPath = Join-Path $PSScriptRoot "smoke-visitor-journey.ps1"
   if (-not (Test-Path -LiteralPath $journeyPath)) {

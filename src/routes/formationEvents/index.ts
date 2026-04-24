@@ -311,3 +311,4 @@ formationEventsRouter.get("/visitors/:id/formation/profile", async (req, res) =>
 
 
 
+

@@ -1,169 +1,100 @@
-// src/storage/formation/formationEventsRepo.ts
-import { TableClient, TableEntityResult } from "@azure/data-tables";
-import {
-  FormationEventType,
-  FormationVisibility,
-  FormationSensitivity,
-} from "../../domain/formation/phase3_1_scope";
+import { TableClient } from "@azure/data-tables";
 
-export type FormationEventEntity = {
-  partitionKey: string; // visitorId
-  rowKey: string; // ISO timestamp + random suffix (sortable)
-  id?: string;
-
+export interface FormationEventEntity {
+  partitionKey: string;
+  rowKey: string;
+  id: string;
   visitorId: string;
-  type: FormationEventType;
-
-  occurredAt: string;  // ISO
-  recordedAt: string;  // ISO
-
+  type: string;
+  occurredAt: string;
+  recordedAt: string;
   channel: string;
-  visibility: FormationVisibility;
-  sensitivity: FormationSensitivity;
-
+  visibility?: string;
+  sensitivity?: string;
   summary?: string;
-  metadata?: string; // JSON string
+  metadata?: string;
   idempotencyKey?: string;
-};
+}
 
-export type FormationEventResult = TableEntityResult<FormationEventEntity>;
+function isConflictAlreadyExists(err: any): boolean {
+  return err?.statusCode === 409;
+}
 
 /**
- * Insert a Formation event (append-only).
- * We never update events; corrections are new events.
+ * INSERT (idempotent-safe)
  */
 export async function insertFormationEvent(
   table: TableClient,
   entity: FormationEventEntity
-): Promise<void> {
-  await table.createEntity(entity);
+): Promise<{ inserted: boolean }> {
+  try {
+    await table.createEntity(entity as any);
+    return { inserted: true };
+  } catch (err: any) {
+    if (isConflictAlreadyExists(err)) {
+      return { inserted: false };
+    }
+    throw err;
+  }
 }
 
 /**
- * List Formation events for a visitor (timeline).
- * Uses PartitionKey = visitorId.
- *
- * NOTE: Azure Tables OData filter uses PartitionKey/RowKey, not our "partitionKey" property.
+ * LIST BY VISITOR
  */
 export async function listFormationEventsByVisitor(
   table: TableClient,
   visitorId: string,
-  options?: {
+  opts?: {
     limit?: number;
-    beforeRowKey?: string; // optional pagination cursor (RowKey sort)
+    beforeRowKey?: string;
   }
-): Promise<FormationEventEntity[]> {
-  const limit = options?.limit ?? 50;
+) {
+  const results: any[] = [];
 
-  // RowKey is `${occurredAtIso}__${suffix}` so it sorts chronologically.
-  // If beforeRowKey is provided, return events strictly earlier than that.
-  const filter = options?.beforeRowKey
-    ? `PartitionKey eq '${escapeOData(visitorId)}' and RowKey lt '${escapeOData(
-        options.beforeRowKey
-      )}'`
-    : `PartitionKey eq '${escapeOData(visitorId)}'`;
+  let filter = `PartitionKey eq '${visitorId}'`;
 
-  const results: FormationEventEntity[] = [];
+  if (opts?.beforeRowKey) {
+    filter += ` and RowKey lt '${opts.beforeRowKey}'`;
+  }
 
-  // Select only what we need for performance
-  const select = [
-    "PartitionKey",
-    "RowKey",
-    "visitorId",
-    "type",
-    "occurredAt",
-    "recordedAt",
-    "channel",
-    "visibility",
-    "sensitivity",
-    "summary",
-    "metadata",
-    "idempotencyKey",
-  ];
+  const entities = table.listEntities({
+    queryOptions: { filter }
+  });
 
-  // listEntities returns in ascending order by RowKey for a given partition
-  // We'll keep that, and let the caller reverse if they want newest-first UI.
-  for await (const e of table.listEntities<any>({
-    queryOptions: { filter, select },
-  })) {
-    results.push({
-      partitionKey: e.partitionKey ?? e.PartitionKey,
-      rowKey: e.rowKey ?? e.RowKey,
-
-      visitorId: e.visitorId,
-      type: e.type,
-
-      occurredAt: e.occurredAt,
-      recordedAt: e.recordedAt,
-
-      channel: e.channel,
-      visibility: e.visibility,
-      sensitivity: e.sensitivity,
-
-      summary: e.summary,
-      metadata: e.metadata,
-      idempotencyKey: e.idempotencyKey,
-    });
-
-    if (results.length >= limit) break;
+  for await (const entity of entities) {
+    results.push(entity);
+    if (opts?.limit && results.length >= opts.limit) break;
   }
 
   return results;
 }
 
-/** Minimal OData string escaping for single quotes */
-function escapeOData(value: string): string {
-  return value.replace(/'/g, "''");
-}
-
+/**
+ * LIST RECENT
+ */
 export async function listRecentFormationEvents(
-  table: any,
-  options?: {
+  table: TableClient,
+  opts?: {
     limit?: number;
     since?: string;
   }
-): Promise<any[]> {
-  const limitRaw = Number(options?.limit ?? 10);
-  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(200, limitRaw)) : 10;
-  const since = typeof options?.since === "string" && options.since.trim().length > 0
-    ? options.since.trim()
-    : null;
+) {
+  const results: any[] = [];
 
-  const items: any[] = [];
+  let filter: string | undefined = undefined;
 
-  for await (const entity of table.listEntities()) {
-    const occurredAt =
-      typeof entity?.occurredAt === "string" && entity.occurredAt.trim().length > 0
-        ? entity.occurredAt.trim()
-        : null;
-
-    if (since && occurredAt && occurredAt < since) {
-      continue;
-    }
-
-    items.push(entity);
+  if (opts?.since) {
+    filter = "Timestamp ge datetime'" + opts.since + "'";
   }
 
-  items.sort((a, b) => {
-    const aOccurredAt =
-      typeof a?.occurredAt === "string" && a.occurredAt.trim().length > 0
-        ? a.occurredAt.trim()
-        : "";
-    const bOccurredAt =
-      typeof b?.occurredAt === "string" && b.occurredAt.trim().length > 0
-        ? b.occurredAt.trim()
-        : "";
+  const entities = table.listEntities(
+    filter ? { queryOptions: { filter } } : undefined
+  );
 
-    if (aOccurredAt !== bOccurredAt) {
-      return aOccurredAt < bOccurredAt ? 1 : -1;
-    }
+  for await (const entity of entities) {
+    results.push(entity);
+    if (opts?.limit && results.length >= opts.limit) break;
+  }
 
-    const aRowKey = typeof a?.rowKey === "string" ? a.rowKey : "";
-    const bRowKey = typeof b?.rowKey === "string" ? b.rowKey : "";
-
-    if (aRowKey === bRowKey) return 0;
-    return aRowKey < bRowKey ? 1 : -1;
-  });
-
-  return items.slice(0, limit);
+  return results;
 }

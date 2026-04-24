@@ -7,3 +7,13 @@
 - [x] Merged **#267**: dashboard shell layout polish with sidebar navigation.
 - [x] Merged **#268**: shared dashboard loading / empty / error page states.
 
+## 2026-04-24 Backend hardening sync
+
+- [x] Ops followups owner rollup enforced
+- [x] Ops engagements create/list/summary enforced
+- [x] Ops visitors create/read/list enforced in Express smoke
+- [x] Phase 3 formation pagination/idempotency/auth scoping enforced
+- [x] Phase 4 integration summary enforced
+- [x] Formation profiles list checks enforced
+- [x] Stale backend SKIP paths removed except local secret-gated Engagement E2E
+

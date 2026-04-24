@@ -589,7 +589,7 @@ Operational verification:
 - Minimal contract, auditable output.
 
 **Why**
-- Explicit gap in checklist: journey tracking not implemented.
+- Previously identified journey tracking gap is now closed by #524 (GET /api/visitors/{visitorId}/journey); journey remains read-only, derived from existing engagement + formation truth.
 - Enables operator understanding without expanding scope.
 - Keeps system event-driven and deterministic.
 
@@ -723,3 +723,31 @@ Current shipped state:
 - operator-facing labels are aligned across Visitors and Followups
 - Visitors now includes quick-priority operator presets for My Action Needed, At Risk, and Overdue
 - current dashboard/followup alignment work should be treated as stable unless a real blocker appears
+
+## 2026-04-24 — Backend endpoint + assertion hardening closeout (#687–#698)
+
+**What landed**
+- ✅ **#687**: aligned `/ops/engagements` contract and smoke coverage.
+- ✅ **#688**: added `/api/ops/followups` owner rollup contract and regression wiring.
+- ✅ **#689**: added Express ops visitors list parity.
+- ✅ **#690**: added Express ops visitor read parity.
+- ✅ **#691**: enforced visitor read-after-write in Express smoke.
+- ✅ **#692**: removed stale `/ops/engagements` skip paths from focused asserts.
+- ✅ **#693**: enforced Phase 3 formation pagination gate.
+- ✅ **#694**: enforced Phase 3 formation idempotency gate.
+- ✅ **#695**: enforced Phase 3 auth scoping gate.
+- ✅ **#696**: enforced Phase 4 integration summary gate.
+- ✅ **#697**: enforced visitors list in Express smoke.
+- ✅ **#698**: enforced formation profiles list checks with deterministic dev-storage validation.
+
+**Current backend baseline**
+- `/ops/followups` owner rollup is implemented and regression-covered.
+- `/ops/engagements` create/list/summary are required and assertion-covered.
+- `/ops/visitors` create/read/list parity is smoke-covered.
+- Visitor read-after-write is required in smoke.
+- Formation pagination, idempotency, auth scoping, integration summary, and formation profiles list checks are enforced.
+- No stale backend `SKIP:` paths remain except the local secret-gated engagement E2E smoke.
+
+**Rule**
+- Backend invariants should PASS or FAIL; do not reintroduce skip paths for implemented behavior.
+- Dashboard work should remain a thin display/testing layer over hardened `/api/*` surfaces unless a real blocker requires backend changes.

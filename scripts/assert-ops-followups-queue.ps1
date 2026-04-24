@@ -1,6 +1,6 @@
 param(
   [string]$ApiBase = "http://localhost:7071/api",
-  [string]$OpsBase = "http://localhost:7071/ops",
+  [string]$OpsBase = "http://127.0.0.1:7071/api/ops",
   [string]$ApiKey = $env:HOPE_API_KEY
 )
 

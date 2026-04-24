@@ -77,6 +77,17 @@ formationEventsRouter.post("/formation/events", async (req, res) => {
   }
 
   // Accept both legacy and envelope v1
+    // --- REQUIRED FIELD VALIDATION (ALL MODES) ---
+  if (typeof body.visitorId !== "string" || body.visitorId.trim() === "") {
+    return res.status(400).json({ ok: false, error: "visitorId is required (string)" });
+  }
+  if (typeof body.type !== "string" || body.type.trim() === "") {
+    return res.status(400).json({ ok: false, error: "type is required (string)" });
+  }
+  if (body.occurredAt !== undefined && typeof body.occurredAt !== "string") {
+    return res.status(400).json({ ok: false, error: "occurredAt must be ISO string if provided" });
+  }
+
   const visitorId = body.visitorId;
   const type = body.type;
   const occurredAt = body.occurredAt;

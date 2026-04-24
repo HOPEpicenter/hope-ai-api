@@ -728,7 +728,7 @@ Current shipped state:
 
 **What landed**
 - ✅ **#687**: aligned `/ops/engagements` contract and smoke coverage.
-- ✅ **#688**: added `/api/ops/followups` owner rollup contract and regression wiring.
+- ✅ **#688**: added `/ops/followups` owner rollup contract and regression wiring.
 - ✅ **#689**: added Express ops visitors list parity.
 - ✅ **#690**: added Express ops visitor read parity.
 - ✅ **#691**: enforced visitor read-after-write in Express smoke.
@@ -754,7 +754,7 @@ Current shipped state:
 
 ## 2026-04-24 — Ops followups scope guardrail
 
-- `/ops/followups` and `/api/ops/followups` remain supported ops-only read/projection surfaces.
+- `/ops/followups` remains the supported ops-only read/projection surface.
 - Product/dashboard follow-up views should use `/api/formation/profiles` and derive display rows there.
 - Do not delete `/ops/followups` while regression scripts and ops tooling still depend on it.
 - Do not evolve `/ops/followups` for dashboard/product needs; keep it stable for operational queue/reporting use only.

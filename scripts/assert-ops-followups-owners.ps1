@@ -1,5 +1,6 @@
 param(
-  [string]$Base = "http://127.0.0.1:3000"
+  [string]$ApiBase = "http://127.0.0.1:3000/api",
+[string]$OpsBase = "http://127.0.0.1:3000/ops"
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,7 +32,7 @@ function New-Visitor([string]$namePrefix) {
     email = New-SafeEmail $namePrefix
   } | ConvertTo-Json -Depth 10
 
-  $res = Invoke-RestMethod -ErrorAction Stop -Method Post -Uri "$Base/api/visitors" -Headers $headers -ContentType "application/json" -Body $body
+  $res = Invoke-RestMethod -ErrorAction Stop -Method Post -Uri "$ApiBase/visitors" -Headers $headers -ContentType "application/json" -Body $body
   if ($res.ok -ne $true) { throw "Create visitor returned non-ok." }
   return [string]$res.visitorId
 }
@@ -47,7 +48,7 @@ function Post-FormationEvent([string]$visitorId, [string]$type, [hashtable]$data
     data       = $data
   } | ConvertTo-Json -Depth 20
 
-  $resp = Invoke-RestMethod -ErrorAction Stop -Method Post -Uri "$Base/api/formation/events" -Headers $headers -ContentType "application/json" -Body $evt
+  $resp = Invoke-RestMethod -ErrorAction Stop -Method Post -Uri "$ApiBase/formation/events" -Headers $headers -ContentType "application/json" -Body $evt
   if ($resp.ok -ne $true) { throw "Formation event '$type' was not accepted." }
 }
 
@@ -75,7 +76,7 @@ Post-FormationEvent -visitorId $visitorC -type "FOLLOWUP_ASSIGNED" -data @{
   assigneeId = $owner2Id
 } -occurredAt $now.AddHours(-2)
 
-$result = Invoke-RestMethod -ErrorAction Stop -Method Get -Uri "$Base/api/ops/followups?includeResolved=true&limit=100" -Headers $headers
+$result = Invoke-RestMethod -ErrorAction Stop -Method Get -Uri "$OpsBase/followups?includeResolved=true&limit=100" -Headers $headers
 
 if ($result.ok -ne $true) { throw "Expected ok=true from /ops/followups." }
 if ($null -eq $result.owners) { throw "Expected owners rollup to exist." }

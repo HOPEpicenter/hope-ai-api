@@ -1,7 +1,7 @@
 ## 2026-04-24 Backend hardening closeout
 
 - [x] `/ops/engagements` create/list/summary required and covered by focused assertions — #687, #692
-- [x] `/api/ops/followups` owner rollup implemented and regression-covered — #688
+- [x] `/ops/followups` owner rollup implemented and regression-covered — #688
 - [x] `/ops/visitors` create/read/list parity enforced in Express smoke — #689, #690, #691, #697
 - [x] Phase 3 formation pagination gate enforced — #693
 - [x] Phase 3 formation idempotency gate enforced — #694

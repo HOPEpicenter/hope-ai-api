@@ -78,7 +78,15 @@ export class GlobalTimelineRepository {
       rawJson: item.raw == null ? null : JSON.stringify(item.raw)
     };
 
-    await table.upsertEntity(entity, "Replace");
+    try {
+      await table.createEntity(entity as any);
+    } catch (err: any) {
+      if (err?.statusCode === 409) {
+        // already exists → idempotent no-op
+        return;
+      }
+      throw err;
+    }
   }
 
   async read(limit: number, cursor?: string): Promise<GlobalTimelinePage> {
@@ -119,4 +127,5 @@ export class GlobalTimelineRepository {
     };
   }
 }
+
 

@@ -121,9 +121,12 @@ export default async function (context: any, req: any): Promise<void> {
         continue;
       }
 
+      const hasOutcome = outcomeAtMs !== null;
+      const isContactMade = contactedAtMs !== null && !hasOutcome;
+
       // queue filter
       if (queue === "action-needed" && !needsFollowup) continue;
-      if (queue === "contact-made" && !(contactedAtMs !== null && !resolvedForAssignment)) continue;
+      if (queue === "contact-made" && !isContactMade) continue;
 
       // age filter (state-aware)
       const ageTs =
@@ -139,7 +142,7 @@ export default async function (context: any, req: any): Promise<void> {
       if (items.length < limit) {
         // summary counts match returned filtered rows
         if (needsFollowup) actionNeededCount++;
-        else if (contactedAtMs !== null && !resolvedForAssignment) contactMadeCount++;
+        else if (isContactMade) contactMadeCount++;
 
         items.push({
         visitorId: String(p.rowKey ?? ""),
@@ -229,6 +232,8 @@ function isOlderThan(hours: number, ts: number | null): boolean {
   if (ts === null) return false;
   return (Date.now() - ts) >= hours * 3600000;
 }
+
+
 
 
 

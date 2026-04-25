@@ -49,6 +49,11 @@ export default async function (context: any, req: any): Promise<void> {
     const table = TableClient.fromConnectionString(conn, tableName);
 
     await ensureTableExists(table);
+    const rawLimit = Number(req?.query?.limit ?? 100);
+    const limit = Number.isFinite(rawLimit)
+      ? Math.max(1, Math.min(500, Math.trunc(rawLimit)))
+      : 100;
+
 
     const items: any[] = [];
     const ownersMap: Record<string, number> = {};
@@ -108,7 +113,8 @@ export default async function (context: any, req: any): Promise<void> {
         continue;
       }
 
-      items.push({
+      if (items.length < limit) {
+        items.push({
         visitorId: String(p.rowKey ?? ""),
         assignedTo: assignedTo ? { ownerType: "user", ownerId: assignedTo } : null,
         lastFollowupAssignedAt: assignedAt,
@@ -119,6 +125,7 @@ export default async function (context: any, req: any): Promise<void> {
         stage: p.stage ?? null,
         needsFollowup
       });
+      }
     }
 
     context.res = {
@@ -180,3 +187,7 @@ async function ensureTableExists(table: TableClient) {
     throw e;
   }
 }
+
+
+
+

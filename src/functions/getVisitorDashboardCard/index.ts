@@ -87,7 +87,8 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     const followupUrgency = deriveFollowupUrgency({
       assignedTo,
       followupStatus,
-      lastFollowupAssignedAt
+      lastFollowupAssignedAt,
+      lastFollowupContactedAt: profile?.lastFollowupContactedAt ?? null
     });
 
     const followupOverdue = followupUrgency === "OVERDUE";
@@ -125,4 +126,5 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     };
   }
 }
+
 

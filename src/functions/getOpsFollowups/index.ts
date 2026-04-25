@@ -131,11 +131,11 @@ export default async function (context: any, req: any): Promise<void> {
       if (age === "24h+" && !isOlderThan(24, assignedAtMs)) continue;
 
 
-      // summary counts
-      if (needsFollowup) actionNeededCount++;
-      else if (contactedAtMs !== null && !resolvedForAssignment) contactMadeCount++;
-
       if (items.length < limit) {
+        // summary counts match returned filtered rows
+        if (needsFollowup) actionNeededCount++;
+        else if (contactedAtMs !== null && !resolvedForAssignment) contactMadeCount++;
+
         items.push({
         visitorId: String(p.rowKey ?? ""),
         assignedTo: assignedTo ? { ownerType: "user", ownerId: assignedTo } : null,
@@ -224,6 +224,7 @@ function isOlderThan(hours: number, ts: number | null): boolean {
   if (ts === null) return true;
   return (Date.now() - ts) >= hours * 3600000;
 }
+
 
 
 

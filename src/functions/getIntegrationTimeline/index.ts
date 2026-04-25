@@ -25,8 +25,11 @@ export async function getIntegrationTimeline(context: any, req: any): Promise<vo
       return;
     }
 
-    const limit = Number(req?.query?.limit ?? 50);
-    const cursor = req?.query?.cursor;
+    const rawLimit = Number(req?.query?.limit ?? 50);
+    const limit = Number.isFinite(rawLimit)
+      ? Math.max(1, Math.min(200, Math.trunc(rawLimit)))
+      : 50;
+    const cursor = req?.query?.cursor ? String(req.query.cursor) : undefined;
 
     const service = new IntegrationService(new EngagementEventsRepository());
     const page = await service.readIntegratedTimeline(visitorId, limit, cursor);
@@ -62,3 +65,4 @@ export async function getIntegrationTimeline(context: any, req: any): Promise<vo
     };
   }
 }
+

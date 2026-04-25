@@ -15,7 +15,10 @@ export async function getGlobalIntegrationTimeline(context: any, req: any): Prom
       };
     }
 
-    const limit = Number(req?.query?.limit ?? 50);
+    const rawLimit = Number(req?.query?.limit ?? 50);
+    const limit = Number.isFinite(rawLimit)
+      ? Math.max(1, Math.min(200, Math.trunc(rawLimit)))
+      : 50;
     const cursor =
       typeof req?.query?.cursor === "string" && req.query.cursor.trim().length > 0
         ? req.query.cursor.trim()
@@ -50,7 +53,7 @@ export async function getGlobalIntegrationTimeline(context: any, req: any): Prom
 
     try {
       const repo = new GlobalTimelineRepository();
-      const shadow = await repo.read(Math.max(1, Math.min(200, Number(limit || 50))), cursor);
+      const shadow = await repo.read(limit, cursor);
       shadowCount = Array.isArray(shadow.items) ? shadow.items.length : 0;
     } catch (err: any) {
       shadowError = String(err?.message ?? err);
@@ -81,3 +84,5 @@ export async function getGlobalIntegrationTimeline(context: any, req: any): Prom
     };
   }
 }
+
+

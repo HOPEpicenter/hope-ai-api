@@ -54,8 +54,16 @@ export default async function (context: any, req: any): Promise<void> {
       ? Math.max(1, Math.min(500, Math.trunc(rawLimit)))
       : 100;
 
+    const queue = String(req?.query?.queue ?? "all").trim();
+    const age = String(req?.query?.age ?? "").trim();
+
+
 
     const items: any[] = [];
+
+    let actionNeededCount = 0;
+    let contactMadeCount = 0;
+
     const ownersMap: Record<string, number> = {};
     const ownersBuckets: Record<string, { resolved: number; overdue: number; atRisk: number; onTrack: number }> = {};
 
@@ -113,6 +121,20 @@ export default async function (context: any, req: any): Promise<void> {
         continue;
       }
 
+      // queue filter
+      if (queue === "action-needed" && !needsFollowup) continue;
+      if (queue === "contact-made" && !(contactedAtMs !== null && !resolvedForAssignment)) continue;
+
+      // age filter
+      if (age === "72h+" && !isOlderThan(72, assignedAtMs)) continue;
+      if (age === "48h+" && !isOlderThan(48, assignedAtMs)) continue;
+      if (age === "24h+" && !isOlderThan(24, assignedAtMs)) continue;
+
+
+      // summary counts
+      if (needsFollowup) actionNeededCount++;
+      else if (contactedAtMs !== null && !resolvedForAssignment) contactMadeCount++;
+
       if (items.length < limit) {
         items.push({
         visitorId: String(p.rowKey ?? ""),
@@ -138,6 +160,11 @@ export default async function (context: any, req: any): Promise<void> {
       body: {
         ok: true,
         items,
+        summary: {
+          open: items.length,
+          actionNeeded: actionNeededCount,
+          contactMade: contactMadeCount
+        },
         owners: Object.entries(ownersMap).map(([ownerId, total]) => {
           const buckets = ownersBuckets[ownerId] ?? {
             resolved: 0,
@@ -186,6 +213,16 @@ async function ensureTableExists(table: TableClient) {
     }
     throw e;
   }
+}
+
+
+
+
+
+
+function isOlderThan(hours: number, ts: number | null): boolean {
+  if (ts === null) return true;
+  return (Date.now() - ts) >= hours * 3600000;
 }
 
 

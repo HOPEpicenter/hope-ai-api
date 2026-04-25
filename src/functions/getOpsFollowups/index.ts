@@ -125,10 +125,15 @@ export default async function (context: any, req: any): Promise<void> {
       if (queue === "action-needed" && !needsFollowup) continue;
       if (queue === "contact-made" && !(contactedAtMs !== null && !resolvedForAssignment)) continue;
 
-      // age filter
-      if (age === "72h+" && !isOlderThan(72, assignedAtMs)) continue;
-      if (age === "48h+" && !isOlderThan(48, assignedAtMs)) continue;
-      if (age === "24h+" && !isOlderThan(24, assignedAtMs)) continue;
+      // age filter (state-aware)
+      const ageTs =
+        queue === "contact-made"
+          ? contactedAtMs
+          : assignedAtMs;
+
+      if (age === "72h+" && !isOlderThan(72, ageTs)) continue;
+      if (age === "48h+" && !isOlderThan(48, ageTs)) continue;
+      if (age === "24h+" && !isOlderThan(24, ageTs)) continue;
 
 
       if (items.length < limit) {
@@ -221,9 +226,11 @@ async function ensureTableExists(table: TableClient) {
 
 
 function isOlderThan(hours: number, ts: number | null): boolean {
-  if (ts === null) return true;
+  if (ts === null) return false;
   return (Date.now() - ts) >= hours * 3600000;
 }
+
+
 
 
 

@@ -1,5 +1,6 @@
 import { TableClient } from "@azure/data-tables";
-import { getFollowupAgeHours } from "../../services/followups/deriveFollowupUrgency";
+import { deriveFollowupState } from "../../services/followups/deriveFollowupState";
+import { deriveFollowupUrgency } from "../../services/followups/deriveFollowupUrgency";
 
 // Repo pattern: legacy default export invoked as (context, req) via function.json.
 export default async function (context: any, req: any): Promise<void> {
@@ -50,6 +51,7 @@ export default async function (context: any, req: any): Promise<void> {
     const table = TableClient.fromConnectionString(conn, tableName);
 
     await ensureTableExists(table);
+
     const rawLimit = Number(req?.query?.limit ?? 100);
     const limit = Number.isFinite(rawLimit)
       ? Math.max(1, Math.min(500, Math.trunc(rawLimit)))
@@ -57,8 +59,9 @@ export default async function (context: any, req: any): Promise<void> {
 
     const queue = String(req?.query?.queue ?? "all").trim();
     const age = String(req?.query?.age ?? "").trim();
-
-
+    const includeResolved =
+      req?.query?.includeResolved === "true" ||
+      req?.query?.get?.("includeResolved") === "true";
 
     const items: any[] = [];
 
@@ -80,16 +83,14 @@ export default async function (context: any, req: any): Promise<void> {
 
       const assignedAtMs = toMs(assignedAt);
       const contactedAtMs = toMs(contactedAt);
-      const outcomeAtMs = toMs(outcomeAt);
 
       if (assignedAtMs === null) continue;
 
-      const resolvedForAssignment =
-        outcomeAtMs !== null && outcomeAtMs >= assignedAtMs;
-
-      const needsFollowup =
-        contactedAtMs === null ||
-        (contactedAtMs !== null && assignedAtMs > contactedAtMs);
+      const state = deriveFollowupState(p);
+      const followupStatus = state.followupStatus;
+      const resolvedForAssignment = followupStatus === "resolved";
+      const needsFollowup = state.needsAttention;
+      const isContactMade = state.isContactMade;
 
       if (assignedTo) {
         ownersMap[assignedTo] = (ownersMap[assignedTo] ?? 0) + 1;
@@ -106,11 +107,15 @@ export default async function (context: any, req: any): Promise<void> {
         if (resolvedForAssignment) {
           ownersBuckets[assignedTo].resolved++;
         } else {
-          const ageHours = getFollowupAgeHours(assignedAt);
+          const urgency = deriveFollowupUrgency({
+            assignedTo,
+            followupStatus,
+            lastFollowupAssignedAt: assignedAt
+          });
 
-          if (ageHours !== null && ageHours >= 48) {
+          if (urgency === "OVERDUE") {
             ownersBuckets[assignedTo].overdue++;
-          } else if (ageHours !== null && ageHours >= 24) {
+          } else if (urgency === "AT_RISK") {
             ownersBuckets[assignedTo].atRisk++;
           } else {
             ownersBuckets[assignedTo].onTrack++;
@@ -118,20 +123,17 @@ export default async function (context: any, req: any): Promise<void> {
         }
       }
 
-      if (resolvedForAssignment && req?.query?.includeResolved !== "true" && req?.query?.get?.("includeResolved") !== "true") {
+      if (resolvedForAssignment && !includeResolved) {
         continue;
       }
 
-      const hasOutcome = outcomeAtMs !== null;
-      const isContactMade = contactedAtMs !== null && !hasOutcome;
-
       // queue filter
-      if (queue === "action-needed" && !needsFollowup) continue;
-      if (queue === "contact-made" && !isContactMade) continue;
+      if (queue === "action-needed" && followupStatus !== "action_needed") continue;
+      if (queue === "contact-made" && followupStatus !== "contact_made") continue;
 
       // age filter (state-aware)
       const ageTs =
-        queue === "contact-made"
+        followupStatus === "contact_made"
           ? contactedAtMs
           : assignedAtMs;
 
@@ -139,23 +141,22 @@ export default async function (context: any, req: any): Promise<void> {
       if (age === "48h+" && !isOlderThan(48, ageTs)) continue;
       if (age === "24h+" && !isOlderThan(24, ageTs)) continue;
 
-
       if (items.length < limit) {
         // summary counts match returned filtered rows
-        if (needsFollowup) actionNeededCount++;
-        else if (isContactMade) contactMadeCount++;
+        if (followupStatus === "action_needed") actionNeededCount++;
+        if (followupStatus === "contact_made") contactMadeCount++;
 
         items.push({
-        visitorId: String(p.rowKey ?? ""),
-        assignedTo: assignedTo ? { ownerType: "user", ownerId: assignedTo } : null,
-        lastFollowupAssignedAt: assignedAt,
-        lastFollowupContactedAt: contactedAt,
-        lastFollowupOutcomeAt: outcomeAt,
-        lastFollowupOutcome: outcome,
-        resolvedForAssignment,
-        stage: p.stage ?? null,
-        needsFollowup
-      });
+          visitorId: String(p.rowKey ?? ""),
+          assignedTo: assignedTo ? { ownerType: "user", ownerId: assignedTo } : null,
+          lastFollowupAssignedAt: assignedAt,
+          lastFollowupContactedAt: contactedAt,
+          lastFollowupOutcomeAt: outcomeAt,
+          lastFollowupOutcome: outcome,
+          resolvedForAssignment,
+          stage: p.stage ?? null,
+          needsFollowup
+        });
       }
     }
 
@@ -224,13 +225,7 @@ async function ensureTableExists(table: TableClient) {
   }
 }
 
-
-
-
-
-
 function isOlderThan(hours: number, ts: number | null): boolean {
   if (ts === null) return false;
   return (Date.now() - ts) >= hours * 3600000;
 }
-

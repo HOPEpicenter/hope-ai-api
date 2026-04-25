@@ -3,6 +3,7 @@ import { IntegrationService } from "../../services/integration/integrationServic
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { createGetVisitorSummaryAdapter } from "../../routes/visitors/createGetVisitorSummaryAdapter";
 import { deriveFollowupPriority } from "../../services/followups/deriveFollowupPriority";
+import { deriveFollowupState } from "../../services/followups/deriveFollowupState";
 
 const integrationService = new IntegrationService(new EngagementEventsRepository());
 
@@ -32,22 +33,6 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     const items = Array.isArray(page?.items) ? page.items : [];
     const latest = items[0] ?? null;
 
-    const hasOutcomeRecorded = items.some((item: any) => item?.type === "FOLLOWUP_OUTCOME_RECORDED");
-    const hasContacted = items.some((item: any) => item?.type === "FOLLOWUP_CONTACTED");
-    const hasAssigned = items.some((item: any) => item?.type === "FOLLOWUP_ASSIGNED");
-
-    const followupStatus = hasOutcomeRecorded
-      ? "resolved"
-      : hasAssigned
-        ? hasContacted
-          ? "contact_made"
-          : "action_needed"
-        : "none";
-
-    const attentionState =
-      followupStatus === "resolved"
-        ? "clear"
-        : "needs_attention";
 
     const getVisitorSummary = createGetVisitorSummaryAdapter();
     const summaryResponse: any = {
@@ -72,6 +57,11 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     );
 
     const profile = summaryResponse?.body?.summary?.formation?.profile ?? null;
+    const state = deriveFollowupState(profile);
+
+    const followupStatus = state.followupStatus;
+    const attentionState = state.needsAttention ? "needs_attention" : "clear";
+
     const risk = summaryResponse?.body?.summary?.engagement?.risk ?? null;
     const priority = deriveFollowupPriority({
       needsFollowup: risk?.engagement?.needsFollowup ?? null,
@@ -151,3 +141,4 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     };
   }
 }
+

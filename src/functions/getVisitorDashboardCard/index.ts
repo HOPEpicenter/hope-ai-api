@@ -4,6 +4,7 @@ import { EngagementEventsRepository } from "../../repositories/engagementEventsR
 import { createGetVisitorSummaryAdapter } from "../../routes/visitors/createGetVisitorSummaryAdapter";
 import { deriveFollowupPriority } from "../../services/followups/deriveFollowupPriority";
 import { deriveFollowupState } from "../../services/followups/deriveFollowupState";
+import { deriveFollowupUrgency } from "../../services/followups/deriveFollowupUrgency";
 
 const integrationService = new IntegrationService(new EngagementEventsRepository());
 
@@ -83,28 +84,11 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
         ? profile.lastFollowupAssignedAt.trim()
         : null;
 
-    const getAgeHours = (value: string | null): number | null => {
-      if (!value) return null;
-
-      const assignedMs = new Date(value).getTime();
-      if (Number.isNaN(assignedMs)) return null;
-
-      const diffMs = Date.now() - assignedMs;
-      if (diffMs < 0) return 0;
-
-      return Math.floor(diffMs / (1000 * 60 * 60));
-    };
-
-    const ageHours = getAgeHours(lastFollowupAssignedAt);
-
-    const followupUrgency =
-      !assignedTo || followupStatus === "resolved"
-        ? null
-        : ageHours !== null && ageHours >= 48
-          ? "OVERDUE"
-          : ageHours !== null && ageHours >= 24
-            ? "AT_RISK"
-            : "ON_TRACK";
+    const followupUrgency = deriveFollowupUrgency({
+      assignedTo,
+      followupStatus,
+      lastFollowupAssignedAt
+    });
 
     const followupOverdue = followupUrgency === "OVERDUE";
 

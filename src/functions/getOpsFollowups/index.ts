@@ -1,4 +1,5 @@
 import { TableClient } from "@azure/data-tables";
+import { getFollowupAgeHours } from "../../services/followups/deriveFollowupUrgency";
 
 // Repo pattern: legacy default export invoked as (context, req) via function.json.
 export default async function (context: any, req: any): Promise<void> {
@@ -105,11 +106,11 @@ export default async function (context: any, req: any): Promise<void> {
         if (resolvedForAssignment) {
           ownersBuckets[assignedTo].resolved++;
         } else {
-          const ageHours = (Date.now() - assignedAtMs) / (1000 * 60 * 60);
+          const ageHours = getFollowupAgeHours(assignedAt);
 
-          if (ageHours >= 48) {
+          if (ageHours !== null && ageHours >= 48) {
             ownersBuckets[assignedTo].overdue++;
-          } else if (ageHours >= 24) {
+          } else if (ageHours !== null && ageHours >= 24) {
             ownersBuckets[assignedTo].atRisk++;
           } else {
             ownersBuckets[assignedTo].onTrack++;
@@ -232,12 +233,4 @@ function isOlderThan(hours: number, ts: number | null): boolean {
   if (ts === null) return false;
   return (Date.now() - ts) >= hours * 3600000;
 }
-
-
-
-
-
-
-
-
 

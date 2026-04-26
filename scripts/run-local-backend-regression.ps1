@@ -232,6 +232,10 @@ Write-Host "[OK] Follow-up resolution semantics invariant"
 finally {
   if ($null -ne $funcProc -and -not $funcProc.HasExited) {
 
+Write-Host "=== Latest activity consistency invariant ==="
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-latest-activity-consistency.ps1
+if ($LASTEXITCODE -ne 0) { throw "assert-latest-activity-consistency.ps1 failed" }
+Write-Host "[OK] Latest activity consistency invariant"
 Write-Host "=== Engagement transition validity invariants ==="
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-engagement-transition-validity.ps1
 Write-Host "[OK] Engagement transition validity invariants"
@@ -242,6 +246,7 @@ Write-Host "[OK] Engagement transition validity invariants"
     Get-Process func -ErrorAction SilentlyContinue | Stop-Process -Force
   }
 }
+
 
 
 

@@ -64,9 +64,6 @@ function summaryForItem(item: any): string {
   const type = String(item?.type ?? "").trim();
 
   if (item?.stream === "formation") {
-    if (typeof item?.data?.summary === "string" && item.data.summary.trim().length > 0) {
-      return item.data.summary.trim();
-    }
     if (type === "FOLLOWUP_ASSIGNED") return "Followup assigned";
     if (type === "FOLLOWUP_CONTACTED") return "Followup contacted";
     if (type === "FOLLOWUP_OUTCOME_RECORDED") return "Followup outcome recorded";
@@ -356,6 +353,8 @@ export class IntegrationService {
     });
   }
 }
+
+
 
 
 

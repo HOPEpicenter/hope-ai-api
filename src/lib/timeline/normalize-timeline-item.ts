@@ -63,7 +63,16 @@ function getKind(item: TimelineLike): NormalizedTimelineItem["kind"] {
 }
 
 export function normalizeTimelineItem(item: TimelineLike): NormalizedTimelineItem {
-  return {
+  function formatSummary(type: string): string {
+  if (!type) return "";
+
+  return type
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+return {
     id: item.id ?? `${item.visitorId ?? "unknown"}:${getEventType(item)}:${getBestTimestamp(item) ?? "no-time"}`,
     visitorId: item.visitorId ?? null,
     kind: getKind(item),
@@ -75,3 +84,4 @@ export function normalizeTimelineItem(item: TimelineLike): NormalizedTimelineIte
     raw: item
   };
 }
+

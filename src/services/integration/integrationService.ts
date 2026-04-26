@@ -115,6 +115,73 @@ function enrichTimelineItems(items: any[]) {
   }));
 }
 
+function getTimelineGroupKey(item: any): string {
+  const visitorId = String(item?.visitorId ?? "").trim();
+  const stream = String(item?.stream ?? "").trim();
+  const type = String(item?.type ?? "").trim();
+  const day = String(item?.occurredAt ?? "").slice(0, 10);
+
+  if (!visitorId || !stream || !type || !day) return "";
+
+  // Keep status transitions separate because they tell a sequence.
+  if (type === "status.transition") return "";
+
+  return [visitorId, stream, type, day].join("|");
+}
+
+function formatGroupedSummary(summary: string, count: number): string {
+  if (count <= 1) return summary;
+
+  const normalized = summary.trim();
+  if (normalized.toLowerCase() === "followup outcome recorded") {
+    return `Followup outcomes recorded (${count})`;
+  }
+
+  if (normalized.toLowerCase() === "followup contacted") {
+    return `Followup contacts recorded (${count})`;
+  }
+
+  if (normalized.toLowerCase() === "followup assigned") {
+    return `Followups assigned (${count})`;
+  }
+
+  if (normalized.toLowerCase() === "followup unassigned") {
+    return `Followups unassigned (${count})`;
+  }
+
+  return `${normalized} (${count})`;
+}
+
+function groupTimelinePageItems(items: any[]): any[] {
+  const result: any[] = [];
+
+  for (const item of items) {
+    const key = getTimelineGroupKey(item);
+    const previous = result[result.length - 1];
+    const previousKey = previous ? getTimelineGroupKey(previous) : "";
+
+    if (key && previous && key === previousKey) {
+      const count = Number(previous.groupCount ?? 1) + 1;
+      const groupedEventIds = Array.isArray(previous.groupedEventIds)
+        ? previous.groupedEventIds
+        : [previous.eventId];
+
+      previous.groupCount = count;
+      previous.groupedEventIds = [...groupedEventIds, item.eventId].filter(Boolean);
+      previous.groupedUntil = item.occurredAt ?? previous.groupedUntil ?? previous.occurredAt;
+      previous.summary = formatGroupedSummary(String(previous.summary ?? summaryForItem(previous)), count);
+      continue;
+    }
+
+    result.push({
+      ...item,
+      groupCount: 1
+    });
+  }
+
+  return result;
+}
+
 function normalizeActivityFamily(item: any): string {
   const type = String(item?.type ?? "").trim();
   const summary = String(item?.summary ?? summaryForItem(item) ?? "").trim().toLowerCase();
@@ -207,12 +274,13 @@ export class IntegrationService {
       }
     }
 
-    const pageItems = merged.slice(0, safeLimit);
+    const rawPageItems = merged.slice(0, safeLimit);
+    const pageItems = groupTimelinePageItems(rawPageItems);
 
     const nextCursor =
       merged.length > safeLimit
         ? (() => {
-            const last = pageItems[pageItems.length - 1];
+            const last = rawPageItems[rawPageItems.length - 1];
             return makeIntegratedTimelineCursor(last);
           })()
         : null;
@@ -353,6 +421,7 @@ export class IntegrationService {
     });
   }
 }
+
 
 
 

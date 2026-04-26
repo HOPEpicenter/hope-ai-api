@@ -767,3 +767,4 @@ Current shipped state:
 - Current trusted local backend verification command:
   `pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-backend-all.ps1`
 - Current backend posture: strict gates, no known stale SKIP paths except intentional/non-backend legacy cases, clean /api product vs /ops tooling boundary.
+

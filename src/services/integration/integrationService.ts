@@ -107,9 +107,50 @@ function toEngagementTimelineItem(event: any) {
   };
 }
 
+function classifyTimelineActivity(item: any): { activityType: string; activityCategory: string } {
+  const type = String(item?.type ?? "").trim();
+
+  if (type === "FOLLOWUP_ASSIGNED") {
+    return { activityType: "FOLLOWUP_ASSIGNED", activityCategory: "FOLLOWUP" };
+  }
+
+  if (type === "FOLLOWUP_CONTACTED") {
+    return { activityType: "CONTACT_MADE", activityCategory: "FOLLOWUP" };
+  }
+
+  if (type === "FOLLOWUP_OUTCOME_RECORDED") {
+    return { activityType: "FOLLOWUP_COMPLETED", activityCategory: "FOLLOWUP" };
+  }
+
+  if (type === "FOLLOWUP_UNASSIGNED") {
+    return { activityType: "FOLLOWUP_UNASSIGNED", activityCategory: "FOLLOWUP" };
+  }
+
+  if (type === "status.transition") {
+    const to = String(item?.data?.to ?? "").trim().toUpperCase();
+
+    if (to === "ENGAGED") {
+      return { activityType: "VISITOR_ENGAGED", activityCategory: "ENGAGEMENT" };
+    }
+
+    if (to === "DISENGAGED") {
+      return { activityType: "VISITOR_DISENGAGED", activityCategory: "ENGAGEMENT" };
+    }
+
+    return { activityType: "STATUS_CHANGE", activityCategory: "ENGAGEMENT" };
+  }
+
+  if (type === "NEXT_STEP_SELECTED") {
+    return { activityType: "NEXT_STEP_SELECTED", activityCategory: "FORMATION" };
+  }
+
+  return { activityType: type || "UNKNOWN", activityCategory: "OTHER" };
+}
+
 function enrichTimelineItems(items: any[]) {
   return items.map((item) => ({
     ...item,
+    ...classifyTimelineActivity(item),
     summary: summaryForItem(item),
     data: item?.data ?? {}
   }));
@@ -134,11 +175,11 @@ function formatGroupedSummary(summary: string, count: number): string {
 
   const normalized = summary.trim();
   if (normalized.toLowerCase() === "followup outcome recorded") {
-    return `Followup outcomes recorded (${count})`;
+    return `Followups completed (${count})`;
   }
 
   if (normalized.toLowerCase() === "followup contacted") {
-    return `Followup contacts recorded (${count})`;
+    return `Contacts made (${count})`;
   }
 
   if (normalized.toLowerCase() === "followup assigned") {
@@ -421,6 +462,8 @@ export class IntegrationService {
     });
   }
 }
+
+
 
 
 

@@ -22,8 +22,42 @@ function compareNewestFirst(a: any, b: any): number {
 
   const ae = String(a?.eventId ?? "");
   const be = String(b?.eventId ?? "");
-  if (ae === be) return 0;
-  return ae > be ? -1 : 1;
+  if (ae !== be) return ae > be ? -1 : 1;
+
+  const as = String(a?.stream ?? "");
+  const bs = String(b?.stream ?? "");
+  if (as === bs) return 0;
+  return as > bs ? -1 : 1;
+}
+
+function makeIntegratedTimelineCursor(item: any): string | null {
+  const occurredAt = String(item?.occurredAt ?? "").trim();
+  const eventId = String(item?.eventId ?? "").trim();
+  const stream = String(item?.stream ?? "").trim();
+
+  if (!occurredAt || !eventId) return null;
+
+  return [occurredAt, eventId, stream].join("|");
+}
+
+function parseIntegratedTimelineCursor(cursor: string): any | null {
+  const parts = String(cursor ?? "").split("|");
+  const occurredAt = String(parts[0] ?? "").trim();
+  const eventId = String(parts[1] ?? "").trim();
+  const stream = String(parts[2] ?? "").trim();
+
+  if (!occurredAt || !eventId) return null;
+
+  // stream is optional for backwards compatibility with older occurredAt|eventId cursors
+  return {
+    occurredAt,
+    eventId,
+    stream
+  };
+}
+
+function isAfterIntegratedCursor(item: any, cursorItem: any): boolean {
+  return compareNewestFirst(item, cursorItem) > 0;
 }
 
 function summaryForItem(item: any): string {
@@ -166,17 +200,14 @@ export class IntegrationService {
         let merged = this.buildMergedActivityItems(inputs);
 
     if (opts.cursor) {
-      const [cAt, cId] = opts.cursor.split("|");
+      const cursorItem = parseIntegratedTimelineCursor(opts.cursor);
 
-      merged = merged.filter((item) => {
-        if (!item?.occurredAt || !item?.eventId) return false;
-
-        if (item.occurredAt < cAt) return true;
-        if (item.occurredAt > cAt) return false;
-
-        // same timestamp → compare eventId
-        return item.eventId < cId;
-      });
+      if (cursorItem) {
+        merged = merged.filter((item) => {
+          if (!item?.occurredAt || !item?.eventId) return false;
+          return isAfterIntegratedCursor(item, cursorItem);
+        });
+      }
     }
 
     const pageItems = merged.slice(0, safeLimit);
@@ -185,7 +216,7 @@ export class IntegrationService {
       merged.length > safeLimit
         ? (() => {
             const last = pageItems[pageItems.length - 1];
-            return last ? `${last.occurredAt}|${last.eventId}` : null;
+            return makeIntegratedTimelineCursor(last);
           })()
         : null;
 
@@ -325,6 +356,7 @@ export class IntegrationService {
     });
   }
 }
+
 
 
 

@@ -768,3 +768,40 @@ Current shipped state:
   `pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-backend-all.ps1`
 - Current backend posture: strict gates, no known stale SKIP paths except intentional/non-backend legacy cases, clean /api product vs /ops tooling boundary.
 
+
+## 2026-04-25 — Followups system unification + stabilization (#715–#719)
+
+**What landed**
+- ✅ Unified followup state via deriveFollowupState.
+- ✅ Unified followup urgency via deriveFollowupUrgency.
+- ✅ State-aware urgency:
+  - action-needed → uses assigned timestamp
+  - contact-made → uses contacted timestamp
+- ✅ /ops/followups, visitor dashboard card, and dashboard followups all aligned.
+- ✅ Contact-made queue now excludes resolved/outcome rows correctly.
+- ✅ Dashboard refresh after outcome save eliminates stale UI state.
+- ✅ Queue/attention filters no longer leak or conflict.
+
+**Why this matters (master plan alignment)**
+- Eliminates drift between ops, dashboard, and visitor surfaces.
+- Establishes a single source of truth for followup state + urgency.
+- Locks followups as a regression-protected operational model.
+- Moves dashboard fully into a thin display layer over backend truth.
+
+**Current state**
+- Followups system is STABLE and COMPLETE.
+- Behavior is consistent across:
+  - ops followups
+  - dashboard followups
+  - visitor dashboard card
+- No known drift between filtering, counts, and urgency.
+
+**Rule going forward**
+- Do not rework followup logic unless a real workflow blocker appears.
+- All future work must consume shared state/urgency services.
+
+**Next**
+- Shift focus to visitors + timeline consistency validation.
+- Continue backend-first discipline.
+- Only expand engagement/formation if required by real workflows.
+

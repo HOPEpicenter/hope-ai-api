@@ -1,6 +1,7 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepository";
 import { IntegrationService } from "../../services/integration/integrationService";
+import { TIMELINE_DERIVATION_LIMIT } from "../../services/integration/timelineConstants";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { EngagementsService } from "../../services/engagements/engagementsService";
 import { readEngagementRiskV1 } from "../../services/engagements/readEngagementRisk";
@@ -49,7 +50,7 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
       engagementsService.getCurrentStatus(visitorId),
       readEngagementRiskV1(engagementsService, visitorId, 14),
       integrationService.readIntegrationSummary(visitorId),
-      integrationService.readIntegratedTimeline(visitorId, 5),
+      integrationService.readIntegratedTimeline(visitorId, TIMELINE_DERIVATION_LIMIT),
       getFormationProfileByVisitorId(table, visitorId)
     ]);
 
@@ -100,3 +101,5 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
     };
   }
 }
+
+

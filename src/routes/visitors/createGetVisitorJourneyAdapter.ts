@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1";
 import { IntegrationService } from "../../services/integration/integrationService";
+import { TIMELINE_DERIVATION_LIMIT } from "../../services/integration/timelineConstants";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
 import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
@@ -31,7 +32,7 @@ export function createGetVisitorJourneyAdapter() {
       let engagementEvents: any[] = [];
 
       try {
-        const timelinePage = await integrationService.readIntegratedTimeline(visitorId, 5);
+        const timelinePage = await integrationService.readIntegratedTimeline(visitorId, TIMELINE_DERIVATION_LIMIT);
         engagementEvents = Array.isArray(timelinePage?.items) ? timelinePage.items : [];
       } catch {
         engagementEvents = [];
@@ -73,4 +74,6 @@ export function createGetVisitorJourneyAdapter() {
     }
   };
 }
+
+
 

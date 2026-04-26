@@ -2,6 +2,7 @@ import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1
 import type { Request, Response, NextFunction } from "express";
 import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepository";
 import { IntegrationService } from "../../services/integration/integrationService";
+import { TIMELINE_DERIVATION_LIMIT } from "../../services/integration/timelineConstants";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { EngagementsService } from "../../services/engagements/engagementsService";
 import { readEngagementRiskV1 } from "../../services/engagements/readEngagementRisk";
@@ -36,7 +37,7 @@ export function createGetVisitorSummaryAdapter() {
         engagementSummaryRepo.get(visitorId),
         readEngagementRiskV1(engagementsService, visitorId, 14),
         integrationService.readIntegrationSummary(visitorId),
-        integrationService.readIntegratedTimeline(visitorId, 5),
+        integrationService.readIntegratedTimeline(visitorId, TIMELINE_DERIVATION_LIMIT),
         getFormationProfile(profilesTable as any, visitorId)
       ]);
 
@@ -94,3 +95,5 @@ export function createGetVisitorSummaryAdapter() {
     }
   };
 }
+
+

@@ -5,6 +5,7 @@ import { getVisitorById } from "../_shared/visitorsRepository";
 import { getFormationProfileByVisitorId } from "../_shared/formation";
 import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1";
 import { IntegrationService } from "../../services/integration/integrationService";
+import { TIMELINE_DERIVATION_LIMIT } from "../../services/integration/timelineConstants";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
 
@@ -47,7 +48,7 @@ export async function getVisitorJourney(context: any, req: any): Promise<void> {
   let engagementEvents: any[] = [];
 
   try {
-    const timelinePage = await integrationService.readIntegratedTimeline(visitorId, 5);
+    const timelinePage = await integrationService.readIntegratedTimeline(visitorId, TIMELINE_DERIVATION_LIMIT);
     engagementEvents = Array.isArray(timelinePage?.items) ? timelinePage.items : [];
   } catch {
     engagementEvents = [];
@@ -73,6 +74,8 @@ export async function getVisitorJourney(context: any, req: any): Promise<void> {
     }
   };
 }
+
+
 
 
 

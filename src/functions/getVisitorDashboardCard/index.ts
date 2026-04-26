@@ -5,6 +5,7 @@ import { createGetVisitorSummaryAdapter } from "../../routes/visitors/createGetV
 import { deriveFollowupPriority } from "../../services/followups/deriveFollowupPriority";
 import { deriveFollowupState } from "../../services/followups/deriveFollowupState";
 import { deriveFollowupUrgency } from "../../services/followups/deriveFollowupUrgency";
+import { TIMELINE_DERIVATION_LIMIT } from "../../services/integration/timelineConstants";
 
 const integrationService = new IntegrationService(new EngagementEventsRepository());
 
@@ -30,7 +31,7 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
       return;
     }
 
-    const page = await integrationService.readIntegratedTimeline(visitorId, 20);
+    const page = await integrationService.readIntegratedTimeline(visitorId, TIMELINE_DERIVATION_LIMIT);
     const items = Array.isArray(page?.items) ? page.items : [];
     const latest = items[0] ?? null;
 
@@ -126,5 +127,7 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     };
   }
 }
+
+
 
 

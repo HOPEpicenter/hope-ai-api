@@ -18,6 +18,7 @@ export type FormationEventType =
   | "FOLLOWUP_CONTACTED"
   | "FOLLOWUP_OUTCOME_RECORDED"
   | "NEXT_STEP_SELECTED"
+  | "NEXT_STEP_COMPLETED"
   | "INFO_REQUESTED"
   | "PRAYER_REQUESTED";
 
@@ -54,6 +55,7 @@ export interface FormationProfileSnapshot {
   lastFollowupOutcome?: string;
   lastFollowupOutcomeNotes?: string;
   lastNextStepAt?: string;
+  lastNextStepCompletedAt?: string;
   lastPrayerRequestedAt?: string;
 
   // Snapshot update timestamp

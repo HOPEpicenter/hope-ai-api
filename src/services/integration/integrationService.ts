@@ -140,8 +140,8 @@ function classifyTimelineActivity(item: any): { activityType: string; activityCa
     return { activityType: "STATUS_CHANGE", activityCategory: "ENGAGEMENT" };
   }
 
-  if (type === "NEXT_STEP_SELECTED") {
-    return { activityType: "NEXT_STEP_SELECTED", activityCategory: "FORMATION" };
+  if (type === "NEXT_STEP_SELECTED" || type === "NEXT_STEP_COMPLETED") {
+    return { activityType: type, activityCategory: "FORMATION" };
   }
 
   return { activityType: type || "UNKNOWN", activityCategory: "OTHER" };
@@ -228,6 +228,7 @@ function normalizeActivityFamily(item: any): string {
   const summary = String(item?.summary ?? summaryForItem(item) ?? "").trim().toLowerCase();
 
   if (type === "NEXT_STEP_SELECTED") return "next_step_selected";
+  if (type === "NEXT_STEP_COMPLETED") return "next_step_completed";
   if (type === "status.transition") return "status_transition";
   if (type === "note.add") return "note_add";
 

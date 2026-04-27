@@ -57,6 +57,7 @@ export const FormationEventType = {
   GROUP_LEFT: "GROUP_LEFT",
   FOLLOWUP_OUTCOME_RECORDED: "FOLLOWUP_OUTCOME_RECORDED",
   NEXT_STEP_SELECTED: "NEXT_STEP_SELECTED",
+  NEXT_STEP_COMPLETED: "NEXT_STEP_COMPLETED",
   INFO_REQUESTED: "INFO_REQUESTED",
   PRAYER_REQUESTED: "PRAYER_REQUESTED",
   SALVATION_RECORDED: "SALVATION_RECORDED",
@@ -171,6 +172,7 @@ export type FormationEventMetadataByType = {
   FOLLOWUP_CONTACTED: FollowupContactedMetadata;
   FOLLOWUP_OUTCOME_RECORDED: FollowupOutcomeRecordedMetadata;
   NEXT_STEP_SELECTED: NextStepSelectedMetadata;
+  NEXT_STEP_COMPLETED: NextStepSelectedMetadata;
   INFO_REQUESTED: InfoRequestedMetadata;
   PRAYER_REQUESTED: PrayerRequestedMetadata;
   SALVATION_RECORDED: SalvationRecordedMetadata;
@@ -281,7 +283,8 @@ export function validateFormationEvent(input: FormationEventInput): ValidationRe
       break;
 
     case FormationEventType.NEXT_STEP_SELECTED:
-      if (!md.nextStep) return { ok: false, error: "metadata.nextStep required for NEXT_STEP_SELECTED" };
+    case FormationEventType.NEXT_STEP_COMPLETED:
+      if (!md.nextStep) return { ok: false, error: "metadata.nextStep required for NEXT_STEP event" };
       break;
 
     case FormationEventType.INFO_REQUESTED:

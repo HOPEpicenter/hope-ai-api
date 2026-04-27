@@ -107,6 +107,7 @@ function computeNextStage(
       return maxStage(current, "Guest");
 
     case FormationEventType.NEXT_STEP_SELECTED:
+    case FormationEventType.NEXT_STEP_COMPLETED:
       return maxStage(current, "Connected");
 
     case FormationEventType.FOLLOWUP_OUTCOME_RECORDED: {
@@ -234,8 +235,12 @@ function applyProfileTouchpoint(
       break;
 
     case FormationEventType.NEXT_STEP_SELECTED:
+    case FormationEventType.NEXT_STEP_COMPLETED:
     case FormationEventType.INFO_REQUESTED:
       (profile as any).lastNextStepAt = occurredAt;
+      if (type === FormationEventType.NEXT_STEP_COMPLETED) {
+        (profile as any).lastNextStepCompletedAt = occurredAt;
+      }
       break;
 
     case FormationEventType.PRAYER_REQUESTED:

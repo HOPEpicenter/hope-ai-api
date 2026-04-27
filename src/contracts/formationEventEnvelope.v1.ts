@@ -56,9 +56,9 @@ export function validateFormationEventEnvelopeV1Strict(body: unknown): Formation
     // no additional required data for v1
   }
 
-  if (t === "NEXT_STEP_SELECTED") {
+  if (t === "NEXT_STEP_SELECTED" || t === "NEXT_STEP_COMPLETED") {
     if (!isNonEmptyString(d.nextStep)) {
-      throw new Error("NEXT_STEP_SELECTED requires data.nextStep (string)");
+      throw new Error("NEXT_STEP event requires data.nextStep (string)");
     }
   }
 

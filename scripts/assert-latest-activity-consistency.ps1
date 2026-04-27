@@ -82,6 +82,27 @@ function Post-FormationEvent([string]$VisitorId, [datetime]$OccurredAt) {
     -Body $body | Out-Null
 }
 
+
+function Post-NextStepCompleted([string]$VisitorId, [datetime]$OccurredAt) {
+  $body = @{
+    v = 1
+    eventId = "evt-$([guid]::NewGuid().ToString("N"))"
+    visitorId = $VisitorId
+    type = "NEXT_STEP_COMPLETED"
+    occurredAt = $OccurredAt.ToUniversalTime().ToString("o")
+    source = @{ system = "assert-latest-activity-consistency" }
+    data = @{
+      nextStep = "prayer"
+    }
+  } | ConvertTo-Json -Depth 10
+
+  Invoke-RestMethod `
+    -Method POST `
+    -Uri "$BaseUrl/api/formation/events" `
+    -Headers (Get-Headers) `
+    -ContentType "application/json" `
+    -Body $body | Out-Null
+}
 function Get-IntegrationTimeline([string]$VisitorId) {
   Invoke-RestMethod `
     -Method GET `
@@ -123,6 +144,8 @@ $base = (Get-Date).ToUniversalTime().AddMinutes(-10)
 Post-EngagementTransition -VisitorId $visitorId -OccurredAt $base
 Start-Sleep -Milliseconds 100
 Post-FormationEvent -VisitorId $visitorId -OccurredAt $base.AddSeconds(30)
+Start-Sleep -Milliseconds 100
+Post-NextStepCompleted -VisitorId $visitorId -OccurredAt $base.AddSeconds(60)
 
 $timeline = Get-IntegrationTimeline -VisitorId $visitorId
 $summary = Get-VisitorSummary -VisitorId $visitorId
@@ -164,6 +187,8 @@ Assert ([string]$card.card.lastActivitySummary -eq [string]$latest.summary) "das
 Assert ($null -ne $profile.profile) "formation profile missing"
 Assert ([string]$profile.profile.lastEventAt -eq [string]$latest.occurredAt) "formation profile lastEventAt does not match integration latest"
 Assert ([string]$profile.profile.lastEventType -eq [string]$latest.type) "formation profile lastEventType does not match integration latest type"
+Assert ([string]$profile.profile.lastEventType -eq "NEXT_STEP_COMPLETED") "formation profile latest event should be NEXT_STEP_COMPLETED"
+Assert ([string]$profile.profile.lastNextStepCompletedAt -eq [string]$latest.occurredAt) "formation profile lastNextStepCompletedAt does not match integration latest"
 
 Assert ($null -ne $insights.insights) "activity insights missing"
 Assert ($null -ne $insights.insights.lastMeaningfulActivity) "activity insights lastMeaningfulActivity missing"

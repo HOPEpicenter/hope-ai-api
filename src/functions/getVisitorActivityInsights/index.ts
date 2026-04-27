@@ -29,7 +29,8 @@ function isMeaningfulActivity(item: any): boolean {
     "FOLLOWUP_UNASSIGNED",
     "VISITOR_ENGAGED",
     "VISITOR_DISENGAGED",
-    "NEXT_STEP_SELECTED"
+    "NEXT_STEP_SELECTED",
+    "NEXT_STEP_COMPLETED"
   ].includes(activityType);
 }
 

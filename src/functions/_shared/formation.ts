@@ -46,6 +46,7 @@ export type FunctionFormationProfileEntity = {
   lastFollowupOutcome?: string;
   lastFollowupOutcomeNotes?: string;
   lastNextStepAt?: string;
+  lastNextStepCompletedAt?: string;
   lastPrayerRequestedAt?: string;
   displayName?: string;
   groupsJson?: string;
@@ -129,6 +130,7 @@ const SUPPORTED_FORMATION_EVENT_TYPES = new Set([
   "FOLLOWUP_CONTACTED",
   "FOLLOWUP_OUTCOME_RECORDED",
   "NEXT_STEP_SELECTED",
+  "NEXT_STEP_COMPLETED",
   "SALVATION_RECORDED",
   "BAPTISM_RECORDED",
   "MEMBERSHIP_RECORDED",
@@ -169,7 +171,7 @@ function validateFormationEventEnvelopeV1Strict(body: unknown): {
     requireNonEmptyString(data.assigneeId, "data.assigneeId");
   }
 
-  if (type === "NEXT_STEP_SELECTED") {
+  if (type === "NEXT_STEP_SELECTED" || type === "NEXT_STEP_COMPLETED") {
     requireNonEmptyString(data.nextStep, "data.nextStep");
   }
 
@@ -712,15 +714,22 @@ try {
     }
   }
 
-  if (type === "NEXT_STEP_SELECTED") {
+  if (type === "NEXT_STEP_SELECTED" || type === "NEXT_STEP_COMPLETED") {
     const nextStep = String(data.nextStep ?? "").trim();
     if (!nextStep) {
-      throw new Error("NEXT_STEP_SELECTED requires data.nextStep (string)");
+      throw new Error("NEXT_STEP event requires data.nextStep (string)");
     }
 
     if (shouldAdvanceTouchpointAt(profile.lastNextStepAt, occurredAt)) {
       profile.lastNextStepAt = occurredAt;
       maybeSetStage(profile, "Connected", occurredAt, type);
+    }
+
+    if (
+      type === "NEXT_STEP_COMPLETED" &&
+      shouldAdvanceTouchpointAt(profile.lastNextStepCompletedAt, occurredAt)
+    ) {
+      profile.lastNextStepCompletedAt = occurredAt;
     }
   }
 

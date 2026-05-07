@@ -4,6 +4,7 @@ import {
   ensureTable,
   type FunctionFormationProfileEntity
 } from "../_shared/formation";
+import { getVisitorById } from "../_shared/visitorsRepository";
 
 function parseLimit(val: unknown, fallback = 200): number {
   const n = typeof val === "string" ? Number(val) : fallback;
@@ -63,15 +64,36 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
         ? pageItems[pageItems.length - 1].rowKey
         : null;
 
+    const visitorNameById = new Map<string, string>();
+
+    await Promise.all(
+      pageItems
+        .filter((p) => !String(p.displayName ?? "").trim())
+        .map(async (p) => {
+          const visitorId = String(p.visitorId ?? "").trim();
+          if (!visitorId || visitorNameById.has(visitorId)) return;
+
+          const visitor = await getVisitorById(visitorId);
+          const visitorName = String(visitor?.name ?? "").trim();
+          if (visitorName) {
+            visitorNameById.set(visitorId, visitorName);
+          }
+        })
+    );
+
     const items = pageItems.map((p) => {
       const followupState =
         p.lastFollowupContactedAt
           ? "Contacted"
           : "Assigned";
 
+      const visitorId = String(p.visitorId ?? "").trim();
+      const displayName = String(p.displayName ?? "").trim();
+      const visitorName = visitorNameById.get(visitorId) ?? "";
+
       return {
         visitorId: p.visitorId,
-        name: (p.displayName && String(p.displayName).trim()) ? String(p.displayName).trim() : p.visitorId,
+        name: displayName || visitorName || visitorId,
         email: null,
         assignedTo: p.assignedTo,
         followupState,

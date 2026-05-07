@@ -2,6 +2,7 @@ import {
   getFormationProfilesTableClient,
   listFormationProfiles,
   ensureTable,
+  resolveOperatorDisplayName,
   type FunctionFormationProfileEntity
 } from "../_shared/formation";
 import { getVisitorById } from "../_shared/visitorsRepository";
@@ -65,10 +66,6 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
         : null;
 
     const visitorNameById = new Map<string, string>();
-    const operatorNameById = new Map<string, string>([
-      ["ops-user-1", "Operations Team"],
-      ["ops-user-2", "Guest Services"]
-    ]);
 
     await Promise.all(
       pageItems
@@ -97,8 +94,7 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
 
       const assignedTo = String(p.assignedTo ?? "").trim();
       const assignedToName =
-        operatorNameById.get(assignedTo) ??
-        assignedTo;
+        resolveOperatorDisplayName(assignedTo);
 
       return {
         visitorId: p.visitorId,

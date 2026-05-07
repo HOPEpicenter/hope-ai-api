@@ -65,6 +65,10 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
         : null;
 
     const visitorNameById = new Map<string, string>();
+    const operatorNameById = new Map<string, string>([
+      ["ops-user-1", "Operations Team"],
+      ["ops-user-2", "Guest Services"]
+    ]);
 
     await Promise.all(
       pageItems
@@ -91,11 +95,17 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
       const displayName = String(p.displayName ?? "").trim();
       const visitorName = visitorNameById.get(visitorId) ?? "";
 
+      const assignedTo = String(p.assignedTo ?? "").trim();
+      const assignedToName =
+        operatorNameById.get(assignedTo) ??
+        assignedTo;
+
       return {
         visitorId: p.visitorId,
         name: displayName || visitorName || visitorId,
         email: null,
-        assignedTo: p.assignedTo,
+        assignedTo,
+        assignedToName,
         followupState,
         attentionState:
           followupState === "Assigned"

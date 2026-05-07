@@ -250,10 +250,21 @@ function shouldSkipDedupe(item: any): boolean {
 }
 
 function dedupeMergedActivityItems(items: any[]): any[] {
+  const seenEventIds = new Set<string>();
   const seen = new Set<string>();
   const result: any[] = [];
 
   for (const item of items) {
+    const eventId = String(item?.eventId ?? "").trim();
+
+    if (eventId) {
+      if (seenEventIds.has(eventId)) {
+        continue;
+      }
+
+      seenEventIds.add(eventId);
+    }
+
     if (shouldSkipDedupe(item)) {
       result.push(item);
       continue;

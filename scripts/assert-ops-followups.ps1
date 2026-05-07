@@ -205,7 +205,7 @@ $primaryVisitorId = New-Visitor -FirstName "Ops" -LastName "Followups" -Prefix "
 Write-Host "[assert-ops-followups] POST /api/formation/events FOLLOWUP_ASSIGNED ..."
 $now = (Get-Date).ToUniversalTime()
 $assignedAt = $now.ToString("o")
-Add-FormationEvent -VisitorId $primaryVisitorId -Type "FOLLOWUP_ASSIGNED" -OccurredAt $assignedAt -Metadata @{ assigneeId = "ops-user-1" }
+Add-FormationEvent -VisitorId $primaryVisitorId -Type "FOLLOWUP_ASSIGNED" -OccurredAt $assignedAt -Metadata @{ assigneeId = "ops-user-1"; displayName = "Ops Followups" }
 
 Start-Sleep -Milliseconds 250
 

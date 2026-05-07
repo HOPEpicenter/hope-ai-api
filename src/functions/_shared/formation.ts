@@ -11,6 +11,7 @@ function normalizeAssignedTo(input: any): string | null {
 import { TableClient } from "@azure/data-tables";
 import { getConnString } from "./tableClient";
 import { GlobalTimelineRepository } from "../../repositories/globalTimelineRepository";
+import { getVisitorById } from "./visitorsRepository";
 
 export type FunctionFormationEventEntity = {
   partitionKey: string;
@@ -675,6 +676,12 @@ try {
     const displayName = String(data.displayName ?? "").trim();
     if (displayName) {
       profile.displayName = displayName;
+    } else if (!String(profile.displayName ?? "").trim()) {
+      const visitor = await getVisitorById(visitorId);
+      const visitorName = String(visitor?.name ?? "").trim();
+      if (visitorName) {
+        profile.displayName = visitorName;
+      }
     }
 
     if (shouldAdvanceTouchpointAt(profile.lastFollowupAssignedAt, occurredAt)) {

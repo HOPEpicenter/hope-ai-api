@@ -6,10 +6,17 @@ import { deriveFollowupPriority } from "../../services/followups/deriveFollowupP
 import { deriveFollowupUrgency } from "../../services/followups/deriveFollowupUrgency";
 import { projectFollowupState } from "../_shared/followupProjection";
 import { TIMELINE_DERIVATION_LIMIT } from "../../services/integration/timelineConstants";
+import {
+  apiErrorBody,
+  getRequestId,
+  logFunctionError
+} from "../../shared/observability/functionObservability";
 
 const integrationService = new IntegrationService(new EngagementEventsRepository());
 
 export async function getVisitorDashboardCard(context: any, req: any): Promise<void> {
+  const requestId = getRequestId(req);
+
   try {
     const auth = requireApiKeyForFunction(req);
     if (!auth.ok) {
@@ -105,6 +112,7 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
       headers: { "content-type": "application/json; charset=utf-8" },
       body: {
         ok: true,
+        requestId,
         visitorId,
         card: {
           visitorId,
@@ -127,10 +135,19 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
       }
     };
   } catch (err: any) {
-    context.log.error(err?.message ?? err);
+    logFunctionError(context, "getVisitorDashboardCard", err, {
+      requestId,
+      visitorId: req?.params?.id ?? null
+    });
+
     context.res = {
       status: 500,
-      body: { ok: false, error: "internal error" }
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: apiErrorBody(
+        "VISITOR_DASHBOARD_CARD_FAILED",
+        "Unexpected visitor dashboard card error",
+        requestId
+      )
     };
   }
 }

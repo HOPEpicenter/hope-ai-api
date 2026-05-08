@@ -6,6 +6,11 @@ import {
 } from "../_shared/formation";
 import { projectFollowupState } from "../_shared/followupProjection";
 import { getVisitorById } from "../_shared/visitorsRepository";
+import {
+  apiErrorBody,
+  getRequestId,
+  logFunctionError
+} from "../../shared/observability/functionObservability";
 
 function parseLimit(val: unknown, fallback = 200): number {
   const n = typeof val === "string" ? Number(val) : fallback;
@@ -23,6 +28,8 @@ function isOpenAssignedFollowup(profile: FunctionFormationProfileEntity): boolea
 }
 
 export async function getDashboardFollowups(context: any, req: any): Promise<void> {
+  const requestId = getRequestId(req);
+
   try {
     const limit = parseLimit(req?.query?.limit, 200);
     const requestedCursor = parseCursor(req?.query?.cursor);
@@ -107,6 +114,7 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
       headers: { "content-type": "application/json; charset=utf-8" },
       body: {
         ok: true,
+        requestId,
         count: items.length,
         limit,
         cursor: nextCursor,
@@ -116,10 +124,20 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
     };
 
   } catch (err: any) {
-    context.log.error(err?.message ?? err);
+    logFunctionError(context, "getDashboardFollowups", err, {
+      requestId,
+      limit: req?.query?.limit ?? null,
+      cursor: req?.query?.cursor ?? null
+    });
+
     context.res = {
       status: 500,
-      body: { ok: false, error: "GET_DASHBOARD_FOLLOWUPS_FAILED" }
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: apiErrorBody(
+        "GET_DASHBOARD_FOLLOWUPS_FAILED",
+        "Unexpected dashboard followups error",
+        requestId
+      )
     };
   }
 }

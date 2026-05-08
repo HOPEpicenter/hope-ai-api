@@ -24,6 +24,7 @@ export function resolveOperatorDisplayName(ownerId: unknown): string | null {
   return OPERATOR_DISPLAY_NAMES.get(normalized) ?? normalized;
 }
 import { TableClient } from "@azure/data-tables";
+import { logFunctionError } from "../../shared/observability/functionObservability";
 import { getConnString } from "./tableClient";
 import { GlobalTimelineRepository } from "../../repositories/globalTimelineRepository";
 import { getVisitorById } from "./visitorsRepository";
@@ -302,7 +303,11 @@ function toComparableProfileState(profile: FunctionFormationProfileEntity | null
 }
 
 function logFormationEventDecision(payload: Record<string, unknown>): void {
-  console.log("[formation-event]", JSON.stringify(payload));
+  console.log(JSON.stringify({
+    level: "info",
+    operation: "recordFormationEventV1",
+    ...payload
+  }));
 }
 
 export function toFormationHttpError(error: any, fallbackStatus = 400): number {
@@ -576,7 +581,13 @@ try {
     raw: eventEntity
   });
 } catch (err: any) {
-  console.error("globalTimeline append failed (v1 path)", err);
+  logFunctionError(null, "recordFormationEventV1.globalTimelineAppend", err, {
+    visitorId: eventEntity.visitorId,
+    eventId: eventEntity.id,
+    type: eventEntity.type,
+    occurredAt: eventEntity.occurredAt
+  });
+
   throw new Error(`globalTimeline append failed (v1 path): ${String(err?.message ?? err)}`);
 }
 // --- End Global Timeline Write ---

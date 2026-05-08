@@ -515,3 +515,14 @@ Current rule:
 - [ ] Validate duplicate replay/idempotency edge cases
 - [ ] Validate delayed/out-of-order event handling
 - [ ] Validate stale projection recovery behavior
+
+### 2026-05-08 — Replay and out-of-order validation
+
+- [x] Duplicate eventId replay returned accepted=false
+- [x] Duplicate replay did not create duplicate timeline entries
+- [x] Duplicate replay did not corrupt queue state
+- [x] Out-of-order stale contacted event did not reopen resolved state
+- [x] Out-of-order stale assigned event did not reopen resolved state
+- [x] Timeline preserved stale events as historical records
+- [x] Resolved projection state remained authoritative
+- [ ] Begin operational hardening review

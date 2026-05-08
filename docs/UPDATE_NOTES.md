@@ -544,3 +544,19 @@ Verified:
 
 ### Outcome
 The system now operates with a shared semantic lifecycle layer instead of duplicated surface-specific followup logic.
+
+## 2026-05-08 — Replay and out-of-order validation
+
+### Summary
+Validated staging behavior for duplicate replay and stale out-of-order lifecycle events.
+
+### Results
+- Duplicate event replay returned accepted=false on the second post.
+- Duplicate replay produced one timeline item only.
+- Queue state remained stable after replay.
+- Late stale assigned/contacted events did not reopen a resolved followup.
+- Timeline preserved late events historically while projection state remained resolved.
+- Queue remained closed after resolution.
+
+### Outcome
+Replay safety and out-of-order lifecycle safety are validated. The project can now shift toward operational hardening.

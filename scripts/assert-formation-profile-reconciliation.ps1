@@ -143,6 +143,7 @@ function Derive-ExpectedProfileFromEvents($Events) {
     lastFollowupContactedAt = $null
     lastFollowupOutcomeAt = $null
     lastFollowupOutcome = $null
+    lastNextStepAt = $null
     lastEventType = $null
     lastEventAt = $null
     lastEventId = $null
@@ -209,6 +210,18 @@ function Derive-ExpectedProfileFromEvents($Events) {
         $expected.stageReason = "event:FOLLOWUP_OUTCOME_RECORDED"
       }
     }
+
+    if ($event.type -eq "NEXT_STEP_SELECTED") {
+      if ($null -eq $expected.lastNextStepAt -or $eventAt -gt $expected.lastNextStepAt) {
+        $expected.lastNextStepAt = $eventAt
+      }
+
+      if ($expected.stage -ne "Connected") {
+        $expected.stage = "Connected"
+        $expected.stageUpdatedAt = $eventAt
+        $expected.stageReason = "event:NEXT_STEP_SELECTED"
+      }
+    }
   }
 
   return [pscustomobject]$expected
@@ -253,9 +266,16 @@ Post-FormationEvent `
 
 Post-FormationEvent `
   -VisitorId $visitorId `
+  -EventId (New-EventId "evt-recon-next-step") `
+  -Type "NEXT_STEP_SELECTED" `
+  -OccurredAt $baseTime.AddSeconds(40) `
+  -Data @{ nextStep = "Attend Service" } | Out-Null
+
+Post-FormationEvent `
+  -VisitorId $visitorId `
   -EventId (New-EventId "evt-recon-outcome") `
   -Type "FOLLOWUP_OUTCOME_RECORDED" `
-  -OccurredAt $baseTime.AddSeconds(40) `
+  -OccurredAt $baseTime.AddSeconds(50) `
   -Data @{ outcome = "connected"; notes = "profile reconciliation assertion" } | Out-Null
 
 Start-Sleep -Milliseconds 500
@@ -274,6 +294,7 @@ Assert ((To-IsoMillis $profile.lastFollowupAssignedAt) -eq $expected.lastFollowu
 Assert ((To-IsoMillis $profile.lastFollowupContactedAt) -eq $expected.lastFollowupContactedAt) "lastFollowupContactedAt drift"
 Assert ((To-IsoMillis $profile.lastFollowupOutcomeAt) -eq $expected.lastFollowupOutcomeAt) "lastFollowupOutcomeAt drift"
 Assert ([string]$profile.lastFollowupOutcome -eq $expected.lastFollowupOutcome) "lastFollowupOutcome drift"
+Assert ((To-IsoMillis $profile.lastNextStepAt) -eq $expected.lastNextStepAt) "lastNextStepAt drift"
 Assert ([string]$profile.stage -eq $expected.stage) "stage drift"
 Assert ((To-IsoMillis $profile.stageUpdatedAt) -eq $expected.stageUpdatedAt) "stageUpdatedAt drift"
 Assert ([string]$profile.stageReason -eq $expected.stageReason) "stageReason drift"
@@ -306,6 +327,13 @@ Post-FormationEvent `
   -Type "FOLLOWUP_CONTACTED" `
   -OccurredAt $contactAt `
   -Data @{ method = "text"; result = "connected" } | Out-Null
+
+Post-FormationEvent `
+  -VisitorId $visitorId `
+  -EventId (New-EventId "evt-recon-ooo-next-step") `
+  -Type "NEXT_STEP_SELECTED" `
+  -OccurredAt $baseTime.AddSeconds(60) `
+  -Data @{ nextStep = "Join Group" } | Out-Null
 
 Post-FormationEvent `
   -VisitorId $visitorId `
@@ -344,9 +372,11 @@ Assert ((To-IsoMillis $profile.lastFollowupAssignedAt) -eq $expected.lastFollowu
 Assert ((To-IsoMillis $profile.lastFollowupContactedAt) -eq $expected.lastFollowupContactedAt) "out-of-order lastFollowupContactedAt drift"
 Assert ((To-IsoMillis $profile.lastFollowupOutcomeAt) -eq $expected.lastFollowupOutcomeAt) "out-of-order lastFollowupOutcomeAt drift"
 Assert ([string]$profile.lastFollowupOutcome -eq $expected.lastFollowupOutcome) "out-of-order lastFollowupOutcome drift"
+Assert ((To-IsoMillis $profile.lastNextStepAt) -eq $expected.lastNextStepAt) "out-of-order lastNextStepAt drift"
 Assert ([string]$profile.stage -eq $expected.stage) "out-of-order stage drift"
 Assert ((To-IsoMillis $profile.stageUpdatedAt) -eq $expected.stageUpdatedAt) "out-of-order stageUpdatedAt drift"
 Assert ([string]$profile.stageReason -eq $expected.stageReason) "out-of-order stageReason drift"
 
 Write-Host "[assert-formation-profile-reconciliation] OK: profile reconciles with raw formation event history for in-order and out-of-order ingestion." -ForegroundColor Green
+
 

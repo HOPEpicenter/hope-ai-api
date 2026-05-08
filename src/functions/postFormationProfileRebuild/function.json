@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/postFormationProfileRebuild/index.js",
+  "entryPoint": "postFormationProfileRebuild",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "post" ],
+      "route": "visitors/{id}/formation/profile/rebuild"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

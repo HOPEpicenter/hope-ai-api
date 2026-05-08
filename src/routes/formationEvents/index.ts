@@ -5,8 +5,10 @@ import { recordFormationEvent } from "../../domain/formation/recordFormationEven
 import { listFormationEventsByVisitor } from "../../storage/formation/formationEventsRepo";
 import { getFormationProfilesTableClient, getFormationEventsTableClient } from "../../storage/formation/formationTables";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
-import { getFormationProfile, listFormationProfiles, upsertFormationProfile } from "../../storage/formation/formationProfilesRepo";
+import { getFormationProfile,
+  listFormationProfiles, upsertFormationProfile } from "../../storage/formation/formationProfilesRepo";
 import { looksLikeFormationEnvelopeV1, validateFormationEventEnvelopeV1Strict } from "../../contracts/formationEventEnvelope.v1";
+import { rebuildFormationProfileForVisitor } from "../../functions/_shared/formation";
 
 export const formationEventsRouter = Router();
 formationEventsRouter.use(requireApiKey);
@@ -309,6 +311,19 @@ formationEventsRouter.get("/visitors/:id/formation/profile", async (req, res) =>
   }
 });
 
+formationEventsRouter.post("/visitors/:id/formation/profile/rebuild", async (req, res) => {
+  try {
+    const visitorId = String(req.params.id || "").trim();
+    const result = await rebuildFormationProfileForVisitor(visitorId);
 
-
+    return res.status(200).json({
+      ok: true,
+      visitorId: result.visitorId,
+      eventCount: result.eventCount,
+      profile: result.profile
+    });
+  } catch (e: any) {
+    return res.status(toHttpStatus(e, 400)).json({ ok: false, error: e?.message || "Bad Request" });
+  }
+});
 

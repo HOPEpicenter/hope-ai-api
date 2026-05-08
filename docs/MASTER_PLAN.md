@@ -805,3 +805,33 @@ Current shipped state:
 - Continue backend-first discipline.
 - Only expand engagement/formation if required by real workflows.
 
+
+## 2026-05-08 Update
+
+**What landed**
+- ✅ centralized followup projection semantics across dashboard card, queue, and visitor detail
+- ✅ centralized operator display-name normalization
+- ✅ unified timeline semantic wording and activity classification
+- ✅ timeline duplicate suppression hardened using canonical eventId dedupe
+- ✅ validated assign → contact → unassign → reassign → outcome lifecycle on staging
+
+**Validation completed**
+- dashboard card, queue, and unified timeline stayed semantically aligned during reassignment
+- normalized operator naming remained consistent after reassignment
+- resolved followups correctly exited the open queue
+- timeline summaries remained canonicalized:
+  - Followup assigned
+  - Contact made
+  - Followup unassigned
+  - Outcome recorded
+
+**Why this matters (master plan alignment)**
+- reduces backend/frontend semantic drift risk
+- centralizes lifecycle semantics into shared projection layers
+- keeps backend truth authoritative before broader dashboard expansion
+- validates production-style lifecycle behavior before scaling new surfaces
+
+**Next**
+- validate duplicate replay/idempotency edge cases
+- validate delayed/out-of-order event behavior
+- continue operational hardening and observability cleanup

@@ -52,6 +52,7 @@ export type FunctionFormationProfileEntity = {
   stageUpdatedAt?: string;
   stageUpdatedBy?: string;
   stageReason?: string;
+  stageEventId?: string;
   assignedTo?: string | null;
   lastEventType?: string;
   lastEventAt?: string;
@@ -259,13 +260,26 @@ function maybeSetStage(
   profile: FunctionFormationProfileEntity,
   stage: string,
   occurredAtIso: string,
-  eventType: string
+  eventType: string,
+  eventId: string
 ): void {
-  if (profile.stage !== stage) {
+  const currentStageEventId = String((profile as any).stageEventId ?? "").trim();
+
+  const shouldApplyStage =
+    profile.stage !== stage &&
+    compareEventOrder(
+      occurredAtIso,
+      eventId,
+      profile.stageUpdatedAt,
+      currentStageEventId
+    ) > 0;
+
+  if (shouldApplyStage) {
     profile.stage = stage;
     profile.stageUpdatedAt = occurredAtIso;
     profile.stageUpdatedBy = "system";
     profile.stageReason = "event:" + eventType;
+    (profile as any).stageEventId = eventId;
   }
 }
 
@@ -283,6 +297,7 @@ function toComparableProfileState(profile: FunctionFormationProfileEntity | null
     stageUpdatedAt: profile.stageUpdatedAt ?? null,
     stageUpdatedBy: profile.stageUpdatedBy ?? null,
     stageReason: profile.stageReason ?? null,
+    stageEventId: (profile as any).stageEventId ?? null,
     assignedTo: profile.assignedTo ?? null,
     lastEventType: profile.lastEventType ?? null,
     lastEventAt: profile.lastEventAt ?? null,
@@ -713,7 +728,7 @@ try {
     if (shouldAdvanceTouchpointAt(profile.lastFollowupAssignedAt, occurredAt)) {
       profile.assignedTo = assigneeId;
       profile.lastFollowupAssignedAt = occurredAt;
-      maybeSetStage(profile, "Guest", occurredAt, type);
+      maybeSetStage(profile, "Guest", occurredAt, type, eventId);
     }
   }
 
@@ -743,7 +758,7 @@ try {
       profile.lastFollowupOutcome = outcome;
       profile.lastFollowupOutcomeNotes =
         typeof data.notes === "string" ? data.notes.trim() || undefined : undefined;
-      maybeSetStage(profile, "Connected", occurredAt, type);
+      maybeSetStage(profile, "Connected", occurredAt, type, eventId);
     }
   }
 
@@ -755,7 +770,7 @@ try {
 
     if (shouldAdvanceTouchpointAt(profile.lastNextStepAt, occurredAt)) {
       profile.lastNextStepAt = occurredAt;
-      maybeSetStage(profile, "Connected", occurredAt, type);
+      maybeSetStage(profile, "Connected", occurredAt, type, eventId);
     }
 
     if (
@@ -877,6 +892,7 @@ export async function listFormationProfiles(
     "stageUpdatedAt",
     "stageUpdatedBy",
     "stageReason",
+    "stageEventId",
     "assignedTo",
     "lastEventType",
     "lastEventAt",
@@ -907,6 +923,7 @@ export async function listFormationProfiles(
       stageUpdatedAt: entity.stageUpdatedAt,
       stageUpdatedBy: entity.stageUpdatedBy,
       stageReason: entity.stageReason,
+      stageEventId: entity.stageEventId,
       assignedTo: entity.assignedTo,
       lastEventType: entity.lastEventType,
       lastEventAt: entity.lastEventAt,
@@ -943,10 +960,4 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
-
-
-
-
-
-
 

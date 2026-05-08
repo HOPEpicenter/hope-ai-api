@@ -299,6 +299,37 @@ Assert ([string]$profile.stage -eq $expected.stage) "stage drift"
 Assert ((To-IsoMillis $profile.stageUpdatedAt) -eq $expected.stageUpdatedAt) "stageUpdatedAt drift"
 Assert ([string]$profile.stageReason -eq $expected.stageReason) "stageReason drift"
 
+# Duplicate replay/idempotency scenario:
+# Re-posting an already-seen canonical event should not drift projection state.
+
+$duplicateEventId = $expected.lastEventId
+
+Post-FormationEvent `
+  -VisitorId $visitorId `
+  -EventId $duplicateEventId `
+  -Type "FOLLOWUP_OUTCOME_RECORDED" `
+  -OccurredAt $baseTime.AddSeconds(50) `
+  -Data @{ outcome = "connected"; notes = "duplicate replay assertion" } | Out-Null
+
+Start-Sleep -Milliseconds 300
+
+$profileAfterDuplicate = Get-FormationProfile $visitorId
+$eventsAfterDuplicate = Get-FormationEvents $visitorId
+$expectedAfterDuplicate = Derive-ExpectedProfileFromEvents $eventsAfterDuplicate
+
+Assert ((To-IsoMillis $profileAfterDuplicate.lastEventAt) -eq $expectedAfterDuplicate.lastEventAt) "duplicate replay lastEventAt drift"
+Assert ([string]$profileAfterDuplicate.lastEventType -eq $expectedAfterDuplicate.lastEventType) "duplicate replay lastEventType drift"
+Assert ([string]$profileAfterDuplicate.lastEventId -eq $expectedAfterDuplicate.lastEventId) "duplicate replay lastEventId drift"
+Assert ([string]$profileAfterDuplicate.assignedTo -eq $expectedAfterDuplicate.assignedTo) "duplicate replay assignedTo drift"
+Assert ((To-IsoMillis $profileAfterDuplicate.lastFollowupAssignedAt) -eq $expectedAfterDuplicate.lastFollowupAssignedAt) "duplicate replay lastFollowupAssignedAt drift"
+Assert ((To-IsoMillis $profileAfterDuplicate.lastFollowupContactedAt) -eq $expectedAfterDuplicate.lastFollowupContactedAt) "duplicate replay lastFollowupContactedAt drift"
+Assert ((To-IsoMillis $profileAfterDuplicate.lastFollowupOutcomeAt) -eq $expectedAfterDuplicate.lastFollowupOutcomeAt) "duplicate replay lastFollowupOutcomeAt drift"
+Assert ([string]$profileAfterDuplicate.lastFollowupOutcome -eq $expectedAfterDuplicate.lastFollowupOutcome) "duplicate replay lastFollowupOutcome drift"
+Assert ((To-IsoMillis $profileAfterDuplicate.lastNextStepAt) -eq $expectedAfterDuplicate.lastNextStepAt) "duplicate replay lastNextStepAt drift"
+Assert ([string]$profileAfterDuplicate.stage -eq $expectedAfterDuplicate.stage) "duplicate replay stage drift"
+Assert ((To-IsoMillis $profileAfterDuplicate.stageUpdatedAt) -eq $expectedAfterDuplicate.stageUpdatedAt) "duplicate replay stageUpdatedAt drift"
+Assert ([string]$profileAfterDuplicate.stageReason -eq $expectedAfterDuplicate.stageReason) "duplicate replay stageReason drift"
+
 Write-Host "[assert-formation-profile-reconciliation] in-order scenario passed." -ForegroundColor Green
 
 # Out-of-order ingestion scenario:
@@ -378,5 +409,4 @@ Assert ((To-IsoMillis $profile.stageUpdatedAt) -eq $expected.stageUpdatedAt) "ou
 Assert ([string]$profile.stageReason -eq $expected.stageReason) "out-of-order stageReason drift"
 
 Write-Host "[assert-formation-profile-reconciliation] OK: profile reconciles with raw formation event history for in-order and out-of-order ingestion." -ForegroundColor Green
-
 

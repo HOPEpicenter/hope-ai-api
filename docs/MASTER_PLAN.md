@@ -835,3 +835,16 @@ Current shipped state:
 - validate duplicate replay/idempotency edge cases
 - validate delayed/out-of-order event behavior
 - continue operational hardening and observability cleanup
+
+## 2026-05-08 Validation Update
+
+**Additional validation completed**
+- ✅ duplicate replay/idempotency validation passed
+- ✅ duplicate eventId replay returned accepted=false and did not create duplicate timeline rows
+- ✅ out-of-order stale events did not reopen resolved followups
+- ✅ resolved lifecycle state remained authoritative after late assignment/contact events
+- ✅ stale events remained visible historically in timeline without corrupting projection state
+
+**Current conclusion**
+- replay safety, reassignment safety, and out-of-order lifecycle safety are validated on staging
+- remaining focus shifts from semantic stabilization to operational hardening

@@ -1,3 +1,8 @@
+import {
+  compareEventOrder,
+  shouldAdvanceEventState,
+  shouldAdvanceTouchpointAt
+} from "./reconciliation";
 function normalizeAssignedTo(input: any): string | null {
   if (input === null || input === undefined) return null;
 
@@ -215,46 +220,7 @@ function buildEventRowKey(occurredAtIso: string, eventId: string): string {
   return occurredAtIso + "__" + String(eventId).trim();
 }
 
-function eventAtOrMin(value: unknown): number {
-  const text = typeof value === "string" ? value.trim() : "";
-  if (!text) {
-    return Number.NEGATIVE_INFINITY;
-  }
 
-  const ms = Date.parse(text);
-  return Number.isFinite(ms) ? ms : Number.NEGATIVE_INFINITY;
-}
-
-function compareEventOrder(
-  leftOccurredAtIso: unknown,
-  leftEventId: unknown,
-  rightOccurredAtIso: unknown,
-  rightEventId: unknown
-): number {
-  const leftMs = eventAtOrMin(leftOccurredAtIso);
-  const rightMs = eventAtOrMin(rightOccurredAtIso);
-
-  if (leftMs !== rightMs) {
-    return leftMs - rightMs;
-  }
-
-  const leftId = String(leftEventId ?? "").trim();
-  const rightId = String(rightEventId ?? "").trim();
-  return leftId.localeCompare(rightId);
-}
-
-function shouldAdvanceEventState(
-  profile: FunctionFormationProfileEntity | null,
-  occurredAtIso: string,
-  eventId: string
-): boolean {
-  return compareEventOrder(
-    occurredAtIso,
-    eventId,
-    profile?.lastEventAt,
-    (profile as any)?.lastEventId
-  ) >= 0;
-}
 
 function maybeSetStage(
   profile: FunctionFormationProfileEntity,
@@ -283,9 +249,6 @@ function maybeSetStage(
   }
 }
 
-function shouldAdvanceTouchpointAt(currentAt: unknown, occurredAtIso: string): boolean {
-  return !currentAt || occurredAtIso > String(currentAt);
-}
 
 function toComparableProfileState(profile: FunctionFormationProfileEntity | null): string {
   if (!profile) {
@@ -655,7 +618,12 @@ try {
     visitorId
   };
 
-  const shouldAdvance = shouldAdvanceEventState(existingProfile, occurredAt, eventId);
+  const shouldAdvance = shouldAdvanceEventState(
+    occurredAt,
+    eventId,
+    existingProfile?.lastEventAt,
+    (existingProfile as any)?.lastEventId
+  );
 
   if (shouldAdvance) {
     profile.lastEventType = type;

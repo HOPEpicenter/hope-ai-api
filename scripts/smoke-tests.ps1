@@ -464,8 +464,6 @@ Write-Host "Engagement E2E OK"
   Write-Host "Journey smoke OK"
 
 
-}
-
 # OPS followups regression (promoted from smoke)
 $fuPath = Join-Path $PSScriptRoot "assert-ops-followups.ps1"
 if (-not (Test-Path -LiteralPath $fuPath)) {
@@ -482,6 +480,4 @@ Write-Host "Followups regression OK"
 
 Write-Host "SMOKE TESTS PASSED"
 exit 0
-
-
 

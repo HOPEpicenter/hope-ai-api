@@ -1,8 +1,14 @@
+import { TableClient } from "@azure/data-tables";
+import { GlobalTimelineRepository } from "../../repositories/globalTimelineRepository";
+import { logFunctionError } from "../../shared/observability/functionObservability";
+import { getConnString } from "./tableClient";
+import { getVisitorById } from "./visitorsRepository";
 import {
   compareEventOrder,
   shouldAdvanceEventState,
   shouldAdvanceTouchpointAt
 } from "./reconciliation";
+
 function normalizeAssignedTo(input: any): string | null {
   if (input === null || input === undefined) return null;
 
@@ -28,11 +34,6 @@ export function resolveOperatorDisplayName(ownerId: unknown): string | null {
 
   return OPERATOR_DISPLAY_NAMES.get(normalized) ?? normalized;
 }
-import { TableClient } from "@azure/data-tables";
-import { logFunctionError } from "../../shared/observability/functionObservability";
-import { getConnString } from "./tableClient";
-import { GlobalTimelineRepository } from "../../repositories/globalTimelineRepository";
-import { getVisitorById } from "./visitorsRepository";
 
 export type FunctionFormationEventEntity = {
   partitionKey: string;
@@ -451,6 +452,141 @@ export async function listFormationEventsByVisitorId(
   return filtered.slice(0, limit);
 }
 
+async function applyFormationEventToProfile(params: {
+  profile: FunctionFormationProfileEntity;
+  visitorId: string;
+  type: string;
+  occurredAt: string;
+  eventId: string;
+  data: any;
+  shouldAdvance: boolean;
+}): Promise<void> {
+  const { profile, visitorId, type, occurredAt, eventId, data, shouldAdvance } = params;
+
+  if (shouldAdvance) {
+    profile.lastEventType = type;
+    profile.lastEventAt = occurredAt;
+    (profile as any).lastEventId = eventId;
+  }
+
+  if (type === "GROUP_JOINED") {
+    const groupId = String(data.groupId ?? "").trim();
+    const displayName = String(data.displayName ?? "").trim();
+
+    if (displayName) {
+      profile.displayName = displayName;
+    }
+
+    const currentGroups = Array.isArray((profile as any).groups)
+      ? [...(profile as any).groups]
+      : [];
+
+    const existingIndex = currentGroups.findIndex(
+      (g: any) => String(g?.groupId ?? "").trim() === groupId
+    );
+
+    const nextGroup =
+      existingIndex >= 0
+        ? {
+            ...currentGroups[existingIndex],
+            groupId,
+            ...(displayName ? { displayName } : {})
+          }
+        : {
+            groupId,
+            ...(displayName ? { displayName } : {})
+          };
+
+    (profile as any).groups =
+      existingIndex >= 0
+        ? currentGroups.map((g: any, i: number) => (i === existingIndex ? nextGroup : g))
+        : [...currentGroups, nextGroup];
+  }
+
+  if (type === "GROUP_LEFT") {
+    const groupId = String(data.groupId ?? "").trim();
+    const currentGroups = Array.isArray((profile as any).groups)
+      ? [...(profile as any).groups]
+      : [];
+
+    (profile as any).groups = currentGroups.filter(
+      (g: any) => String(g?.groupId ?? "").trim() !== groupId
+    );
+  }
+
+  if (type === "FOLLOWUP_ASSIGNED") {
+    const assigneeId = normalizeAssignedTo(data.assigneeId);
+    if (!assigneeId) {
+      throw new Error("FOLLOWUP_ASSIGNED requires data.assigneeId (string)");
+    }
+
+    const displayName = String(data.displayName ?? "").trim();
+    if (displayName) {
+      profile.displayName = displayName;
+    } else if (!String(profile.displayName ?? "").trim()) {
+      const visitor = await getVisitorById(visitorId);
+      const visitorName = String(visitor?.name ?? "").trim();
+      if (visitorName) {
+        profile.displayName = visitorName;
+      }
+    }
+
+    if (shouldAdvanceTouchpointAt(profile.lastFollowupAssignedAt, occurredAt)) {
+      profile.assignedTo = assigneeId;
+      profile.lastFollowupAssignedAt = occurredAt;
+      maybeSetStage(profile, "Guest", occurredAt, type, eventId);
+    }
+  }
+
+  if (type === "FOLLOWUP_UNASSIGNED") {
+    if (shouldAdvance) {
+      profile.assignedTo = null;
+    }
+  }
+
+  if (type === "FOLLOWUP_CONTACTED") {
+    if (
+      !profile.lastFollowupContactedAt ||
+      occurredAt > profile.lastFollowupContactedAt
+    ) {
+      profile.lastFollowupContactedAt = occurredAt;
+    }
+  }
+
+  if (type === "FOLLOWUP_OUTCOME_RECORDED") {
+    const outcome = String(data.outcome ?? "").trim();
+    if (!outcome) {
+      throw new Error("FOLLOWUP_OUTCOME_RECORDED requires data.outcome (string)");
+    }
+
+    if (shouldAdvanceTouchpointAt(profile.lastFollowupOutcomeAt, occurredAt)) {
+      profile.lastFollowupOutcomeAt = occurredAt;
+      profile.lastFollowupOutcome = outcome;
+      profile.lastFollowupOutcomeNotes =
+        typeof data.notes === "string" ? data.notes.trim() || undefined : undefined;
+      maybeSetStage(profile, "Connected", occurredAt, type, eventId);
+    }
+  }
+
+  if (type === "NEXT_STEP_SELECTED" || type === "NEXT_STEP_COMPLETED") {
+    const nextStep = String(data.nextStep ?? "").trim();
+    if (!nextStep) {
+      throw new Error("NEXT_STEP event requires data.nextStep (string)");
+    }
+
+    if (shouldAdvanceTouchpointAt(profile.lastNextStepAt, occurredAt)) {
+      profile.lastNextStepAt = occurredAt;
+      maybeSetStage(profile, "Connected", occurredAt, type, eventId);
+    }
+
+    if (
+      type === "NEXT_STEP_COMPLETED" &&
+      shouldAdvanceTouchpointAt(profile.lastNextStepCompletedAt, occurredAt)
+    ) {
+      profile.lastNextStepCompletedAt = occurredAt;
+    }
+  }
+}
 export async function recordFormationEventV1(body: unknown): Promise<{
   accepted: boolean;
   id: string;
@@ -625,129 +761,15 @@ try {
     (existingProfile as any)?.lastEventId
   );
 
-  if (shouldAdvance) {
-    profile.lastEventType = type;
-    profile.lastEventAt = occurredAt;
-    (profile as any).lastEventId = eventId;
-  }
-
-  if (type === "GROUP_JOINED") {
-    const groupId = String(data.groupId ?? "").trim();
-    const displayName = String(data.displayName ?? "").trim();
-
-    if (displayName) {
-      profile.displayName = displayName;
-    }
-
-    const currentGroups = Array.isArray((profile as any).groups)
-      ? [...(profile as any).groups]
-      : [];
-
-    const existingIndex = currentGroups.findIndex(
-      (g: any) => String(g?.groupId ?? "").trim() === groupId
-    );
-
-    const nextGroup =
-      existingIndex >= 0
-        ? {
-            ...currentGroups[existingIndex],
-            groupId,
-            ...(displayName ? { displayName } : {})
-          }
-        : {
-            groupId,
-            ...(displayName ? { displayName } : {})
-          };
-
-    (profile as any).groups =
-      existingIndex >= 0
-        ? currentGroups.map((g: any, i: number) => (i === existingIndex ? nextGroup : g))
-        : [...currentGroups, nextGroup];
-  }
-
-  if (type === "GROUP_LEFT") {
-    const groupId = String(data.groupId ?? "").trim();
-    const currentGroups = Array.isArray((profile as any).groups)
-      ? [...(profile as any).groups]
-      : [];
-
-    (profile as any).groups = currentGroups.filter(
-      (g: any) => String(g?.groupId ?? "").trim() !== groupId
-    );
-  }
-
-  if (type === "FOLLOWUP_ASSIGNED") {
-    const assigneeId = normalizeAssignedTo(data.assigneeId);
-    if (!assigneeId) {
-      throw new Error("FOLLOWUP_ASSIGNED requires data.assigneeId (string)");
-    }
-
-    const displayName = String(data.displayName ?? "").trim();
-    if (displayName) {
-      profile.displayName = displayName;
-    } else if (!String(profile.displayName ?? "").trim()) {
-      const visitor = await getVisitorById(visitorId);
-      const visitorName = String(visitor?.name ?? "").trim();
-      if (visitorName) {
-        profile.displayName = visitorName;
-      }
-    }
-
-    if (shouldAdvanceTouchpointAt(profile.lastFollowupAssignedAt, occurredAt)) {
-      profile.assignedTo = assigneeId;
-      profile.lastFollowupAssignedAt = occurredAt;
-      maybeSetStage(profile, "Guest", occurredAt, type, eventId);
-    }
-  }
-
-  if (type === "FOLLOWUP_UNASSIGNED") {
-    if (shouldAdvance) {
-      profile.assignedTo = null;
-    }
-  }
-
-  if (type === "FOLLOWUP_CONTACTED") {
-    if (
-      !profile.lastFollowupContactedAt ||
-      occurredAt > profile.lastFollowupContactedAt
-    ) {
-      profile.lastFollowupContactedAt = occurredAt;
-    }
-  }
-
-  if (type === "FOLLOWUP_OUTCOME_RECORDED") {
-    const outcome = String(data.outcome ?? "").trim();
-    if (!outcome) {
-      throw new Error("FOLLOWUP_OUTCOME_RECORDED requires data.outcome (string)");
-    }
-
-    if (shouldAdvanceTouchpointAt(profile.lastFollowupOutcomeAt, occurredAt)) {
-      profile.lastFollowupOutcomeAt = occurredAt;
-      profile.lastFollowupOutcome = outcome;
-      profile.lastFollowupOutcomeNotes =
-        typeof data.notes === "string" ? data.notes.trim() || undefined : undefined;
-      maybeSetStage(profile, "Connected", occurredAt, type, eventId);
-    }
-  }
-
-  if (type === "NEXT_STEP_SELECTED" || type === "NEXT_STEP_COMPLETED") {
-    const nextStep = String(data.nextStep ?? "").trim();
-    if (!nextStep) {
-      throw new Error("NEXT_STEP event requires data.nextStep (string)");
-    }
-
-    if (shouldAdvanceTouchpointAt(profile.lastNextStepAt, occurredAt)) {
-      profile.lastNextStepAt = occurredAt;
-      maybeSetStage(profile, "Connected", occurredAt, type, eventId);
-    }
-
-    if (
-      type === "NEXT_STEP_COMPLETED" &&
-      shouldAdvanceTouchpointAt(profile.lastNextStepCompletedAt, occurredAt)
-    ) {
-      profile.lastNextStepCompletedAt = occurredAt;
-    }
-  }
+  await applyFormationEventToProfile({
+    profile,
+    visitorId,
+    type,
+    occurredAt,
+    eventId,
+    data,
+    shouldAdvance
+  });
 
   const beforeState = toComparableProfileState(existingProfile);
   const afterState = toComparableProfileState(profile);

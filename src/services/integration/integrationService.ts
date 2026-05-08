@@ -4,6 +4,7 @@ import { listFormationEventsByVisitor } from "../../storage/formation/formationE
 import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import { deriveIntegrationSummaryV1 } from "../../domain/integration/deriveIntegrationSummary.v1";
+import { getTimelineActivityType, getTimelineSummary } from "./timelineSemantics";
 
 export type IntegratedTimelinePageV1 = {
   items: any[];
@@ -64,11 +65,7 @@ function summaryForItem(item: any): string {
   const type = String(item?.type ?? "").trim();
 
   if (item?.stream === "formation") {
-    if (type === "FOLLOWUP_ASSIGNED") return "Followup assigned";
-    if (type === "FOLLOWUP_CONTACTED") return "Followup contacted";
-    if (type === "FOLLOWUP_OUTCOME_RECORDED") return "Followup outcome recorded";
-    if (type === "FOLLOWUP_UNASSIGNED") return "Followup unassigned";
-    return type || "formation event";
+    return getTimelineSummary(type);
   }
 
   if (item?.stream === "engagement") {
@@ -110,20 +107,8 @@ function toEngagementTimelineItem(event: any) {
 function classifyTimelineActivity(item: any): { activityType: string; activityCategory: string } {
   const type = String(item?.type ?? "").trim();
 
-  if (type === "FOLLOWUP_ASSIGNED") {
-    return { activityType: "FOLLOWUP_ASSIGNED", activityCategory: "FOLLOWUP" };
-  }
-
-  if (type === "FOLLOWUP_CONTACTED") {
-    return { activityType: "CONTACT_MADE", activityCategory: "FOLLOWUP" };
-  }
-
-  if (type === "FOLLOWUP_OUTCOME_RECORDED") {
-    return { activityType: "FOLLOWUP_COMPLETED", activityCategory: "FOLLOWUP" };
-  }
-
-  if (type === "FOLLOWUP_UNASSIGNED") {
-    return { activityType: "FOLLOWUP_UNASSIGNED", activityCategory: "FOLLOWUP" };
+  if (type.startsWith("FOLLOWUP_")) {
+    return { activityType: getTimelineActivityType(type), activityCategory: "FOLLOWUP" };
   }
 
   if (type === "status.transition") {
@@ -141,7 +126,7 @@ function classifyTimelineActivity(item: any): { activityType: string; activityCa
   }
 
   if (type === "NEXT_STEP_SELECTED" || type === "NEXT_STEP_COMPLETED") {
-    return { activityType: type, activityCategory: "FORMATION" };
+    return { activityType: getTimelineActivityType(type), activityCategory: "FORMATION" };
   }
 
   return { activityType: type || "UNKNOWN", activityCategory: "OTHER" };

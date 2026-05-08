@@ -4,8 +4,15 @@ import {
   recordFormationEventV1,
   toFormationHttpError
 } from "../_shared/formation";
+import {
+  apiErrorBody,
+  getRequestId,
+  logFunctionError
+} from "../../shared/observability/functionObservability";
 
 export async function postFormationEvent(context: any, req: any): Promise<void> {
+  const requestId = getRequestId(req);
+
   try {
     const auth = requireApiKeyForFunction(req);
     if (!auth.ok) {
@@ -31,6 +38,7 @@ export async function postFormationEvent(context: any, req: any): Promise<void> 
       headers: { "content-type": "application/json; charset=utf-8" },
       body: {
         ok: true,
+        requestId,
         accepted: result.accepted,
         id: result.id,
         visitorId: result.visitorId,
@@ -41,12 +49,27 @@ export async function postFormationEvent(context: any, req: any): Promise<void> 
       }
     };
   } catch (error: any) {
-    context.log.error(error?.message ?? error);
     const status = toFormationHttpError(error, 400);
+    const publicMessage = status >= 500
+      ? "Unexpected formation event error"
+      : String(error?.message || "Bad Request");
+
+    logFunctionError(context, "postFormationEvent", error, {
+      requestId,
+      status,
+      visitorId: req?.body?.visitorId ?? null,
+      eventId: req?.body?.eventId ?? null,
+      type: req?.body?.type ?? null
+    });
+
     context.res = {
       status,
       headers: { "content-type": "application/json; charset=utf-8" },
-      body: { ok: false, error: error?.message || "Bad Request" }
+      body: apiErrorBody(
+        status >= 500 ? "FORMATION_EVENT_INTERNAL_ERROR" : "FORMATION_EVENT_BAD_REQUEST",
+        publicMessage,
+        requestId
+      )
     };
   }
 }

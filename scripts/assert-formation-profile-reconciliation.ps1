@@ -264,11 +264,7 @@ $profile = Get-FormationProfile $visitorId
 $events = Get-FormationEvents $visitorId
 $expected = Derive-ExpectedProfileFromEvents $events
 
-Write-Host "[assert-formation-profile-reconciliation] expected:"
-$expected | ConvertTo-Json -Depth 10 | Write-Host
 
-Write-Host "[assert-formation-profile-reconciliation] actual profile:"
-$profile | ConvertTo-Json -Depth 10 | Write-Host
 
 Assert ((To-IsoMillis $profile.lastEventAt) -eq $expected.lastEventAt) "lastEventAt drift"
 Assert ([string]$profile.lastEventType -eq $expected.lastEventType) "lastEventType drift"
@@ -338,11 +334,7 @@ $profile = Get-FormationProfile $visitorId
 $events = Get-FormationEvents $visitorId
 $expected = Derive-ExpectedProfileFromEvents $events
 
-Write-Host "[assert-formation-profile-reconciliation] out-of-order expected:"
-$expected | ConvertTo-Json -Depth 10 | Write-Host
 
-Write-Host "[assert-formation-profile-reconciliation] out-of-order actual profile:"
-$profile | ConvertTo-Json -Depth 10 | Write-Host
 
 Assert ((To-IsoMillis $profile.lastEventAt) -eq $expected.lastEventAt) "out-of-order lastEventAt drift"
 Assert ([string]$profile.lastEventType -eq $expected.lastEventType) "out-of-order lastEventType drift"
@@ -357,5 +349,4 @@ Assert ((To-IsoMillis $profile.stageUpdatedAt) -eq $expected.stageUpdatedAt) "ou
 Assert ([string]$profile.stageReason -eq $expected.stageReason) "out-of-order stageReason drift"
 
 Write-Host "[assert-formation-profile-reconciliation] OK: profile reconciles with raw formation event history for in-order and out-of-order ingestion." -ForegroundColor Green
-
 

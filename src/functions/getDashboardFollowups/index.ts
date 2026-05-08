@@ -2,9 +2,9 @@ import {
   getFormationProfilesTableClient,
   listFormationProfiles,
   ensureTable,
-  resolveOperatorDisplayName,
   type FunctionFormationProfileEntity
 } from "../_shared/formation";
+import { projectFollowupState } from "../_shared/followupProjection";
 import { getVisitorById } from "../_shared/visitorsRepository";
 
 function parseLimit(val: unknown, fallback = 200): number {
@@ -83,30 +83,20 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
     );
 
     const items = pageItems.map((p) => {
-      const followupState =
-        p.lastFollowupContactedAt
-          ? "Contacted"
-          : "Assigned";
+      const projection = projectFollowupState(p);
 
       const visitorId = String(p.visitorId ?? "").trim();
       const displayName = String(p.displayName ?? "").trim();
       const visitorName = visitorNameById.get(visitorId) ?? "";
 
-      const assignedTo = String(p.assignedTo ?? "").trim();
-      const assignedToName =
-        resolveOperatorDisplayName(assignedTo);
-
       return {
         visitorId: p.visitorId,
         name: displayName || visitorName || visitorId,
         email: null,
-        assignedTo,
-        assignedToName,
-        followupState,
-        attentionState:
-          followupState === "Assigned"
-            ? "Action needed"
-            : "Contact made",
+        assignedTo: projection.assignedTo,
+        assignedToName: projection.assignedToName,
+        followupState: projection.followupState,
+        attentionState: projection.attentionState,
         lastFollowupAssignedAt: p.lastFollowupAssignedAt ?? null,
         lastFollowupContactedAt: p.lastFollowupContactedAt ?? null
       };

@@ -11,6 +11,7 @@ import { computeEngagementScoreV1 } from "../../domain/engagement/computeEngagem
 import { deriveFormationState } from "../../ops/formationState";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { EngagementsService } from "../../services/engagements/engagementsService";
+import { auditFormationProfileForVisitor } from "../../functions/_shared/formation";
 
 type FollowupUrgency = "ON_TRACK" | "AT_RISK" | "OVERDUE";
 type FollowupAgingBucket = "SAME_DAY" | "ONE_DAY" | "TWO_PLUS_DAYS";
@@ -597,4 +598,36 @@ const includeResolved =
 
 
 
+
+
+
+
+opsFollowupsRouter.post("/formation/profile-audit", async (req, res) => {
+  try {
+    const visitorId = String(req.body?.visitorId ?? "").trim();
+    const repair = req.body?.repair === true;
+
+    if (!visitorId) {
+      return res.status(400).json({
+        ok: false,
+        error: "visitorId is required"
+      });
+    }
+
+    const result = await auditFormationProfileForVisitor(visitorId, {
+      repair
+    });
+
+    return res.status(200).json({
+      ok: true,
+      repair,
+      ...result
+    });
+  } catch (err: any) {
+    return res.status(400).json({
+      ok: false,
+      error: err?.message ?? "Bad Request"
+    });
+  }
+});
 

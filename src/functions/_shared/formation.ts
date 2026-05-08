@@ -802,7 +802,7 @@ try {
   };
 }
 
-export async function rebuildFormationProfileForVisitor(visitorIdInput: string): Promise<{
+export async function deriveFormationProfileForVisitor(visitorIdInput: string): Promise<{
   visitorId: string;
   eventCount: number;
   profile: FunctionFormationProfileEntity;
@@ -813,20 +813,14 @@ export async function rebuildFormationProfileForVisitor(visitorIdInput: string):
   }
 
   const eventsTable = getFormationEventsTableClient();
-  const profilesTable = getFormationProfilesTableClient();
-
   await ensureTable(eventsTable);
-  await ensureTable(profilesTable);
 
   const events = await listFormationEventsByVisitorId(eventsTable, {
     visitorId,
     limit: 10000
   });
 
-  events.sort((a, b) => {
-    const at = compareEventOrder(a.occurredAt, a.rowKey, b.occurredAt, b.rowKey);
-    return at;
-  });
+  events.sort((a, b) => compareEventOrder(a.occurredAt, a.rowKey, b.occurredAt, b.rowKey));
 
   const profile: FunctionFormationProfileEntity = {
     partitionKey: "VISITOR",
@@ -859,13 +853,80 @@ export async function rebuildFormationProfileForVisitor(visitorIdInput: string):
     });
   }
 
-  profile.updatedAt = new Date().toISOString();
-  await profilesTable.upsertEntity(serializeGroups(profile) as any, "Replace");
-
   return {
     visitorId,
     eventCount: events.length,
     profile
+  };
+}
+
+export async function auditFormationProfileForVisitor(
+  visitorIdInput: string,
+  options?: { repair?: boolean }
+): Promise<{
+  visitorId: string;
+  eventCount: number;
+  drifted: boolean;
+  repaired: boolean;
+  currentProfile: FunctionFormationProfileEntity | null;
+  expectedProfile: FunctionFormationProfileEntity;
+}> {
+  const visitorId = String(visitorIdInput ?? "").trim();
+  if (!visitorId) {
+    throw new Error("visitorId is required");
+  }
+
+  const profilesTable = getFormationProfilesTableClient();
+  await ensureTable(profilesTable);
+
+  const currentProfile = await getFormationProfileByVisitorId(profilesTable, visitorId);
+  const derived = await deriveFormationProfileForVisitor(visitorId);
+
+  const currentState = toComparableProfileState(currentProfile);
+  const expectedState = toComparableProfileState(derived.profile);
+  const drifted = currentState !== expectedState;
+
+  let repaired = false;
+
+  if (options?.repair === true && drifted) {
+    derived.profile.updatedAt = new Date().toISOString();
+
+    await profilesTable.upsertEntity(
+      serializeGroups(derived.profile) as any,
+      "Replace"
+    );
+
+    repaired = true;
+
+    return await auditFormationProfileForVisitor(visitorId, {
+      repair: false
+    }).then(result => ({
+      ...result,
+      repaired: true
+    }));
+  }
+
+  return {
+    visitorId,
+    eventCount: derived.eventCount,
+    drifted,
+    repaired,
+    currentProfile,
+    expectedProfile: derived.profile
+  };
+}
+
+export async function rebuildFormationProfileForVisitor(visitorIdInput: string): Promise<{
+  visitorId: string;
+  eventCount: number;
+  profile: FunctionFormationProfileEntity;
+}> {
+  const audit = await auditFormationProfileForVisitor(visitorIdInput, { repair: true });
+
+  return {
+    visitorId: audit.visitorId,
+    eventCount: audit.eventCount,
+    profile: audit.expectedProfile
   };
 }
 function parseMetadataJson(value: unknown): any {
@@ -1016,4 +1077,5 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
+
 

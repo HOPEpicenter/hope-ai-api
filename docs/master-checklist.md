@@ -501,3 +501,17 @@ Current rule:
 - [x] Add regression assert for followup priority surface
 - [x] Add regression assert for followup queue priority
 - [x] Backend hardening closeout complete: unified runner self-contained, ops followups normalized, Engagement E2E skip removed — #700-#704
+
+### 2026-05-08 — Lifecycle consistency + semantic normalization
+
+- [x] Shared followup projection layer aligned across queue, dashboard card, and visitor detail
+- [x] Shared operator display-name normalization implemented
+- [x] Unified timeline semantic wording centralized
+- [x] Unified timeline activity classification centralized
+- [x] Timeline duplicate suppression hardened using canonical eventId dedupe
+- [x] Validated assign → contact → unassign → reassign → outcome lifecycle on staging
+- [x] Verified resolved followups correctly exit open queue surfaces
+- [x] Verified queue/dashboard/timeline semantic alignment after reassignment
+- [ ] Validate duplicate replay/idempotency edge cases
+- [ ] Validate delayed/out-of-order event handling
+- [ ] Validate stale projection recovery behavior

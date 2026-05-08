@@ -516,3 +516,31 @@ Result:
 - backend smoke/assert layer now reflects current implementation truth
 - implemented backend behavior should fail loudly instead of silently skipping
 - dashboard should remain API-backed and should not invent state models
+
+## 2026-05-08 — Followup semantic stabilization + lifecycle validation
+
+### Summary
+Completed the major semantic consistency hardening pass for followup lifecycle behavior.
+
+### Shipped
+- Centralized followup projection semantics
+- Centralized operator display-name resolution
+- Unified dashboard card / queue / visitor detail lifecycle semantics
+- Centralized unified timeline semantic wording
+- Centralized unified timeline activity classification
+- Hardened duplicate suppression using canonical eventId dedupe
+
+### Validation
+Validated full staging lifecycle:
+
+assign → contact → unassign → reassign → outcome
+
+Verified:
+- queue consistency
+- dashboard card consistency
+- unified timeline consistency
+- normalized operator naming
+- resolved followups exiting open queue surfaces
+
+### Outcome
+The system now operates with a shared semantic lifecycle layer instead of duplicated surface-specific followup logic.

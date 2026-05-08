@@ -3,8 +3,8 @@ import { IntegrationService } from "../../services/integration/integrationServic
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { createGetVisitorSummaryAdapter } from "../../routes/visitors/createGetVisitorSummaryAdapter";
 import { deriveFollowupPriority } from "../../services/followups/deriveFollowupPriority";
-import { deriveFollowupState } from "../../services/followups/deriveFollowupState";
 import { deriveFollowupUrgency } from "../../services/followups/deriveFollowupUrgency";
+import { projectFollowupState } from "../_shared/followupProjection";
 import { TIMELINE_DERIVATION_LIMIT } from "../../services/integration/timelineConstants";
 
 const integrationService = new IntegrationService(new EngagementEventsRepository());
@@ -59,10 +59,22 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     );
 
     const profile = summaryResponse?.body?.summary?.formation?.profile ?? null;
-    const state = deriveFollowupState(profile);
 
-    const followupStatus = state.followupStatus;
-    const attentionState = state.needsAttention ? "needs_attention" : "clear";
+    const projection = projectFollowupState(profile);
+
+    const followupStatus =
+      projection.followupState === "Assigned"
+        ? "action_needed"
+        : projection.followupState === "Contacted"
+          ? "contact_made"
+          : projection.followupState === "Resolved"
+            ? "resolved"
+            : "unassigned";
+
+    const attentionState =
+      projection.attentionState === "Action needed"
+        ? "needs_attention"
+        : "clear";
 
     const risk = summaryResponse?.body?.summary?.engagement?.risk ?? null;
     const priority = deriveFollowupPriority({
@@ -71,14 +83,8 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
       riskScore: risk?.riskScore ?? null
     });
 
-    const assignedToRaw =
-      typeof profile?.assignedTo === "string"
-        ? profile.assignedTo.trim()
-        : typeof profile?.assignedTo?.ownerId === "string"
-          ? profile.assignedTo.ownerId.trim()
-          : "";
-
-    const assignedTo = assignedToRaw.length > 0 ? assignedToRaw : null;
+    const assignedTo = projection.assignedTo;
+    const assignedToName = projection.assignedToName;
 
     const lastFollowupAssignedAt =
       typeof profile?.lastFollowupAssignedAt === "string" && profile.lastFollowupAssignedAt.trim().length > 0
@@ -106,6 +112,7 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
           lastActivitySummary: latest?.summary ?? null,
           followupStatus,
           assignedTo,
+          assignedToName,
           attentionState,
           followupUrgency,
           followupOverdue,

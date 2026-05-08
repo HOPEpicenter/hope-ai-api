@@ -62,7 +62,7 @@ $inOrderProfile = GetJson "$ApiBase/visitors/$inOrderVisitorId/formation/profile
 $outOfOrderProfile = GetJson "$ApiBase/visitors/$outOfOrderVisitorId/formation/profile" $headers
 
 $expectedStage = "Connected"
-$expectedStageUpdatedAt = [datetime]::Parse($connectedAt.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")).ToUniversalTime()
+$expectedStageUpdatedAt = $connectedAt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
 $expectedStageReason = "event:NEXT_STEP_SELECTED"
 
 if ($inOrderProfile.profile.stage -ne $expectedStage) {
@@ -73,14 +73,14 @@ if ($outOfOrderProfile.profile.stage -ne $expectedStage) {
   throw "Out-of-order stage mismatch. Expected $expectedStage, got $($outOfOrderProfile.profile.stage)"
 }
 
-$inOrderStageUpdatedAt = ([datetime]$inOrderProfile.profile.stageUpdatedAt).ToUniversalTime()
+$inOrderStageUpdatedAt = ([datetime]$inOrderProfile.profile.stageUpdatedAt).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
 if ($inOrderStageUpdatedAt -ne $expectedStageUpdatedAt) {
-  throw "In-order stageUpdatedAt mismatch. Expected $($expectedStageUpdatedAt.ToString("o")), got $($inOrderStageUpdatedAt.ToString("o"))"
+  throw "In-order stageUpdatedAt mismatch. Expected $expectedStageUpdatedAt, got $inOrderStageUpdatedAt"
 }
 
-$outOfOrderStageUpdatedAt = ([datetime]$outOfOrderProfile.profile.stageUpdatedAt).ToUniversalTime()
+$outOfOrderStageUpdatedAt = ([datetime]$outOfOrderProfile.profile.stageUpdatedAt).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
 if ($outOfOrderStageUpdatedAt -ne $expectedStageUpdatedAt) {
-  throw "Out-of-order stageUpdatedAt mismatch. Expected $($expectedStageUpdatedAt.ToString("o")), got $($outOfOrderStageUpdatedAt.ToString("o"))"
+  throw "Out-of-order stageUpdatedAt mismatch. Expected $expectedStageUpdatedAt, got $outOfOrderStageUpdatedAt"
 }
 
 if ($inOrderProfile.profile.stageReason -ne $expectedStageReason) {
@@ -92,6 +92,7 @@ if ($outOfOrderProfile.profile.stageReason -ne $expectedStageReason) {
 }
 
 Write-Host "[assert-formation-stage-replay-reconciliation] OK" -ForegroundColor Green
+
 
 
 

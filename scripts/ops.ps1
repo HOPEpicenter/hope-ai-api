@@ -89,6 +89,11 @@ if (-not $reqHeaders.ContainsKey("x-api-key")) {
 
     $status = [int]$resp.StatusCode
     $text = $resp.Content
+
+    if ($text -is [byte[]]) {
+      $text = [System.Text.Encoding]::UTF8.GetString($text)
+    }
+
     $outHeaders = $resp.Headers
   }
   catch {
@@ -198,6 +203,4 @@ function OpsFollowups {
   )
   OpsRequest -BaseUrl $BaseUrl -Method GET -Path "/ops/followups"
 }
-
-
 

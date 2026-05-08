@@ -802,6 +802,72 @@ try {
   };
 }
 
+export async function rebuildFormationProfileForVisitor(visitorIdInput: string): Promise<{
+  visitorId: string;
+  eventCount: number;
+  profile: FunctionFormationProfileEntity;
+}> {
+  const visitorId = String(visitorIdInput ?? "").trim();
+  if (!visitorId) {
+    throw new Error("visitorId is required");
+  }
+
+  const eventsTable = getFormationEventsTableClient();
+  const profilesTable = getFormationProfilesTableClient();
+
+  await ensureTable(eventsTable);
+  await ensureTable(profilesTable);
+
+  const events = await listFormationEventsByVisitorId(eventsTable, {
+    visitorId,
+    limit: 10000
+  });
+
+  events.sort((a, b) => {
+    const at = compareEventOrder(a.occurredAt, a.rowKey, b.occurredAt, b.rowKey);
+    return at;
+  });
+
+  const profile: FunctionFormationProfileEntity = {
+    partitionKey: "VISITOR",
+    rowKey: visitorId,
+    visitorId
+  };
+
+  for (const event of events) {
+    const eventId = String((event as any).id ?? event.rowKey ?? "").split("__").pop() ?? "";
+    const occurredAt = String(event.occurredAt ?? "").trim();
+    const type = String(event.type ?? "").trim();
+    const metadata = parseMetadataJson(event.metadata) ?? {};
+    const data = metadata.data ?? metadata;
+
+    const shouldAdvance = shouldAdvanceEventState(
+      occurredAt,
+      eventId,
+      profile.lastEventAt,
+      (profile as any).lastEventId
+    );
+
+    await applyFormationEventToProfile({
+      profile,
+      visitorId,
+      type,
+      occurredAt,
+      eventId,
+      data,
+      shouldAdvance
+    });
+  }
+
+  profile.updatedAt = new Date().toISOString();
+  await profilesTable.upsertEntity(serializeGroups(profile) as any, "Replace");
+
+  return {
+    visitorId,
+    eventCount: events.length,
+    profile
+  };
+}
 function parseMetadataJson(value: unknown): any {
   if (typeof value !== "string" || value.trim() === "") {
     return undefined;

@@ -386,6 +386,9 @@ if ($LASTEXITCODE -ne 0) { throw "Formation snapshot invariants failed (exit=$LA
 pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-formation-stage-replay-reconciliation.ps1" -ApiBase "$BaseUrl/api" -ApiKey $ApiKey
 if ($LASTEXITCODE -ne 0) { throw "Formation stage replay reconciliation failed (exit=$LASTEXITCODE)" }
 
+pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-formation-profile-reconciliation.ps1" -BaseUrl $BaseUrl -ApiKey $ApiKey
+if ($LASTEXITCODE -ne 0) { throw "Formation profile reconciliation failed (exit=$LASTEXITCODE)" }
+
 Write-Host "OK: Cross-stream cursor boundary regression OK"
 
 Write-Host "Timeline page1 OK (nextCursor present)"

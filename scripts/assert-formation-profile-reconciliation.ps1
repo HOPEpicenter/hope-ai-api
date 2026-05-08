@@ -51,6 +51,28 @@ function New-EventId([string]$Prefix) {
   return "$Prefix-$([Guid]::NewGuid().ToString('N'))"
 }
 
+function Get-EventMetadataData($Event) {
+  $metadata = $Event.metadata
+
+  if ($metadata -is [string]) {
+    try {
+      $metadata = $metadata | ConvertFrom-Json
+    } catch {
+      return [pscustomobject]@{}
+    }
+  }
+
+  if ($metadata -and $metadata.PSObject.Properties.Match("data").Count -gt 0) {
+    return $metadata.data
+  }
+
+  if ($metadata) {
+    return $metadata
+  }
+
+  return [pscustomobject]@{}
+}
+
 function Create-TestVisitor {
   $stamp = [Guid]::NewGuid().ToString("N")
   $created = Json-Post `
@@ -153,7 +175,7 @@ function Derive-ExpectedProfileFromEvents($Events) {
     if ($event.type -eq "FOLLOWUP_ASSIGNED") {
       if ($null -eq $expected.lastFollowupAssignedAt -or $eventAt -gt $expected.lastFollowupAssignedAt) {
         $expected.lastFollowupAssignedAt = $eventAt
-        $expected.assignedTo = [string]$event.metadata.data.assigneeId
+        $expected.assignedTo = [string](Get-EventMetadataData $event).assigneeId
       }
 
       if ($expected.stage -ne "Guest") {
@@ -178,7 +200,7 @@ function Derive-ExpectedProfileFromEvents($Events) {
     if ($event.type -eq "FOLLOWUP_OUTCOME_RECORDED") {
       if ($null -eq $expected.lastFollowupOutcomeAt -or $eventAt -gt $expected.lastFollowupOutcomeAt) {
         $expected.lastFollowupOutcomeAt = $eventAt
-        $expected.lastFollowupOutcome = [string]$event.metadata.data.outcome
+        $expected.lastFollowupOutcome = [string](Get-EventMetadataData $event).outcome
       }
 
       if ($expected.stage -ne "Connected") {
@@ -335,4 +357,5 @@ Assert ((To-IsoMillis $profile.stageUpdatedAt) -eq $expected.stageUpdatedAt) "ou
 Assert ([string]$profile.stageReason -eq $expected.stageReason) "out-of-order stageReason drift"
 
 Write-Host "[assert-formation-profile-reconciliation] OK: profile reconciles with raw formation event history for in-order and out-of-order ingestion." -ForegroundColor Green
+
 

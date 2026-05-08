@@ -124,6 +124,9 @@ function Derive-ExpectedProfileFromEvents($Events) {
     lastEventType = $null
     lastEventAt = $null
     lastEventId = $null
+    stage = $null
+    stageUpdatedAt = $null
+    stageReason = $null
   }
 
   $ordered = @($Events) | Sort-Object `
@@ -152,6 +155,12 @@ function Derive-ExpectedProfileFromEvents($Events) {
         $expected.lastFollowupAssignedAt = $eventAt
         $expected.assignedTo = [string]$event.metadata.data.assigneeId
       }
+
+      if ($expected.stage -ne "Guest") {
+        $expected.stage = "Guest"
+        $expected.stageUpdatedAt = $eventAt
+        $expected.stageReason = "event:FOLLOWUP_ASSIGNED"
+      }
     }
 
     if ($event.type -eq "FOLLOWUP_UNASSIGNED") {
@@ -170,6 +179,12 @@ function Derive-ExpectedProfileFromEvents($Events) {
       if ($null -eq $expected.lastFollowupOutcomeAt -or $eventAt -gt $expected.lastFollowupOutcomeAt) {
         $expected.lastFollowupOutcomeAt = $eventAt
         $expected.lastFollowupOutcome = [string]$event.metadata.data.outcome
+      }
+
+      if ($expected.stage -ne "Connected") {
+        $expected.stage = "Connected"
+        $expected.stageUpdatedAt = $eventAt
+        $expected.stageReason = "event:FOLLOWUP_OUTCOME_RECORDED"
       }
     }
   }
@@ -241,6 +256,9 @@ Assert ((To-IsoMillis $profile.lastFollowupAssignedAt) -eq $expected.lastFollowu
 Assert ((To-IsoMillis $profile.lastFollowupContactedAt) -eq $expected.lastFollowupContactedAt) "lastFollowupContactedAt drift"
 Assert ((To-IsoMillis $profile.lastFollowupOutcomeAt) -eq $expected.lastFollowupOutcomeAt) "lastFollowupOutcomeAt drift"
 Assert ([string]$profile.lastFollowupOutcome -eq $expected.lastFollowupOutcome) "lastFollowupOutcome drift"
+Assert ([string]$profile.stage -eq $expected.stage) "stage drift"
+Assert ((To-IsoMillis $profile.stageUpdatedAt) -eq $expected.stageUpdatedAt) "stageUpdatedAt drift"
+Assert ([string]$profile.stageReason -eq $expected.stageReason) "stageReason drift"
 
 Write-Host "[assert-formation-profile-reconciliation] in-order scenario passed." -ForegroundColor Green
 
@@ -312,5 +330,9 @@ Assert ((To-IsoMillis $profile.lastFollowupAssignedAt) -eq $expected.lastFollowu
 Assert ((To-IsoMillis $profile.lastFollowupContactedAt) -eq $expected.lastFollowupContactedAt) "out-of-order lastFollowupContactedAt drift"
 Assert ((To-IsoMillis $profile.lastFollowupOutcomeAt) -eq $expected.lastFollowupOutcomeAt) "out-of-order lastFollowupOutcomeAt drift"
 Assert ([string]$profile.lastFollowupOutcome -eq $expected.lastFollowupOutcome) "out-of-order lastFollowupOutcome drift"
+Assert ([string]$profile.stage -eq $expected.stage) "out-of-order stage drift"
+Assert ((To-IsoMillis $profile.stageUpdatedAt) -eq $expected.stageUpdatedAt) "out-of-order stageUpdatedAt drift"
+Assert ([string]$profile.stageReason -eq $expected.stageReason) "out-of-order stageReason drift"
 
 Write-Host "[assert-formation-profile-reconciliation] OK: profile reconciles with raw formation event history for in-order and out-of-order ingestion." -ForegroundColor Green
+

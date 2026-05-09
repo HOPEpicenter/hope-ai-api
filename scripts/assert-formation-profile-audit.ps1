@@ -22,12 +22,40 @@ $opsBase = $BaseUrl.TrimEnd("/") + "/ops"
 
 $email = "audit-smoke+" + [Guid]::NewGuid().ToString("N") + "@example.com"
 
+$badRequest = Invoke-WebRequest `
+  -Method Post `
+  -Uri "$opsBase/formation/profile-audit" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{ repair = $false } | ConvertTo-Json -Depth 20) `
+  -SkipHttpErrorCheck
+
+if ($badRequest.StatusCode -ne 400) {
+  throw "Expected missing visitorId audit request to return 400, got $($badRequest.StatusCode)"
+}
 $visitor = PostJson "$apiBase/visitors" $headers @{
   name  = "Formation Audit Smoke"
   email = $email
 }
 
 $visitorId = $visitor.visitorId
+
+$getAudit = Invoke-RestMethod `
+  -Method Get `
+  -Uri "$opsBase/formation/profile-audit/$visitorId" `
+  -Headers $headers
+
+if ($getAudit.ok -ne $true) {
+  throw "Expected GET formation profile audit to return ok=true"
+}
+
+if ($getAudit.visitorId -ne $visitorId) {
+  throw "Expected GET formation profile audit visitorId to match"
+}
+
+if ($getAudit.repair -ne $false) {
+  throw "Expected GET formation profile audit to be repair=false"
+}
 
 $base = (Get-Date).ToUniversalTime().AddMinutes(-10)
 
@@ -94,6 +122,8 @@ if ($repair.expectedProfile.lastFollowupOutcome -ne "connected") {
 }
 
 Write-Host "[assert-formation-profile-audit] OK" -ForegroundColor Green
+
+
 
 
 

@@ -41,6 +41,10 @@ if ($null -eq $result.cleanCount) {
   throw "Expected cleanCount from bulk formation profile audit."
 }
 
+if ($null -eq $result.maxScanned) {
+  throw "Expected maxScanned from bulk formation profile audit."
+}
+
 if ($null -eq $result.scanTruncated) {
   throw "Expected scanTruncated from bulk formation profile audit."
 }
@@ -63,6 +67,7 @@ foreach ($item in @($driftedResult.items)) {
 }
 
 Write-Host "[assert-formation-profile-audit-list] OK" -ForegroundColor Green
+
 
 
 

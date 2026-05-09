@@ -482,6 +482,7 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
         drifted: driftedFilter ?? null,
         nextCursor,
         scanned,
+        maxScanned,
         scanTruncated: Boolean(nextCursor && scanned >= maxScanned),
         driftedCount,
         cleanCount,
@@ -555,6 +556,7 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
 
   return opsRouter;
 }
+
 
 
 

@@ -26,6 +26,7 @@ import type { EngagementsRepository } from "../../repositories/engagementsReposi
 import { IntegrationService } from "../../services/integration/integrationService";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
+import { auditFormationProfileForVisitor } from "../../functions/_shared/formation";
 function isAllowedType(v: unknown): v is FormationEventType {
   return typeof v === "string" && (allowedTypes as string[]).includes(v);
 }
@@ -388,6 +389,38 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
     });
   });
 
+  opsRouter.post("/formation/profile-audit", async (req, res) => {
+    try {
+      const visitorId = String(req.body?.visitorId ?? "").trim();
+      const repair = req.body?.repair === true;
+
+      if (!visitorId) {
+        return res.status(400).json({
+          ok: false,
+          error: "visitorId is required"
+        });
+      }
+
+      const result = await auditFormationProfileForVisitor(visitorId, {
+        repair
+      });
+
+      return res.status(200).json({
+        ok: true,
+        repair,
+        ...result
+      });
+    } catch (err: any) {
+      return res.status(400).json({
+        ok: false,
+        error: err?.message ?? "Bad Request"
+      });
+    }
+  });
+
   return opsRouter;
 }
+
+
+
 

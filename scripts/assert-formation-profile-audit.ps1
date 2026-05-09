@@ -18,7 +18,7 @@ $headers = @{
 }
 
 $apiBase = $BaseUrl.TrimEnd("/") + "/api"
-$opsBase = $BaseUrl.TrimEnd("/") + "/ops/followups"
+$opsBase = $BaseUrl.TrimEnd("/") + "/ops"
 
 $email = "audit-smoke+" + [Guid]::NewGuid().ToString("N") + "@example.com"
 
@@ -94,6 +94,7 @@ if ($repair.expectedProfile.lastFollowupOutcome -ne "connected") {
 }
 
 Write-Host "[assert-formation-profile-audit] OK" -ForegroundColor Green
+
 
 
 

@@ -848,3 +848,31 @@ Current shipped state:
 **Current conclusion**
 - replay safety, reassignment safety, and out-of-order lifecycle safety are validated on staging
 - remaining focus shifts from semantic stabilization to operational hardening
+
+---
+
+## Replay Integrity Control Plane (Completed)
+
+Completed backend operational replay integrity surface for formation profiles:
+
+- deterministic reconciliation ordering helpers
+- replay-safe profile derivation
+- reusable projection application helper
+- single visitor rebuild primitive
+- single profile audit/repair endpoint
+- read-only GET audit inspection
+- bulk audit discovery/listing
+- drift filtering
+- bounded scan/fill pagination behavior
+- operational summary metrics
+- scan cap visibility
+- local smoke coverage
+- deployed staging verification coverage
+
+Why this matters (master plan alignment)
+- establishes durable backend replay integrity controls before dashboard expansion
+- keeps replay semantics centralized around shared primitives
+- avoids future rewrite pressure from fragmented repair flows
+- preserves backend-first operational architecture
+- avoids premature orchestration/background replay systems
+

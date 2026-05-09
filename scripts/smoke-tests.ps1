@@ -490,6 +490,10 @@ Write-Host "Followups regression OK"
 pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-formation-profile-audit.ps1" -BaseUrl $BaseUrl -ApiKey $ApiKey
 if ($LASTEXITCODE -ne 0) { throw "Formation profile audit failed (exit=$LASTEXITCODE)" }
 
+pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-formation-profile-audit-list.ps1" -BaseUrl $BaseUrl -ApiKey $ApiKey
+if ($LASTEXITCODE -ne 0) { throw "Formation profile audit list failed (exit=$LASTEXITCODE)" }
+
 
 Write-Host "SMOKE TESTS PASSED"
 exit 0
+

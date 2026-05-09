@@ -26,7 +26,11 @@ import type { EngagementsRepository } from "../../repositories/engagementsReposi
 import { IntegrationService } from "../../services/integration/integrationService";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
-import { auditFormationProfileForVisitor } from "../../functions/_shared/formation";
+import {
+  auditFormationProfileForVisitor,
+  getFormationProfilesTableClient,
+  listFormationProfiles
+} from "../../functions/_shared/formation";
 function isAllowedType(v: unknown): v is FormationEventType {
   return typeof v === "string" && (allowedTypes as string[]).includes(v);
 }
@@ -389,6 +393,72 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
     });
   });
 
+  opsRouter.get("/formation/profile-audit", async (req, res) => {
+    try {
+      const limitRaw = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
+      const cursorRaw = Array.isArray(req.query.cursor) ? req.query.cursor[0] : req.query.cursor;
+      const driftedRaw = Array.isArray(req.query.drifted) ? req.query.drifted[0] : req.query.drifted;
+
+      const parsedLimit = Number(limitRaw);
+      const limit =
+        Number.isFinite(parsedLimit) && parsedLimit > 0
+          ? Math.min(parsedLimit, 50)
+          : 25;
+
+      const cursor = String(cursorRaw ?? "").trim() || undefined;
+      const driftedFilterRaw = String(driftedRaw ?? "").trim().toLowerCase();
+      const driftedFilter =
+        driftedFilterRaw === "true"
+          ? true
+          : driftedFilterRaw === "false"
+            ? false
+            : undefined;
+
+      const table = getFormationProfilesTableClient();
+      const page = await listFormationProfiles(table, {
+        limit,
+        cursor
+      });
+
+      const items = [];
+
+      for (const profile of page.items) {
+        const visitorId = String(profile.visitorId ?? profile.rowKey ?? "").trim();
+        if (!visitorId) continue;
+
+        const audit = await auditFormationProfileForVisitor(visitorId, {
+          repair: false
+        });
+
+        if (driftedFilter !== undefined && audit.drifted !== driftedFilter) {
+          continue;
+        }
+
+        items.push({
+          visitorId: audit.visitorId,
+          eventCount: audit.eventCount,
+          drifted: audit.drifted,
+          repaired: audit.repaired
+        });
+      }
+
+      return res.status(200).json({
+        ok: true,
+        limit,
+        cursor: cursor ?? null,
+        drifted: driftedFilter ?? null,
+        nextCursor: page.cursor,
+        count: items.length,
+        items
+      });
+    } catch (err: any) {
+      return res.status(400).json({
+        ok: false,
+        error: err?.message ?? "Bad Request"
+      });
+    }
+  });
+
   opsRouter.post("/formation/profile-audit", async (req, res) => {
     try {
       const visitorId = String(req.body?.visitorId ?? "").trim();
@@ -420,6 +490,9 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
 
   return opsRouter;
 }
+
+
+
 
 
 

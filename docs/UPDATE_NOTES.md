@@ -560,3 +560,37 @@ Validated staging behavior for duplicate replay and stale out-of-order lifecycle
 
 ### Outcome
 Replay safety and out-of-order lifecycle safety are validated. The project can now shift toward operational hardening.
+
+---
+
+# EOD Replay Integrity Control Plane Closeout (2026-05-09)
+
+Merged + deployed:
+- #757 Add OPS formation profile audit repair endpoint
+- #758 Align OPS formation audit route surface
+- #759 Add filtered OPS formation profile audit listing
+- #760 Improve filtered OPS formation audit pagination
+- #761 Add OPS formation audit summary metrics
+- #762 Expose OPS formation audit scan cap
+- #763 Add OPS formation audit staging verification script
+
+Delivered:
+- replay-safe formation profile audit primitive
+- optional repair capability
+- GET single-profile read-only inspection
+- bulk audit listing
+- drifted=true/false filtering
+- bounded filtered scan/fill behavior
+- audit summary metrics
+- scan cap visibility
+- local smoke verification
+- deployed staging verification against Azure Functions OPS route surface
+
+Operational state:
+- CI green
+- staging deploy green
+- replay integrity control plane established
+- no bulk repair orchestration introduced
+- no frontend coupling introduced
+- backend-first replay durability maintained
+

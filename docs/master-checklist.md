@@ -526,3 +526,24 @@ Current rule:
 - [x] Timeline preserved stale events as historical records
 - [x] Resolved projection state remained authoritative
 - [ ] Begin operational hardening review
+
+---
+
+## Replay Integrity Control Plane Checklist (Completed)
+
+- [x] deterministic reconciliation ordering helpers
+- [x] reusable formation projection application helper
+- [x] replay-safe formation profile derivation
+- [x] single visitor rebuild primitive
+- [x] OPS audit/repair endpoint
+- [x] GET read-only audit inspection endpoint
+- [x] bulk formation audit listing
+- [x] drift filtering support
+- [x] bounded filtered scan/fill behavior
+- [x] audit summary metrics
+- [x] scan cap visibility
+- [x] local smoke verification
+- [x] deployed staging verification
+- [x] CI validation
+- [x] staging deployment validation
+

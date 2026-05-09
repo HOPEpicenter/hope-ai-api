@@ -419,6 +419,8 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
       let scanCursor: string | undefined = cursor;
       let nextCursor: string | null = null;
       let scanned = 0;
+      let driftedCount = 0;
+      let cleanCount = 0;
       const scanLimit = driftedFilter === undefined ? limit : 50;
       const maxScanned = driftedFilter === undefined ? limit : 500;
 
@@ -439,6 +441,12 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
           const audit = await auditFormationProfileForVisitor(visitorId, {
             repair: false
           });
+
+          if (audit.drifted) {
+            driftedCount++;
+          } else {
+            cleanCount++;
+          }
 
           if (driftedFilter !== undefined && audit.drifted !== driftedFilter) {
             continue;
@@ -474,8 +482,39 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
         drifted: driftedFilter ?? null,
         nextCursor,
         scanned,
+        scanTruncated: Boolean(nextCursor && scanned >= maxScanned),
+        driftedCount,
+        cleanCount,
         count: items.length,
         items
+      });
+    } catch (err: any) {
+      return res.status(400).json({
+        ok: false,
+        error: err?.message ?? "Bad Request"
+      });
+    }
+  });
+
+  opsRouter.get("/formation/profile-audit/:visitorId", async (req, res) => {
+    try {
+      const visitorId = String(req.params?.visitorId ?? "").trim();
+
+      if (!visitorId) {
+        return res.status(400).json({
+          ok: false,
+          error: "visitorId is required"
+        });
+      }
+
+      const result = await auditFormationProfileForVisitor(visitorId, {
+        repair: false
+      });
+
+      return res.status(200).json({
+        ok: true,
+        repair: false,
+        ...result
       });
     } catch (err: any) {
       return res.status(400).json({
@@ -516,6 +555,10 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
 
   return opsRouter;
 }
+
+
+
+
 
 
 

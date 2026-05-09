@@ -415,39 +415,65 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
             : undefined;
 
       const table = getFormationProfilesTableClient();
-      const page = await listFormationProfiles(table, {
-        limit,
-        cursor
-      });
-
       const items = [];
+      let scanCursor: string | undefined = cursor;
+      let nextCursor: string | null = null;
+      let scanned = 0;
+      const scanLimit = driftedFilter === undefined ? limit : 50;
+      const maxScanned = driftedFilter === undefined ? limit : 500;
 
-      for (const profile of page.items) {
-        const visitorId = String(profile.visitorId ?? profile.rowKey ?? "").trim();
-        if (!visitorId) continue;
-
-        const audit = await auditFormationProfileForVisitor(visitorId, {
-          repair: false
+      do {
+        const page = await listFormationProfiles(table, {
+          limit: scanLimit,
+          cursor: scanCursor
         });
 
-        if (driftedFilter !== undefined && audit.drifted !== driftedFilter) {
-          continue;
+        nextCursor = page.cursor;
+
+        for (const profile of page.items) {
+          scanned++;
+
+          const visitorId = String(profile.visitorId ?? profile.rowKey ?? "").trim();
+          if (!visitorId) continue;
+
+          const audit = await auditFormationProfileForVisitor(visitorId, {
+            repair: false
+          });
+
+          if (driftedFilter !== undefined && audit.drifted !== driftedFilter) {
+            continue;
+          }
+
+          items.push({
+            visitorId: audit.visitorId,
+            eventCount: audit.eventCount,
+            drifted: audit.drifted,
+            repaired: audit.repaired
+          });
+
+          if (items.length >= limit) {
+            break;
+          }
         }
 
-        items.push({
-          visitorId: audit.visitorId,
-          eventCount: audit.eventCount,
-          drifted: audit.drifted,
-          repaired: audit.repaired
-        });
-      }
+        if (items.length >= limit) {
+          break;
+        }
+
+        scanCursor = page.cursor ?? undefined;
+      } while (
+        driftedFilter !== undefined &&
+        nextCursor &&
+        scanned < maxScanned
+      );
 
       return res.status(200).json({
         ok: true,
         limit,
         cursor: cursor ?? null,
         drifted: driftedFilter ?? null,
-        nextCursor: page.cursor,
+        nextCursor,
+        scanned,
         count: items.length,
         items
       });
@@ -490,6 +516,7 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
 
   return opsRouter;
 }
+
 
 
 

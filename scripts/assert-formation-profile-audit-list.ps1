@@ -29,6 +29,10 @@ if ($null -eq $result.count) {
   throw "Expected count from bulk formation profile audit."
 }
 
+if ($null -eq $result.scanned) {
+  throw "Expected scanned from bulk formation profile audit."
+}
+
 $driftedUrl = $BaseUrl.TrimEnd("/") + "/ops/formation/profile-audit?limit=5&drifted=true"
 $driftedResult = Invoke-RestMethod -Method Get -Uri $driftedUrl -Headers $headers
 
@@ -47,4 +51,5 @@ foreach ($item in @($driftedResult.items)) {
 }
 
 Write-Host "[assert-formation-profile-audit-list] OK" -ForegroundColor Green
+
 

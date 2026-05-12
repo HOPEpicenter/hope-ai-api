@@ -5,6 +5,7 @@ import { getFormationProfile } from "../../storage/formation/formationProfilesRe
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import { deriveIntegrationSummaryV1 } from "../../domain/integration/deriveIntegrationSummary.v1";
 import { getTimelineActivityType, getTimelineSummary } from "./timelineSemantics";
+import { compareTimelineNewestFirst, makeTimelineCursor, parseTimelineCursor, isTimelineItemAfterCursor } from "../../shared/timeline/timelineOrdering";
 
 export type IntegratedTimelinePageV1 = {
   items: any[];
@@ -16,50 +17,7 @@ type ActivityFeedInputs = {
   formationItems: any[];
 };
 
-function compareNewestFirst(a: any, b: any): number {
-  const ao = String(a?.occurredAt ?? "");
-  const bo = String(b?.occurredAt ?? "");
-  if (ao !== bo) return ao > bo ? -1 : 1;
 
-  const ae = String(a?.eventId ?? "");
-  const be = String(b?.eventId ?? "");
-  if (ae !== be) return ae > be ? -1 : 1;
-
-  const as = String(a?.stream ?? "");
-  const bs = String(b?.stream ?? "");
-  if (as === bs) return 0;
-  return as > bs ? -1 : 1;
-}
-
-function makeIntegratedTimelineCursor(item: any): string | null {
-  const occurredAt = String(item?.occurredAt ?? "").trim();
-  const eventId = String(item?.eventId ?? "").trim();
-  const stream = String(item?.stream ?? "").trim();
-
-  if (!occurredAt || !eventId) return null;
-
-  return [occurredAt, eventId, stream].join("|");
-}
-
-function parseIntegratedTimelineCursor(cursor: string): any | null {
-  const parts = String(cursor ?? "").split("|");
-  const occurredAt = String(parts[0] ?? "").trim();
-  const eventId = String(parts[1] ?? "").trim();
-  const stream = String(parts[2] ?? "").trim();
-
-  if (!occurredAt || !eventId) return null;
-
-  // stream is optional for backwards compatibility with older occurredAt|eventId cursors
-  return {
-    occurredAt,
-    eventId,
-    stream
-  };
-}
-
-function isAfterIntegratedCursor(item: any, cursorItem: any): boolean {
-  return compareNewestFirst(item, cursorItem) > 0;
-}
 
 function summaryForItem(item: any): string {
   const type = String(item?.type ?? "").trim();
@@ -302,12 +260,12 @@ export class IntegrationService {
         let merged = this.buildMergedActivityItems(inputs);
 
     if (opts.cursor) {
-      const cursorItem = parseIntegratedTimelineCursor(opts.cursor);
+      const cursorItem = parseTimelineCursor(opts.cursor);
 
       if (cursorItem) {
         merged = merged.filter((item) => {
           if (!item?.occurredAt || !item?.eventId) return false;
-          return isAfterIntegratedCursor(item, cursorItem);
+          return isTimelineItemAfterCursor(item, cursorItem);
         });
       }
     }
@@ -319,7 +277,7 @@ export class IntegrationService {
       merged.length > safeLimit
         ? (() => {
             const last = rawPageItems[rawPageItems.length - 1];
-            return makeIntegratedTimelineCursor(last);
+            return makeTimelineCursor(last);
           })()
         : null;
 
@@ -353,7 +311,7 @@ export class IntegrationService {
 
   private buildMergedActivityItems(inputs: ActivityFeedInputs): any[] {
     const merged = enrichTimelineItems(
-      [...inputs.engagementItems, ...inputs.formationItems].sort(compareNewestFirst)
+      [...inputs.engagementItems, ...inputs.formationItems].sort(compareTimelineNewestFirst)
     );
 
     return dedupeMergedActivityItems(merged);
@@ -460,6 +418,8 @@ export class IntegrationService {
     });
   }
 }
+
+
 
 
 

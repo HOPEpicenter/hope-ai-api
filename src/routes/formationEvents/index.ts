@@ -204,13 +204,8 @@ const ascAll = await listFormationEventsByVisitor(eventsTable as any, visitorId,
   beforeRowKey: cursor,
 });
 
-// Keep only the newest 'limit' events in ascending order
-const start = Math.max(0, ascAll.length - limit);
-    const pageAsc = ascAll.slice(start);
-    // For API clients + scripts, return newest-first
-    const items = pageAsc
-      .slice()
-      .reverse()
+  // Helper already returns newest-first; keep API payload newest-first.
+    const items = ascAll.slice(0, limit)
       .map((e: any) => {
         let metadataObj: any = undefined;
         try {
@@ -236,7 +231,10 @@ const start = Math.max(0, ascAll.length - limit);
       });
 
     // Next cursor should represent "older than this" => the smallest RowKey returned (oldest in this page).
-    const nextCursor = pageAsc.length > 0 ? (pageAsc[0] as any).rowKey : null;
+    const nextCursor =
+      items.length > 0
+        ? items[items.length - 1].rowKey
+        : null;
 
     // Return both names to be extra compatible with scripts
     return res.status(200).json({ ok: true, visitorId, items, cursor: nextCursor, nextCursor });

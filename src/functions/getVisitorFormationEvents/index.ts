@@ -45,12 +45,7 @@ export async function getVisitorFormationEvents(context: any, req: any): Promise
       beforeRowKey: cursor
     });
 
-    const start = Math.max(0, ascAll.length - limit);
-    const pageAsc = ascAll.slice(start);
-
-    const items = pageAsc
-      .slice()
-      .reverse()
+    const items = ascAll.slice(0, limit)
       .map((event: any) => {
         let metadataObj: any = undefined;
         try {
@@ -76,7 +71,10 @@ export async function getVisitorFormationEvents(context: any, req: any): Promise
         };
       });
 
-    const nextCursor = pageAsc.length > 0 ? pageAsc[0].rowKey : null;
+    const nextCursor =
+      items.length > 0
+        ? items[items.length - 1].rowKey
+        : null;
 
     context.res = {
       status: 200,
@@ -98,3 +96,4 @@ export async function getVisitorFormationEvents(context: any, req: any): Promise
     };
   }
 }
+

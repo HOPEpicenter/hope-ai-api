@@ -594,3 +594,48 @@ Operational state:
 - no frontend coupling introduced
 - backend-first replay durability maintained
 
+
+## 2026-05-12 — Timeline + Formation Backend Hardening
+
+### Timeline Pagination + Cursor Stability
+- hardened engagement timeline paging regression coverage
+- added tie-aware pagination regression assertions
+- added newest-first ordering verification under stress
+- validated cursor boundary correctness across pages
+- validated no-overlap paging behavior under high event volume
+- expanded canonical pagination regression gate coverage
+
+### Integration Timeline Stability
+- hardened integration timeline paging stress coverage
+- expanded integration timeline source fetch windows
+- validated occurredAt tie handling across engagement + formation streams
+- aligned stress assertions with grouped integration timeline contract
+- extracted reusable shared timeline ordering + cursor helpers
+
+### Shared Timeline Infrastructure
+- extracted shared timeline ordering utilities
+- extracted shared timeline cursor utilities
+- extracted shared row-key pagination helpers
+- extracted shared offset pagination helpers
+- reduced duplicated paging logic across repositories/services
+
+### Formation Projection + Rebuild Reliability
+- validated deterministic formation profile rebuild behavior
+- validated rebuild idempotency behavior
+- validated out-of-order formation event reconciliation
+- validated canonical profile reconstruction from raw formation event history
+
+### OPS Followups Reliability
+- extracted shared OPS followups queue projection service
+- aligned Azure Functions + Express OPS followups contracts
+- hardened OPS followups filtering, ordering, and pagination assertions
+- added OPS followups lifecycle coverage to canonical regression gate
+
+### Validation
+- npm run build
+- assert-pagination-regressions.ps1
+- assert-formation-profile-reconciliation.ps1
+- assert-ops-followups.ps1
+- stress-engagement-events-paging.ps1
+- stress-integration-timeline-paging.ps1
+

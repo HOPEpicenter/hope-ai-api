@@ -131,11 +131,15 @@ function New-Visitor([string]$FirstName, [string]$LastName, [string]$Prefix) {
 
 function Add-FormationEvent([string]$VisitorId, [string]$Type, [string]$OccurredAt, [hashtable]$Metadata) {
   $null = PostJson "$ApiBase/formation/events" @{
-    id         = [Guid]::NewGuid().ToString()
+    v          = 1
+    eventId    = ("evt-" + ([Guid]::NewGuid().ToString("N")))
     visitorId  = $VisitorId
     type       = $Type
     occurredAt = $OccurredAt
-    metadata   = $Metadata
+    source     = @{
+      system = "scripts/assert-ops-followups.ps1"
+    }
+    data       = $Metadata
   }
 }
 
@@ -498,14 +502,4 @@ foreach ($visitorId in $cleanupVisitorIds) {
 }
 
 Write-Host "[assert-ops-followups] OK: followups lifecycle + ordering invariants regression passed." -ForegroundColor Green
-
-
-
-
-
-
-
-
-
-
 

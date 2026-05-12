@@ -408,5 +408,67 @@ Assert ([string]$profile.stage -eq $expected.stage) "out-of-order stage drift"
 Assert ((To-IsoMillis $profile.stageUpdatedAt) -eq $expected.stageUpdatedAt) "out-of-order stageUpdatedAt drift"
 Assert ([string]$profile.stageReason -eq $expected.stageReason) "out-of-order stageReason drift"
 
-Write-Host "[assert-formation-profile-reconciliation] OK: profile reconciles with raw formation event history for in-order and out-of-order ingestion." -ForegroundColor Green
+Write-Host "[assert-formation-profile-reconciliation] POST rebuild for out-of-order visitor..."
+
+$rebuild1 = Json-Post `
+  -Url "$ApiBase/visitors/$([Uri]::EscapeDataString($visitorId))/formation/profile/rebuild" `
+  -Body @{}
+
+Assert ([bool]$rebuild1.ok) "rebuild1 should return ok=true"
+
+$profileAfterRebuild1 = Get-FormationProfile $visitorId
+
+Write-Host "[assert-formation-profile-reconciliation] POST rebuild again (idempotency)..."
+
+$rebuild2 = Json-Post `
+  -Url "$ApiBase/visitors/$([Uri]::EscapeDataString($visitorId))/formation/profile/rebuild" `
+  -Body @{}
+
+Assert ([bool]$rebuild2.ok) "rebuild2 should return ok=true"
+
+$profileAfterRebuild2 = Get-FormationProfile $visitorId
+
+$fields = @(
+  "stage",
+  "stageReason",
+  "assignedTo",
+  "lastFollowupAssignedAt",
+  "lastFollowupContactedAt",
+  "lastFollowupOutcomeAt",
+  "lastFollowupOutcome",
+  "lastNextStepAt",
+  "lastEventType",
+  "lastEventAt",
+  "lastEventId"
+)
+
+$timestampFields = @(
+  "lastFollowupAssignedAt",
+  "lastFollowupContactedAt",
+  "lastFollowupOutcomeAt",
+  "lastNextStepAt",
+  "lastEventAt",
+  "stageUpdatedAt"
+)
+
+foreach ($field in $fields) {
+  $v1 = if ($timestampFields -contains $field -and $profileAfterRebuild1.$field) { To-IsoMillis $profileAfterRebuild1.$field } else { [string]$profileAfterRebuild1.$field }
+  $v2 = if ($timestampFields -contains $field -and $profileAfterRebuild2.$field) { To-IsoMillis $profileAfterRebuild2.$field } else { [string]$profileAfterRebuild2.$field }
+
+  Assert ($v1 -eq $v2) "Rebuild drift detected for field '$field' ($v1 != $v2)"
+}
+
+$eventsAfter = Get-FormationEvents $visitorId
+$expectedAfter = Derive-ExpectedProfileFromEvents $eventsAfter
+
+foreach ($field in $fields) {
+  $expectedValue = if ($timestampFields -contains $field -and $expectedAfter.$field) { To-IsoMillis $expectedAfter.$field } else { [string]$expectedAfter.$field }
+  $actualValue = if ($timestampFields -contains $field -and $profileAfterRebuild2.$field) { To-IsoMillis $profileAfterRebuild2.$field } else { [string]$profileAfterRebuild2.$field }
+
+  Assert ($expectedValue -eq $actualValue) "Canonical mismatch after rebuild for '$field' expected='$expectedValue' actual='$actualValue'"
+}
+
+Write-Host "[assert-formation-profile-reconciliation] OK: profile reconciles with raw formation event history for in-order and out-of-order ingestion; rebuild is deterministic and idempotent." -ForegroundColor Green
+
+
 

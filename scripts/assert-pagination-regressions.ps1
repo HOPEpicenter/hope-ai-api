@@ -84,8 +84,7 @@ Invoke-Step "ops followups lifecycle and pagination" {
 if ($Stress) {
   Invoke-Step "engagement events paging stress" {
     pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/stress-engagement-events-paging.ps1" `
-      -BaseUrl $api `
-      -ApiKey $ApiKey
+      -BaseUrl $root
   }
 
   Invoke-Step "integration timeline paging stress" {
@@ -97,6 +96,7 @@ if ($Stress) {
 
 Write-Host ""
 Write-Host "OK: pagination regression gate passed." -ForegroundColor Green
+
 
 
 

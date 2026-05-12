@@ -47,7 +47,13 @@ function Invoke-HttpJson {
   }
   catch {
     $msg = $_.Exception.Message
-    throw "HTTP $Method $Uri failed: $msg`nBody=$json"
+    $responseBody = ""
+    try {
+      $stream = $_.Exception.Response.GetResponseStream()
+      $reader = [System.IO.StreamReader]::new($stream)
+      $responseBody = $reader.ReadToEnd()
+    } catch { }
+    throw "HTTP $Method $Uri failed: $msg`nResponse=$responseBody`nBody=$json"
   }
 }
 
@@ -69,6 +75,42 @@ function Get-ItemKey([object]$it) {
   } catch { }
   return (Safe-Json $it 8)
 }
+function Get-ItemSortKey([object]$it) {
+  try {
+    $props = $it.PSObject.Properties.Name
+    $occurredAt = ""
+    if ($props -contains "occurredAt" -and $null -ne $it.occurredAt) {
+      $occurredAt = ([DateTime]::Parse([string]$it.occurredAt)).ToUniversalTime().ToString("o")
+    }
+
+    $eventId = Get-ItemKey $it
+    return "$occurredAt`u{001F}$eventId"
+  } catch {
+    return (Safe-Json $it 8)
+  }
+}
+
+function Assert-NewestFirstPage([object[]]$Items, [string]$Label, [System.Collections.Generic.List[string]]$Failures) {
+  for ($i = 0; $i -lt ($Items.Count - 1); $i++) {
+    $a = Get-ItemSortKey $Items[$i]
+    $b = Get-ItemSortKey $Items[$i + 1]
+    if ([string]::CompareOrdinal($a, $b) -lt 0) {
+      $Failures.Add("$Label not newest-first at index $i. left=$a right=$b") | Out-Null
+      return
+    }
+  }
+}
+
+function Assert-CrossPageBoundary([object[]]$PreviousItems, [object[]]$CurrentItems, [string]$Label, [System.Collections.Generic.List[string]]$Failures) {
+  if ($PreviousItems.Count -eq 0 -or $CurrentItems.Count -eq 0) { return }
+
+  $prevOldest = Get-ItemSortKey $PreviousItems[$PreviousItems.Count - 1]
+  $currentNewest = Get-ItemSortKey $CurrentItems[0]
+
+  if ([string]::CompareOrdinal($prevOldest, $currentNewest) -le 0) {
+    $Failures.Add("$Label boundary did not advance strictly older. prevOldest=$prevOldest currentNewest=$currentNewest") | Out-Null
+  }
+}
 
 $apiKey = Require-Env "HOPE_API_KEY"
 
@@ -86,9 +128,19 @@ $BaseUrl = $BaseUrl.TrimEnd("/")
 $api = "$BaseUrl/api"
 
 if ([string]::IsNullOrWhiteSpace($VisitorId)) {
-  $VisitorId = ("v-" + [Guid]::NewGuid().ToString("N"))
+  $email = "stress-engagement+" + [Guid]::NewGuid().ToString("N") + "@example.com"
+  $visitor = Invoke-HttpJson -Method POST -Uri "$api/visitors" -Headers $headers -Body @{
+    name = "Stress Engagement Paging"
+    email = $email
+    source = "stress-engagement-events-paging.ps1"
+  }
+
+  $VisitorId = [string]$visitor.visitorId
 }
-if ($VisitorId.Trim().Length -lt 8) { throw "VisitorId must be >= 8 chars." }
+
+if ([string]::IsNullOrWhiteSpace($VisitorId) -or $VisitorId.Trim().Length -lt 8) {
+  throw "VisitorId must be created or provided."
+}
 
 Write-Host "== stress-engagement-events-paging =="
 Write-Host ("BaseUrl : {0}" -f $BaseUrl)
@@ -113,9 +165,9 @@ $start = (Get-Date).ToUniversalTime().AddMinutes(-5)
 
 for ($i = 0; $i -lt $Total; $i++) {
   $eventId = New-Id "evt"
-  $occurredAt = NowIsoUtc ($start.AddMilliseconds($i * 15))
+  $occurredAt = NowIsoUtc ($start.AddSeconds($i))
 
-  $type = if ($Mode -eq "status") { "status.transition" } else { "note" }
+  $type = if ($Mode -eq "status") { "status.transition" } else { "note.add" }
 
   $body = @{
     v          = 1
@@ -124,7 +176,7 @@ for ($i = 0; $i -lt $Total; $i++) {
     type       = $type
     occurredAt = $occurredAt
     source     = @{ system = "stress.ps1" }
-    data       = @{ seq = $i; note = "stress seed" }
+    data       = @{ seq = $i; text = "stress seed" }
   }
 
   if ($Mode -eq "status") {
@@ -152,11 +204,19 @@ $allKeys   = New-Object System.Collections.Generic.HashSet[string]
 $pageSizes = New-Object System.Collections.Generic.List[int]
 $cursor    = $null
 $page      = 0
+$failures  = New-Object System.Collections.Generic.List[string]
+$previousItems = @()
+$seenCursors = New-Object System.Collections.Generic.HashSet[string]
 
 while ($true) {
   $page++
   $uri = "$api/engagements/timeline?visitorId=$([uri]::EscapeDataString($VisitorId))&limit=$Limit"
   if (-not [string]::IsNullOrWhiteSpace([string]$cursor)) {
+    if (-not $seenCursors.Add([string]$cursor)) {
+      $failures.Add("cursor repeated before page $page") | Out-Null
+      break
+    }
+
     $uri += "&cursor=$([uri]::EscapeDataString([string]$cursor))"
   }
 
@@ -177,14 +237,25 @@ while ($true) {
   $next = $null
   try { if ($resp.PSObject.Properties.Name -contains "nextCursor") { $next = $resp.nextCursor } } catch { }
 
+  Assert-NewestFirstPage -Items $items -Label "page$page" -Failures $failures
+  Assert-CrossPageBoundary -PreviousItems $previousItems -CurrentItems $items -Label "page$page" -Failures $failures
+
   $dupes = 0
   foreach ($it in $items) {
     $k = Get-ItemKey $it
-    if (-not $allKeys.Add($k)) { $dupes++ }
+    if (-not $allKeys.Add($k)) {
+      $dupes++
+      $failures.Add("duplicate item across pages: $k") | Out-Null
+    }
+  }
+
+  if ($next -and [string]$next -eq [string]$cursor) {
+    $failures.Add("nextCursor did not progress on page $page") | Out-Null
   }
 
   Write-Host ("  Page {0}: count={1}, dupesOnThisPage={2}, nextCursor={3}" -f $page, $pageCount, $dupes, $(if ([string]::IsNullOrWhiteSpace([string]$next)) { "<null>" } else { "<present>" }))
 
+  $previousItems = $items
   $cursor = $next
   if ([string]::IsNullOrWhiteSpace([string]$cursor)) { break }
 }
@@ -198,8 +269,6 @@ $lastCursorIsNull = [string]::IsNullOrWhiteSpace([string]$cursor)
 
 Write-Host ""
 Write-Host "== Assertions =="
-
-$failures = New-Object System.Collections.Generic.List[string]
 
 if ($totalGot -ne $Total) { $failures.Add(("total items expected {0} but got {1}" -f $Total, $totalGot)) | Out-Null }
 if ($page1 -ne $Limit) { $failures.Add(("page1 expected {0} but got {1}" -f $Limit, $page1)) | Out-Null }
@@ -216,4 +285,13 @@ Write-Host "FAIL" -ForegroundColor Red
 $failures | ForEach-Object { Write-Host (" - " + $_) -ForegroundColor Red }
 Write-Host ("Observed: total={0} page1={1} page2={2} pages={3}" -f $totalGot, $page1, $page2, $pageSizes.Count)
 exit 1
+
+
+
+
+
+
+
+
+
 

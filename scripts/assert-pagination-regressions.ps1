@@ -1,5 +1,6 @@
 param(
-  [string]$RootUrl = "http://127.0.0.1:7071",
+  [string]$RootUrl = "",
+  [string]$ApiBase = "",
   [string]$ApiKey = $env:HOPE_API_KEY,
   [switch]$Deep,
   [switch]$Stress
@@ -42,6 +43,28 @@ if ([string]::IsNullOrWhiteSpace($ApiKey)) {
 
 if ($ApiKey.ToLowerInvariant().Contains("placeholder") -or $ApiKey.Contains("<")) {
   throw "HOPE_API_KEY looks like a placeholder. Set a real key value and rerun."
+}
+
+if (-not [string]::IsNullOrWhiteSpace($ApiBase)) {
+  $normalizedApiBase = $ApiBase.Trim().TrimEnd("/")
+
+  if ($normalizedApiBase -match "/api$") {
+    $normalizedApiBase = $normalizedApiBase.Substring(0, $normalizedApiBase.Length - 4)
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($RootUrl)) {
+    $normalizedRoot = Normalize-RootUrl $RootUrl
+
+    if ($normalizedRoot -ne $normalizedApiBase) {
+      throw "RootUrl and ApiBase target different hosts."
+    }
+  }
+
+  $RootUrl = $normalizedApiBase
+}
+
+if ([string]::IsNullOrWhiteSpace($RootUrl)) {
+  $RootUrl = "http://127.0.0.1:7071"
 }
 
 $root = Normalize-RootUrl $RootUrl
@@ -113,6 +136,7 @@ if ($Stress) {
 
 Write-Host ""
 Write-Host "OK: pagination regression gate passed." -ForegroundColor Green
+
 
 
 

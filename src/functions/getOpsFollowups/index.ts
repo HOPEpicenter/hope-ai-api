@@ -1,6 +1,7 @@
 import { TableClient } from "@azure/data-tables";
-import { deriveFollowupState } from "../../services/followups/deriveFollowupState";
-import { deriveFollowupUrgency } from "../../services/followups/deriveFollowupUrgency";
+import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
+import { EngagementsService } from "../../services/engagements/engagementsService";
+import { buildOpsFollowupsQueue } from "../../services/followups/buildOpsFollowupsQueue";
 
 // Repo pattern: legacy default export invoked as (context, req) via function.json.
 export default async function (context: any, req: any): Promise<void> {
@@ -47,118 +48,35 @@ export default async function (context: any, req: any): Promise<void> {
       return;
     }
 
-    const tableName = (process.env.FORMATION_PROFILES_TABLE ?? "devFormationProfiles").trim();
-    const table = TableClient.fromConnectionString(conn, tableName);
+    const eventsTableName = (process.env.FORMATION_EVENTS_TABLE ?? "devFormationEvents").trim();
+    const profilesTableName = (process.env.FORMATION_PROFILES_TABLE ?? "devFormationProfiles").trim();
 
-    await ensureTableExists(table);
+    const eventsTable = TableClient.fromConnectionString(conn, eventsTableName);
+    const profilesTable = TableClient.fromConnectionString(conn, profilesTableName);
 
-    const rawLimit = Number(req?.query?.limit ?? 100);
-    const limit = Number.isFinite(rawLimit)
-      ? Math.max(1, Math.min(500, Math.trunc(rawLimit)))
-      : 100;
+    await ensureTableExists(eventsTable);
+    await ensureTableExists(profilesTable);
 
-    const queue = String(req?.query?.queue ?? "all").trim();
-    const age = String(req?.query?.age ?? "").trim();
+    const limit = parsePositiveInt(req?.query?.limit, 25, 100);
+    const cursor = parseNonNegativeInt(req?.query?.cursor, 0);
+
     const includeResolved =
-      req?.query?.includeResolved === "true" ||
-      req?.query?.get?.("includeResolved") === "true";
+      String(readQuery(req, "includeResolved") ?? "").trim().toLowerCase() === "true";
 
-    const items: any[] = [];
+    const engagementService = new EngagementsService(new EngagementEventsRepository());
 
-    let actionNeededCount = 0;
-    let contactMadeCount = 0;
-
-    const ownersMap: Record<string, number> = {};
-    const ownersBuckets: Record<string, { resolved: number; overdue: number; atRisk: number; onTrack: number }> = {};
-
-    const entities = table.listEntities<any>({});
-
-    for await (const p of entities) {
-      const assignedTo = String(p.assignedTo ?? "").trim();
-
-      const assignedAt = p.lastFollowupAssignedAt ?? null;
-      const contactedAt = p.lastFollowupContactedAt ?? null;
-      const outcomeAt = p.lastFollowupOutcomeAt ?? null;
-      const outcome = p.lastFollowupOutcome ?? null;
-
-      const assignedAtMs = toMs(assignedAt);
-      const contactedAtMs = toMs(contactedAt);
-
-      if (assignedAtMs === null) continue;
-
-      const state = deriveFollowupState(p);
-      const followupStatus = state.followupStatus;
-      const resolvedForAssignment = followupStatus === "resolved";
-      const needsFollowup = state.needsAttention;
-      const isContactMade = state.isContactMade;
-
-      if (assignedTo) {
-        ownersMap[assignedTo] = (ownersMap[assignedTo] ?? 0) + 1;
-
-        if (!ownersBuckets[assignedTo]) {
-          ownersBuckets[assignedTo] = {
-            resolved: 0,
-            overdue: 0,
-            atRisk: 0,
-            onTrack: 0
-          };
-        }
-
-        if (resolvedForAssignment) {
-          ownersBuckets[assignedTo].resolved++;
-        } else {
-          const urgency = deriveFollowupUrgency({
-            assignedTo,
-            followupStatus,
-            lastFollowupAssignedAt: assignedAt
-          });
-
-          if (urgency === "OVERDUE") {
-            ownersBuckets[assignedTo].overdue++;
-          } else if (urgency === "AT_RISK") {
-            ownersBuckets[assignedTo].atRisk++;
-          } else {
-            ownersBuckets[assignedTo].onTrack++;
-          }
-        }
-      }
-
-      if (resolvedForAssignment && !includeResolved) {
-        continue;
-      }
-
-      // queue filter
-      if (queue === "action-needed" && followupStatus !== "action_needed") continue;
-      if (queue === "contact-made" && followupStatus !== "contact_made") continue;
-
-      // age filter (state-aware)
-      const ageTs =
-        followupStatus === "contact_made"
-          ? contactedAtMs
-          : assignedAtMs;
-
-      if (age === "72h+" && !isOlderThan(72, ageTs)) continue;
-      if (age === "48h+" && !isOlderThan(48, ageTs)) continue;
-      if (age === "24h+" && !isOlderThan(24, ageTs)) continue;
-
-      if (items.length < limit) {
-        // summary counts match returned filtered rows
-        if (followupStatus === "action_needed") actionNeededCount++;
-        if (followupStatus === "contact_made") contactMadeCount++;
-
-        items.push({
-          visitorId: String(p.rowKey ?? ""),
-          assignedTo: assignedTo ? { ownerType: "user", ownerId: assignedTo } : null,
-          lastFollowupAssignedAt: assignedAt,
-          lastFollowupContactedAt: contactedAt,
-          lastFollowupOutcomeAt: outcomeAt,
-          lastFollowupOutcome: outcome,
-          resolvedForAssignment,
-          stage: p.stage ?? null,
-          needsFollowup
-        });
-      }
-    }
+    const result = await buildOpsFollowupsQueue({
+      eventsTable,
+      profilesTable,
+      engagementService,
+      limit,
+      cursor,
+      assignedToFilter: String(readQuery(req, "assignedTo") ?? "").trim(),
+      visitorIdFilter: String(readQuery(req, "visitorId") ?? "").trim(),
+      includeResolved,
+      sortBy: String(readQuery(req, "sortBy") ?? "").trim(),
+      sortDir: String(readQuery(req, "sortDir") ?? "").trim().toLowerCase() === "asc" ? "asc" : "desc",
+    });
 
     context.res = {
       status: 200,
@@ -169,29 +87,8 @@ export default async function (context: any, req: any): Promise<void> {
       },
       body: {
         ok: true,
-        items,
-        summary: {
-          open: items.length,
-          actionNeeded: actionNeededCount,
-          contactMade: contactMadeCount
-        },
-        owners: Object.entries(ownersMap).map(([ownerId, total]) => {
-          const buckets = ownersBuckets[ownerId] ?? {
-            resolved: 0,
-            overdue: 0,
-            atRisk: 0,
-            onTrack: 0
-          };
-
-          return {
-            ownerId,
-            total,
-            resolved: buckets.resolved,
-            overdue: buckets.overdue,
-            atRisk: buckets.atRisk,
-            onTrack: buckets.onTrack
-          };
-        })
+        v: 1,
+        ...result
       }
     };
   } catch (err: any) {
@@ -207,10 +104,30 @@ export default async function (context: any, req: any): Promise<void> {
   }
 }
 
-function toMs(v: any): number | null {
-  if (!v) return null;
-  const ms = Date.parse(String(v));
-  return Number.isFinite(ms) ? ms : null;
+function readQuery(req: any, name: string): any {
+  const value = req?.query?.[name];
+  if (Array.isArray(value)) return value[0];
+  if (value !== undefined) return value;
+
+  if (typeof req?.query?.get === "function") {
+    return req.query.get(name);
+  }
+
+  return undefined;
+}
+
+function parsePositiveInt(value: any, fallback: number, max: number): number {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(max, Math.trunc(parsed));
+}
+
+function parseNonNegativeInt(value: any, fallback: number): number {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return Math.trunc(parsed);
 }
 
 async function ensureTableExists(table: TableClient) {
@@ -224,9 +141,3 @@ async function ensureTableExists(table: TableClient) {
     throw e;
   }
 }
-
-function isOlderThan(hours: number, ts: number | null): boolean {
-  if (ts === null) return false;
-  return (Date.now() - ts) >= hours * 3600000;
-}
-

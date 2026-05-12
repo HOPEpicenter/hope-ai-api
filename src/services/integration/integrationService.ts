@@ -5,7 +5,8 @@ import { getFormationProfile } from "../../storage/formation/formationProfilesRe
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import { deriveIntegrationSummaryV1 } from "../../domain/integration/deriveIntegrationSummary.v1";
 import { getTimelineActivityType, getTimelineSummary } from "./timelineSemantics";
-import { compareTimelineNewestFirst, makeTimelineCursor, parseTimelineCursor, isTimelineItemAfterCursor } from "../../shared/timeline/timelineOrdering";
+import { compareTimelineNewestFirst } from "../../shared/timeline/timelineOrdering";
+import { paginateTimelineItems } from "../../shared/timeline/timelinePaginator";
 
 export type IntegratedTimelinePageV1 = {
   items: any[];
@@ -257,29 +258,11 @@ export class IntegrationService {
       ? await this.fetchVisitorActivityInputs(opts.visitorId, safeLimit)
       : await this.fetchGlobalActivityInputs();
 
-        let merged = this.buildMergedActivityItems(inputs);
-
-    if (opts.cursor) {
-      const cursorItem = parseTimelineCursor(opts.cursor);
-
-      if (cursorItem) {
-        merged = merged.filter((item) => {
-          if (!item?.occurredAt || !item?.eventId) return false;
-          return isTimelineItemAfterCursor(item, cursorItem);
-        });
-      }
-    }
-
-    const rawPageItems = merged.slice(0, safeLimit);
+    const merged = this.buildMergedActivityItems(inputs);
+    const page = paginateTimelineItems(merged, safeLimit, opts.cursor);
+    const rawPageItems = page.items;
     const pageItems = groupTimelinePageItems(rawPageItems);
-
-    const nextCursor =
-      merged.length > safeLimit
-        ? (() => {
-            const last = rawPageItems[rawPageItems.length - 1];
-            return makeTimelineCursor(last);
-          })()
-        : null;
+    const nextCursor = page.nextCursor;
 
     const legacyResult = {
       items: pageItems,
@@ -418,6 +401,8 @@ export class IntegrationService {
     });
   }
 }
+
+
 
 
 

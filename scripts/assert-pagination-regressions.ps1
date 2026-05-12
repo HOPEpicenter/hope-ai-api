@@ -61,6 +61,11 @@ Invoke-Step "formation pagination" {
   pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-formation-pagination.ps1" `
     -ApiBase $api
 }
+Invoke-Step "formation profile reconciliation rebuild determinism" {
+  pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-formation-profile-reconciliation.ps1" `
+    -BaseUrl $root `
+    -ApiKey $ApiKey
+}
 
 Invoke-Step "integration cross-stream cursor boundary" {
   pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-integration-cross-stream-cursor-boundary.ps1" `
@@ -96,6 +101,7 @@ if ($Stress) {
 
 Write-Host ""
 Write-Host "OK: pagination regression gate passed." -ForegroundColor Green
+
 
 
 

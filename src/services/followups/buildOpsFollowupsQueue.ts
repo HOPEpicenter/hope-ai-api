@@ -1,3 +1,4 @@
+import { paginateOffsetItems } from "../../shared/timeline/offsetPaginator";
 import { TableClient } from "@azure/data-tables";
 import { deriveFollowupPriority } from "./deriveFollowupPriority";
 import { deriveEngagementRiskV1 } from "../../domain/engagement/deriveEngagementRisk.v1";
@@ -449,8 +450,9 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
     });
   }
 
-  const pagedItems = filteredItems.slice(cursor, cursor + limit);
-  const nextCursor = cursor + limit < filteredItems.length ? String(cursor + limit) : null;
+  const page = paginateOffsetItems(filteredItems, cursor, limit);
+  const pagedItems = page.items;
+  const nextCursor = page.nextCursor;
 
   const stats = {
     total: filteredItems.length,
@@ -503,5 +505,9 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
     items: pagedItems,
   };
 }
+
+
+
+
 
 

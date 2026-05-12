@@ -93,6 +93,26 @@ function GetFollowupItem([object[]]$Items, [string]$VisitorId) {
   return @($Items) | Where-Object { $_.visitorId -eq $VisitorId } | Select-Object -First 1
 }
 
+function GetFormationProfile {
+  param(
+    [string]$VisitorId
+  )
+
+  return GetJson "$ApiBase/formation/profile/$VisitorId"
+}
+
+function Assert-PropertyMissing {
+  param(
+    [object]$Object,
+    [string]$PropertyName,
+    [string]$Message
+  )
+
+  if ($null -ne $Object.PSObject.Properties[$PropertyName]) {
+    throw $Message
+  }
+}
+
 function GetFollowupItemIndex([object[]]$Items, [string]$VisitorId) {
   for ($i = 0; $i -lt @($Items).Count; $i++) {
     if (@($Items)[$i].visitorId -eq $VisitorId) {
@@ -502,4 +522,5 @@ foreach ($visitorId in $cleanupVisitorIds) {
 }
 
 Write-Host "[assert-ops-followups] OK: followups lifecycle + ordering invariants regression passed." -ForegroundColor Green
+
 

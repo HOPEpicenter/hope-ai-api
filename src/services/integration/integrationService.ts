@@ -363,13 +363,14 @@ export class IntegrationService {
     visitorId: string,
     safeLimit: number
   ): Promise<ActivityFeedInputs> {
-    const engagementPage = await this.engagementRepo.readTimeline(visitorId, safeLimit, undefined);
+    const sourceLimit = Math.max(1000, safeLimit * 100);
+    const engagementPage = await this.engagementRepo.readTimeline(visitorId, sourceLimit, undefined);
 
     const eventsTable = getFormationEventsTableClient();
     await ensureTableExists(eventsTable);
 
     const formationAscAll = await listFormationEventsByVisitor(eventsTable as any, visitorId, {
-      limit: 500
+      limit: sourceLimit
     });
 
     const formationItems = formationAscAll
@@ -459,6 +460,8 @@ export class IntegrationService {
     });
   }
 }
+
+
 
 
 

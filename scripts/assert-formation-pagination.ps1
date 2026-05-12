@@ -124,10 +124,10 @@ if ([string]::IsNullOrWhiteSpace($cursor1)) { throw "Expected nextCursor/cursor 
 Write-Host "[assert-formation-pagination] page1 count=$($items1.Count) cursor=$cursor1"
 
 function Get-EventKey($e) {
-  if ($e.id) { return [string]$e.id }
-  if ($e.eventId) { return [string]$e.eventId }
   if ($e.rowKey) { return [string]$e.rowKey }
   if ($e.RowKey) { return [string]$e.RowKey }
+  if ($e.id) { return [string]$e.id }
+  if ($e.eventId) { return [string]$e.eventId }
   return ($e | ConvertTo-Json -Depth 6)
 }
 
@@ -242,3 +242,4 @@ Assert-NewestFirst $items2 "page2"
 Assert-NoOverlap $items1 $items2 "page1-page2"
 
 Write-Host "[assert-formation-pagination] OK: formation pagination assertions passed." -ForegroundColor Green
+

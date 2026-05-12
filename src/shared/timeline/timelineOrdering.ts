@@ -72,3 +72,16 @@ export function isTimelineItemAfterCursor(
 ): boolean {
   return compareTimelineNewestFirst(item, cursorItem) > 0;
 }
+const MAX_TIMELINE_MS = 253402300799999;
+
+export function makeInvertedMillisKey(occurredAt: string): string {
+  const ms = Date.parse(occurredAt);
+  const safeMs = Number.isFinite(ms) ? ms : Date.now();
+  return String(MAX_TIMELINE_MS - safeMs).padStart(15, "0");
+}
+
+export function makeNewestFirstRowKey(occurredAt: string, stableId: string): string {
+  return `${makeInvertedMillisKey(occurredAt)}|${stableId}`;
+}
+
+

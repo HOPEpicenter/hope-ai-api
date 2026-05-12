@@ -1,77 +1,135 @@
 param(
-  [string]$ApiBase = "http://localhost:7071/api",
-  [string]$OpsBase = "http://127.0.0.1:7071/api/ops",
+  [string]$ApiBase = "http://127.0.0.1:7071/api",
   [string]$ApiKey = $env:HOPE_API_KEY
 )
 
-Write-Host "[ops-followups-include-resolved] test start"
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
 
-if (-not $ApiKey) {
-  throw "HOPE_API_KEY is required"
+function Json-Get {
+  param([string]$Url)
+
+  return Invoke-RestMethod `
+    -Method Get `
+    -Uri $Url `
+    -Headers @{ "x-api-key" = $ApiKey }
 }
 
-$stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+function Json-Post {
+  param(
+    [string]$Url,
+    [object]$Body
+  )
 
-$visitor = Invoke-RestMethod -Method POST -Uri "$ApiBase/visitors" -Body (@{
-  name = "Ops Resolved $stamp"
-  email = "ops-resolved-$stamp@test.com"
-} | ConvertTo-Json) -ContentType "application/json"
+  return Invoke-RestMethod `
+    -Method Post `
+    -Uri $Url `
+    -Headers @{ "x-api-key" = $ApiKey } `
+    -ContentType "application/json" `
+    -Body ($Body | ConvertTo-Json -Depth 20)
+}
 
-$visitorId = $visitor.visitorId
-if (-not $visitorId) { throw "visitorId missing" }
+function Assert {
+  param(
+    [bool]$Condition,
+    [string]$Message
+  )
 
-$assignedAt = (Get-Date).ToUniversalTime().AddHours(-30).ToString("o")
-$contactedAt = (Get-Date).ToUniversalTime().AddHours(-29).ToString("o")
-$outcomeAt = (Get-Date).ToUniversalTime().AddHours(-28).ToString("o")
-
-$events = @(
-  @{
-    visitorId = $visitorId
-    type = "FOLLOWUP_ASSIGNED"
-    occurredAt = $assignedAt
-    source = @{ system = "assert-ops-followups-include-resolved" }
-    data = @{ assigneeId = "ops-user-resolved" }
-  },
-  @{
-    visitorId = $visitorId
-    type = "FOLLOWUP_CONTACTED"
-    occurredAt = $contactedAt
-    source = @{ system = "assert-ops-followups-include-resolved" }
-    data = @{ method = "phone" }
-  },
-  @{
-    visitorId = $visitorId
-    type = "FOLLOWUP_OUTCOME_RECORDED"
-    occurredAt = $outcomeAt
-    source = @{ system = "assert-ops-followups-include-resolved" }
-    data = @{ outcome = "connected" }
+  if (-not $Condition) {
+    throw "ASSERT FAILED: $Message"
   }
-)
-
-foreach ($evt in $events) {
-  Invoke-RestMethod -Method POST -Uri "$ApiBase/formation/events" -Headers @{
-    "x-api-key" = $ApiKey
-  } -Body ($evt | ConvertTo-Json -Depth 10) -ContentType "application/json" | Out-Null
 }
 
-$defaultQueue = Invoke-RestMethod -Method GET -Uri "$OpsBase/followups?assignedTo=ops-user-resolved&limit=10" -Headers @{
-  "x-api-key" = $ApiKey
+function Get-FollowupItem {
+  param(
+    [object[]]$Items,
+    [string]$VisitorId
+  )
+
+  return @($Items) | Where-Object { $_.visitorId -eq $VisitorId } | Select-Object -First 1
 }
 
-$resolvedQueue = Invoke-RestMethod -Method GET -Uri "$OpsBase/followups?assignedTo=ops-user-resolved&includeResolved=true&limit=10" -Headers @{
-  "x-api-key" = $ApiKey
+function Assert-PropertyMissing {
+  param(
+    [object]$Object,
+    [string]$PropertyName,
+    [string]$Message
+  )
+
+  if ($null -ne $Object.PSObject.Properties[$PropertyName]) {
+    throw $Message
+  }
 }
 
-if (-not $defaultQueue.ok) { throw "default queue ok false" }
-if (-not $resolvedQueue.ok) { throw "resolved queue ok false" }
+if ([string]::IsNullOrWhiteSpace($ApiKey)) {
+  throw "ApiKey is required."
+}
 
-$defaultItem = $defaultQueue.items | Where-Object { $_.visitorId -eq $visitorId } | Select-Object -First 1
-if ($defaultItem) { throw "resolved item should not appear by default" }
+$api = $ApiBase.Trim().TrimEnd("/")
+$ops = "$api/ops"
 
-$resolvedItem = $resolvedQueue.items | Where-Object { $_.visitorId -eq $visitorId } | Select-Object -First 1
-if (-not $resolvedItem) { throw "resolved item missing when includeResolved=true" }
-if ($resolvedItem.followupResolved -ne $true) { throw "expected followupResolved true" }
-if ($resolvedQueue.stats.resolved -lt 1) { throw "expected resolved stats count" }
-if ($resolvedItem.followupReason -ne "FOLLOWUP_OUTCOME_RECORDED") { throw "expected resolved followup reason" }
+Write-Host "=== ASSERT: Ops followups includeResolved parity ==="
+Write-Host "ApiBase=$api"
 
-Write-Host "[ops-followups-include-resolved] OK" -ForegroundColor Green
+$visitor = Json-Post "$api/visitors" @{
+  name = "Include Resolved Parity"
+  email = "include-resolved-parity@example.org"
+}
+
+$visitorId = [string]$visitor.visitorId
+Assert ($visitorId.Length -gt 0) "visitorId should exist"
+
+$now = (Get-Date).ToUniversalTime()
+
+Json-Post "$api/formation/events" @{
+  v = 1
+  eventId = "evt-include-resolved-assign-$([guid]::NewGuid().ToString('N'))"
+  visitorId = $visitorId
+  type = "FOLLOWUP_ASSIGNED"
+  occurredAt = $now.ToString("o")
+  source = @{ system = "scripts/assert-ops-followups-include-resolved.ps1" }
+  data = @{ assigneeId = "ops-user-include-resolved" }
+} | Out-Null
+
+Start-Sleep -Milliseconds 250
+
+$active = Json-Get "$ops/followups?visitorId=$visitorId&includeResolved=false"
+$activeItem = Get-FollowupItem -Items $active.items -VisitorId $visitorId
+
+Assert ($null -ne $activeItem) "assigned visitor should appear before outcome"
+Assert ($activeItem.followupResolved -ne $true) "assigned visitor should be unresolved before outcome"
+Assert-PropertyMissing $activeItem "lastFollowupOutcome" "followups item must not expose canonical outcome ownership"
+
+Json-Post "$api/formation/events" @{
+  v = 1
+  eventId = "evt-include-resolved-outcome-$([guid]::NewGuid().ToString('N'))"
+  visitorId = $visitorId
+  type = "FOLLOWUP_OUTCOME_RECORDED"
+  occurredAt = $now.AddSeconds(1).ToString("o")
+  source = @{ system = "scripts/assert-ops-followups-include-resolved.ps1" }
+  data = @{ outcome = "resolved_by_include_resolved_assert" }
+} | Out-Null
+
+Start-Sleep -Milliseconds 250
+
+$defaultAfterOutcome = Json-Get "$ops/followups?visitorId=$visitorId&includeResolved=false"
+$defaultItem = Get-FollowupItem -Items $defaultAfterOutcome.items -VisitorId $visitorId
+
+Assert ($null -eq $defaultItem) "resolved visitor should be excluded when includeResolved=false"
+
+$includedAfterOutcome = Json-Get "$ops/followups?visitorId=$visitorId&includeResolved=true"
+$includedItem = Get-FollowupItem -Items $includedAfterOutcome.items -VisitorId $visitorId
+
+Assert ($null -ne $includedItem) "resolved visitor should be included when includeResolved=true"
+Assert ($includedItem.followupResolved -eq $true) "included resolved item should set followupResolved=true"
+Assert-PropertyMissing $includedItem "lastFollowupOutcome" "resolved followups item must not expose canonical outcome ownership"
+
+$audit = Json-Post "$api/_ops/formation/profile-audit" @{
+  visitorId = $visitorId
+  repair = $false
+}
+
+Assert ($audit.ok -eq $true) "profile audit should succeed"
+Assert ($audit.currentProfile.lastFollowupOutcome -eq "resolved_by_include_resolved_assert") "canonical profile should own lastFollowupOutcome"
+
+Write-Host "OK: ops followups includeResolved parity assertion passed."

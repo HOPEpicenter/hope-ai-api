@@ -132,6 +132,12 @@ Invoke-Step "ops followups lifecycle and pagination" {
     -ApiKey $ApiKey
 }
 
+Invoke-Step "ops followups includeResolved parity" {
+  pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-ops-followups-include-resolved.ps1" `
+    -ApiBase $api `
+    -ApiKey $ApiKey
+}
+
 
 if ($Stress) {
   Invoke-Step "engagement events paging stress" {
@@ -148,6 +154,7 @@ if ($Stress) {
 
 Write-Host ""
 Write-Host "OK: pagination regression gate passed." -ForegroundColor Green
+
 
 
 

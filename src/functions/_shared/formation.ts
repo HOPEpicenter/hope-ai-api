@@ -870,6 +870,11 @@ export async function auditFormationProfileForVisitor(
   repaired: boolean;
   currentProfile: FunctionFormationProfileEntity | null;
   expectedProfile: FunctionFormationProfileEntity;
+  profileBehind: boolean;
+  lagMs: number | null;
+  latestEventAt: string | null;
+  profileLastEventAt: string | null;
+  driftFields: string[];
 }> {
   const visitorId = String(visitorIdInput ?? "").trim();
   if (!visitorId) {
@@ -885,6 +890,31 @@ export async function auditFormationProfileForVisitor(
   const currentState = toComparableProfileState(currentProfile);
   const expectedState = toComparableProfileState(derived.profile);
   const drifted = currentState !== expectedState;
+
+  const latestEventAt = derived.profile.lastEventAt ?? null;
+  const profileLastEventAt = currentProfile?.lastEventAt ?? null;
+
+  const latestEventTime = latestEventAt ? Date.parse(latestEventAt) : NaN;
+  const profileLastEventTime = profileLastEventAt ? Date.parse(profileLastEventAt) : NaN;
+
+  const profileBehind = Number.isFinite(latestEventTime) && (
+    !Number.isFinite(profileLastEventTime) ||
+    profileLastEventTime < latestEventTime
+  );
+
+  const lagMs = profileBehind && Number.isFinite(latestEventTime)
+    ? latestEventTime - (Number.isFinite(profileLastEventTime) ? profileLastEventTime : 0)
+    : null;
+
+  const currentComparable = currentProfile ? JSON.parse(currentState) : {};
+  const expectedComparable = JSON.parse(expectedState);
+
+  const driftFields = Array.from(
+    new Set([
+      ...Object.keys(currentComparable),
+      ...Object.keys(expectedComparable)
+    ])
+  ).filter(key => JSON.stringify(currentComparable[key] ?? null) !== JSON.stringify(expectedComparable[key] ?? null));
 
   let repaired = false;
 
@@ -912,7 +942,12 @@ export async function auditFormationProfileForVisitor(
     drifted,
     repaired,
     currentProfile,
-    expectedProfile: derived.profile
+    expectedProfile: derived.profile,
+    profileBehind,
+    lagMs,
+    latestEventAt,
+    profileLastEventAt,
+    driftFields
   };
 }
 
@@ -1077,5 +1112,7 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
+
+
 
 

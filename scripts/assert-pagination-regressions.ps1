@@ -66,6 +66,13 @@ Invoke-Step "formation profile reconciliation rebuild determinism" {
     -BaseUrl $root `
     -ApiKey $ApiKey
 }
+
+Invoke-Step "formation projection health diagnostics" {
+  pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-formation-projection-health.ps1" `
+    -ApiBase $api `
+    -ApiKey $ApiKey
+}
+
 Invoke-Step "cross-surface consistency audit" {
   pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-cross-surface-consistency.ps1" `
     -BaseUrl $root `

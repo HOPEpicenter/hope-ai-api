@@ -73,6 +73,12 @@ Invoke-Step "integration paging ties" {
     -ApiBaseUrl $api `
     -ApiKey $ApiKey
 }
+Invoke-Step "ops followups lifecycle and pagination" {
+  pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-ops-followups.ps1" `
+    -ApiBase $api `
+    -OpsBase "$api/ops" `
+    -ApiKey $ApiKey
+}
 
 
 if ($Stress) {
@@ -91,6 +97,7 @@ if ($Stress) {
 
 Write-Host ""
 Write-Host "OK: pagination regression gate passed." -ForegroundColor Green
+
 
 
 

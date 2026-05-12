@@ -102,6 +102,12 @@ Invoke-Step "formation projection health report contract" {
     -ApiKey $ApiKey
 }
 
+Invoke-Step "formation projection health repair contract" {
+  pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-formation-projection-health-repair-contract.ps1" `
+    -ApiBase $api `
+    -ApiKey $ApiKey
+}
+
 Invoke-Step "cross-surface consistency audit" {
   pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-cross-surface-consistency.ps1" `
     -BaseUrl $root `

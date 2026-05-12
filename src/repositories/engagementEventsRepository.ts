@@ -1,6 +1,7 @@
 import { EngagementEventEnvelopeV1 } from "../contracts/engagementEvent.v1";
 import { decodeCursorV1, encodeCursorV1 } from "../contracts/timeline.v1";
 import { getTableClient } from "../storage/tableClient";
+import { makeNewestFirstRowKey } from "../shared/timeline/timelineOrdering";
 
 const TABLE_NAME = "EngagementEvents";
 
@@ -10,15 +11,7 @@ export type TimelinePage = {
 };
 
 function makeRowKey(evt: EngagementEventEnvelopeV1): string {
-  // Newest-first ordering in Azure Tables (lexicographic ascending => most recent first)
-  // Use an inverted millisecond timestamp so newer events sort "earlier".
-  const MAX_MS = 253402300799999; // 9999-12-31T23:59:59.999Z
-  const ms = Date.parse(evt.occurredAt);
-  const safeMs = Number.isFinite(ms) ? ms : Date.now();
-  const inv = MAX_MS - safeMs;
-  const invKey = String(inv).padStart(15, "0");
-  // Tie-break with eventId so RowKey is unique even for same millisecond
-  return `${invKey}|${evt.eventId}`;
+  return makeNewestFirstRowKey(evt.occurredAt, evt.eventId);
 }
 
 function escapeOData(value: string): string {
@@ -198,4 +191,5 @@ try {
     };
   }
 }
+
 

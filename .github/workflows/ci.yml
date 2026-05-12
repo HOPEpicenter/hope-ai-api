@@ -66,6 +66,12 @@ jobs:
           $ErrorActionPreference = "Stop"
           npm run build
 
+
+      - name: Regression target normalization assert
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          ./scripts/assert-regression-target-normalization.ps1
       - name: Express smoke (Azurite owned by script)
         shell: pwsh
         env:

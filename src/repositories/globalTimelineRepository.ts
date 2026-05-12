@@ -1,3 +1,4 @@
+import { paginateRowKeyItems } from "../shared/timeline/rowKeyPaginator";
 import { getTableClient } from "../storage/tableClient";
 import { ensureTableExists } from "../shared/storage/ensureTableExists";
 
@@ -109,23 +110,10 @@ export class GlobalTimelineRepository {
       if (entities.length >= safeLimit + 1) break;
     }
 
-    entities.sort((a, b) => {
-      if (a.rowKey === b.rowKey) return 0;
-      return a.rowKey < b.rowKey ? -1 : 1;
-    });
-
-    const pageItems = entities.slice(0, safeLimit);
-
-    const nextCursor =
-      entities.length > safeLimit
-        ? pageItems[pageItems.length - 1]?.rowKey ?? null
-        : null;
-
-    return {
-      items: pageItems,
-      nextCursor
-    };
+    return paginateRowKeyItems(entities, safeLimit);
   }
 }
+
+
 
 

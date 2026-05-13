@@ -120,6 +120,12 @@ Invoke-Step "ops projection summary contract" {
     -ApiKey $ApiKey
 }
 
+Invoke-Step "task generation readiness" {
+  pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-task-generation-readiness.ps1" `
+    -ApiBase $api `
+    -ApiKey $ApiKey
+}
+
 Invoke-Step "cross-surface consistency audit" {
   pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-cross-surface-consistency.ps1" `
     -BaseUrl $root `
@@ -166,6 +172,7 @@ if ($Stress) {
 
 Write-Host ""
 Write-Host "OK: pagination regression gate passed." -ForegroundColor Green
+
 
 
 

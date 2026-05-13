@@ -159,6 +159,32 @@ $audit = Json-Post "$api/_ops/formation/profile-audit" @{
 Assert ($audit.ok -eq $true) "profile audit should succeed"
 Assert ($audit.currentProfile.lastFollowupOutcome -eq "resolved_by_include_resolved_assert") "canonical profile should own lastFollowupOutcome"
 
+Write-Host "Checking filtered cursor + ownership invariants..."
+
+$resolvedPage1 = Json-Get "$ops/followups?includeResolved=true&limit=1"
+Assert ($null -ne $resolvedPage1.cursor) "cursor field should exist"
+Assert ($resolvedPage1.cursor -match '^\d+$') "cursor should remain numeric offset"
+
+if ($resolvedPage1.nextCursor) {
+  Assert ($resolvedPage1.nextCursor -match '^\d+$') "nextCursor should remain numeric offset"
+}
+
+$filteredVisitor = Json-Get "$ops/followups?visitorId=$visitorId&includeResolved=true&limit=50"
+
+foreach ($item in @($filteredVisitor.items)) {
+  Assert ($item.visitorId -eq $visitorId) "visitorId filter must not leak unrelated visitors"
+}
+
+$ownerFiltered = Json-Get "$ops/followups?assignedTo=ops-user-include-resolved&includeResolved=true&limit=50"
+
+foreach ($item in @($ownerFiltered.items)) {
+  Assert ($item.assignedTo.ownerId -eq "ops-user-include-resolved") "assignedTo filter must not leak unrelated owners"
+}
+
+Assert-StatsMatchItems -Response $filteredVisitor -Label "visitor filtered response"
+Assert-StatsMatchItems -Response $ownerFiltered -Label "owner filtered response"
+
 Write-Host "OK: ops followups includeResolved parity assertion passed."
+
 
 

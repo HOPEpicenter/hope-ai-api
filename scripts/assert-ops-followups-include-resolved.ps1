@@ -60,6 +60,24 @@ function Assert-PropertyMissing {
     throw $Message
   }
 }
+function Count-ResolvedItems {
+  param([object[]]$Items)
+
+  return @($Items | Where-Object { $_.followupResolved -eq $true }).Count
+}
+
+function Assert-StatsMatchItems {
+  param(
+    [object]$Response,
+    [string]$Label
+  )
+
+  $items = @($Response.items)
+  $resolvedCount = Count-ResolvedItems -Items $items
+
+  Assert ([int]$Response.stats.total -eq $items.Count) "$Label stats.total should match returned item count"
+  Assert ([int]$Response.stats.resolved -eq $resolvedCount) "$Label stats.resolved should match returned resolved item count"
+}
 
 if ([string]::IsNullOrWhiteSpace($ApiKey)) {
   throw "ApiKey is required."
@@ -96,6 +114,9 @@ Start-Sleep -Milliseconds 250
 $active = Json-Get "$ops/followups?visitorId=$visitorId&includeResolved=false"
 $activeItem = Get-FollowupItem -Items $active.items -VisitorId $visitorId
 
+Assert-StatsMatchItems -Response $active -Label "active unresolved response"
+Assert ([int]$active.stats.resolved -eq 0) "active unresolved response should have stats.resolved=0"
+
 Assert ($null -ne $activeItem) "assigned visitor should appear before outcome"
 Assert ($activeItem.followupResolved -ne $true) "assigned visitor should be unresolved before outcome"
 Assert-PropertyMissing $activeItem "lastFollowupOutcome" "followups item must not expose canonical outcome ownership"
@@ -115,10 +136,16 @@ Start-Sleep -Milliseconds 250
 $defaultAfterOutcome = Json-Get "$ops/followups?visitorId=$visitorId&includeResolved=false"
 $defaultItem = Get-FollowupItem -Items $defaultAfterOutcome.items -VisitorId $visitorId
 
+Assert-StatsMatchItems -Response $defaultAfterOutcome -Label "default after outcome response"
+Assert ([int]$defaultAfterOutcome.stats.resolved -eq 0) "default after outcome response should have stats.resolved=0"
+
 Assert ($null -eq $defaultItem) "resolved visitor should be excluded when includeResolved=false"
 
 $includedAfterOutcome = Json-Get "$ops/followups?visitorId=$visitorId&includeResolved=true"
 $includedItem = Get-FollowupItem -Items $includedAfterOutcome.items -VisitorId $visitorId
+
+Assert-StatsMatchItems -Response $includedAfterOutcome -Label "includeResolved response"
+Assert ([int]$includedAfterOutcome.stats.resolved -ge 1) "includeResolved response should report at least one resolved item"
 
 Assert ($null -ne $includedItem) "resolved visitor should be included when includeResolved=true"
 Assert ($includedItem.followupResolved -eq $true) "included resolved item should set followupResolved=true"
@@ -133,3 +160,5 @@ Assert ($audit.ok -eq $true) "profile audit should succeed"
 Assert ($audit.currentProfile.lastFollowupOutcome -eq "resolved_by_include_resolved_assert") "canonical profile should own lastFollowupOutcome"
 
 Write-Host "OK: ops followups includeResolved parity assertion passed."
+
+

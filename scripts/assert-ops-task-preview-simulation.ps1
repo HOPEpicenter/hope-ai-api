@@ -70,6 +70,9 @@ Assert ($null -ne $response.policy) "policy should exist"
 Assert ($null -ne $response.complianceSummary) "complianceSummary should exist"
 Assert ($null -ne $response.complianceProofs) "complianceProofs should exist"
 Assert ($null -ne $response.compliance) "compliance should exist"
+Assert ($null -ne $response.attestationSummary) "attestationSummary should exist"
+Assert ($null -ne $response.attestationProofs) "attestationProofs should exist"
+Assert ($null -ne $response.attestation) "attestation should exist"
 
 Assert ($response.previews -is [array]) "previews should be an array"
 Assert ($response.plans -is [array]) "plans should be an array"
@@ -895,6 +898,130 @@ Assert (
   $null -ne $response.compliance.complianceProofs
 ) "compliance complianceProofs should exist"
 
+Assert (
+  $response.attestationSummary.deterministic -eq $true
+) "attestationSummary should be deterministic"
+
+Assert (
+  $response.attestationSummary.attestationReady -eq $true
+) "attestationReady should be true"
+
+Assert (
+  $response.attestationSummary.attestationMode -eq "OPS_READ_ONLY_ATTESTED"
+) "attestationMode should be OPS_READ_ONLY_ATTESTED"
+
+Assert (
+  $response.attestationSummary.governanceAttested -eq $true
+) "governanceAttested should be true"
+
+Assert (
+  $response.attestationSummary.policyAttested -eq $true
+) "policyAttested should be true"
+
+Assert (
+  $response.attestationSummary.complianceAttested -eq $true
+) "complianceAttested should be true"
+
+Assert (
+  $response.attestationSummary.replayAttested -eq $true
+) "replayAttested should be true"
+
+Assert (
+  $response.attestationSummary.snapshotAttested -eq $true
+) "snapshotAttested should be true"
+
+Assert (
+  $response.attestationSummary.exportAttested -eq $true
+) "exportAttested should be true"
+
+Assert (
+  $response.attestationSummary.consistencyAttested -eq $true
+) "consistencyAttested should be true"
+
+Assert (
+  $response.attestationSummary.opsOnlyAttested -eq $true
+) "opsOnlyAttested should be true"
+
+Assert (
+  $response.attestationProofs.deterministic -eq $true
+) "attestationProofs should be deterministic"
+
+Assert (
+  $response.attestationProofs.governanceAttestationProof -eq $true
+) "governanceAttestationProof should be true"
+
+Assert (
+  $response.attestationProofs.policyAttestationProof -eq $true
+) "policyAttestationProof should be true"
+
+Assert (
+  $response.attestationProofs.complianceAttestationProof -eq $true
+) "complianceAttestationProof should be true"
+
+Assert (
+  $response.attestationProofs.replayAttestationProof -eq $true
+) "replayAttestationProof should be true"
+
+Assert (
+  $response.attestationProofs.exportAttestationProof -eq $true
+) "exportAttestationProof should be true"
+
+Assert (
+  $response.attestationProofs.snapshotAttestationProof -eq $true
+) "snapshotAttestationProof should be true"
+
+Assert (
+  $response.attestationProofs.consistencyAttestationProof -eq $true
+) "consistencyAttestationProof should be true"
+
+Assert (
+  $response.attestationProofs.opsBoundaryAttestationProof -eq $true
+) "opsBoundaryAttestationProof should be true"
+
+Assert (
+  $response.attestation.deterministic -eq $true
+) "attestation should be deterministic"
+
+Assert (
+  $response.attestation.attestationVersion -eq 1
+) "attestationVersion should be 1"
+
+Assert (
+  $response.attestation.attestationState -eq "TRUST_VERIFIED_READ_ONLY"
+) "attestationState should be TRUST_VERIFIED_READ_ONLY"
+
+Assert (
+  $response.attestation.orchestrationAttestation -eq "ATTESTED_PROHIBITED"
+) "orchestrationAttestation should be ATTESTED_PROHIBITED"
+
+Assert (
+  $response.attestation.persistenceAttestation -eq "ATTESTED_PROHIBITED"
+) "persistenceAttestation should be ATTESTED_PROHIBITED"
+
+Assert (
+  $response.attestation.schedulerAttestation -eq "ATTESTED_PROHIBITED"
+) "schedulerAttestation should be ATTESTED_PROHIBITED"
+
+Assert (
+  $response.attestation.mutationAttestation -eq "ATTESTED_PROHIBITED"
+) "mutationAttestation should be ATTESTED_PROHIBITED"
+
+Assert (
+  $response.attestation.executionAttestation -eq "ATTESTED_PROHIBITED"
+) "executionAttestation should be ATTESTED_PROHIBITED"
+
+Assert (
+  $response.attestation.simulatedOnly -eq $true
+) "attestation simulatedOnly should be true"
+
+Assert (
+  $response.attestation.attestationStable -eq $true
+) "attestationStable should be true"
+
+Assert (
+  $null -ne $response.attestation.attestationProofs
+) "attestation attestationProofs should exist"
+
 for ($i = 0; $i -lt $response.simulationTimeline.Count; $i++) {
   $event = $response.simulationTimeline[$i]
 
@@ -970,6 +1097,7 @@ foreach ($plan in $response.plans) {
 }
 
 Write-Host "OK: OPS task preview simulation assertion passed."
+
 
 
 

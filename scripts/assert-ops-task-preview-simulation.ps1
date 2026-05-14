@@ -73,6 +73,13 @@ Assert ($null -ne $response.compliance) "compliance should exist"
 Assert ($null -ne $response.attestationSummary) "attestationSummary should exist"
 Assert ($null -ne $response.attestationProofs) "attestationProofs should exist"
 Assert ($null -ne $response.attestation) "attestation should exist"
+Assert ($null -ne $response.certificationSummary) "certificationSummary should exist"
+Assert ($null -ne $response.certificationProofs) "certificationProofs should exist"
+Assert ($null -ne $response.certification) "certification should exist"
+Assert ($null -ne $response.accreditationSummary) "accreditationSummary should exist"
+Assert ($null -ne $response.accreditationProofs) "accreditationProofs should exist"
+Assert ($null -ne $response.accreditation) "accreditation should exist"
+Assert ($null -ne $response.trustSeal) "trustSeal should exist"
 
 Assert ($response.previews -is [array]) "previews should be an array"
 Assert ($response.plans -is [array]) "plans should be an array"
@@ -1022,6 +1029,84 @@ Assert (
   $null -ne $response.attestation.attestationProofs
 ) "attestation attestationProofs should exist"
 
+Assert ($response.certificationSummary.deterministic -eq $true) "certificationSummary should be deterministic"
+Assert ($response.certificationSummary.certificationReady -eq $true) "certificationReady should be true"
+Assert ($response.certificationSummary.certificationMode -eq "OPS_READ_ONLY_CERTIFIED") "certificationMode should match"
+Assert ($response.certificationSummary.governanceCertified -eq $true) "governanceCertified should be true"
+Assert ($response.certificationSummary.policyCertified -eq $true) "policyCertified should be true"
+Assert ($response.certificationSummary.complianceCertified -eq $true) "complianceCertified should be true"
+Assert ($response.certificationSummary.attestationCertified -eq $true) "attestationCertified should be true"
+Assert ($response.certificationSummary.replayCertified -eq $true) "replayCertified should be true"
+Assert ($response.certificationSummary.exportCertified -eq $true) "exportCertified should be true"
+Assert ($response.certificationSummary.snapshotCertified -eq $true) "snapshotCertified should be true"
+Assert ($response.certificationSummary.consistencyCertified -eq $true) "consistencyCertified should be true"
+Assert ($response.certificationSummary.opsOnlyCertified -eq $true) "opsOnlyCertified should be true"
+
+Assert ($response.certificationProofs.deterministic -eq $true) "certificationProofs should be deterministic"
+Assert ($response.certificationProofs.governanceCertificationProof -eq $true) "governanceCertificationProof should be true"
+Assert ($response.certificationProofs.policyCertificationProof -eq $true) "policyCertificationProof should be true"
+Assert ($response.certificationProofs.complianceCertificationProof -eq $true) "complianceCertificationProof should be true"
+Assert ($response.certificationProofs.attestationCertificationProof -eq $true) "attestationCertificationProof should be true"
+Assert ($response.certificationProofs.replayCertificationProof -eq $true) "replayCertificationProof should be true"
+Assert ($response.certificationProofs.exportCertificationProof -eq $true) "exportCertificationProof should be true"
+Assert ($response.certificationProofs.snapshotCertificationProof -eq $true) "snapshotCertificationProof should be true"
+Assert ($response.certificationProofs.consistencyCertificationProof -eq $true) "consistencyCertificationProof should be true"
+Assert ($response.certificationProofs.opsBoundaryCertificationProof -eq $true) "opsBoundaryCertificationProof should be true"
+
+Assert ($response.certification.deterministic -eq $true) "certification should be deterministic"
+Assert ($response.certification.certificationVersion -eq 1) "certificationVersion should be 1"
+Assert ($response.certification.certificationState -eq "CERTIFIED_READ_ONLY") "certificationState should match"
+Assert ($response.certification.orchestrationCertification -eq "CERTIFIED_PROHIBITED") "orchestrationCertification should be prohibited"
+Assert ($response.certification.persistenceCertification -eq "CERTIFIED_PROHIBITED") "persistenceCertification should be prohibited"
+Assert ($response.certification.schedulerCertification -eq "CERTIFIED_PROHIBITED") "schedulerCertification should be prohibited"
+Assert ($response.certification.mutationCertification -eq "CERTIFIED_PROHIBITED") "mutationCertification should be prohibited"
+Assert ($response.certification.executionCertification -eq "CERTIFIED_PROHIBITED") "executionCertification should be prohibited"
+Assert ($response.certification.simulatedOnly -eq $true) "certification simulatedOnly should be true"
+Assert ($response.certification.certificationStable -eq $true) "certificationStable should be true"
+Assert ($null -ne $response.certification.certificationProofs) "certificationProofs should exist on certification"
+
+Assert ($response.accreditationSummary.deterministic -eq $true) "accreditationSummary should be deterministic"
+Assert ($response.accreditationSummary.accreditationReady -eq $true) "accreditationReady should be true"
+Assert ($response.accreditationSummary.accreditationMode -eq "OPS_READ_ONLY_ACCREDITED") "accreditationMode should match"
+Assert ($response.accreditationSummary.governanceAccredited -eq $true) "governanceAccredited should be true"
+Assert ($response.accreditationSummary.policyAccredited -eq $true) "policyAccredited should be true"
+Assert ($response.accreditationSummary.complianceAccredited -eq $true) "complianceAccredited should be true"
+Assert ($response.accreditationSummary.attestationAccredited -eq $true) "attestationAccredited should be true"
+Assert ($response.accreditationSummary.certificationAccredited -eq $true) "certificationAccredited should be true"
+Assert ($response.accreditationSummary.opsOnlyAccredited -eq $true) "opsOnlyAccredited should be true"
+
+Assert ($response.accreditationProofs.deterministic -eq $true) "accreditationProofs should be deterministic"
+Assert ($response.accreditationProofs.governanceAccreditationProof -eq $true) "governanceAccreditationProof should be true"
+Assert ($response.accreditationProofs.policyAccreditationProof -eq $true) "policyAccreditationProof should be true"
+Assert ($response.accreditationProofs.complianceAccreditationProof -eq $true) "complianceAccreditationProof should be true"
+Assert ($response.accreditationProofs.attestationAccreditationProof -eq $true) "attestationAccreditationProof should be true"
+Assert ($response.accreditationProofs.certificationAccreditationProof -eq $true) "certificationAccreditationProof should be true"
+Assert ($response.accreditationProofs.opsBoundaryAccreditationProof -eq $true) "opsBoundaryAccreditationProof should be true"
+
+Assert ($response.accreditation.deterministic -eq $true) "accreditation should be deterministic"
+Assert ($response.accreditation.accreditationVersion -eq 1) "accreditationVersion should be 1"
+Assert ($response.accreditation.accreditationState -eq "ACCREDITED_READ_ONLY") "accreditationState should match"
+Assert ($response.accreditation.orchestrationAccreditation -eq "ACCREDITED_PROHIBITED") "orchestrationAccreditation should be prohibited"
+Assert ($response.accreditation.persistenceAccreditation -eq "ACCREDITED_PROHIBITED") "persistenceAccreditation should be prohibited"
+Assert ($response.accreditation.schedulerAccreditation -eq "ACCREDITED_PROHIBITED") "schedulerAccreditation should be prohibited"
+Assert ($response.accreditation.mutationAccreditation -eq "ACCREDITED_PROHIBITED") "mutationAccreditation should be prohibited"
+Assert ($response.accreditation.executionAccreditation -eq "ACCREDITED_PROHIBITED") "executionAccreditation should be prohibited"
+Assert ($response.accreditation.simulatedOnly -eq $true) "accreditation simulatedOnly should be true"
+Assert ($response.accreditation.accreditationStable -eq $true) "accreditationStable should be true"
+Assert ($null -ne $response.accreditation.accreditationProofs) "accreditationProofs should exist on accreditation"
+
+Assert ($response.trustSeal.deterministic -eq $true) "trustSeal should be deterministic"
+Assert ($response.trustSeal.trustSealVersion -eq 1) "trustSealVersion should be 1"
+Assert ($response.trustSeal.trustSealState -eq "TRUST_SEAL_VERIFIED") "trustSealState should match"
+Assert ($response.trustSeal.governanceTrusted -eq $true) "governanceTrusted should be true"
+Assert ($response.trustSeal.policyTrusted -eq $true) "policyTrusted should be true"
+Assert ($response.trustSeal.complianceTrusted -eq $true) "complianceTrusted should be true"
+Assert ($response.trustSeal.attestationTrusted -eq $true) "attestationTrusted should be true"
+Assert ($response.trustSeal.certificationTrusted -eq $true) "certificationTrusted should be true"
+Assert ($response.trustSeal.accreditationTrusted -eq $true) "accreditationTrusted should be true"
+Assert ($response.trustSeal.simulatedOnly -eq $true) "trustSeal simulatedOnly should be true"
+Assert ($response.trustSeal.opsOnlyTrusted -eq $true) "opsOnlyTrusted should be true"
+
 for ($i = 0; $i -lt $response.simulationTimeline.Count; $i++) {
   $event = $response.simulationTimeline[$i]
 
@@ -1097,6 +1182,7 @@ foreach ($plan in $response.plans) {
 }
 
 Write-Host "OK: OPS task preview simulation assertion passed."
+
 
 
 

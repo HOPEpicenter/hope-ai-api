@@ -3,6 +3,8 @@ export type TaskPreviewInput = {
   audit: any;
 };
 
+export const TASK_PREVIEW_SCHEMA_VERSION = 1;
+
 export type TaskPreviewEscalationLevel =
   | "NONE"
   | "ELEVATED"
@@ -20,7 +22,28 @@ export type TaskPreviewFreshnessSeverity =
   | "DRIFTED"
   | "STALE";
 
+export type TaskPreviewFilter = {
+  ownerId?: string | null;
+  eligibleOnly?: boolean;
+  previewEscalationLevel?: TaskPreviewEscalationLevel;
+  previewFreshnessSeverity?: TaskPreviewFreshnessSeverity;
+};
+
+export type TaskPreviewSummary = {
+  total: number;
+  eligible: number;
+  suppressed: number;
+  escalationHigh: number;
+  escalationElevated: number;
+  escalationNone: number;
+  freshnessHealthy: number;
+  freshnessDrifted: number;
+  freshnessProfileBehind: number;
+  freshnessStale: number;
+};
+
 export type SerializedTaskPreview = {
+  schemaVersion: number;
   candidateIdentityKey: string;
   visitorId: string;
   ownerId: string | null;
@@ -61,6 +84,12 @@ function normalizeString(value: unknown): string {
   return typeof value === "string"
     ? value.trim()
     : "";
+}
+
+function normalizeSuppressionReasons(
+  reasons: TaskPreviewSuppressionReason[]
+): TaskPreviewSuppressionReason[] {
+  return [...new Set(reasons)].sort();
 }
 
 function derivePreviewEscalationLevel(
@@ -137,7 +166,9 @@ function deriveSuppressionReasons(args: {
     reasons.push("OWNER_MISSING");
   }
 
-  return reasons;
+  return normalizeSuppressionReasons(
+    reasons
+  );
 }
 
 export function deriveTaskPreview(
@@ -224,6 +255,8 @@ export function serializeTaskPreview(
   preview: TaskPreview
 ): SerializedTaskPreview {
   return {
+    schemaVersion:
+      TASK_PREVIEW_SCHEMA_VERSION,
     candidateIdentityKey:
       preview.candidateIdentityKey,
     visitorId:
@@ -241,6 +274,80 @@ export function serializeTaskPreview(
     suppressionReasons: [
       ...preview.suppressionReasons
     ]
+  };
+}
+
+export function filterTaskPreviews(
+  previews: TaskPreview[],
+  filter: TaskPreviewFilter
+): TaskPreview[] {
+  return previews.filter((preview) => {
+    if (
+      filter.ownerId !== undefined &&
+      preview.ownerId !== filter.ownerId
+    ) {
+      return false;
+    }
+
+    if (
+      filter.eligibleOnly === true &&
+      !preview.candidateTaskEligible
+    ) {
+      return false;
+    }
+
+    if (
+      filter.previewEscalationLevel &&
+      preview.previewEscalationLevel !==
+        filter.previewEscalationLevel
+    ) {
+      return false;
+    }
+
+    if (
+      filter.previewFreshnessSeverity &&
+      preview.previewFreshnessSeverity !==
+        filter.previewFreshnessSeverity
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+export function summarizeTaskPreviews(
+  previews: TaskPreview[]
+): TaskPreviewSummary {
+  return {
+    total: previews.length,
+    eligible: previews.filter(
+      x => x.candidateTaskEligible
+    ).length,
+    suppressed: previews.filter(
+      x => !x.candidateTaskEligible
+    ).length,
+    escalationHigh: previews.filter(
+      x => x.previewEscalationLevel === "HIGH"
+    ).length,
+    escalationElevated: previews.filter(
+      x => x.previewEscalationLevel === "ELEVATED"
+    ).length,
+    escalationNone: previews.filter(
+      x => x.previewEscalationLevel === "NONE"
+    ).length,
+    freshnessHealthy: previews.filter(
+      x => x.previewFreshnessSeverity === "HEALTHY"
+    ).length,
+    freshnessDrifted: previews.filter(
+      x => x.previewFreshnessSeverity === "DRIFTED"
+    ).length,
+    freshnessProfileBehind: previews.filter(
+      x => x.previewFreshnessSeverity === "PROFILE_BEHIND"
+    ).length,
+    freshnessStale: previews.filter(
+      x => x.previewFreshnessSeverity === "STALE"
+    ).length
   };
 }
 

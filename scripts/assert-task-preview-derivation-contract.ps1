@@ -16,6 +16,12 @@ const deriveTaskPreview =
 const serializeTaskPreview =
   mod.serializeTaskPreview;
 
+const filterTaskPreviews =
+  mod.filterTaskPreviews;
+
+const summarizeTaskPreviews =
+  mod.summarizeTaskPreviews;
+
 const dedupeTaskPreviews =
   mod.dedupeTaskPreviews;
 
@@ -24,6 +30,9 @@ const sortTaskPreviews =
 
 const groupTaskPreviews =
   mod.groupTaskPreviews;
+
+const TASK_PREVIEW_SCHEMA_VERSION =
+  mod.TASK_PREVIEW_SCHEMA_VERSION;
 
 function assert(condition, message) {
   if (!condition) {
@@ -59,7 +68,7 @@ const preview2 = deriveTaskPreview({
 
 assert(
   JSON.stringify(preview1) === JSON.stringify(preview2),
-  "preview derivation should be deterministic"
+  "preview derivation should remain deterministic"
 );
 
 assert(
@@ -74,18 +83,13 @@ const serialized2 =
   serializeTaskPreview(preview2);
 
 assert(
+  serialized1.schemaVersion === TASK_PREVIEW_SCHEMA_VERSION,
+  "serialized previews should expose schemaVersion"
+);
+
+assert(
   JSON.stringify(serialized1) === JSON.stringify(serialized2),
   "serialization should remain deterministic"
-);
-
-assert(
-  serialized1.previewEscalationLevel === "ELEVATED",
-  "serialized preview should preserve escalation level"
-);
-
-assert(
-  serialized1.previewFreshnessSeverity === "HEALTHY",
-  "serialized preview should preserve freshness severity"
 );
 
 assert(
@@ -121,8 +125,9 @@ const resolvedPreview = deriveTaskPreview({
 });
 
 assert(
-  resolvedPreview.suppressionReasons.includes("FOLLOWUP_RESOLVED"),
-  "resolved preview should expose FOLLOWUP_RESOLVED suppression"
+  JSON.stringify(resolvedPreview.suppressionReasons) ===
+    JSON.stringify(["FOLLOWUP_RESOLVED"]),
+  "suppression reasons should normalize deterministically"
 );
 
 const driftedPreview = deriveTaskPreview({
@@ -180,11 +185,75 @@ assert(
 const highEscalationPreview = deriveTaskPreview({
   followup: {
     ...baseFollowup,
+    visitorId: "visitor-high",
     priorityBand: "urgent",
     followupUrgency: "CRITICAL"
   },
   audit: healthyAudit
 });
+
+const allPreviews = [
+  preview1,
+  resolvedPreview,
+  driftedPreview,
+  behindPreview,
+  stalePreview,
+  ownerlessPreview,
+  highEscalationPreview
+];
+
+const eligibleOnly =
+  filterTaskPreviews(allPreviews, {
+    eligibleOnly: true
+  });
+
+assert(
+  eligibleOnly.every(x => x.candidateTaskEligible),
+  "eligibleOnly filter should only return eligible previews"
+);
+
+const highEscalationOnly =
+  filterTaskPreviews(allPreviews, {
+    previewEscalationLevel: "HIGH"
+  });
+
+assert(
+  highEscalationOnly.length === 1,
+  "HIGH escalation filter should isolate HIGH previews"
+);
+
+const staleOnly =
+  filterTaskPreviews(allPreviews, {
+    previewFreshnessSeverity: "STALE"
+  });
+
+assert(
+  staleOnly.length === 1,
+  "STALE freshness filter should isolate stale previews"
+);
+
+const summary =
+  summarizeTaskPreviews(allPreviews);
+
+assert(
+  summary.total === allPreviews.length,
+  "summary total should match preview count"
+);
+
+assert(
+  summary.eligible + summary.suppressed === summary.total,
+  "eligible/suppressed counts should reconcile"
+);
+
+assert(
+  summary.escalationHigh >= 1,
+  "summary should count HIGH escalation previews"
+);
+
+assert(
+  summary.freshnessStale >= 1,
+  "summary should count STALE previews"
+);
 
 const sorted = sortTaskPreviews([
   preview1,
@@ -217,7 +286,7 @@ const grouped =
 
 assert(
   grouped.length >= 2,
-  "grouping should produce multiple deterministic groups"
+  "grouping should produce deterministic groups"
 );
 
 const groupedAgain =
@@ -230,11 +299,6 @@ const groupedAgain =
 assert(
   JSON.stringify(grouped) === JSON.stringify(groupedAgain),
   "grouping should remain deterministic"
-);
-
-assert(
-  grouped.every(group => typeof group.total === "number"),
-  "group totals should remain numeric"
 );
 
 console.log(

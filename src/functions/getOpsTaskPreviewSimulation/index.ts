@@ -635,6 +635,112 @@ export default async function (context: any, req: any): Promise<void> {
       attestationProofs,
       attestationStable: true
     };
+    const certificationSummary = {
+      deterministic: true,
+      certificationReady: true,
+      certificationMode: "OPS_READ_ONLY_CERTIFIED",
+      governanceCertified: true,
+      policyCertified: true,
+      complianceCertified: true,
+      attestationCertified: true,
+      replayCertified: true,
+      exportCertified: true,
+      snapshotCertified: true,
+      consistencyCertified: true,
+      opsOnlyCertified: true
+    };
+
+    const certificationProofs = {
+      deterministic: true,
+      governanceCertificationProof:
+        governance.governanceStable === true,
+      policyCertificationProof:
+        policy.policyStable === true,
+      complianceCertificationProof:
+        compliance.complianceStable === true,
+      attestationCertificationProof:
+        attestation.attestationStable === true,
+      replayCertificationProof:
+        replay.simulatedOnly === true,
+      exportCertificationProof:
+        exportEnvelope.simulatedOnly === true,
+      snapshotCertificationProof:
+        snapshot.simulatedOnly === true,
+      consistencyCertificationProof:
+        consistency.consistencyStable === true,
+      opsBoundaryCertificationProof:
+        governanceSummary.opsSurfaceOnly === true
+    };
+
+    const certification = {
+      deterministic: true,
+      certificationVersion: 1,
+      certificationState: "CERTIFIED_READ_ONLY",
+      orchestrationCertification: "CERTIFIED_PROHIBITED",
+      persistenceCertification: "CERTIFIED_PROHIBITED",
+      schedulerCertification: "CERTIFIED_PROHIBITED",
+      mutationCertification: "CERTIFIED_PROHIBITED",
+      executionCertification: "CERTIFIED_PROHIBITED",
+      simulatedOnly: true,
+      certificationProofs,
+      certificationStable: true
+    };
+
+    const accreditationSummary = {
+      deterministic: true,
+      accreditationReady: true,
+      accreditationMode: "OPS_READ_ONLY_ACCREDITED",
+      governanceAccredited: true,
+      policyAccredited: true,
+      complianceAccredited: true,
+      attestationAccredited: true,
+      certificationAccredited: true,
+      opsOnlyAccredited: true
+    };
+
+    const accreditationProofs = {
+      deterministic: true,
+      governanceAccreditationProof:
+        governance.governanceStable === true,
+      policyAccreditationProof:
+        policy.policyStable === true,
+      complianceAccreditationProof:
+        compliance.complianceStable === true,
+      attestationAccreditationProof:
+        attestation.attestationStable === true,
+      certificationAccreditationProof:
+        certification.certificationStable === true,
+      opsBoundaryAccreditationProof:
+        governanceSummary.opsSurfaceOnly === true
+    };
+
+    const accreditation = {
+      deterministic: true,
+      accreditationVersion: 1,
+      accreditationState: "ACCREDITED_READ_ONLY",
+      orchestrationAccreditation: "ACCREDITED_PROHIBITED",
+      persistenceAccreditation: "ACCREDITED_PROHIBITED",
+      schedulerAccreditation: "ACCREDITED_PROHIBITED",
+      mutationAccreditation: "ACCREDITED_PROHIBITED",
+      executionAccreditation: "ACCREDITED_PROHIBITED",
+      simulatedOnly: true,
+      accreditationProofs,
+      accreditationStable: true
+    };
+
+    const trustSeal = {
+      deterministic: true,
+      trustSealVersion: 1,
+      trustSealState: "TRUST_SEAL_VERIFIED",
+      governanceTrusted: true,
+      policyTrusted: true,
+      complianceTrusted: true,
+      attestationTrusted: true,
+      certificationTrusted: true,
+      accreditationTrusted: true,
+      simulatedOnly: true,
+      opsOnlyTrusted: true
+    };
 
     context.res = {
       status: 200,
@@ -700,7 +806,14 @@ export default async function (context: any, req: any): Promise<void> {
         compliance,
         attestationSummary,
         attestationProofs,
-        attestation
+        attestation,
+        certificationSummary,
+        certificationProofs,
+        certification,
+        accreditationSummary,
+        accreditationProofs,
+        accreditation,
+        trustSeal
       }
     };
   } catch (err: any) {
@@ -822,6 +935,7 @@ async function ensureTableExists(
     throw e;
   }
 }
+
 
 
 

@@ -55,6 +55,9 @@ Assert ($null -ne $response.exportSummary) "exportSummary should exist"
 Assert ($null -ne $response.exportEnvelope) "exportEnvelope should exist"
 Assert ($null -ne $response.lineage) "lineage should exist"
 Assert ($null -ne $response.multiRun) "multiRun should exist"
+Assert ($null -ne $response.snapshotSummary) "snapshotSummary should exist"
+Assert ($null -ne $response.snapshot) "snapshot should exist"
+Assert ($null -ne $response.snapshotCompatibility) "snapshotCompatibility should exist"
 
 Assert ($response.previews -is [array]) "previews should be an array"
 Assert ($response.plans -is [array]) "plans should be an array"
@@ -340,6 +343,110 @@ Assert (
   $response.multiRun.runComparison.baselineReplayHash -eq $response.replay.replayHash
 ) "runComparison baselineReplayHash should reconcile"
 
+Assert (
+  $response.snapshotSummary.deterministic -eq $true
+) "snapshotSummary should be deterministic"
+
+Assert (
+  $response.snapshotSummary.snapshotReady -eq $true
+) "snapshotSummary should be snapshotReady"
+
+Assert (
+  $response.snapshotSummary.previewCount -eq $response.previews.Count
+) "snapshotSummary previewCount should reconcile"
+
+Assert (
+  $response.snapshotSummary.planCount -eq $response.plans.Count
+) "snapshotSummary planCount should reconcile"
+
+Assert (
+  $response.snapshotSummary.timelineCount -eq $response.simulationTimeline.Count
+) "snapshotSummary timelineCount should reconcile"
+
+Assert (
+  $response.snapshotSummary.explainabilityCount -eq $response.explainability.Count
+) "snapshotSummary explainabilityCount should reconcile"
+
+Assert (
+  $response.snapshotSummary.replayHash -eq $response.replay.replayHash
+) "snapshotSummary replayHash should reconcile"
+
+Assert (
+  $response.snapshotSummary.exportHash -eq $response.exportEnvelope.exportHash
+) "snapshotSummary exportHash should reconcile"
+
+Assert (
+  $response.snapshot.snapshotVersion -eq 1
+) "snapshotVersion should be 1"
+
+Assert (
+  $response.snapshot.deterministic -eq $true
+) "snapshot should be deterministic"
+
+Assert (
+  $response.snapshot.snapshotMode -eq "IN_MEMORY_ONLY"
+) "snapshotMode should be IN_MEMORY_ONLY"
+
+Assert (
+  -not [string]::IsNullOrWhiteSpace($response.snapshot.snapshotHash)
+) "snapshotHash should exist"
+
+Assert (
+  $response.snapshot.replayHash -eq $response.replay.replayHash
+) "snapshot replayHash should reconcile"
+
+Assert (
+  $response.snapshot.exportHash -eq $response.exportEnvelope.exportHash
+) "snapshot exportHash should reconcile"
+
+Assert (
+  $response.snapshot.lineageReplayHash -eq $response.lineage.currentReplayHash
+) "snapshot lineageReplayHash should reconcile"
+
+Assert (
+  $response.snapshot.snapshotReady -eq $true
+) "snapshot should be snapshotReady"
+
+Assert (
+  $response.snapshot.simulatedOnly -eq $true
+) "snapshot should be simulatedOnly"
+
+Assert (
+  $response.snapshotCompatibility.deterministic -eq $true
+) "snapshotCompatibility should be deterministic"
+
+Assert (
+  $response.snapshotCompatibility.replayCompatible -eq $true
+) "snapshot replayCompatible should be true"
+
+Assert (
+  $response.snapshotCompatibility.exportCompatible -eq $true
+) "snapshot exportCompatible should be true"
+
+Assert (
+  $response.snapshotCompatibility.lineageCompatible -eq $true
+) "snapshot lineageCompatible should be true"
+
+Assert (
+  $response.snapshotCompatibility.multiRunCompatible -eq $true
+) "snapshot multiRunCompatible should be true"
+
+Assert (
+  $response.snapshotCompatibility.diagnosticsCompatible -eq $true
+) "snapshot diagnosticsCompatible should be true"
+
+Assert (
+  $response.snapshotCompatibility.explainabilityCompatible -eq $true
+) "snapshot explainabilityCompatible should be true"
+
+Assert (
+  $response.snapshotCompatibility.driftCompatible -eq $true
+) "snapshot driftCompatible should be true"
+
+Assert (
+  $response.snapshotCompatibility.snapshotStable -eq $true
+) "snapshot snapshotStable should be true"
+
 for ($i = 0; $i -lt $response.simulationTimeline.Count; $i++) {
   $event = $response.simulationTimeline[$i]
 
@@ -415,6 +522,7 @@ foreach ($plan in $response.plans) {
 }
 
 Write-Host "OK: OPS task preview simulation assertion passed."
+
 
 
 

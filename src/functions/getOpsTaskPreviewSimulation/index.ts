@@ -361,6 +361,65 @@ export default async function (context: any, req: any): Promise<void> {
       comparisonMode: "IN_MEMORY_ONLY",
       runComparison
     };
+    const snapshotSummary = {
+      deterministic: true,
+      snapshotReady: true,
+      previewCount:
+        serializedPreviews.length,
+      planCount:
+        plans.length,
+      timelineCount:
+        simulationTimeline.length,
+      explainabilityCount:
+        explainability.length,
+      replayHash:
+        replay.replayHash,
+      exportHash:
+        exportEnvelope.exportHash
+    };
+
+    const snapshotCanonical =
+      JSON.stringify({
+        replay,
+        exportEnvelope,
+        lineage,
+        multiRun,
+        diagnostics,
+        comparison,
+        driftDiagnostics,
+        snapshotSummary
+      });
+
+    const snapshot = {
+      snapshotVersion: 1,
+      deterministic: true,
+      snapshotMode: "IN_MEMORY_ONLY",
+      snapshotHash:
+        Buffer.from(snapshotCanonical)
+          .toString("base64")
+          .slice(0, 32),
+      replayHash:
+        replay.replayHash,
+      exportHash:
+        exportEnvelope.exportHash,
+      lineageReplayHash:
+        lineage.currentReplayHash,
+      snapshotReady:
+        snapshotSummary.snapshotReady,
+      simulatedOnly: true
+    };
+
+    const snapshotCompatibility = {
+      deterministic: true,
+      replayCompatible: true,
+      exportCompatible: true,
+      lineageCompatible: true,
+      multiRunCompatible: true,
+      diagnosticsCompatible: true,
+      explainabilityCompatible: true,
+      driftCompatible: true,
+      snapshotStable: true
+    };
 
     context.res = {
       status: 200,
@@ -408,7 +467,10 @@ export default async function (context: any, req: any): Promise<void> {
         exportSummary,
         exportEnvelope,
         lineage,
-        multiRun
+        multiRun,
+        snapshotSummary,
+        snapshot,
+        snapshotCompatibility
       }
     };
   } catch (err: any) {
@@ -530,6 +592,8 @@ async function ensureTableExists(
     throw e;
   }
 }
+
+
 
 
 

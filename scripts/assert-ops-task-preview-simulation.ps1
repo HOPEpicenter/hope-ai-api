@@ -67,6 +67,9 @@ Assert ($null -ne $response.governance) "governance should exist"
 Assert ($null -ne $response.policySummary) "policySummary should exist"
 Assert ($null -ne $response.policyProofs) "policyProofs should exist"
 Assert ($null -ne $response.policy) "policy should exist"
+Assert ($null -ne $response.complianceSummary) "complianceSummary should exist"
+Assert ($null -ne $response.complianceProofs) "complianceProofs should exist"
+Assert ($null -ne $response.compliance) "compliance should exist"
 
 Assert ($response.previews -is [array]) "previews should be an array"
 Assert ($response.plans -is [array]) "plans should be an array"
@@ -776,6 +779,122 @@ Assert (
   $null -ne $response.policy.policyProofs
 ) "policy policyProofs should exist"
 
+Assert (
+  $response.complianceSummary.deterministic -eq $true
+) "complianceSummary should be deterministic"
+
+Assert (
+  $response.complianceSummary.complianceReady -eq $true
+) "complianceReady should be true"
+
+Assert (
+  $response.complianceSummary.complianceMode -eq "OPS_READ_ONLY_COMPLIANT"
+) "complianceMode should be OPS_READ_ONLY_COMPLIANT"
+
+Assert (
+  $response.complianceSummary.governanceCompliant -eq $true
+) "governanceCompliant should be true"
+
+Assert (
+  $response.complianceSummary.policyCompliant -eq $true
+) "policyCompliant should be true"
+
+Assert (
+  $response.complianceSummary.replayCompliant -eq $true
+) "replayCompliant should be true"
+
+Assert (
+  $response.complianceSummary.snapshotCompliant -eq $true
+) "snapshotCompliant should be true"
+
+Assert (
+  $response.complianceSummary.exportCompliant -eq $true
+) "exportCompliant should be true"
+
+Assert (
+  $response.complianceSummary.consistencyCompliant -eq $true
+) "consistencyCompliant should be true"
+
+Assert (
+  $response.complianceSummary.opsOnlyCompliant -eq $true
+) "opsOnlyCompliant should be true"
+
+Assert (
+  $response.complianceProofs.deterministic -eq $true
+) "complianceProofs should be deterministic"
+
+Assert (
+  $response.complianceProofs.governanceComplianceProof -eq $true
+) "governanceComplianceProof should be true"
+
+Assert (
+  $response.complianceProofs.policyComplianceProof -eq $true
+) "policyComplianceProof should be true"
+
+Assert (
+  $response.complianceProofs.replayComplianceProof -eq $true
+) "replayComplianceProof should be true"
+
+Assert (
+  $response.complianceProofs.exportComplianceProof -eq $true
+) "exportComplianceProof should be true"
+
+Assert (
+  $response.complianceProofs.snapshotComplianceProof -eq $true
+) "snapshotComplianceProof should be true"
+
+Assert (
+  $response.complianceProofs.consistencyComplianceProof -eq $true
+) "consistencyComplianceProof should be true"
+
+Assert (
+  $response.complianceProofs.opsBoundaryComplianceProof -eq $true
+) "opsBoundaryComplianceProof should be true"
+
+Assert (
+  $response.compliance.deterministic -eq $true
+) "compliance should be deterministic"
+
+Assert (
+  $response.compliance.complianceVersion -eq 1
+) "complianceVersion should be 1"
+
+Assert (
+  $response.compliance.complianceState -eq "VERIFIED_READ_ONLY"
+) "complianceState should be VERIFIED_READ_ONLY"
+
+Assert (
+  $response.compliance.orchestrationCompliance -eq "VERIFIED_PROHIBITED"
+) "orchestrationCompliance should be VERIFIED_PROHIBITED"
+
+Assert (
+  $response.compliance.persistenceCompliance -eq "VERIFIED_PROHIBITED"
+) "persistenceCompliance should be VERIFIED_PROHIBITED"
+
+Assert (
+  $response.compliance.schedulerCompliance -eq "VERIFIED_PROHIBITED"
+) "schedulerCompliance should be VERIFIED_PROHIBITED"
+
+Assert (
+  $response.compliance.mutationCompliance -eq "VERIFIED_PROHIBITED"
+) "mutationCompliance should be VERIFIED_PROHIBITED"
+
+Assert (
+  $response.compliance.executionCompliance -eq "VERIFIED_PROHIBITED"
+) "executionCompliance should be VERIFIED_PROHIBITED"
+
+Assert (
+  $response.compliance.simulatedOnly -eq $true
+) "compliance simulatedOnly should be true"
+
+Assert (
+  $response.compliance.complianceStable -eq $true
+) "complianceStable should be true"
+
+Assert (
+  $null -ne $response.compliance.complianceProofs
+) "compliance complianceProofs should exist"
+
 for ($i = 0; $i -lt $response.simulationTimeline.Count; $i++) {
   $event = $response.simulationTimeline[$i]
 
@@ -851,6 +970,7 @@ foreach ($plan in $response.plans) {
 }
 
 Write-Host "OK: OPS task preview simulation assertion passed."
+
 
 
 

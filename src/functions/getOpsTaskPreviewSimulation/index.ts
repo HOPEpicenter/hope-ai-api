@@ -280,6 +280,52 @@ export default async function (context: any, req: any): Promise<void> {
         ),
       readinessTransitions
     };
+    const exportSummary = {
+      deterministic: true,
+      totalPreviews:
+        serializedPreviews.length,
+      totalPlans:
+        plans.length,
+      totalTimelineEvents:
+        simulationTimeline.length,
+      totalExplainabilityRecords:
+        explainability.length,
+      totalDriftTransitions:
+        readinessTransitions.length,
+      exportReady: true
+    };
+
+    const exportCanonical =
+      JSON.stringify({
+        schemaVersion:
+          TASK_PREVIEW_SCHEMA_VERSION,
+        previews:
+          serializedPreviews,
+        plans,
+        simulationTimeline,
+        explainability,
+        diagnostics,
+        comparison,
+        driftDiagnostics,
+        exportSummary
+      });
+
+    const exportEnvelope = {
+      exportVersion: 1,
+      deterministic: true,
+      exportMode: "READ_ONLY",
+      simulatedOnly: true,
+      exportHash:
+        Buffer.from(exportCanonical)
+          .toString("base64")
+          .slice(0, 32),
+      generatedAt:
+        new Date().toISOString(),
+      replayHash:
+        replay.replayHash,
+      exportReady:
+        exportSummary.exportReady
+    };
 
     context.res = {
       status: 200,
@@ -323,7 +369,9 @@ export default async function (context: any, req: any): Promise<void> {
         explainability,
         diagnostics,
         comparison,
-        driftDiagnostics
+        driftDiagnostics,
+        exportSummary,
+        exportEnvelope
       }
     };
   } catch (err: any) {
@@ -445,6 +493,8 @@ async function ensureTableExists(
     throw e;
   }
 }
+
+
 
 
 

@@ -51,6 +51,8 @@ Assert ($null -ne $response.explainability) "explainability should exist"
 Assert ($null -ne $response.diagnostics) "diagnostics should exist"
 Assert ($null -ne $response.comparison) "comparison should exist"
 Assert ($null -ne $response.driftDiagnostics) "driftDiagnostics should exist"
+Assert ($null -ne $response.exportSummary) "exportSummary should exist"
+Assert ($null -ne $response.exportEnvelope) "exportEnvelope should exist"
 
 Assert ($response.previews -is [array]) "previews should be an array"
 Assert ($response.plans -is [array]) "plans should be an array"
@@ -192,6 +194,62 @@ Assert (
   $response.driftDiagnostics.readinessTransitions.Count -eq $response.plans.Count
 ) "readinessTransitions should reconcile with plans"
 
+Assert (
+  $response.exportSummary.deterministic -eq $true
+) "exportSummary should be deterministic"
+
+Assert (
+  $response.exportSummary.exportReady -eq $true
+) "exportSummary should be exportReady"
+
+Assert (
+  $response.exportSummary.totalPreviews -eq $response.previews.Count
+) "exportSummary totalPreviews should reconcile"
+
+Assert (
+  $response.exportSummary.totalPlans -eq $response.plans.Count
+) "exportSummary totalPlans should reconcile"
+
+Assert (
+  $response.exportSummary.totalTimelineEvents -eq $response.simulationTimeline.Count
+) "exportSummary totalTimelineEvents should reconcile"
+
+Assert (
+  $response.exportSummary.totalExplainabilityRecords -eq $response.explainability.Count
+) "exportSummary totalExplainabilityRecords should reconcile"
+
+Assert (
+  $response.exportSummary.totalDriftTransitions -eq $response.driftDiagnostics.readinessTransitions.Count
+) "exportSummary totalDriftTransitions should reconcile"
+
+Assert (
+  $response.exportEnvelope.exportVersion -eq 1
+) "exportEnvelope exportVersion should be 1"
+
+Assert (
+  $response.exportEnvelope.deterministic -eq $true
+) "exportEnvelope should be deterministic"
+
+Assert (
+  $response.exportEnvelope.exportMode -eq "READ_ONLY"
+) "exportEnvelope exportMode should be READ_ONLY"
+
+Assert (
+  $response.exportEnvelope.simulatedOnly -eq $true
+) "exportEnvelope should be simulatedOnly"
+
+Assert (
+  $response.exportEnvelope.exportReady -eq $true
+) "exportEnvelope should be exportReady"
+
+Assert (
+  -not [string]::IsNullOrWhiteSpace($response.exportEnvelope.exportHash)
+) "exportEnvelope exportHash should exist"
+
+Assert (
+  $response.exportEnvelope.replayHash -eq $response.replay.replayHash
+) "exportEnvelope replayHash should reconcile"
+
 for ($i = 0; $i -lt $response.simulationTimeline.Count; $i++) {
   $event = $response.simulationTimeline[$i]
 
@@ -267,5 +325,6 @@ foreach ($plan in $response.plans) {
 }
 
 Write-Host "OK: OPS task preview simulation assertion passed."
+
 
 

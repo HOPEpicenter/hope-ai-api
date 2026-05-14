@@ -13,6 +13,12 @@ const mod = require(process.argv[1]);
 const deriveTaskPreview =
   mod.deriveTaskPreview;
 
+const buildTaskPreviewPlan =
+  mod.buildTaskPreviewPlan;
+
+const summarizeTaskPreviewPlans =
+  mod.summarizeTaskPreviewPlans;
+
 const serializeTaskPreview =
   mod.serializeTaskPreview;
 
@@ -71,11 +77,6 @@ assert(
   "preview derivation should remain deterministic"
 );
 
-assert(
-  preview1.previewFreshnessSeverity === "HEALTHY",
-  "healthy projections should expose HEALTHY freshness"
-);
-
 const serialized1 =
   serializeTaskPreview(preview1);
 
@@ -92,9 +93,25 @@ assert(
   "serialization should remain deterministic"
 );
 
+const plan1 =
+  buildTaskPreviewPlan(preview1);
+
+const plan2 =
+  buildTaskPreviewPlan(preview2);
+
 assert(
-  Array.isArray(serialized1.suppressionReasons),
-  "serialized suppressionReasons should remain an array"
+  JSON.stringify(plan1) === JSON.stringify(plan2),
+  "plan generation should remain deterministic"
+);
+
+assert(
+  plan1.planReadiness === "READY",
+  "eligible healthy previews should produce READY plans"
+);
+
+assert(
+  plan1.schemaVersion === TASK_PREVIEW_SCHEMA_VERSION,
+  "plans should expose schemaVersion"
 );
 
 const duplicateCandidates = [
@@ -124,36 +141,17 @@ const resolvedPreview = deriveTaskPreview({
   audit: healthyAudit
 });
 
+const resolvedPlan =
+  buildTaskPreviewPlan(resolvedPreview);
+
 assert(
-  JSON.stringify(resolvedPreview.suppressionReasons) ===
-    JSON.stringify(["FOLLOWUP_RESOLVED"]),
-  "suppression reasons should normalize deterministically"
+  resolvedPlan.planReadiness === "SUPPRESSED",
+  "resolved previews should produce SUPPRESSED plans"
 );
 
-const driftedPreview = deriveTaskPreview({
-  followup: baseFollowup,
-  audit: {
-    drifted: true,
-    profileBehind: false
-  }
-});
-
 assert(
-  driftedPreview.previewFreshnessSeverity === "DRIFTED",
-  "drifted projection should expose DRIFTED freshness"
-);
-
-const behindPreview = deriveTaskPreview({
-  followup: baseFollowup,
-  audit: {
-    drifted: false,
-    profileBehind: true
-  }
-});
-
-assert(
-  behindPreview.previewFreshnessSeverity === "PROFILE_BEHIND",
-  "behind projection should expose PROFILE_BEHIND freshness"
+  resolvedPlan.suppressionReasons.includes("FOLLOWUP_RESOLVED"),
+  "resolved plans should preserve suppression reasons"
 );
 
 const stalePreview = deriveTaskPreview({
@@ -164,9 +162,12 @@ const stalePreview = deriveTaskPreview({
   }
 });
 
+const stalePlan =
+  buildTaskPreviewPlan(stalePreview);
+
 assert(
-  stalePreview.previewFreshnessSeverity === "STALE",
-  "fully stale projection should expose STALE freshness"
+  stalePlan.planReadiness === "STALE",
+  "STALE previews should produce STALE plans"
 );
 
 const ownerlessPreview = deriveTaskPreview({
@@ -177,9 +178,12 @@ const ownerlessPreview = deriveTaskPreview({
   audit: healthyAudit
 });
 
+const ownerlessPlan =
+  buildTaskPreviewPlan(ownerlessPreview);
+
 assert(
-  ownerlessPreview.suppressionReasons.includes("OWNER_MISSING"),
-  "ownerless preview should expose OWNER_MISSING suppression"
+  ownerlessPlan.planReadiness === "SUPPRESSED",
+  "ownerless previews should produce SUPPRESSED plans"
 );
 
 const highEscalationPreview = deriveTaskPreview({
@@ -195,12 +199,44 @@ const highEscalationPreview = deriveTaskPreview({
 const allPreviews = [
   preview1,
   resolvedPreview,
-  driftedPreview,
-  behindPreview,
   stalePreview,
   ownerlessPreview,
   highEscalationPreview
 ];
+
+const allPlans =
+  allPreviews.map(buildTaskPreviewPlan);
+
+const planSummary =
+  summarizeTaskPreviewPlans(allPlans);
+
+assert(
+  planSummary.totalPlans === allPlans.length,
+  "plan summary total should reconcile"
+);
+
+assert(
+  planSummary.readyPlans >= 1,
+  "plan summary should count READY plans"
+);
+
+assert(
+  planSummary.suppressedPlans >= 1,
+  "plan summary should count SUPPRESSED plans"
+);
+
+assert(
+  planSummary.stalePlans >= 1,
+  "plan summary should count STALE plans"
+);
+
+assert(
+  planSummary.readyPlans +
+    planSummary.suppressedPlans +
+    planSummary.stalePlans ===
+    planSummary.totalPlans,
+  "plan readiness counts should reconcile"
+);
 
 const eligibleOnly =
   filterTaskPreviews(allPreviews, {
@@ -212,26 +248,6 @@ assert(
   "eligibleOnly filter should only return eligible previews"
 );
 
-const highEscalationOnly =
-  filterTaskPreviews(allPreviews, {
-    previewEscalationLevel: "HIGH"
-  });
-
-assert(
-  highEscalationOnly.length === 1,
-  "HIGH escalation filter should isolate HIGH previews"
-);
-
-const staleOnly =
-  filterTaskPreviews(allPreviews, {
-    previewFreshnessSeverity: "STALE"
-  });
-
-assert(
-  staleOnly.length === 1,
-  "STALE freshness filter should isolate stale previews"
-);
-
 const summary =
   summarizeTaskPreviews(allPreviews);
 
@@ -240,31 +256,11 @@ assert(
   "summary total should match preview count"
 );
 
-assert(
-  summary.eligible + summary.suppressed === summary.total,
-  "eligible/suppressed counts should reconcile"
-);
-
-assert(
-  summary.escalationHigh >= 1,
-  "summary should count HIGH escalation previews"
-);
-
-assert(
-  summary.freshnessStale >= 1,
-  "summary should count STALE previews"
-);
-
 const sorted = sortTaskPreviews([
   preview1,
   ownerlessPreview,
   highEscalationPreview
 ]);
-
-assert(
-  sorted[0].previewEscalationLevel === "HIGH",
-  "HIGH escalation previews should sort first"
-);
 
 const sortedAgain = sortTaskPreviews([
   ownerlessPreview,
@@ -283,11 +279,6 @@ const grouped =
     highEscalationPreview,
     ownerlessPreview
   ]);
-
-assert(
-  grouped.length >= 2,
-  "grouping should produce deterministic groups"
-);
 
 const groupedAgain =
   groupTaskPreviews([

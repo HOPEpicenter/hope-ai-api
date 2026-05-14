@@ -22,6 +22,11 @@ export type TaskPreviewFreshnessSeverity =
   | "DRIFTED"
   | "STALE";
 
+export type TaskPreviewPlanReadiness =
+  | "READY"
+  | "SUPPRESSED"
+  | "STALE";
+
 export type TaskPreviewFilter = {
   ownerId?: string | null;
   eligibleOnly?: boolean;
@@ -40,6 +45,25 @@ export type TaskPreviewSummary = {
   freshnessDrifted: number;
   freshnessProfileBehind: number;
   freshnessStale: number;
+};
+
+export type TaskPreviewPlan = {
+  schemaVersion: number;
+  candidateIdentityKey: string;
+  visitorId: string;
+  ownerId: string | null;
+  candidateTaskType: "FOLLOWUP";
+  previewEscalationLevel: TaskPreviewEscalationLevel;
+  previewFreshnessSeverity: TaskPreviewFreshnessSeverity;
+  planReadiness: TaskPreviewPlanReadiness;
+  suppressionReasons: TaskPreviewSuppressionReason[];
+};
+
+export type TaskPreviewPlanSummary = {
+  totalPlans: number;
+  readyPlans: number;
+  suppressedPlans: number;
+  stalePlans: number;
 };
 
 export type SerializedTaskPreview = {
@@ -171,6 +195,25 @@ function deriveSuppressionReasons(args: {
   );
 }
 
+function derivePlanReadiness(
+  preview: TaskPreview
+): TaskPreviewPlanReadiness {
+  if (
+    preview.previewFreshnessSeverity ===
+    "STALE"
+  ) {
+    return "STALE";
+  }
+
+  if (
+    !preview.candidateTaskEligible
+  ) {
+    return "SUPPRESSED";
+  }
+
+  return "READY";
+}
+
 export function deriveTaskPreview(
   input: TaskPreviewInput
 ): TaskPreview {
@@ -248,6 +291,49 @@ export function deriveTaskPreview(
     previewEscalationLevel,
     previewFreshnessSeverity,
     suppressionReasons
+  };
+}
+
+export function buildTaskPreviewPlan(
+  preview: TaskPreview
+): TaskPreviewPlan {
+  return {
+    schemaVersion:
+      TASK_PREVIEW_SCHEMA_VERSION,
+    candidateIdentityKey:
+      preview.candidateIdentityKey,
+    visitorId:
+      preview.visitorId,
+    ownerId:
+      preview.ownerId,
+    candidateTaskType:
+      preview.candidateTaskType,
+    previewEscalationLevel:
+      preview.previewEscalationLevel,
+    previewFreshnessSeverity:
+      preview.previewFreshnessSeverity,
+    planReadiness:
+      derivePlanReadiness(preview),
+    suppressionReasons: [
+      ...preview.suppressionReasons
+    ]
+  };
+}
+
+export function summarizeTaskPreviewPlans(
+  plans: TaskPreviewPlan[]
+): TaskPreviewPlanSummary {
+  return {
+    totalPlans: plans.length,
+    readyPlans: plans.filter(
+      x => x.planReadiness === "READY"
+    ).length,
+    suppressedPlans: plans.filter(
+      x => x.planReadiness === "SUPPRESSED"
+    ).length,
+    stalePlans: plans.filter(
+      x => x.planReadiness === "STALE"
+    ).length
   };
 }
 

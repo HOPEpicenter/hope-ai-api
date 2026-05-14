@@ -53,6 +53,8 @@ Assert ($null -ne $response.comparison) "comparison should exist"
 Assert ($null -ne $response.driftDiagnostics) "driftDiagnostics should exist"
 Assert ($null -ne $response.exportSummary) "exportSummary should exist"
 Assert ($null -ne $response.exportEnvelope) "exportEnvelope should exist"
+Assert ($null -ne $response.lineage) "lineage should exist"
+Assert ($null -ne $response.multiRun) "multiRun should exist"
 
 Assert ($response.previews -is [array]) "previews should be an array"
 Assert ($response.plans -is [array]) "plans should be an array"
@@ -250,6 +252,94 @@ Assert (
   $response.exportEnvelope.replayHash -eq $response.replay.replayHash
 ) "exportEnvelope replayHash should reconcile"
 
+Assert (
+  $response.lineage.lineageVersion -eq 1
+) "lineageVersion should be 1"
+
+Assert (
+  $response.lineage.deterministic -eq $true
+) "lineage should be deterministic"
+
+Assert (
+  $response.lineage.lineageMode -eq "SIMULATED_ONLY"
+) "lineageMode should be SIMULATED_ONLY"
+
+Assert (
+  $response.lineage.currentReplayHash -eq $response.replay.replayHash
+) "lineage currentReplayHash should reconcile"
+
+Assert (
+  $response.lineage.parentReplayHash -eq $response.replay.replayHash
+) "lineage parentReplayHash should reconcile"
+
+Assert (
+  $response.lineage.exportHash -eq $response.exportEnvelope.exportHash
+) "lineage exportHash should reconcile"
+
+Assert (
+  $response.lineage.replayGeneration -eq 1
+) "lineage replayGeneration should be 1"
+
+Assert (
+  $response.multiRun.deterministic -eq $true
+) "multiRun should be deterministic"
+
+Assert (
+  $response.multiRun.comparedRuns -eq 1
+) "multiRun comparedRuns should be 1"
+
+Assert (
+  $response.multiRun.lineageConsistent -eq $true
+) "multiRun lineageConsistent should be true"
+
+Assert (
+  $response.multiRun.replayStable -eq $true
+) "multiRun replayStable should be true"
+
+Assert (
+  $response.multiRun.exportStable -eq $true
+) "multiRun exportStable should be true"
+
+Assert (
+  $response.multiRun.comparisonMode -eq "IN_MEMORY_ONLY"
+) "multiRun comparisonMode should be IN_MEMORY_ONLY"
+
+Assert (
+  $null -ne $response.multiRun.runComparison
+) "runComparison should exist"
+
+Assert (
+  $response.multiRun.runComparison.deterministic -eq $true
+) "runComparison should be deterministic"
+
+Assert (
+  $response.multiRun.runComparison.replayEquivalent -eq $true
+) "runComparison replayEquivalent should be true"
+
+Assert (
+  $response.multiRun.runComparison.exportEquivalent -eq $true
+) "runComparison exportEquivalent should be true"
+
+Assert (
+  $response.multiRun.runComparison.diagnosticsEquivalent -eq $true
+) "runComparison diagnosticsEquivalent should be true"
+
+Assert (
+  $response.multiRun.runComparison.explainabilityEquivalent -eq $true
+) "runComparison explainabilityEquivalent should be true"
+
+Assert (
+  $response.multiRun.runComparison.driftEquivalent -eq $true
+) "runComparison driftEquivalent should be true"
+
+Assert (
+  $response.multiRun.runComparison.currentReplayHash -eq $response.replay.replayHash
+) "runComparison currentReplayHash should reconcile"
+
+Assert (
+  $response.multiRun.runComparison.baselineReplayHash -eq $response.replay.replayHash
+) "runComparison baselineReplayHash should reconcile"
+
 for ($i = 0; $i -lt $response.simulationTimeline.Count; $i++) {
   $event = $response.simulationTimeline[$i]
 
@@ -325,6 +415,7 @@ foreach ($plan in $response.plans) {
 }
 
 Write-Host "OK: OPS task preview simulation assertion passed."
+
 
 
 

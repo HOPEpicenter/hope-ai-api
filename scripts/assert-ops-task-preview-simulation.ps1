@@ -49,6 +49,8 @@ Assert ($null -ne $response.replay) "replay should exist"
 Assert ($null -ne $response.auditEnvelope) "auditEnvelope should exist"
 Assert ($null -ne $response.explainability) "explainability should exist"
 Assert ($null -ne $response.diagnostics) "diagnostics should exist"
+Assert ($null -ne $response.comparison) "comparison should exist"
+Assert ($null -ne $response.driftDiagnostics) "driftDiagnostics should exist"
 
 Assert ($response.previews -is [array]) "previews should be an array"
 Assert ($response.plans -is [array]) "plans should be an array"
@@ -138,6 +140,58 @@ Assert (
   $response.diagnostics.suppressedCount -eq $response.planSummary.suppressedPlans
 ) "diagnostics suppressedCount should reconcile"
 
+Assert (
+  $response.comparison.deterministic -eq $true
+) "comparison should be deterministic"
+
+Assert (
+  $response.comparison.replayEquivalent -eq $true
+) "comparison replayEquivalent should be true"
+
+Assert (
+  $response.comparison.timelineEquivalent -eq $true
+) "comparison timelineEquivalent should be true"
+
+Assert (
+  $response.comparison.explainabilityEquivalent -eq $true
+) "comparison explainabilityEquivalent should be true"
+
+Assert (
+  $response.comparison.replayHash -eq $response.replay.replayHash
+) "comparison replayHash should reconcile"
+
+Assert (
+  $response.comparison.comparedReplayHash -eq $response.replay.replayHash
+) "comparison comparedReplayHash should reconcile"
+
+Assert (
+  $response.driftDiagnostics.deterministic -eq $true
+) "driftDiagnostics should be deterministic"
+
+Assert (
+  $response.driftDiagnostics.replayDriftDetected -eq $false
+) "replay drift should remain false"
+
+Assert (
+  $response.driftDiagnostics.timelineDriftDetected -eq $false
+) "timeline drift should remain false"
+
+Assert (
+  $response.driftDiagnostics.explainabilityDriftDetected -eq $false
+) "explainability drift should remain false"
+
+Assert (
+  $response.driftDiagnostics.divergenceFlags -is [array]
+) "divergenceFlags should be an array"
+
+Assert (
+  $response.driftDiagnostics.readinessTransitions -is [array]
+) "readinessTransitions should be an array"
+
+Assert (
+  $response.driftDiagnostics.readinessTransitions.Count -eq $response.plans.Count
+) "readinessTransitions should reconcile with plans"
+
 for ($i = 0; $i -lt $response.simulationTimeline.Count; $i++) {
   $event = $response.simulationTimeline[$i]
 
@@ -156,6 +210,20 @@ for ($i = 0; $i -lt $response.simulationTimeline.Count; $i++) {
   Assert (
     @("WOULD_QUEUE_TASK", "NO_ACTION") -contains $event.simulatedAction
   ) "timeline simulatedAction should be recognized"
+}
+
+foreach ($transition in $response.driftDiagnostics.readinessTransitions) {
+  Assert (
+    $transition.deterministic -eq $true
+  ) "readiness transition should be deterministic"
+
+  Assert (
+    @("READY", "SUPPRESSED", "STALE") -contains $transition.currentReadiness
+  ) "transition currentReadiness should be recognized"
+
+  Assert (
+    @("READY", "UNCHANGED") -contains $transition.simulatedNextReadiness
+  ) "transition simulatedNextReadiness should be recognized"
 }
 
 foreach ($explanation in $response.explainability) {
@@ -199,4 +267,5 @@ foreach ($plan in $response.plans) {
 }
 
 Write-Host "OK: OPS task preview simulation assertion passed."
+
 

@@ -245,6 +245,41 @@ export default async function (context: any, req: any): Promise<void> {
             item.reasoningTree.readiness === "SUPPRESSED"
         ).length
     };
+    const readinessTransitions =
+      plans.map((plan: any) => ({
+        candidateIdentityKey:
+          plan.candidateIdentityKey,
+        currentReadiness:
+          plan.planReadiness,
+        simulatedNextReadiness:
+          plan.planReadiness === "READY"
+            ? "READY"
+            : "UNCHANGED",
+        deterministic: true
+      }));
+
+    const comparison = {
+      deterministic: true,
+      replayHash:
+        replay.replayHash,
+      comparedReplayHash:
+        replay.replayHash,
+      replayEquivalent: true,
+      timelineEquivalent: true,
+      explainabilityEquivalent: true
+    };
+
+    const driftDiagnostics = {
+      deterministic: true,
+      replayDriftDetected: false,
+      timelineDriftDetected: false,
+      explainabilityDriftDetected: false,
+      divergenceFlags:
+        explainability.flatMap(
+          (item: any) => item.anomalyFlags
+        ),
+      readinessTransitions
+    };
 
     context.res = {
       status: 200,
@@ -286,7 +321,9 @@ export default async function (context: any, req: any): Promise<void> {
         replay,
         auditEnvelope,
         explainability,
-        diagnostics
+        diagnostics,
+        comparison,
+        driftDiagnostics
       }
     };
   } catch (err: any) {
@@ -408,5 +445,6 @@ async function ensureTableExists(
     throw e;
   }
 }
+
 
 

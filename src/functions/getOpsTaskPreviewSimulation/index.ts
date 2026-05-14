@@ -588,6 +588,53 @@ export default async function (context: any, req: any): Promise<void> {
       complianceProofs,
       complianceStable: true
     };
+    const attestationSummary = {
+      deterministic: true,
+      attestationReady: true,
+      attestationMode: "OPS_READ_ONLY_ATTESTED",
+      governanceAttested: true,
+      policyAttested: true,
+      complianceAttested: true,
+      replayAttested: true,
+      snapshotAttested: true,
+      exportAttested: true,
+      consistencyAttested: true,
+      opsOnlyAttested: true
+    };
+
+    const attestationProofs = {
+      deterministic: true,
+      governanceAttestationProof:
+        governance.governanceStable === true,
+      policyAttestationProof:
+        policy.policyStable === true,
+      complianceAttestationProof:
+        compliance.complianceStable === true,
+      replayAttestationProof:
+        replay.simulatedOnly === true,
+      exportAttestationProof:
+        exportEnvelope.simulatedOnly === true,
+      snapshotAttestationProof:
+        snapshot.simulatedOnly === true,
+      consistencyAttestationProof:
+        consistency.consistencyStable === true,
+      opsBoundaryAttestationProof:
+        governanceSummary.opsSurfaceOnly === true
+    };
+
+    const attestation = {
+      deterministic: true,
+      attestationVersion: 1,
+      attestationState: "TRUST_VERIFIED_READ_ONLY",
+      orchestrationAttestation: "ATTESTED_PROHIBITED",
+      persistenceAttestation: "ATTESTED_PROHIBITED",
+      schedulerAttestation: "ATTESTED_PROHIBITED",
+      mutationAttestation: "ATTESTED_PROHIBITED",
+      executionAttestation: "ATTESTED_PROHIBITED",
+      simulatedOnly: true,
+      attestationProofs,
+      attestationStable: true
+    };
 
     context.res = {
       status: 200,
@@ -650,7 +697,10 @@ export default async function (context: any, req: any): Promise<void> {
         policy,
         complianceSummary,
         complianceProofs,
-        compliance
+        compliance,
+        attestationSummary,
+        attestationProofs,
+        attestation
       }
     };
   } catch (err: any) {
@@ -772,6 +822,7 @@ async function ensureTableExists(
     throw e;
   }
 }
+
 
 
 

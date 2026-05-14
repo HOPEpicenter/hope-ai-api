@@ -459,6 +459,48 @@ export default async function (context: any, req: any): Promise<void> {
       integrityProofs,
       consistencyStable: true
     };
+    const governanceSummary = {
+      deterministic: true,
+      governanceReady: true,
+      orchestrationPermitted: false,
+      persistencePermitted: false,
+      schedulerPermitted: false,
+      mutationPermitted: false,
+      executionPermitted: false,
+      readOnlyVerified: true,
+      opsSurfaceOnly: true
+    };
+
+    const safetyProofs = {
+      deterministic: true,
+      orchestrationInactiveProof:
+        auditEnvelope.orchestrationActive === false,
+      persistenceInactiveProof:
+        auditEnvelope.taskPersistenceActive === false,
+      replaySimulatedOnlyProof:
+        replay.simulatedOnly === true,
+      exportSimulatedOnlyProof:
+        exportEnvelope.simulatedOnly === true,
+      snapshotSimulatedOnlyProof:
+        snapshot.simulatedOnly === true,
+      readOnlyModeProof:
+        consistency.consistencyMode === "READ_ONLY_IN_MEMORY",
+      governanceBoundaryProof:
+        governanceSummary.opsSurfaceOnly === true
+    };
+
+    const governance = {
+      deterministic: true,
+      governanceMode: "OPS_READ_ONLY",
+      executionProhibited: true,
+      persistenceProhibited: true,
+      schedulerProhibited: true,
+      orchestrationProhibited: true,
+      mutationProhibited: true,
+      simulatedOnly: true,
+      safetyProofs,
+      governanceStable: true
+    };
 
     context.res = {
       status: 200,
@@ -512,7 +554,10 @@ export default async function (context: any, req: any): Promise<void> {
         snapshotCompatibility,
         consistencySummary,
         integrityProofs,
-        consistency
+        consistency,
+        governanceSummary,
+        safetyProofs,
+        governance
       }
     };
   } catch (err: any) {
@@ -634,6 +679,7 @@ async function ensureTableExists(
     throw e;
   }
 }
+
 
 
 

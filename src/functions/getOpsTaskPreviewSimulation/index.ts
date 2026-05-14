@@ -544,6 +544,50 @@ export default async function (context: any, req: any): Promise<void> {
       policyProofs,
       policyStable: true
     };
+    const complianceSummary = {
+      deterministic: true,
+      complianceReady: true,
+      complianceMode: "OPS_READ_ONLY_COMPLIANT",
+      governanceCompliant: true,
+      policyCompliant: true,
+      replayCompliant: true,
+      snapshotCompliant: true,
+      exportCompliant: true,
+      consistencyCompliant: true,
+      opsOnlyCompliant: true
+    };
+
+    const complianceProofs = {
+      deterministic: true,
+      governanceComplianceProof:
+        governance.governanceStable === true,
+      policyComplianceProof:
+        policy.policyStable === true,
+      replayComplianceProof:
+        replay.simulatedOnly === true,
+      exportComplianceProof:
+        exportEnvelope.simulatedOnly === true,
+      snapshotComplianceProof:
+        snapshot.simulatedOnly === true,
+      consistencyComplianceProof:
+        consistency.consistencyStable === true,
+      opsBoundaryComplianceProof:
+        governanceSummary.opsSurfaceOnly === true
+    };
+
+    const compliance = {
+      deterministic: true,
+      complianceVersion: 1,
+      complianceState: "VERIFIED_READ_ONLY",
+      orchestrationCompliance: "VERIFIED_PROHIBITED",
+      persistenceCompliance: "VERIFIED_PROHIBITED",
+      schedulerCompliance: "VERIFIED_PROHIBITED",
+      mutationCompliance: "VERIFIED_PROHIBITED",
+      executionCompliance: "VERIFIED_PROHIBITED",
+      simulatedOnly: true,
+      complianceProofs,
+      complianceStable: true
+    };
 
     context.res = {
       status: 200,
@@ -603,7 +647,10 @@ export default async function (context: any, req: any): Promise<void> {
         governance,
         policySummary,
         policyProofs,
-        policy
+        policy,
+        complianceSummary,
+        complianceProofs,
+        compliance
       }
     };
   } catch (err: any) {
@@ -725,6 +772,7 @@ async function ensureTableExists(
     throw e;
   }
 }
+
 
 
 

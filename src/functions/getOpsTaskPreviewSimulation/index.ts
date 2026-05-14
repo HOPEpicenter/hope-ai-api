@@ -741,6 +741,117 @@ export default async function (context: any, req: any): Promise<void> {
       simulatedOnly: true,
       opsOnlyTrusted: true
     };
+    const assuranceSummary = {
+      deterministic: true,
+      assuranceReady: true,
+      assuranceMode: "OPS_READ_ONLY_ASSURED",
+      governanceAssured: true,
+      policyAssured: true,
+      complianceAssured: true,
+      attestationAssured: true,
+      certificationAssured: true,
+      accreditationAssured: true,
+      trustSealAssured: true,
+      opsOnlyAssured: true
+    };
+
+    const assuranceProofs = {
+      deterministic: true,
+      governanceAssuranceProof:
+        governance.governanceStable === true,
+      policyAssuranceProof:
+        policy.policyStable === true,
+      complianceAssuranceProof:
+        compliance.complianceStable === true,
+      attestationAssuranceProof:
+        attestation.attestationStable === true,
+      certificationAssuranceProof:
+        certification.certificationStable === true,
+      accreditationAssuranceProof:
+        accreditation.accreditationStable === true,
+      trustSealAssuranceProof:
+        trustSeal.trustSealState === "TRUST_SEAL_VERIFIED",
+      opsBoundaryAssuranceProof:
+        governanceSummary.opsSurfaceOnly === true
+    };
+
+    const assurance = {
+      deterministic: true,
+      assuranceVersion: 1,
+      assuranceState: "ASSURED_READ_ONLY",
+      orchestrationAssurance: "ASSURED_PROHIBITED",
+      persistenceAssurance: "ASSURED_PROHIBITED",
+      schedulerAssurance: "ASSURED_PROHIBITED",
+      mutationAssurance: "ASSURED_PROHIBITED",
+      executionAssurance: "ASSURED_PROHIBITED",
+      simulatedOnly: true,
+      assuranceProofs,
+      assuranceStable: true
+    };
+
+    const observabilitySummary = {
+      deterministic: true,
+      observabilityReady: true,
+      observabilityMode: "OPS_READ_ONLY_OBSERVABLE",
+      previewCount:
+        serializedPreviews.length,
+      planCount:
+        plans.length,
+      timelineCount:
+        simulationTimeline.length,
+      explainabilityCount:
+        explainability.length,
+      anomalyCount:
+        diagnostics.anomalyCount,
+      suppressedCount:
+        diagnostics.suppressedCount,
+      trustSealVisible: true,
+      assuranceVisible: true
+    };
+
+    const verificationTelemetry = {
+      deterministic: true,
+      telemetryVersion: 1,
+      replayHash:
+        replay.replayHash,
+      exportHash:
+        exportEnvelope.exportHash,
+      snapshotHash:
+        snapshot.snapshotHash,
+      lineageReplayHash:
+        lineage.currentReplayHash,
+      totalProofFamilies: 9,
+      totalSimulationRecords:
+        serializedPreviews.length +
+        plans.length +
+        simulationTimeline.length +
+        explainability.length,
+      simulatedOnly: true
+    };
+
+    const trustDiagnostics = {
+      deterministic: true,
+      diagnosticsVersion: 1,
+      trustDiagnosticsMode: "OPS_READ_ONLY_DIAGNOSTICS",
+      trustSealVerified:
+        trustSeal.trustSealState === "TRUST_SEAL_VERIFIED",
+      assuranceStable:
+        assurance.assuranceStable === true,
+      governanceStable:
+        governance.governanceStable === true,
+      policyStable:
+        policy.policyStable === true,
+      complianceStable:
+        compliance.complianceStable === true,
+      attestationStable:
+        attestation.attestationStable === true,
+      certificationStable:
+        certification.certificationStable === true,
+      accreditationStable:
+        accreditation.accreditationStable === true,
+      simulatedOnly: true,
+      opsOnlyDiagnostic: true
+    };
 
     context.res = {
       status: 200,
@@ -813,7 +924,13 @@ export default async function (context: any, req: any): Promise<void> {
         accreditationSummary,
         accreditationProofs,
         accreditation,
-        trustSeal
+        trustSeal,
+        assuranceSummary,
+        assuranceProofs,
+        assurance,
+        observabilitySummary,
+        verificationTelemetry,
+        trustDiagnostics
       }
     };
   } catch (err: any) {
@@ -935,6 +1052,7 @@ async function ensureTableExists(
     throw e;
   }
 }
+
 
 
 

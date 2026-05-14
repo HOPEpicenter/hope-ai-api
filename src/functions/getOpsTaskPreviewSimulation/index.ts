@@ -852,6 +852,104 @@ export default async function (context: any, req: any): Promise<void> {
       simulatedOnly: true,
       opsOnlyDiagnostic: true
     };
+    const intelligenceSummary = {
+      deterministic: true,
+      intelligenceReady: true,
+      intelligenceMode: "OPS_READ_ONLY_INTELLIGENCE",
+      analyticsReady: true,
+      trustInsightsReady: true,
+      governanceInsightsReady: true,
+      observabilityInsightsReady: true,
+      simulatedOnly: true,
+      opsOnlyIntelligence: true
+    };
+
+    const analyticsSummary = {
+      deterministic: true,
+      analyticsVersion: 1,
+      analyticsMode: "IN_MEMORY_ROLLUP_ONLY",
+      totalPreviews:
+        serializedPreviews.length,
+      totalPlans:
+        plans.length,
+      totalTimelineEvents:
+        simulationTimeline.length,
+      totalExplainabilityRecords:
+        explainability.length,
+      totalAnomalies:
+        diagnostics.anomalyCount,
+      totalSuppressed:
+        diagnostics.suppressedCount,
+      simulatedOnly: true
+    };
+
+    const replayAnalytics = {
+      deterministic: true,
+      replayAnalyticsVersion: 1,
+      replayHash:
+        replay.replayHash,
+      replayStable:
+        comparison.replayEquivalent === true,
+      replayDriftDetected:
+        driftDiagnostics.replayDriftDetected === true,
+      lineageConsistent:
+        lineage.currentReplayHash === replay.replayHash,
+      simulatedOnly: true
+    };
+
+    const trustAnalytics = {
+      deterministic: true,
+      trustAnalyticsVersion: 1,
+      trustSealVerified:
+        trustSeal.trustSealState === "TRUST_SEAL_VERIFIED",
+      trustDiagnosticsHealthy:
+        trustDiagnostics.trustSealVerified === true &&
+        trustDiagnostics.assuranceStable === true,
+      assuranceTrusted:
+        assurance.assuranceStable === true,
+      accreditationTrusted:
+        accreditation.accreditationStable === true,
+      certificationTrusted:
+        certification.certificationStable === true,
+      simulatedOnly: true
+    };
+
+    const governanceIntelligence = {
+      deterministic: true,
+      governanceIntelligenceVersion: 1,
+      governanceStable:
+        governance.governanceStable === true,
+      policyStable:
+        policy.policyStable === true,
+      complianceStable:
+        compliance.complianceStable === true,
+      executionStillProhibited:
+        governance.executionProhibited === true &&
+        policy.executionPolicy === "PROHIBITED" &&
+        compliance.executionCompliance === "VERIFIED_PROHIBITED",
+      opsBoundaryStable:
+        governanceSummary.opsSurfaceOnly === true,
+      simulatedOnly: true
+    };
+
+    const observabilityAnalytics = {
+      deterministic: true,
+      observabilityAnalyticsVersion: 1,
+      observabilityReady:
+        observabilitySummary.observabilityReady === true,
+      telemetryAligned:
+        verificationTelemetry.replayHash === replay.replayHash &&
+        verificationTelemetry.exportHash === exportEnvelope.exportHash &&
+        verificationTelemetry.snapshotHash === snapshot.snapshotHash,
+      observableRecordCount:
+        observabilitySummary.previewCount +
+        observabilitySummary.planCount +
+        observabilitySummary.timelineCount +
+        observabilitySummary.explainabilityCount,
+      telemetryRecordCount:
+        verificationTelemetry.totalSimulationRecords,
+      simulatedOnly: true
+    };
 
     context.res = {
       status: 200,
@@ -930,7 +1028,13 @@ export default async function (context: any, req: any): Promise<void> {
         assurance,
         observabilitySummary,
         verificationTelemetry,
-        trustDiagnostics
+        trustDiagnostics,
+        intelligenceSummary,
+        analyticsSummary,
+        replayAnalytics,
+        trustAnalytics,
+        governanceIntelligence,
+        observabilityAnalytics
       }
     };
   } catch (err: any) {
@@ -1052,6 +1156,7 @@ async function ensureTableExists(
     throw e;
   }
 }
+
 
 
 

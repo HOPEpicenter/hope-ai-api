@@ -47,10 +47,13 @@ Assert ($null -ne $response.plans) "plans should exist"
 Assert ($null -ne $response.simulationTimeline) "simulationTimeline should exist"
 Assert ($null -ne $response.replay) "replay should exist"
 Assert ($null -ne $response.auditEnvelope) "auditEnvelope should exist"
+Assert ($null -ne $response.explainability) "explainability should exist"
+Assert ($null -ne $response.diagnostics) "diagnostics should exist"
 
 Assert ($response.previews -is [array]) "previews should be an array"
 Assert ($response.plans -is [array]) "plans should be an array"
 Assert ($response.simulationTimeline -is [array]) "simulationTimeline should be an array"
+Assert ($response.explainability -is [array]) "explainability should be an array"
 
 Assert (
   $response.planSummary.totalPlans -eq $response.plans.Count
@@ -63,6 +66,10 @@ Assert (
 Assert (
   $response.simulationTimeline.Count -eq $response.plans.Count
 ) "timeline count should reconcile with plans"
+
+Assert (
+  $response.explainability.Count -eq $response.plans.Count
+) "explainability count should reconcile with plans"
 
 Assert (
   ($response.planSummary.readyPlans +
@@ -115,6 +122,22 @@ Assert (
   $response.auditEnvelope.replayHash -eq $response.replay.replayHash
 ) "auditEnvelope replayHash should reconcile"
 
+Assert (
+  $response.diagnostics.deterministic -eq $true
+) "diagnostics should be deterministic"
+
+Assert (
+  $response.diagnostics.replayConsistent -eq $true
+) "diagnostics replayConsistent should be true"
+
+Assert (
+  $response.diagnostics.timelineConsistent -eq $true
+) "diagnostics timelineConsistent should be true"
+
+Assert (
+  $response.diagnostics.suppressedCount -eq $response.planSummary.suppressedPlans
+) "diagnostics suppressedCount should reconcile"
+
 for ($i = 0; $i -lt $response.simulationTimeline.Count; $i++) {
   $event = $response.simulationTimeline[$i]
 
@@ -135,6 +158,32 @@ for ($i = 0; $i -lt $response.simulationTimeline.Count; $i++) {
   ) "timeline simulatedAction should be recognized"
 }
 
+foreach ($explanation in $response.explainability) {
+  Assert (
+    $null -ne $explanation.reasoningTree
+  ) "each explanation should include reasoningTree"
+
+  Assert (
+    $null -ne $explanation.trace
+  ) "each explanation should include trace"
+
+  Assert (
+    $explanation.trace.replayHash -eq $response.replay.replayHash
+  ) "explanation trace should reconcile replayHash"
+
+  Assert (
+    $explanation.trace.deterministic -eq $true
+  ) "explanation trace should be deterministic"
+
+  Assert (
+    $explanation.anomalyFlags -is [array]
+  ) "explanation anomalyFlags should be an array"
+
+  Assert (
+    $explanation.suppressionReasonsExpanded -is [array]
+  ) "suppressionReasonsExpanded should be an array"
+}
+
 foreach ($plan in $response.plans) {
   Assert (
     $plan.schemaVersion -eq 1
@@ -150,3 +199,4 @@ foreach ($plan in $response.plans) {
 }
 
 Write-Host "OK: OPS task preview simulation assertion passed."
+

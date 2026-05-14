@@ -61,6 +61,9 @@ Assert ($null -ne $response.snapshotCompatibility) "snapshotCompatibility should
 Assert ($null -ne $response.consistencySummary) "consistencySummary should exist"
 Assert ($null -ne $response.integrityProofs) "integrityProofs should exist"
 Assert ($null -ne $response.consistency) "consistency should exist"
+Assert ($null -ne $response.governanceSummary) "governanceSummary should exist"
+Assert ($null -ne $response.safetyProofs) "safetyProofs should exist"
+Assert ($null -ne $response.governance) "governance should exist"
 
 Assert ($response.previews -is [array]) "previews should be an array"
 Assert ($response.plans -is [array]) "plans should be an array"
@@ -550,6 +553,114 @@ Assert (
   $null -ne $response.consistency.integrityProofs
 ) "consistency integrityProofs should exist"
 
+Assert (
+  $response.governanceSummary.deterministic -eq $true
+) "governanceSummary should be deterministic"
+
+Assert (
+  $response.governanceSummary.governanceReady -eq $true
+) "governanceSummary governanceReady should be true"
+
+Assert (
+  $response.governanceSummary.orchestrationPermitted -eq $false
+) "governanceSummary orchestrationPermitted should be false"
+
+Assert (
+  $response.governanceSummary.persistencePermitted -eq $false
+) "governanceSummary persistencePermitted should be false"
+
+Assert (
+  $response.governanceSummary.schedulerPermitted -eq $false
+) "governanceSummary schedulerPermitted should be false"
+
+Assert (
+  $response.governanceSummary.mutationPermitted -eq $false
+) "governanceSummary mutationPermitted should be false"
+
+Assert (
+  $response.governanceSummary.executionPermitted -eq $false
+) "governanceSummary executionPermitted should be false"
+
+Assert (
+  $response.governanceSummary.readOnlyVerified -eq $true
+) "governanceSummary readOnlyVerified should be true"
+
+Assert (
+  $response.governanceSummary.opsSurfaceOnly -eq $true
+) "governanceSummary opsSurfaceOnly should be true"
+
+Assert (
+  $response.safetyProofs.deterministic -eq $true
+) "safetyProofs should be deterministic"
+
+Assert (
+  $response.safetyProofs.orchestrationInactiveProof -eq $true
+) "orchestrationInactiveProof should be true"
+
+Assert (
+  $response.safetyProofs.persistenceInactiveProof -eq $true
+) "persistenceInactiveProof should be true"
+
+Assert (
+  $response.safetyProofs.replaySimulatedOnlyProof -eq $true
+) "replaySimulatedOnlyProof should be true"
+
+Assert (
+  $response.safetyProofs.exportSimulatedOnlyProof -eq $true
+) "exportSimulatedOnlyProof should be true"
+
+Assert (
+  $response.safetyProofs.snapshotSimulatedOnlyProof -eq $true
+) "snapshotSimulatedOnlyProof should be true"
+
+Assert (
+  $response.safetyProofs.readOnlyModeProof -eq $true
+) "readOnlyModeProof should be true"
+
+Assert (
+  $response.safetyProofs.governanceBoundaryProof -eq $true
+) "governanceBoundaryProof should be true"
+
+Assert (
+  $response.governance.deterministic -eq $true
+) "governance should be deterministic"
+
+Assert (
+  $response.governance.governanceMode -eq "OPS_READ_ONLY"
+) "governanceMode should be OPS_READ_ONLY"
+
+Assert (
+  $response.governance.executionProhibited -eq $true
+) "executionProhibited should be true"
+
+Assert (
+  $response.governance.persistenceProhibited -eq $true
+) "persistenceProhibited should be true"
+
+Assert (
+  $response.governance.schedulerProhibited -eq $true
+) "schedulerProhibited should be true"
+
+Assert (
+  $response.governance.orchestrationProhibited -eq $true
+) "orchestrationProhibited should be true"
+
+Assert (
+  $response.governance.mutationProhibited -eq $true
+) "mutationProhibited should be true"
+
+Assert (
+  $response.governance.simulatedOnly -eq $true
+) "governance simulatedOnly should be true"
+
+Assert (
+  $response.governance.governanceStable -eq $true
+) "governanceStable should be true"
+
+Assert (
+  $null -ne $response.governance.safetyProofs
+) "governance safetyProofs should exist"
+
 for ($i = 0; $i -lt $response.simulationTimeline.Count; $i++) {
   $event = $response.simulationTimeline[$i]
 
@@ -625,6 +736,7 @@ foreach ($plan in $response.plans) {
 }
 
 Write-Host "OK: OPS task preview simulation assertion passed."
+
 
 
 

@@ -180,6 +180,71 @@ export default async function (context: any, req: any): Promise<void> {
       timelineDeterministic: true,
       simulatedOnly: true
     };
+    const explainability =
+      plans.map((plan: any, index: number) => {
+        const suppressionReasonsExpanded =
+          plan.planReadiness === "SUPPRESSED"
+            ? [
+                {
+                  code: "SUPPRESSED",
+                  detail:
+                    "Candidate is not currently eligible for orchestration."
+                }
+              ]
+            : [];
+
+        const anomalyFlags = [];
+
+        if (!plan.ownerId) {
+          anomalyFlags.push("MISSING_OWNER");
+        }
+
+        if (plan.planReadiness === "STALE") {
+          anomalyFlags.push("PROJECTION_STALE");
+        }
+
+        return {
+          candidateIdentityKey:
+            plan.candidateIdentityKey,
+          visitorId:
+            plan.visitorId,
+          reasoningTree: {
+            readiness:
+              plan.planReadiness,
+            ownerPresent:
+              !!plan.ownerId
+          },
+          suppressionReasonsExpanded,
+          anomalyFlags,
+          trace: {
+            timelineSequence:
+              index + 1,
+            replayHash:
+              replay.replayHash,
+            simulatedAction:
+              simulationTimeline[index]?.simulatedAction,
+            deterministic: true
+          }
+        };
+      });
+
+    const diagnostics = {
+      deterministic: true,
+      replayConsistent: true,
+      timelineConsistent:
+        simulationTimeline.length === plans.length,
+      anomalyCount:
+        explainability.reduce(
+          (sum: number, item: any) =>
+            sum + item.anomalyFlags.length,
+          0
+        ),
+      suppressedCount:
+        explainability.filter(
+          (item: any) =>
+            item.reasoningTree.readiness === "SUPPRESSED"
+        ).length
+    };
 
     context.res = {
       status: 200,
@@ -219,7 +284,9 @@ export default async function (context: any, req: any): Promise<void> {
         plans,
         simulationTimeline,
         replay,
-        auditEnvelope
+        auditEnvelope,
+        explainability,
+        diagnostics
       }
     };
   } catch (err: any) {
@@ -341,3 +408,5 @@ async function ensureTableExists(
     throw e;
   }
 }
+
+

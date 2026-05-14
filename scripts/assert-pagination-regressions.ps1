@@ -130,6 +130,12 @@ Invoke-Step "task preview derivation contract" {
   pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-task-preview-derivation-contract.ps1"
 }
 
+Invoke-Step "ops task preview simulation" {
+  pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-ops-task-preview-simulation.ps1" `
+    -ApiBase $api `
+    -ApiKey $ApiKey
+}
+
 Invoke-Step "task generation preview contract" {
   pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot/assert-task-generation-preview-contract.ps1" `
     -ApiBase $api `
@@ -182,4 +188,5 @@ if ($Stress) {
 
 Write-Host ""
 Write-Host "OK: pagination regression gate passed." -ForegroundColor Green
+
 

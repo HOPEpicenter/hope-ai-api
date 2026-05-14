@@ -501,6 +501,49 @@ export default async function (context: any, req: any): Promise<void> {
       safetyProofs,
       governanceStable: true
     };
+    const policySummary = {
+      deterministic: true,
+      policyReady: true,
+      policyMode: "READ_ONLY_POLICY",
+      governanceAligned: true,
+      replayPolicyAligned: true,
+      snapshotPolicyAligned: true,
+      exportPolicyAligned: true,
+      consistencyPolicyAligned: true,
+      opsOnlyPolicy: true
+    };
+
+    const policyProofs = {
+      deterministic: true,
+      governancePolicyProof:
+        governance.governanceMode === "OPS_READ_ONLY",
+      replayPolicyProof:
+        replay.simulatedOnly === true,
+      exportPolicyProof:
+        exportEnvelope.exportMode === "READ_ONLY",
+      snapshotPolicyProof:
+        snapshot.snapshotMode === "IN_MEMORY_ONLY",
+      consistencyPolicyProof:
+        consistency.consistencyMode === "READ_ONLY_IN_MEMORY",
+      safetyBoundaryProof:
+        governance.executionProhibited === true,
+      opsBoundaryProof:
+        governanceSummary.opsSurfaceOnly === true
+    };
+
+    const policy = {
+      deterministic: true,
+      policyVersion: 1,
+      policyState: "ENFORCED_READ_ONLY",
+      orchestrationPolicy: "PROHIBITED",
+      persistencePolicy: "PROHIBITED",
+      schedulerPolicy: "PROHIBITED",
+      mutationPolicy: "PROHIBITED",
+      executionPolicy: "PROHIBITED",
+      simulatedOnly: true,
+      policyProofs,
+      policyStable: true
+    };
 
     context.res = {
       status: 200,
@@ -557,7 +600,10 @@ export default async function (context: any, req: any): Promise<void> {
         consistency,
         governanceSummary,
         safetyProofs,
-        governance
+        governance,
+        policySummary,
+        policyProofs,
+        policy
       }
     };
   } catch (err: any) {
@@ -679,6 +725,7 @@ async function ensureTableExists(
     throw e;
   }
 }
+
 
 
 

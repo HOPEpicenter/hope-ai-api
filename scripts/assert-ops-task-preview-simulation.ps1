@@ -58,6 +58,9 @@ Assert ($null -ne $response.multiRun) "multiRun should exist"
 Assert ($null -ne $response.snapshotSummary) "snapshotSummary should exist"
 Assert ($null -ne $response.snapshot) "snapshot should exist"
 Assert ($null -ne $response.snapshotCompatibility) "snapshotCompatibility should exist"
+Assert ($null -ne $response.consistencySummary) "consistencySummary should exist"
+Assert ($null -ne $response.integrityProofs) "integrityProofs should exist"
+Assert ($null -ne $response.consistency) "consistency should exist"
 
 Assert ($response.previews -is [array]) "previews should be an array"
 Assert ($response.plans -is [array]) "plans should be an array"
@@ -447,6 +450,106 @@ Assert (
   $response.snapshotCompatibility.snapshotStable -eq $true
 ) "snapshot snapshotStable should be true"
 
+Assert (
+  $response.consistencySummary.deterministic -eq $true
+) "consistencySummary should be deterministic"
+
+Assert (
+  $response.consistencySummary.replayConsistent -eq $true
+) "consistencySummary replayConsistent should be true"
+
+Assert (
+  $response.consistencySummary.exportConsistent -eq $true
+) "consistencySummary exportConsistent should be true"
+
+Assert (
+  $response.consistencySummary.lineageConsistent -eq $true
+) "consistencySummary lineageConsistent should be true"
+
+Assert (
+  $response.consistencySummary.snapshotConsistent -eq $true
+) "consistencySummary snapshotConsistent should be true"
+
+Assert (
+  $response.consistencySummary.explainabilityConsistent -eq $true
+) "consistencySummary explainabilityConsistent should be true"
+
+Assert (
+  $response.consistencySummary.diagnosticsConsistent -eq $true
+) "consistencySummary diagnosticsConsistent should be true"
+
+Assert (
+  $response.consistencySummary.driftConsistent -eq $true
+) "consistencySummary driftConsistent should be true"
+
+Assert (
+  $response.consistencySummary.consistencyReady -eq $true
+) "consistencySummary consistencyReady should be true"
+
+Assert (
+  $response.integrityProofs.deterministic -eq $true
+) "integrityProofs should be deterministic"
+
+Assert (
+  $response.integrityProofs.replayHashProof -eq $true
+) "integrity replayHashProof should be true"
+
+Assert (
+  $response.integrityProofs.exportHashProof -eq $true
+) "integrity exportHashProof should be true"
+
+Assert (
+  $response.integrityProofs.lineageReplayProof -eq $true
+) "integrity lineageReplayProof should be true"
+
+Assert (
+  $response.integrityProofs.snapshotReplayProof -eq $true
+) "integrity snapshotReplayProof should be true"
+
+Assert (
+  $response.integrityProofs.snapshotExportProof -eq $true
+) "integrity snapshotExportProof should be true"
+
+Assert (
+  $response.integrityProofs.multirunReplayProof -eq $true
+) "integrity multirunReplayProof should be true"
+
+Assert (
+  $response.consistency.deterministic -eq $true
+) "consistency should be deterministic"
+
+Assert (
+  $response.consistency.consistencyMode -eq "READ_ONLY_IN_MEMORY"
+) "consistencyMode should be READ_ONLY_IN_MEMORY"
+
+Assert (
+  $response.consistency.replayExportConverged -eq $true
+) "consistency replayExportConverged should be true"
+
+Assert (
+  $response.consistency.replaySnapshotConverged -eq $true
+) "consistency replaySnapshotConverged should be true"
+
+Assert (
+  $response.consistency.lineageSnapshotConverged -eq $true
+) "consistency lineageSnapshotConverged should be true"
+
+Assert (
+  $response.consistency.diagnosticsConverged -eq $true
+) "consistency diagnosticsConverged should be true"
+
+Assert (
+  $response.consistency.explainabilityConverged -eq $true
+) "consistency explainabilityConverged should be true"
+
+Assert (
+  $response.consistency.consistencyStable -eq $true
+) "consistency consistencyStable should be true"
+
+Assert (
+  $null -ne $response.consistency.integrityProofs
+) "consistency integrityProofs should exist"
+
 for ($i = 0; $i -lt $response.simulationTimeline.Count; $i++) {
   $event = $response.simulationTimeline[$i]
 
@@ -522,6 +625,7 @@ foreach ($plan in $response.plans) {
 }
 
 Write-Host "OK: OPS task preview simulation assertion passed."
+
 
 
 

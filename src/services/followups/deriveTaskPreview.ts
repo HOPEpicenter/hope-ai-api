@@ -14,6 +14,31 @@ export type TaskPreviewSuppressionReason =
   | "PROJECTION_PROFILE_BEHIND"
   | "OWNER_MISSING";
 
+export type TaskPreviewFreshnessSeverity =
+  | "HEALTHY"
+  | "PROFILE_BEHIND"
+  | "DRIFTED"
+  | "STALE";
+
+export type SerializedTaskPreview = {
+  candidateIdentityKey: string;
+  visitorId: string;
+  ownerId: string | null;
+  candidateTaskType: "FOLLOWUP";
+  candidateTaskEligible: boolean;
+  previewEscalationLevel: TaskPreviewEscalationLevel;
+  previewFreshnessSeverity: TaskPreviewFreshnessSeverity;
+  suppressionReasons: TaskPreviewSuppressionReason[];
+};
+
+export type TaskPreviewGroup = {
+  groupKey: string;
+  ownerId: string | null;
+  previewEscalationLevel: TaskPreviewEscalationLevel;
+  candidateTaskEligible: boolean;
+  total: number;
+};
+
 export type TaskPreview = {
   visitorId: string;
   ownerId: string | null;
@@ -28,6 +53,7 @@ export type TaskPreview = {
   candidateTaskEligible: boolean;
   candidateIdentityKey: string;
   previewEscalationLevel: TaskPreviewEscalationLevel;
+  previewFreshnessSeverity: TaskPreviewFreshnessSeverity;
   suppressionReasons: TaskPreviewSuppressionReason[];
 };
 
@@ -63,6 +89,28 @@ function derivePreviewEscalationLevel(
   }
 
   return "NONE";
+}
+
+function derivePreviewFreshnessSeverity(args: {
+  projectionDrifted: boolean;
+  projectionProfileBehind: boolean;
+}): TaskPreviewFreshnessSeverity {
+  if (
+    args.projectionDrifted &&
+    args.projectionProfileBehind
+  ) {
+    return "STALE";
+  }
+
+  if (args.projectionDrifted) {
+    return "DRIFTED";
+  }
+
+  if (args.projectionProfileBehind) {
+    return "PROFILE_BEHIND";
+  }
+
+  return "HEALTHY";
 }
 
 function deriveSuppressionReasons(args: {
@@ -137,12 +185,19 @@ export function deriveTaskPreview(
   const previewEscalationLevel =
     derivePreviewEscalationLevel(followup);
 
+  const previewFreshnessSeverity =
+    derivePreviewFreshnessSeverity({
+      projectionDrifted,
+      projectionProfileBehind
+    });
+
   const candidateIdentityKey = [
     visitorId,
     ownerId,
     "FOLLOWUP",
     priorityReason,
     previewEscalationLevel,
+    previewFreshnessSeverity,
     followupResolved ? "resolved" : "open"
   ].join("|");
 
@@ -160,7 +215,32 @@ export function deriveTaskPreview(
     candidateTaskEligible,
     candidateIdentityKey,
     previewEscalationLevel,
+    previewFreshnessSeverity,
     suppressionReasons
+  };
+}
+
+export function serializeTaskPreview(
+  preview: TaskPreview
+): SerializedTaskPreview {
+  return {
+    candidateIdentityKey:
+      preview.candidateIdentityKey,
+    visitorId:
+      preview.visitorId,
+    ownerId:
+      preview.ownerId,
+    candidateTaskType:
+      preview.candidateTaskType,
+    candidateTaskEligible:
+      preview.candidateTaskEligible,
+    previewEscalationLevel:
+      preview.previewEscalationLevel,
+    previewFreshnessSeverity:
+      preview.previewFreshnessSeverity,
+    suppressionReasons: [
+      ...preview.suppressionReasons
+    ]
   };
 }
 
@@ -197,8 +277,12 @@ export function sortTaskPreviews(
 ): TaskPreview[] {
   return [...previews].sort((a, b) => {
     const escalationDelta =
-      escalationSortWeight(b.previewEscalationLevel) -
-      escalationSortWeight(a.previewEscalationLevel);
+      escalationSortWeight(
+        b.previewEscalationLevel
+      ) -
+      escalationSortWeight(
+        a.previewEscalationLevel
+      );
 
     if (escalationDelta !== 0) {
       return escalationDelta;
@@ -216,4 +300,47 @@ export function sortTaskPreviews(
       b.candidateIdentityKey
     );
   });
+}
+
+export function groupTaskPreviews(
+  previews: TaskPreview[]
+): TaskPreviewGroup[] {
+  const grouped = new Map<
+    string,
+    TaskPreviewGroup
+  >();
+
+  for (const preview of previews) {
+    const groupKey = [
+      preview.ownerId ?? "unowned",
+      preview.previewEscalationLevel,
+      preview.candidateTaskEligible
+        ? "eligible"
+        : "suppressed"
+    ].join("|");
+
+    const existing =
+      grouped.get(groupKey);
+
+    if (existing) {
+      existing.total += 1;
+      continue;
+    }
+
+    grouped.set(groupKey, {
+      groupKey,
+      ownerId: preview.ownerId,
+      previewEscalationLevel:
+        preview.previewEscalationLevel,
+      candidateTaskEligible:
+        preview.candidateTaskEligible,
+      total: 1
+    });
+  }
+
+  return Array.from(
+    grouped.values()
+  ).sort((a, b) =>
+    a.groupKey.localeCompare(b.groupKey)
+  );
 }

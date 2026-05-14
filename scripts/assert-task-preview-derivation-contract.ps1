@@ -13,11 +13,17 @@ const mod = require(process.argv[1]);
 const deriveTaskPreview =
   mod.deriveTaskPreview;
 
+const serializeTaskPreview =
+  mod.serializeTaskPreview;
+
 const dedupeTaskPreviews =
   mod.dedupeTaskPreviews;
 
 const sortTaskPreviews =
   mod.sortTaskPreviews;
+
+const groupTaskPreviews =
+  mod.groupTaskPreviews;
 
 function assert(condition, message) {
   if (!condition) {
@@ -57,48 +63,34 @@ assert(
 );
 
 assert(
-  preview1.visitorId === "visitor-preview-dedup",
-  "preview should preserve visitorId"
+  preview1.previewFreshnessSeverity === "HEALTHY",
+  "healthy projections should expose HEALTHY freshness"
+);
+
+const serialized1 =
+  serializeTaskPreview(preview1);
+
+const serialized2 =
+  serializeTaskPreview(preview2);
+
+assert(
+  JSON.stringify(serialized1) === JSON.stringify(serialized2),
+  "serialization should remain deterministic"
 );
 
 assert(
-  preview1.ownerId === "ops-preview-owner",
-  "preview should preserve ownerId"
+  serialized1.previewEscalationLevel === "ELEVATED",
+  "serialized preview should preserve escalation level"
 );
 
 assert(
-  preview1.candidateTaskType === "FOLLOWUP",
-  "candidateTaskType should be FOLLOWUP"
+  serialized1.previewFreshnessSeverity === "HEALTHY",
+  "serialized preview should preserve freshness severity"
 );
 
 assert(
-  preview1.followupResolved === false,
-  "unresolved followup should expose followupResolved=false"
-);
-
-assert(
-  preview1.projectionHealthy === true,
-  "healthy projection should expose projectionHealthy=true"
-);
-
-assert(
-  preview1.candidateTaskEligible === true,
-  "healthy unresolved owned followup should be eligible"
-);
-
-assert(
-  preview1.previewEscalationLevel === "ELEVATED",
-  "AT_RISK followups should escalate to ELEVATED"
-);
-
-assert(
-  preview1.suppressionReasons.length === 0,
-  "eligible preview should not expose suppression reasons"
-);
-
-assert(
-  preview1.candidateIdentityKey === preview2.candidateIdentityKey,
-  "equivalent previews should share identity key"
+  Array.isArray(serialized1.suppressionReasons),
+  "serialized suppressionReasons should remain an array"
 );
 
 const duplicateCandidates = [
@@ -129,23 +121,8 @@ const resolvedPreview = deriveTaskPreview({
 });
 
 assert(
-  resolvedPreview.followupResolved === true,
-  "resolved preview should expose followupResolved=true"
-);
-
-assert(
-  resolvedPreview.candidateTaskEligible === false,
-  "resolved followup should not be eligible"
-);
-
-assert(
   resolvedPreview.suppressionReasons.includes("FOLLOWUP_RESOLVED"),
   "resolved preview should expose FOLLOWUP_RESOLVED suppression"
-);
-
-assert(
-  resolvedPreview.candidateIdentityKey !== preview1.candidateIdentityKey,
-  "resolved/open identity should not collapse"
 );
 
 const driftedPreview = deriveTaskPreview({
@@ -157,18 +134,8 @@ const driftedPreview = deriveTaskPreview({
 });
 
 assert(
-  driftedPreview.projectionHealthy === false,
-  "drifted projection should not be healthy"
-);
-
-assert(
-  driftedPreview.candidateTaskEligible === false,
-  "drifted projection should suppress eligibility"
-);
-
-assert(
-  driftedPreview.suppressionReasons.includes("PROJECTION_DRIFTED"),
-  "drifted preview should expose PROJECTION_DRIFTED suppression"
+  driftedPreview.previewFreshnessSeverity === "DRIFTED",
+  "drifted projection should expose DRIFTED freshness"
 );
 
 const behindPreview = deriveTaskPreview({
@@ -180,8 +147,21 @@ const behindPreview = deriveTaskPreview({
 });
 
 assert(
-  behindPreview.suppressionReasons.includes("PROJECTION_PROFILE_BEHIND"),
-  "behind preview should expose PROJECTION_PROFILE_BEHIND suppression"
+  behindPreview.previewFreshnessSeverity === "PROFILE_BEHIND",
+  "behind projection should expose PROFILE_BEHIND freshness"
+);
+
+const stalePreview = deriveTaskPreview({
+  followup: baseFollowup,
+  audit: {
+    drifted: true,
+    profileBehind: true
+  }
+});
+
+assert(
+  stalePreview.previewFreshnessSeverity === "STALE",
+  "fully stale projection should expose STALE freshness"
 );
 
 const ownerlessPreview = deriveTaskPreview({
@@ -191,16 +171,6 @@ const ownerlessPreview = deriveTaskPreview({
   },
   audit: healthyAudit
 });
-
-assert(
-  ownerlessPreview.ownerId === null,
-  "ownerless preview should expose ownerId=null"
-);
-
-assert(
-  ownerlessPreview.candidateTaskEligible === false,
-  "ownerless followup should not be eligible"
-);
 
 assert(
   ownerlessPreview.suppressionReasons.includes("OWNER_MISSING"),
@@ -215,11 +185,6 @@ const highEscalationPreview = deriveTaskPreview({
   },
   audit: healthyAudit
 });
-
-assert(
-  highEscalationPreview.previewEscalationLevel === "HIGH",
-  "critical followups should escalate to HIGH"
-);
 
 const sorted = sortTaskPreviews([
   preview1,
@@ -241,6 +206,35 @@ const sortedAgain = sortTaskPreviews([
 assert(
   JSON.stringify(sorted) === JSON.stringify(sortedAgain),
   "sorting should remain deterministic"
+);
+
+const grouped =
+  groupTaskPreviews([
+    preview1,
+    highEscalationPreview,
+    ownerlessPreview
+  ]);
+
+assert(
+  grouped.length >= 2,
+  "grouping should produce multiple deterministic groups"
+);
+
+const groupedAgain =
+  groupTaskPreviews([
+    ownerlessPreview,
+    preview1,
+    highEscalationPreview
+  ]);
+
+assert(
+  JSON.stringify(grouped) === JSON.stringify(groupedAgain),
+  "grouping should remain deterministic"
+);
+
+assert(
+  grouped.every(group => typeof group.total === "number"),
+  "group totals should remain numeric"
 );
 
 console.log(

@@ -64,6 +64,9 @@ Assert ($null -ne $response.consistency) "consistency should exist"
 Assert ($null -ne $response.governanceSummary) "governanceSummary should exist"
 Assert ($null -ne $response.safetyProofs) "safetyProofs should exist"
 Assert ($null -ne $response.governance) "governance should exist"
+Assert ($null -ne $response.policySummary) "policySummary should exist"
+Assert ($null -ne $response.policyProofs) "policyProofs should exist"
+Assert ($null -ne $response.policy) "policy should exist"
 
 Assert ($response.previews -is [array]) "previews should be an array"
 Assert ($response.plans -is [array]) "plans should be an array"
@@ -661,6 +664,118 @@ Assert (
   $null -ne $response.governance.safetyProofs
 ) "governance safetyProofs should exist"
 
+Assert (
+  $response.policySummary.deterministic -eq $true
+) "policySummary should be deterministic"
+
+Assert (
+  $response.policySummary.policyReady -eq $true
+) "policySummary policyReady should be true"
+
+Assert (
+  $response.policySummary.policyMode -eq "READ_ONLY_POLICY"
+) "policyMode should be READ_ONLY_POLICY"
+
+Assert (
+  $response.policySummary.governanceAligned -eq $true
+) "governanceAligned should be true"
+
+Assert (
+  $response.policySummary.replayPolicyAligned -eq $true
+) "replayPolicyAligned should be true"
+
+Assert (
+  $response.policySummary.snapshotPolicyAligned -eq $true
+) "snapshotPolicyAligned should be true"
+
+Assert (
+  $response.policySummary.exportPolicyAligned -eq $true
+) "exportPolicyAligned should be true"
+
+Assert (
+  $response.policySummary.consistencyPolicyAligned -eq $true
+) "consistencyPolicyAligned should be true"
+
+Assert (
+  $response.policySummary.opsOnlyPolicy -eq $true
+) "opsOnlyPolicy should be true"
+
+Assert (
+  $response.policyProofs.deterministic -eq $true
+) "policyProofs should be deterministic"
+
+Assert (
+  $response.policyProofs.governancePolicyProof -eq $true
+) "governancePolicyProof should be true"
+
+Assert (
+  $response.policyProofs.replayPolicyProof -eq $true
+) "replayPolicyProof should be true"
+
+Assert (
+  $response.policyProofs.exportPolicyProof -eq $true
+) "exportPolicyProof should be true"
+
+Assert (
+  $response.policyProofs.snapshotPolicyProof -eq $true
+) "snapshotPolicyProof should be true"
+
+Assert (
+  $response.policyProofs.consistencyPolicyProof -eq $true
+) "consistencyPolicyProof should be true"
+
+Assert (
+  $response.policyProofs.safetyBoundaryProof -eq $true
+) "safetyBoundaryProof should be true"
+
+Assert (
+  $response.policyProofs.opsBoundaryProof -eq $true
+) "opsBoundaryProof should be true"
+
+Assert (
+  $response.policy.deterministic -eq $true
+) "policy should be deterministic"
+
+Assert (
+  $response.policy.policyVersion -eq 1
+) "policyVersion should be 1"
+
+Assert (
+  $response.policy.policyState -eq "ENFORCED_READ_ONLY"
+) "policyState should be ENFORCED_READ_ONLY"
+
+Assert (
+  $response.policy.orchestrationPolicy -eq "PROHIBITED"
+) "orchestrationPolicy should be PROHIBITED"
+
+Assert (
+  $response.policy.persistencePolicy -eq "PROHIBITED"
+) "persistencePolicy should be PROHIBITED"
+
+Assert (
+  $response.policy.schedulerPolicy -eq "PROHIBITED"
+) "schedulerPolicy should be PROHIBITED"
+
+Assert (
+  $response.policy.mutationPolicy -eq "PROHIBITED"
+) "mutationPolicy should be PROHIBITED"
+
+Assert (
+  $response.policy.executionPolicy -eq "PROHIBITED"
+) "executionPolicy should be PROHIBITED"
+
+Assert (
+  $response.policy.simulatedOnly -eq $true
+) "policy simulatedOnly should be true"
+
+Assert (
+  $response.policy.policyStable -eq $true
+) "policyStable should be true"
+
+Assert (
+  $null -ne $response.policy.policyProofs
+) "policy policyProofs should exist"
+
 for ($i = 0; $i -lt $response.simulationTimeline.Count; $i++) {
   $event = $response.simulationTimeline[$i]
 
@@ -736,6 +851,7 @@ foreach ($plan in $response.plans) {
 }
 
 Write-Host "OK: OPS task preview simulation assertion passed."
+
 
 
 

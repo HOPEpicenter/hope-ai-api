@@ -102,6 +102,7 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
         email: null,
         assignedTo: projection.assignedTo,
         assignedToName: projection.assignedToName,
+        projectionMetadata: projection.projectionMetadata,
         followupState: projection.followupState,
         attentionState: projection.attentionState,
         lastFollowupAssignedAt: p.lastFollowupAssignedAt ?? null,
@@ -141,5 +142,3 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
     };
   }
 }
-
-

@@ -1,8 +1,14 @@
 import { resolveOperatorDisplayName } from "./formation";
 
+export type FollowupProjectionMetadata = {
+  sourceSystem: string | null;
+  isDiagnostic: boolean;
+};
+
 export type FollowupProjection = {
   assignedTo: string | null;
   assignedToName: string | null;
+  projectionMetadata: FollowupProjectionMetadata;
 
   followupState:
     | "Assigned"
@@ -19,7 +25,25 @@ export type FollowupProjection = {
   isOpen: boolean;
 };
 
+function getFollowupProjectionMetadata(profile: any): FollowupProjectionMetadata {
+  const sourceSystem =
+    typeof profile?.source?.system === "string" && profile.source.system.trim().length > 0
+      ? profile.source.system.trim()
+      : null;
+
+  const normalizedSourceSystem = sourceSystem?.toLowerCase() ?? "";
+
+  return {
+    sourceSystem,
+    isDiagnostic:
+      normalizedSourceSystem.startsWith("scripts/") ||
+      normalizedSourceSystem.includes("assert")
+  };
+}
+
 export function projectFollowupState(profile: any): FollowupProjection {
+  const projectionMetadata = getFollowupProjectionMetadata(profile);
+
   const assignedToRaw =
     typeof profile?.assignedTo === "string"
       ? profile.assignedTo.trim()
@@ -45,6 +69,7 @@ export function projectFollowupState(profile: any): FollowupProjection {
     return {
       assignedTo: null,
       assignedToName: null,
+      projectionMetadata,
       followupState: "Unassigned",
       attentionState: "Unassigned",
       isOpen: false
@@ -55,6 +80,7 @@ export function projectFollowupState(profile: any): FollowupProjection {
     return {
       assignedTo,
       assignedToName,
+      projectionMetadata,
       followupState: "Resolved",
       attentionState: "Resolved",
       isOpen: false
@@ -65,6 +91,7 @@ export function projectFollowupState(profile: any): FollowupProjection {
     return {
       assignedTo,
       assignedToName,
+      projectionMetadata,
       followupState: "Contacted",
       attentionState: "Contact made",
       isOpen: true
@@ -74,6 +101,7 @@ export function projectFollowupState(profile: any): FollowupProjection {
   return {
     assignedTo,
     assignedToName,
+    projectionMetadata,
     followupState: "Assigned",
     attentionState: "Action needed",
     isOpen: true

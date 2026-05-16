@@ -273,7 +273,7 @@ let nextCursor: string | null = null;
 if (visitorIdQ) {
   const one = await getFormationProfile(profilesTable as any, visitorIdQ);
   // Contract: visitorId fast path returns exactly 1 item (profile may be null)
-  items = one ? [one] : [{ partitionKey: "VISITOR", rowKey: visitorIdQ, visitorId: visitorIdQ } as any];
+  items = one ? [one] : [];
 } else {
   const out = await listFormationProfiles(profilesTable as any, {
     limit,

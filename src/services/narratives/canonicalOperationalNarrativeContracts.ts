@@ -23,3 +23,22 @@ export function buildCanonicalVisitorOperationalNarrative(
     }
   };
 }
+export type CanonicalUnifiedVisitorStory = {
+  storyType: "visitor";
+  visitor: CanonicalVisitorNarrative;
+  operations: {
+    followups: OpsFollowupsQueueResult | null;
+  };
+};
+
+export function buildCanonicalUnifiedVisitorStory(
+  input: BuildCanonicalVisitorOperationalNarrativeInput
+): CanonicalUnifiedVisitorStory {
+  const narrative = buildCanonicalVisitorOperationalNarrative(input);
+
+  return {
+    storyType: "visitor",
+    visitor: narrative.visitor,
+    operations: narrative.operations
+  };
+}

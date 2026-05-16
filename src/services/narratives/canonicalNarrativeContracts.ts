@@ -20,3 +20,21 @@ export type CanonicalVisitorNarrative = {
   formation: unknown;
   journey: CanonicalJourneyNarrative | unknown;
 };
+export type CanonicalEngagementTimelinePreviewItem = {
+  eventId?: string;
+  visitorId?: string;
+  type?: string;
+  occurredAt?: string;
+  source?: unknown;
+  data?: unknown;
+  [key: string]: unknown;
+};
+
+export type CanonicalEngagementNarrative = {
+  summary: unknown | null;
+  status: string | null;
+  lastChangedAt: string | null;
+  lastEventId: string | null;
+  risk: unknown;
+  timelinePreview: CanonicalEngagementTimelinePreviewItem[];
+};

@@ -5,7 +5,7 @@ import {
   getFormationProfilesTableClient,
 } from "../../storage/formation/formationTables";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
-import { readOpsFollowupsQueue } from "../../services/followups/readOpsFollowupsQueue";
+import { readCanonicalOpsFollowupsNarrative } from "../../services/followups/readCanonicalOpsFollowupsNarrative";
 import { normalizeOpsFollowupsQuery } from "../../services/followups/opsFollowupsQuery";
 
 export const opsFollowupsRouter = Router();
@@ -26,7 +26,7 @@ opsFollowupsRouter.get("/", async (req, res) => {
 
   const query = normalizeOpsFollowupsQuery(req.query);
 
-  const result = await readOpsFollowupsQueue({
+  const result = await readCanonicalOpsFollowupsNarrative({
     eventsTable: eventsTable as any,
     profilesTable: profilesTable as any,
     limit: query.limit,

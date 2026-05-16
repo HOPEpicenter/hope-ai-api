@@ -1,5 +1,5 @@
 import { TableClient } from "@azure/data-tables";
-import { readOpsFollowupsQueue } from "../../services/followups/readOpsFollowupsQueue";
+import { readCanonicalOpsFollowupsNarrative } from "../../services/followups/readCanonicalOpsFollowupsNarrative";
 import { normalizeOpsFollowupsQuery, readQueryValue } from "../../services/followups/opsFollowupsQuery";
 
 // Repo pattern: legacy default export invoked as (context, req) via function.json.
@@ -66,7 +66,7 @@ export default async function (context: any, req: any): Promise<void> {
       sortDir: readQueryValue(req?.query, "sortDir")
     });
 
-    const result = await readOpsFollowupsQueue({
+    const result = await readCanonicalOpsFollowupsNarrative({
       eventsTable,
       profilesTable,
       limit: query.limit,

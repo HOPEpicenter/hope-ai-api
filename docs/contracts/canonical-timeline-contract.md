@@ -228,3 +228,49 @@ Future work must not:
 - break cursor semantics
 - redefine ordering rules
 - move semantic ownership into frontend layers
+---
+
+# Timeline Contract Drift Audit
+
+## Confirmed Alignment
+
+Current implementation correctly aligns with canonical timeline semantics for:
+
+- deterministic occurredAt DESC ordering
+- stable eventId tie-break ordering
+- stable stream tie-break ordering
+- exclusive upper-bound cursor semantics
+- deterministic pagination behavior
+- grouping after pagination
+- dedupe before pagination
+- replay-safe next-step preservation
+- replay-safe status transition preservation
+
+## Identified Drift
+
+### Shadow Read Governance Drift
+
+Current implementation allows shadow-read results to replace canonical timeline results when shadow items exist.
+
+Current behavior:
+
+- shadow read may replace legacy output
+- shadow read is not strictly validation-only
+
+Architectural risk:
+
+- canonical timeline semantics may vary by shadow-read availability
+- output determinism may drift during migration phases
+- transport/runtime behavior may affect narrative semantics
+
+## Canonical Direction
+
+Shadow reads should remain:
+
+- validation-only
+- non-authoritative
+- non-semantic
+- non-governing
+
+Canonical timeline semantics must remain owned by the primary timeline orchestration path.
+

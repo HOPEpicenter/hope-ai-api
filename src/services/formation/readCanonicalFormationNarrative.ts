@@ -1,6 +1,7 @@
 import { projectFollowupState } from "../../functions/_shared/followupProjection";
+import type { CanonicalFormationNarrative } from "../narratives/canonicalNarrativeContracts";
 
-export function buildCanonicalFormationNarrative(formationProfile: any | null) {
+export function buildCanonicalFormationNarrative(formationProfile: any | null): CanonicalFormationNarrative {
   const followupProjection =
     formationProfile
       ? projectFollowupState(formationProfile)

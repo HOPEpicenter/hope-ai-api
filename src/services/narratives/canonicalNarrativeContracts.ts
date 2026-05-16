@@ -38,3 +38,21 @@ export type CanonicalEngagementNarrative = {
   risk: unknown;
   timelinePreview: CanonicalEngagementTimelinePreviewItem[];
 };
+export type CanonicalFormationProfile = {
+  followupStatus?: string | null;
+  attentionState?: string | null;
+  projectionMetadata?: unknown | null;
+  lastEventType?: string | null;
+  [key: string]: unknown;
+};
+
+export type CanonicalFormationMilestones = {
+  hasSalvation: boolean;
+  hasBaptism: boolean;
+  hasMembership: boolean;
+};
+
+export type CanonicalFormationNarrative = {
+  profile: CanonicalFormationProfile | null;
+  milestones: CanonicalFormationMilestones;
+};

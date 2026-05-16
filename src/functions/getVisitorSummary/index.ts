@@ -4,7 +4,7 @@ import { EngagementEventsRepository } from "../../repositories/engagementEventsR
 import { readCanonicalEngagementNarrative } from "../../services/engagements/readCanonicalEngagementNarrative";
 import { getFormationProfilesTableClient, getFormationProfileByVisitorId } from "../_shared/formation";
 import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1";
-import { projectFollowupState } from "../_shared/followupProjection";
+import { buildCanonicalFormationNarrative } from "../../services/formation/readCanonicalFormationNarrative";
 
 const integrationService = new IntegrationService(new EngagementEventsRepository());
 
@@ -52,10 +52,7 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
       formationProfile: formationProfile ?? null
     });
 
-    const followupProjection =
-      formationProfile
-        ? projectFollowupState(formationProfile)
-        : null;
+    const formation = buildCanonicalFormationNarrative(formationProfile ?? null);
 
     context.res = {
       status: 200,
@@ -67,20 +64,7 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
         summary: {
           engagement,
           integration: integrationSummary ?? null,
-          formation: {
-            profile: formationProfile
-              ? {
-                  ...formationProfile,
-                  followupStatus: followupProjection?.followupState ?? null,
-                  attentionState: followupProjection?.attentionState ?? null
-                }
-              : null,
-            milestones: {
-              hasSalvation: formationProfile?.lastEventType === "SALVATION_RECORDED",
-              hasBaptism: formationProfile?.lastEventType === "BAPTISM_RECORDED",
-              hasMembership: formationProfile?.lastEventType === "MEMBERSHIP_RECORDED"
-            }
-          },
+          formation,
           journey
         }
       }

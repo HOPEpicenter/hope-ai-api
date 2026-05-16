@@ -1,18 +1,13 @@
 import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1";
 import type { Request, Response, NextFunction } from "express";
-import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepository";
 import { IntegrationService } from "../../services/integration/integrationService";
-import { TIMELINE_DERIVATION_LIMIT } from "../../services/integration/timelineConstants";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { EngagementsService } from "../../services/engagements/engagementsService";
-import { readEngagementRiskV1 } from "../../services/engagements/readEngagementRisk";
+import { readCanonicalEngagementNarrative } from "../../services/engagements/readCanonicalEngagementNarrative";
 import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
 import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
 import { projectFollowupState } from "../../functions/_shared/followupProjection";
 
-const engagementSummaryRepo = new EngagementSummaryRepository();
 const integrationService = new IntegrationService(new EngagementEventsRepository());
-const engagementsService = new EngagementsService(new EngagementEventsRepository());
 
 export function createGetVisitorSummaryAdapter() {
   return async function getVisitorSummary(req: Request, res: Response, next: NextFunction) {
@@ -34,17 +29,14 @@ export function createGetVisitorSummaryAdapter() {
 
       const profilesTable = getFormationProfilesTableClient(storageConnectionString);
 
-      const [engagementSummary, engagementStatus, engagementRisk, integrationSummary, timelinePage, formationProfile] = await Promise.all([
-        engagementSummaryRepo.get(visitorId),
-        engagementsService.getCurrentStatus(visitorId),
-        readEngagementRiskV1(engagementsService, visitorId, 14),
+      const [engagement, integrationSummary, formationProfile] = await Promise.all([
+        readCanonicalEngagementNarrative(visitorId),
         integrationService.readIntegrationSummary(visitorId),
-        integrationService.readIntegratedTimeline(visitorId, TIMELINE_DERIVATION_LIMIT),
         getFormationProfile(profilesTable as any, visitorId)
       ]);
 
       const journey = deriveJourneySummaryV1({
-        engagementEvents: timelinePage?.items ?? [],
+        engagementEvents: engagement.timelinePreview,
         formationProfile: formationProfile ?? null
       });
 
@@ -66,14 +58,7 @@ export function createGetVisitorSummaryAdapter() {
         v: 1,
         visitorId,
         summary: {
-          engagement: {
-            summary: engagementSummary ?? null,
-            status: engagementStatus?.status ?? null,
-            lastChangedAt: engagementStatus?.lastChangedAt ?? null,
-            lastEventId: engagementStatus?.lastEventId ?? null,
-            risk: engagementRisk,
-            timelinePreview: timelinePage?.items ?? []
-          },
+          engagement,
           integration: integrationSummary ?? null,
           formation: {
             profile: canonicalFormationProfile,

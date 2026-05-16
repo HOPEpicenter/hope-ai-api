@@ -33,8 +33,9 @@ export function createGetVisitorSummaryAdapter() {
 
       const profilesTable = getFormationProfilesTableClient(storageConnectionString);
 
-      const [engagementSummary, engagementRisk, integrationSummary, timelinePage, formationProfile] = await Promise.all([
+      const [engagementSummary, engagementStatus, engagementRisk, integrationSummary, timelinePage, formationProfile] = await Promise.all([
         engagementSummaryRepo.get(visitorId),
+        engagementsService.getCurrentStatus(visitorId),
         readEngagementRiskV1(engagementsService, visitorId, 14),
         integrationService.readIntegrationSummary(visitorId),
         integrationService.readIntegratedTimeline(visitorId, TIMELINE_DERIVATION_LIMIT),
@@ -75,6 +76,9 @@ export function createGetVisitorSummaryAdapter() {
         summary: {
           engagement: {
             summary: engagementSummary ?? null,
+            status: engagementStatus?.status ?? null,
+            lastChangedAt: engagementStatus?.lastChangedAt ?? null,
+            lastEventId: engagementStatus?.lastEventId ?? null,
             risk: engagementRisk,
             timelinePreview: timelinePage?.items ?? []
           },
@@ -95,5 +99,6 @@ export function createGetVisitorSummaryAdapter() {
     }
   };
 }
+
 
 

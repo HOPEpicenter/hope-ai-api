@@ -27,8 +27,8 @@ export type FollowupProjection = {
 
 function getFollowupProjectionMetadata(profile: any): FollowupProjectionMetadata {
   const sourceSystem =
-    typeof profile?.source?.system === "string" && profile.source.system.trim().length > 0
-      ? profile.source.system.trim()
+    typeof profile?.lastSourceSystem === "string" && profile.lastSourceSystem.trim().length > 0
+      ? profile.lastSourceSystem.trim()
       : null;
 
   const normalizedSourceSystem = sourceSystem?.toLowerCase() ?? "";

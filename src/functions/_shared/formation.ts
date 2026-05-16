@@ -266,6 +266,10 @@ function toComparableProfileState(profile: FunctionFormationProfileEntity | null
     lastEventType: profile.lastEventType ?? null,
     lastEventAt: profile.lastEventAt ?? null,
     lastEventId: (profile as any).lastEventId ?? null,
+    lastSourceSystem:
+      (profile as any).lastSourceSystem ?? null,
+    lastSourceCategory:
+      (profile as any).lastSourceCategory ?? null,
     lastServiceAttendedAt: profile.lastServiceAttendedAt ?? null,
     lastFollowupAssignedAt: profile.lastFollowupAssignedAt ?? null,
     lastFollowupContactedAt: profile.lastFollowupContactedAt ?? null,
@@ -459,14 +463,19 @@ async function applyFormationEventToProfile(params: {
   occurredAt: string;
   eventId: string;
   data: any;
+  source: Record<string, any>;
   shouldAdvance: boolean;
 }): Promise<void> {
-  const { profile, visitorId, type, occurredAt, eventId, data, shouldAdvance } = params;
+  const { profile, visitorId, type, occurredAt, eventId, data, source, shouldAdvance } = params;
 
   if (shouldAdvance) {
     profile.lastEventType = type;
     profile.lastEventAt = occurredAt;
     (profile as any).lastEventId = eventId;
+    (profile as any).lastSourceSystem =
+      typeof source?.system === "string" ? source.system : null;
+    (profile as any).lastSourceCategory =
+      typeof source?.category === "string" ? source.category : null;
   }
 
   if (type === "GROUP_JOINED") {
@@ -768,6 +777,7 @@ try {
     occurredAt,
     eventId,
     data,
+    source,
     shouldAdvance
   });
 
@@ -834,6 +844,10 @@ export async function deriveFormationProfileForVisitor(visitorIdInput: string): 
     const type = String(event.type ?? "").trim();
     const metadata = parseMetadataJson(event.metadata) ?? {};
     const data = metadata.data ?? metadata;
+    const source =
+      metadata.source && typeof metadata.source === "object"
+        ? metadata.source
+        : {};
 
     const shouldAdvance = shouldAdvanceEventState(
       occurredAt,
@@ -849,6 +863,7 @@ export async function deriveFormationProfileForVisitor(visitorIdInput: string): 
       occurredAt,
       eventId,
       data,
+      source,
       shouldAdvance
     });
   }
@@ -1112,7 +1127,3 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
-
-
-
-

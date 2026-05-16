@@ -5,9 +5,7 @@ import {
   getFormationProfilesTableClient,
 } from "../../storage/formation/formationTables";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
-import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { EngagementsService } from "../../services/engagements/engagementsService";
-import { buildOpsFollowupsQueue } from "../../services/followups/buildOpsFollowupsQueue";
+import { readOpsFollowupsQueue } from "../../services/followups/readOpsFollowupsQueue";
 
 export const opsFollowupsRouter = Router();
 opsFollowupsRouter.use(requireApiKey);
@@ -24,8 +22,6 @@ opsFollowupsRouter.get("/", async (req, res) => {
 
   await ensureTableExists(eventsTable as any);
   await ensureTableExists(profilesTable as any);
-
-  const engagementService = new EngagementsService(new EngagementEventsRepository());
 
   const limitRaw = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
   const cursorRaw = Array.isArray(req.query.cursor) ? req.query.cursor[0] : req.query.cursor;
@@ -53,10 +49,9 @@ opsFollowupsRouter.get("/", async (req, res) => {
       ? parsedCursor
       : 0;
 
-  const result = await buildOpsFollowupsQueue({
+  const result = await readOpsFollowupsQueue({
     eventsTable: eventsTable as any,
     profilesTable: profilesTable as any,
-    engagementService,
     limit,
     cursor,
     assignedToFilter: String(assignedToFilterRaw ?? "").trim(),

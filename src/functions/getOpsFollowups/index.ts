@@ -1,7 +1,5 @@
 import { TableClient } from "@azure/data-tables";
-import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { EngagementsService } from "../../services/engagements/engagementsService";
-import { buildOpsFollowupsQueue } from "../../services/followups/buildOpsFollowupsQueue";
+import { readOpsFollowupsQueue } from "../../services/followups/readOpsFollowupsQueue";
 
 // Repo pattern: legacy default export invoked as (context, req) via function.json.
 export default async function (context: any, req: any): Promise<void> {
@@ -63,12 +61,9 @@ export default async function (context: any, req: any): Promise<void> {
     const includeResolved =
       String(readQuery(req, "includeResolved") ?? "").trim().toLowerCase() === "true";
 
-    const engagementService = new EngagementsService(new EngagementEventsRepository());
-
-    const result = await buildOpsFollowupsQueue({
+    const result = await readOpsFollowupsQueue({
       eventsTable,
       profilesTable,
-      engagementService,
       limit,
       cursor,
       assignedToFilter: String(readQuery(req, "assignedTo") ?? "").trim(),

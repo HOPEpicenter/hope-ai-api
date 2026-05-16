@@ -5,7 +5,7 @@ import { EngagementEventsRepository } from "../../repositories/engagementEventsR
 import { readCanonicalEngagementNarrative } from "../../services/engagements/readCanonicalEngagementNarrative";
 import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
 import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
-import { projectFollowupState } from "../../functions/_shared/followupProjection";
+import { buildCanonicalFormationNarrative } from "../../services/formation/readCanonicalFormationNarrative";
 
 const integrationService = new IntegrationService(new EngagementEventsRepository());
 
@@ -40,18 +40,7 @@ export function createGetVisitorSummaryAdapter() {
         formationProfile: formationProfile ?? null
       });
 
-      const followupProjection = formationProfile
-        ? projectFollowupState(formationProfile)
-        : null;
-
-      const canonicalFormationProfile = formationProfile
-        ? {
-            ...formationProfile,
-            followupStatus: followupProjection?.followupState ?? "none",
-            attentionState: followupProjection?.attentionState ?? "clear",
-            projectionMetadata: followupProjection?.projectionMetadata ?? null
-          }
-        : null;
+      const formation = buildCanonicalFormationNarrative(formationProfile ?? null);
 
       return res.status(200).json({
         ok: true,
@@ -60,14 +49,7 @@ export function createGetVisitorSummaryAdapter() {
         summary: {
           engagement,
           integration: integrationSummary ?? null,
-          formation: {
-            profile: canonicalFormationProfile,
-            milestones: {
-              hasSalvation: formationProfile?.lastEventType === "SALVATION_RECORDED",
-              hasBaptism: formationProfile?.lastEventType === "BAPTISM_RECORDED",
-              hasMembership: formationProfile?.lastEventType === "MEMBERSHIP_RECORDED"
-            }
-          },
+          formation,
           journey
         },
       });

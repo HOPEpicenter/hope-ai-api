@@ -39,6 +39,7 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
     await ensureTable(table);
 
     const collected: FunctionFormationProfileEntity[] = [];
+    let orphanFollowupsExcluded = 0;
     let sourceCursor = requestedCursor;
     let sourceHasMore = true;
 
@@ -49,7 +50,24 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
       });
 
       const openAssigned = page.items.filter(isOpenAssignedFollowup);
-      collected.push(...openAssigned);
+
+      for (const profile of openAssigned) {
+        const visitorId = String(profile.visitorId ?? "").trim();
+
+        if (!visitorId) {
+          orphanFollowupsExcluded++;
+          continue;
+        }
+
+        const visitor = await getVisitorById(visitorId);
+
+        if (!visitor) {
+          orphanFollowupsExcluded++;
+          continue;
+        }
+
+        collected.push(profile);
+      }
 
       if (page.cursor) {
         sourceCursor = page.cursor;
@@ -120,7 +138,10 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
         limit,
         cursor: nextCursor,
         nextCursor,
-        items
+        items,
+        projectionIntegrity: {
+          orphanFollowupsExcluded
+        }
       }
     };
 
@@ -142,3 +163,4 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
     };
   }
 }
+

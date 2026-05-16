@@ -1,13 +1,7 @@
-import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1";
 import type { Request, Response, NextFunction } from "express";
-import { IntegrationService } from "../../services/integration/integrationService";
-import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { readCanonicalEngagementNarrative } from "../../services/engagements/readCanonicalEngagementNarrative";
 import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
 import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
-import { buildCanonicalFormationNarrative } from "../../services/formation/readCanonicalFormationNarrative";
-
-const integrationService = new IntegrationService(new EngagementEventsRepository());
+import { readCanonicalVisitorNarrative } from "../../services/visitors/readCanonicalVisitorNarrative";
 
 export function createGetVisitorSummaryAdapter() {
   return async function getVisitorSummary(req: Request, res: Response, next: NextFunction) {
@@ -29,29 +23,16 @@ export function createGetVisitorSummaryAdapter() {
 
       const profilesTable = getFormationProfilesTableClient(storageConnectionString);
 
-      const [engagement, integrationSummary, formationProfile] = await Promise.all([
-        readCanonicalEngagementNarrative(visitorId),
-        integrationService.readIntegrationSummary(visitorId),
-        getFormationProfile(profilesTable as any, visitorId)
-      ]);
-
-      const journey = deriveJourneySummaryV1({
-        engagementEvents: engagement.timelinePreview,
-        formationProfile: formationProfile ?? null
-      });
-
-      const formation = buildCanonicalFormationNarrative(formationProfile ?? null);
+      const summary = await readCanonicalVisitorNarrative(
+        visitorId,
+        async (id) => getFormationProfile(profilesTable as any, id)
+      );
 
       return res.status(200).json({
         ok: true,
         v: 1,
         visitorId,
-        summary: {
-          engagement,
-          integration: integrationSummary ?? null,
-          formation,
-          journey
-        },
+        summary,
       });
     } catch (err) {
       return next(err);

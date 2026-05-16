@@ -530,21 +530,109 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
       const visitorId = String(req.body?.visitorId ?? "").trim();
       const repair = req.body?.repair === true;
 
-      if (!visitorId) {
+      if (visitorId) {
+        const result = await auditFormationProfileForVisitor(visitorId, {
+          repair
+        });
+
+        return res.status(200).json({
+          ok: true,
+          repair,
+          bulk: false,
+          ...result
+        });
+      }
+
+      if (!repair) {
         return res.status(400).json({
           ok: false,
           error: "visitorId is required"
         });
       }
 
-      const result = await auditFormationProfileForVisitor(visitorId, {
-        repair
+      const parsedLimit = Number(req.body?.limit);
+      const limit =
+        Number.isFinite(parsedLimit) && parsedLimit > 0
+          ? Math.min(parsedLimit, 100)
+          : 25;
+
+      const driftedOnly = req.body?.driftedOnly !== false;
+      const table = getFormationProfilesTableClient();
+      const page = await listFormationProfiles(table, {
+        limit
       });
+
+      let drifted = 0;
+      let repaired = 0;
+      let failed = 0;
+      const items = [];
+
+      for (const profile of page.items) {
+        const profileVisitorId = String(profile.visitorId ?? profile.rowKey ?? "").trim();
+        if (!profileVisitorId) {
+          failed++;
+          items.push({
+            visitorId: null,
+            ok: false,
+            error: "visitorId is required"
+          });
+          continue;
+        }
+
+        try {
+          const before = await auditFormationProfileForVisitor(profileVisitorId, {
+            repair: false
+          });
+
+          if (!before.drifted) {
+            if (!driftedOnly) {
+              items.push({
+                visitorId: before.visitorId,
+                ok: true,
+                drifted: false,
+                repaired: false
+              });
+            }
+            continue;
+          }
+
+          drifted++;
+
+          const after = await auditFormationProfileForVisitor(profileVisitorId, {
+            repair: true
+          });
+
+          repaired++;
+
+          items.push({
+            visitorId: after.visitorId,
+            ok: true,
+            drifted: true,
+            repaired: after.repaired,
+            driftFields: before.driftFields
+          });
+        } catch (err: any) {
+          failed++;
+          items.push({
+            visitorId: profileVisitorId,
+            ok: false,
+            error: err?.message ?? "Bad Request"
+          });
+        }
+      }
 
       return res.status(200).json({
         ok: true,
-        repair,
-        ...result
+        repair: true,
+        bulk: true,
+        limit,
+        scanned: page.items.length,
+        nextCursor: page.cursor,
+        drifted,
+        repaired,
+        failed,
+        count: items.length,
+        items
       });
     } catch (err: any) {
       return res.status(400).json({
@@ -556,16 +644,4 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
 
   return opsRouter;
 }
-
-
-
-
-
-
-
-
-
-
-
-
 

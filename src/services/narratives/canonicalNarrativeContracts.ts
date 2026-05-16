@@ -1,5 +1,29 @@
 export type ReadFormationProfile = (visitorId: string) => Promise<any | null>;
 
+export type CanonicalEngagementRiskLevel = "low" | "medium" | "high" | "unknown" | string;
+
+export type CanonicalFollowupState =
+  | "none"
+  | "needed"
+  | "assigned"
+  | "contacted"
+  | "completed"
+  | "closed"
+  | string;
+
+export type CanonicalAttentionState =
+  | "none"
+  | "watch"
+  | "needs_attention"
+  | "urgent"
+  | string;
+
+export type CanonicalProjectionMetadata = {
+  projectedAt?: string;
+  reason?: string;
+  [key: string]: unknown;
+};
+
 export type CanonicalJourneySource = "engagement" | "formation" | string;
 
 export type CanonicalNarrativeEvidence = {
@@ -39,9 +63,9 @@ export type CanonicalEngagementNarrative = {
   timelinePreview: CanonicalEngagementTimelinePreviewItem[];
 };
 export type CanonicalFormationProfile = {
-  followupStatus?: string | null;
-  attentionState?: string | null;
-  projectionMetadata?: unknown | null;
+  followupStatus?: CanonicalFollowupState | null;
+  attentionState?: CanonicalAttentionState | null;
+  projectionMetadata?: CanonicalProjectionMetadata | null;
   lastEventType?: string | null;
   [key: string]: unknown;
 };

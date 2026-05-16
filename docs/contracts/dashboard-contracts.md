@@ -92,6 +92,7 @@ Integrity metadata:
   }
 }
 ```
+
 ### GET /api/formation/profiles
 
 Purpose:
@@ -149,6 +150,7 @@ Integrity metadata:
   }
 }
 ```
+
 ### GET /api/visitors/:visitorId
 
 Purpose:
@@ -170,6 +172,7 @@ Frontend must not:
 - Treat missing profile data as proof of visitor state.
 - Invent pastoral state from partial data.
 - Combine unrelated surfaces without backend-provided semantics.
+
 ### GET /api/integration/timeline
 
 Purpose:
@@ -196,6 +199,8 @@ Frontend must not:
 - Deduplicate timeline items heuristically.
 - Merge streams independently.
 - Infer lifecycle state from timeline alone when a projection endpoint exists.
+
+
 ### GET /api/integration/timeline/global
 
 Purpose:
@@ -212,6 +217,7 @@ Frontend must not:
 
 - Use global timeline as a substitute for visitor detail state.
 - Infer followup queue state from global timeline.
+
 ## Projection Integrity Semantics
 
 Projection integrity metadata reports backend-side consistency checks.
@@ -247,6 +253,7 @@ Dashboard frontend must not:
 - Treat display labels as canonical identifiers.
 - Hide integrity problems without backend metadata.
 - Add dashboard-only lifecycle semantics.
+
 ## Cross-Surface Consistency Rules
 
 The following concepts must mean the same thing everywhere:
@@ -275,10 +282,10 @@ Followup state is projected by the backend shared followup projection layer.
 
 Rules:
 
-No assignee means Unassigned.
-Assigned with no outcome means open.
-Assigned with contact and no outcome means Contacted.
-Outcome recorded means Resolved.
+- No assignee means Unassigned.
+- Assigned with no outcome means open.
+- Assigned with contact and no outcome means Contacted.
+- Outcome recorded means Resolved.
 
 Display language should be pastoral and care-centered, but must not change canonical state meanings.
 
@@ -296,13 +303,13 @@ Formation state must be changed only by backend event ingestion, replay, repair,
 
 Dashboard should display:
 
-current stage
-milestone history
-next step
-last event
-last event time
-stage reason
-pastoral guidance when available
+- current stage
+- milestone history
+- next step
+- last event
+- last event time
+- stage reason
+- pastoral guidance when available
 
 Dashboard must not independently advance formation stages.
 
@@ -312,11 +319,11 @@ The dashboard is a pastoral cockpit.
 
 It should help every operator:
 
-See who needs care.
-Understand their story.
-Understand why attention is needed.
-Take the next best pastoral action.
-Preserve continuity across ministry surfaces.
+- See who needs care.
+- Understand their story.
+- Understand why attention is needed.
+- Take the next best pastoral action.
+- Preserve continuity across ministry surfaces.
 
 The dashboard should be warm, minimal, trustworthy, and action-oriented.
 
@@ -602,6 +609,150 @@ Design must not change:
 - formation progression rules
 - timeline ordering rules
 - diagnostic classification rules
+
+
+
+
+## Canonical Visitor Narrative Contract
+
+The canonical visitor narrative is the backend-owned pastoral and operational representation of a single visitor.
+
+Purpose:
+- establish one trusted visitor story
+- prevent cross-surface drift
+- unify engagement, formation, followup, and integration semantics
+- provide a stable foundation for dashboard and intelligence experiences
+
+Primary surface:
+- `GET /api/visitors/:id/summary`
+
+The visitor narrative contract is the canonical source for:
+- visitor identity context
+- engagement summary
+- engagement risk
+- engagement timeline preview
+- formation profile
+- followup lifecycle state
+- attention state
+- milestone state
+- integration summary
+- derived journey state
+
+Frontend must treat this surface as authoritative.
+
+### Canonical Narrative Responsibilities
+
+The backend narrative surface is responsible for:
+
+- identity consistency
+- pastoral lifecycle consistency
+- timeline ordering consistency
+- followup lifecycle consistency
+- milestone derivation
+- journey derivation
+- projection integrity enforcement
+- cross-stream semantic alignment
+
+Frontend must not recompute these independently.
+
+### Canonical Narrative Sections
+
+The canonical visitor narrative may include:
+
+- `visitor`
+- `summary.engagement`
+- `summary.integration`
+- `summary.formation`
+- `summary.journey`
+- `summary.projectionIntegrity`
+- `summary.stateVerification`
+
+### Canonical Followup Semantics
+
+Canonical followup lifecycle states are backend-owned.
+
+Allowed canonical states:
+
+- `none`
+- `assigned`
+- `contacted`
+- `resolved`
+
+Derived attention semantics are backend-owned.
+
+Allowed canonical attention states:
+
+- `needs_attention`
+- `clear`
+
+Frontend must not derive these independently from timestamps.
+
+### Canonical Journey Semantics
+
+Journey state is a derived backend narrative layer.
+
+Frontend must not:
+- infer journey progression
+- infer milestones
+- infer formation advancement
+- infer pastoral readiness
+
+Journey semantics must derive from canonical backend orchestration and replay logic.
+
+
+### Canonical Narrative Expansion Rules
+
+New visitor narrative fields should be added backend-first.
+
+Frontend feature requirements must not introduce:
+- dashboard-only visitor state
+- duplicate lifecycle semantics
+- alternate pastoral classifications
+- frontend-owned orchestration
+
+All narrative expansion should preserve:
+- replay determinism
+- projection consistency
+- cross-surface semantic alignment
+
+### Timeline Preview Semantics
+
+`summary.engagement.timelinePreview` is a backend-curated narrative preview.
+
+Frontend must not:
+- reorder items
+- deduplicate items heuristically
+- merge additional streams into preview
+- reinterpret timeline ordering semantics
+
+### Projection Integrity Semantics
+
+Narrative surfaces may expose projection integrity metadata.
+
+Integrity metadata is backend-owned.
+
+Frontend may display integrity indicators but must not invent integrity conclusions.
+
+### State Verification Semantics
+
+Narrative surfaces may expose synchronization verification metadata.
+
+`State Verified` indicators must be backend-owned.
+
+Frontend must not independently decide synchronization correctness.
+
+### Narrative Contract Goal
+
+The canonical visitor narrative should eventually become the foundation for:
+
+- visitor detail
+- pastoral cockpit
+- followup intelligence
+- care continuity
+- shepherding workflows
+- future pastoral intelligence systems
+
+
 
 
 

@@ -1,12 +1,6 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
-import { IntegrationService } from "../../services/integration/integrationService";
-import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { readCanonicalEngagementNarrative } from "../../services/engagements/readCanonicalEngagementNarrative";
 import { getFormationProfilesTableClient, getFormationProfileByVisitorId } from "../_shared/formation";
-import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1";
-import { buildCanonicalFormationNarrative } from "../../services/formation/readCanonicalFormationNarrative";
-
-const integrationService = new IntegrationService(new EngagementEventsRepository());
+import { readCanonicalVisitorNarrative } from "../../services/visitors/readCanonicalVisitorNarrative";
 
 export async function getVisitorSummary(context: any, req: any): Promise<void> {
   try {
@@ -33,26 +27,10 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
 
     const table = getFormationProfilesTableClient();
 
-    const [
-      engagement,
-      integrationSummary,
-      formationProfile
-    ] = await Promise.all([
-      readCanonicalEngagementNarrative(visitorId),
-      integrationService.readIntegrationSummary(visitorId),
-      getFormationProfileByVisitorId(table, visitorId)
-    ]);
-
-    const safeTimelineItems = Array.isArray(engagement?.timelinePreview)
-      ? engagement.timelinePreview
-      : [];
-
-    const journey = deriveJourneySummaryV1({
-      engagementEvents: safeTimelineItems,
-      formationProfile: formationProfile ?? null
-    });
-
-    const formation = buildCanonicalFormationNarrative(formationProfile ?? null);
+    const summary = await readCanonicalVisitorNarrative(
+      visitorId,
+      async (id) => getFormationProfileByVisitorId(table, id)
+    );
 
     context.res = {
       status: 200,
@@ -61,12 +39,7 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
         ok: true,
         v: 1,
         visitorId,
-        summary: {
-          engagement,
-          integration: integrationSummary ?? null,
-          formation,
-          journey
-        }
+        summary
       }
     };
   } catch (err: any) {

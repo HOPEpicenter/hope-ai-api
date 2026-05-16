@@ -3,15 +3,14 @@ import { EngagementEventsRepository } from "../../repositories/engagementEventsR
 import { readCanonicalEngagementNarrative } from "../engagements/readCanonicalEngagementNarrative";
 import { buildCanonicalFormationNarrative } from "../formation/readCanonicalFormationNarrative";
 import { IntegrationService } from "../integration/integrationService";
+import type { CanonicalVisitorNarrative, ReadFormationProfile } from "../narratives/canonicalNarrativeContracts";
 
 const integrationService = new IntegrationService(new EngagementEventsRepository());
-
-type ReadFormationProfile = (visitorId: string) => Promise<any | null>;
 
 export async function readCanonicalVisitorNarrative(
   visitorId: string,
   readFormationProfile: ReadFormationProfile
-) {
+): Promise<CanonicalVisitorNarrative> {
   const [
     engagement,
     integrationSummary,

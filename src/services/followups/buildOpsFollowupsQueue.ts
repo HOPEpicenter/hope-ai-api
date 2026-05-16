@@ -5,34 +5,12 @@ import { deriveEngagementRiskV1 } from "../../domain/engagement/deriveEngagement
 import { computeEngagementScoreV1 } from "../../domain/engagement/computeEngagementScore.v1";
 import { deriveFormationState } from "../../ops/formationState";
 import { EngagementsService } from "../engagements/engagementsService";
-
-type FollowupUrgency = "ON_TRACK" | "AT_RISK" | "OVERDUE";
-type FollowupAgingBucket = "SAME_DAY" | "ONE_DAY" | "TWO_PLUS_DAYS";
-
-export type OpsFollowupsQueueItem = {
-  visitorId: string;
-  assignedTo: { ownerType: "user"; ownerId: string } | null;
-  lastFollowupAssignedAt: string | null;
-  lastFollowupContactedAt: string | null;
-  lastFollowupOutcomeAt: string | null;
-  stage: string | null;
-  lastFormationEventType?: string | null;
-  lastFormationEventAt?: string | null;
-  needsFollowup: boolean;
-  followupReason?: string;
-  followupResolved: boolean;
-  resolvedForAssignment: boolean;
-  followupUrgency?: FollowupUrgency;
-  followupPriorityScore?: number;
-  followupAgingBucket?: FollowupAgingBucket;
-  followupEscalated: boolean;
-  followupOverdue: boolean;
-  engagementRiskLevel?: string | null;
-  engagementRiskScore?: number | null;
-  priorityBand?: string | null;
-  priorityReason?: string | null;
-  lastActivityAt?: string | null;
-};
+import type {
+  FollowupAgingBucket,
+  FollowupUrgency,
+  OpsFollowupsQueueItem,
+  OpsFollowupsQueueResult
+} from "./opsFollowupsQueueContracts";
 
 type EventState = {
   visitorId: string;
@@ -206,7 +184,7 @@ function compareQueueItems(a: OpsFollowupsQueueItem, b: OpsFollowupsQueueItem): 
   return a.visitorId.localeCompare(b.visitorId);
 }
 
-export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions) {
+export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions): Promise<OpsFollowupsQueueResult> {
   const assignedToFilter = String(opts.assignedToFilter ?? "").trim();
   const visitorIdFilter = String(opts.visitorIdFilter ?? "").trim();
   const sortBy = String(opts.sortBy ?? "").trim();

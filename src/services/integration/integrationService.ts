@@ -289,7 +289,7 @@ export class IntegrationService {
     }
     // --- End shadow read ---
 
-    return shadowResult && shadowResult.items.length > 0 ? shadowResult : legacyResult;
+    return legacyResult;
   }
 
   private buildMergedActivityItems(inputs: ActivityFeedInputs): any[] {
@@ -401,6 +401,7 @@ export class IntegrationService {
     });
   }
 }
+
 
 
 

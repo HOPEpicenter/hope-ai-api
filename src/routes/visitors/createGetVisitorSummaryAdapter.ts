@@ -8,6 +8,7 @@ import { EngagementsService } from "../../services/engagements/engagementsServic
 import { readEngagementRiskV1 } from "../../services/engagements/readEngagementRisk";
 import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
 import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
+import { projectFollowupState } from "../../functions/_shared/followupProjection";
 
 const engagementSummaryRepo = new EngagementSummaryRepository();
 const integrationService = new IntegrationService(new EngagementEventsRepository());
@@ -47,25 +48,16 @@ export function createGetVisitorSummaryAdapter() {
         formationProfile: formationProfile ?? null
       });
 
-      const followupStatus =
-        formationProfile?.lastFollowupOutcomeAt
-          ? "resolved"
-          : formationProfile?.lastFollowupContactedAt
-            ? "contacted"
-            : formationProfile?.lastFollowupAssignedAt
-              ? "assigned"
-              : "none";
-
-      const attentionState =
-        followupStatus === "none" || followupStatus === "assigned"
-          ? "needs_attention"
-          : "clear";
+      const followupProjection = formationProfile
+        ? projectFollowupState(formationProfile)
+        : null;
 
       const canonicalFormationProfile = formationProfile
         ? {
             ...formationProfile,
-            followupStatus,
-            attentionState
+            followupStatus: followupProjection?.followupState ?? "none",
+            attentionState: followupProjection?.attentionState ?? "clear",
+            projectionMetadata: followupProjection?.projectionMetadata ?? null
           }
         : null;
 
@@ -99,6 +91,4 @@ export function createGetVisitorSummaryAdapter() {
     }
   };
 }
-
-
 

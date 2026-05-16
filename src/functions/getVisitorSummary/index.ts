@@ -1,17 +1,11 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
-import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepository";
 import { IntegrationService } from "../../services/integration/integrationService";
-import { TIMELINE_DERIVATION_LIMIT } from "../../services/integration/timelineConstants";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { EngagementsService } from "../../services/engagements/engagementsService";
-import { readEngagementRiskV1 } from "../../services/engagements/readEngagementRisk";
+import { readCanonicalEngagementNarrative } from "../../services/engagements/readCanonicalEngagementNarrative";
 import { getFormationProfilesTableClient, getFormationProfileByVisitorId } from "../_shared/formation";
 import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1";
 import { projectFollowupState } from "../_shared/followupProjection";
 
-const engagementSummaryRepo = new EngagementSummaryRepository();
-const engagementEventsRepo = new EngagementEventsRepository();
-const engagementsService = new EngagementsService(engagementEventsRepo);
 const integrationService = new IntegrationService(new EngagementEventsRepository());
 
 export async function getVisitorSummary(context: any, req: any): Promise<void> {
@@ -40,23 +34,17 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
     const table = getFormationProfilesTableClient();
 
     const [
-      engagementSummary,
-      engagementStatus,
-      engagementRisk,
+      engagement,
       integrationSummary,
-      timelinePage,
       formationProfile
     ] = await Promise.all([
-      engagementSummaryRepo.get(visitorId),
-      engagementsService.getCurrentStatus(visitorId),
-      readEngagementRiskV1(engagementsService, visitorId, 14),
+      readCanonicalEngagementNarrative(visitorId),
       integrationService.readIntegrationSummary(visitorId),
-      integrationService.readIntegratedTimeline(visitorId, TIMELINE_DERIVATION_LIMIT),
       getFormationProfileByVisitorId(table, visitorId)
     ]);
 
-    const safeTimelineItems = Array.isArray(timelinePage?.items)
-      ? timelinePage.items
+    const safeTimelineItems = Array.isArray(engagement?.timelinePreview)
+      ? engagement.timelinePreview
       : [];
 
     const journey = deriveJourneySummaryV1({
@@ -77,14 +65,7 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
         v: 1,
         visitorId,
         summary: {
-          engagement: {
-            summary: engagementSummary ?? null,
-            status: engagementStatus?.status ?? null,
-            lastChangedAt: engagementStatus?.lastChangedAt ?? null,
-            lastEventId: engagementStatus?.lastEventId ?? null,
-            risk: engagementRisk,
-            timelinePreview: safeTimelineItems
-          },
+          engagement,
           integration: integrationSummary ?? null,
           formation: {
             profile: formationProfile
@@ -113,6 +94,4 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
     };
   }
 }
-
-
 

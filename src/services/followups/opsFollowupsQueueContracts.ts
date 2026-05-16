@@ -1,6 +1,15 @@
 export type FollowupUrgency = "ON_TRACK" | "AT_RISK" | "OVERDUE";
 export type FollowupAgingBucket = "SAME_DAY" | "ONE_DAY" | "TWO_PLUS_DAYS";
 
+export type OpsFollowupReason =
+  | "FOLLOWUP_ASSIGNED"
+  | "FOLLOWUP_UNASSIGNED"
+  | "FOLLOWUP_CONTACTED"
+  | "FOLLOWUP_OUTCOME_RECORDED"
+  | string;
+
+export type OpsFollowupPriorityBand = "LOW" | "MEDIUM" | "HIGH" | "URGENT" | string;
+
 export type OpsFollowupsQueueOwnerRef = {
   ownerType: "user";
   ownerId: string;
@@ -16,7 +25,7 @@ export type OpsFollowupsQueueItem = {
   lastFormationEventType?: string | null;
   lastFormationEventAt?: string | null;
   needsFollowup: boolean;
-  followupReason?: string;
+  followupReason?: OpsFollowupReason;
   followupResolved: boolean;
   resolvedForAssignment: boolean;
   followupUrgency?: FollowupUrgency;
@@ -26,7 +35,7 @@ export type OpsFollowupsQueueItem = {
   followupOverdue: boolean;
   engagementRiskLevel?: string | null;
   engagementRiskScore?: number | null;
-  priorityBand?: string | null;
+  priorityBand?: OpsFollowupPriorityBand | null;
   priorityReason?: string | null;
   lastActivityAt?: string | null;
 };

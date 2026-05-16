@@ -4,8 +4,9 @@ import { TIMELINE_DERIVATION_LIMIT } from "../integration/timelineConstants";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { EngagementsService } from "./engagementsService";
 import { readEngagementRiskV1 } from "./readEngagementRisk";
+import type { CanonicalEngagementNarrative } from "../narratives/canonicalNarrativeContracts";
 
-export async function readCanonicalEngagementNarrative(visitorId: string) {
+export async function readCanonicalEngagementNarrative(visitorId: string): Promise<CanonicalEngagementNarrative> {
   const engagementEventsRepo = new EngagementEventsRepository();
   const engagementSummaryRepo = new EngagementSummaryRepository();
   const engagementsService = new EngagementsService(engagementEventsRepo);

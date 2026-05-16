@@ -7,6 +7,7 @@ import { EngagementsService } from "../../services/engagements/engagementsServic
 import { readEngagementRiskV1 } from "../../services/engagements/readEngagementRisk";
 import { getFormationProfilesTableClient, getFormationProfileByVisitorId } from "../_shared/formation";
 import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1";
+import { projectFollowupState } from "../_shared/followupProjection";
 
 const engagementSummaryRepo = new EngagementSummaryRepository();
 const engagementEventsRepo = new EngagementEventsRepository();
@@ -63,6 +64,11 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
       formationProfile: formationProfile ?? null
     });
 
+    const followupProjection =
+      formationProfile
+        ? projectFollowupState(formationProfile)
+        : null;
+
     context.res = {
       status: 200,
       headers: { "content-type": "application/json; charset=utf-8" },
@@ -81,7 +87,13 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
           },
           integration: integrationSummary ?? null,
           formation: {
-            profile: formationProfile ?? null,
+            profile: formationProfile
+              ? {
+                  ...formationProfile,
+                  followupStatus: followupProjection?.followupState ?? null,
+                  attentionState: followupProjection?.attentionState ?? null
+                }
+              : null,
             milestones: {
               hasSalvation: formationProfile?.lastEventType === "SALVATION_RECORDED",
               hasBaptism: formationProfile?.lastEventType === "BAPTISM_RECORDED",
@@ -101,5 +113,6 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
     };
   }
 }
+
 
 

@@ -2,15 +2,14 @@ import { deriveJourneySummaryV1 } from "../../lib/journey/deriveJourneySummaryV1
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { IntegrationService } from "../integration/integrationService";
 import { TIMELINE_DERIVATION_LIMIT } from "../integration/timelineConstants";
+import type { CanonicalJourneyNarrative, ReadFormationProfile } from "../narratives/canonicalNarrativeContracts";
 
 const integrationService = new IntegrationService(new EngagementEventsRepository());
-
-type ReadFormationProfile = (visitorId: string) => Promise<any | null>;
 
 export async function readCanonicalJourneyNarrative(
   visitorId: string,
   readFormationProfile: ReadFormationProfile
-) {
+): Promise<CanonicalJourneyNarrative> {
   let engagementEvents: any[] = [];
 
   try {

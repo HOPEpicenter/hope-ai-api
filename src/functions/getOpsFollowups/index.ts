@@ -1,5 +1,6 @@
 import { TableClient } from "@azure/data-tables";
 import { readOpsFollowupsQueue } from "../../services/followups/readOpsFollowupsQueue";
+import { normalizeOpsFollowupsQuery, readQueryValue } from "../../services/followups/opsFollowupsQuery";
 
 // Repo pattern: legacy default export invoked as (context, req) via function.json.
 export default async function (context: any, req: any): Promise<void> {
@@ -55,22 +56,26 @@ export default async function (context: any, req: any): Promise<void> {
     await ensureTableExists(eventsTable);
     await ensureTableExists(profilesTable);
 
-    const limit = parsePositiveInt(req?.query?.limit, 25, 100);
-    const cursor = parseNonNegativeInt(req?.query?.cursor, 0);
-
-    const includeResolved =
-      String(readQuery(req, "includeResolved") ?? "").trim().toLowerCase() === "true";
+    const query = normalizeOpsFollowupsQuery({
+      limit: readQueryValue(req?.query, "limit"),
+      cursor: readQueryValue(req?.query, "cursor"),
+      assignedTo: readQueryValue(req?.query, "assignedTo"),
+      visitorId: readQueryValue(req?.query, "visitorId"),
+      includeResolved: readQueryValue(req?.query, "includeResolved"),
+      sortBy: readQueryValue(req?.query, "sortBy"),
+      sortDir: readQueryValue(req?.query, "sortDir")
+    });
 
     const result = await readOpsFollowupsQueue({
       eventsTable,
       profilesTable,
-      limit,
-      cursor,
-      assignedToFilter: String(readQuery(req, "assignedTo") ?? "").trim(),
-      visitorIdFilter: String(readQuery(req, "visitorId") ?? "").trim(),
-      includeResolved,
-      sortBy: String(readQuery(req, "sortBy") ?? "").trim(),
-      sortDir: String(readQuery(req, "sortDir") ?? "").trim().toLowerCase() === "asc" ? "asc" : "desc",
+      limit: query.limit,
+      cursor: query.cursor,
+      assignedToFilter: query.assignedToFilter,
+      visitorIdFilter: query.visitorIdFilter,
+      includeResolved: query.includeResolved,
+      sortBy: query.sortBy,
+      sortDir: query.sortDir,
     });
 
     context.res = {
@@ -99,31 +104,6 @@ export default async function (context: any, req: any): Promise<void> {
   }
 }
 
-function readQuery(req: any, name: string): any {
-  const value = req?.query?.[name];
-  if (Array.isArray(value)) return value[0];
-  if (value !== undefined) return value;
-
-  if (typeof req?.query?.get === "function") {
-    return req.query.get(name);
-  }
-
-  return undefined;
-}
-
-function parsePositiveInt(value: any, fallback: number, max: number): number {
-  const raw = Array.isArray(value) ? value[0] : value;
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
-  return Math.min(max, Math.trunc(parsed));
-}
-
-function parseNonNegativeInt(value: any, fallback: number): number {
-  const raw = Array.isArray(value) ? value[0] : value;
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
-  return Math.trunc(parsed);
-}
 
 async function ensureTableExists(table: TableClient) {
   try {

@@ -756,3 +756,58 @@ The canonical visitor narrative should eventually become the foundation for:
 
 
 
+
+## Visitor Summary Contract Drift Audit
+
+Current audit findings identified semantic drift between the Azure Function implementation and the Express adapter implementation of the canonical visitor summary surface.
+
+Affected surface:
+- `GET /api/visitors/:id/summary`
+
+### Drift: Engagement Status Semantics
+
+Azure Function implementation currently exposes:
+
+- `summary.engagement.status`
+- `summary.engagement.lastChangedAt`
+- `summary.engagement.lastEventId`
+
+Express adapter implementation currently does not expose these fields.
+
+### Drift: Followup Narrative Semantics
+
+Express adapter implementation currently exposes:
+
+- `formation.profile.followupStatus`
+- `formation.profile.attentionState`
+
+Azure Function implementation currently does not expose these fields.
+
+### Architectural Risk
+
+This drift creates multiple canonical visitor narratives depending on execution surface.
+
+Risks include:
+- cross-surface dashboard inconsistency
+- frontend conditional behavior drift
+- divergent pastoral interpretation
+- inconsistent intelligence-layer inputs
+- replay/reconciliation ambiguity
+
+### Canonical Direction
+
+The visitor summary contract should converge toward:
+
+- one canonical narrative shape
+- one canonical pastoral interpretation layer
+- one canonical followup semantic layer
+- one canonical engagement semantic layer
+
+Both Azure Function and Express adapter implementations must eventually produce semantically equivalent narrative contracts.
+
+### Backend Ownership Rule
+
+Narrative semantics must not depend on transport/runtime implementation details.
+
+Canonical visitor narrative semantics are backend-owned platform contracts.
+

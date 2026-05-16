@@ -30,6 +30,7 @@ function mapProfile(entity: any) {
   };
 }
 import { requireApiKeyForFunction } from "../_shared/apiKey";
+import { getVisitorById } from "../_shared/visitorsRepository";
 import {
   ensureTable,
   getFormationProfilesTableClient,
@@ -66,6 +67,7 @@ export async function getFormationProfiles(context: any, req: any): Promise<any>
 
     let items: any[] = [];
     let nextCursor: string | null = null;
+    let orphanProfilesExcluded = 0;
 
     if (visitorIdQ) {
       const one = await getFormationProfileByVisitorId(table, visitorIdQ);
@@ -81,7 +83,30 @@ export async function getFormationProfiles(context: any, req: any): Promise<any>
         q
       });
 
-      items = out.items.map((item: any) => mapProfile(item));
+      const validatedItems: any[] = [];
+
+      for (const item of out.items) {
+        const profileVisitorId = String(item?.visitorId ?? item?.rowKey ?? "").trim();
+
+        if (!profileVisitorId) {
+          orphanProfilesExcluded++;
+          continue;
+        }
+
+        const visitor = await getVisitorById(profileVisitorId);
+
+        if (!visitor) {
+          orphanProfilesExcluded++;
+          continue;
+        }
+
+        const mapped = mapProfile(item);
+        if (mapped) {
+          validatedItems.push(mapped);
+        }
+      }
+
+      items = validatedItems;
       nextCursor = out.cursor ?? null;
     }
 
@@ -92,6 +117,9 @@ export async function getFormationProfiles(context: any, req: any): Promise<any>
         ok: true,
         items,
         cursor: nextCursor,
+        projectionIntegrity: {
+          orphanProfilesExcluded
+        },
         source: "function-formation-profiles-return-v1"
       }
     };
@@ -104,6 +132,4 @@ export async function getFormationProfiles(context: any, req: any): Promise<any>
     };
   }
 }
-
-
 

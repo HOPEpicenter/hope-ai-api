@@ -9,6 +9,7 @@ import { getFormationProfile,
   listFormationProfiles, upsertFormationProfile } from "../../storage/formation/formationProfilesRepo";
 import { looksLikeFormationEnvelopeV1, validateFormationEventEnvelopeV1Strict } from "../../contracts/formationEventEnvelope.v1";
 import { rebuildFormationProfileForVisitor } from "../../functions/_shared/formation";
+import { getVisitorById } from "../../functions/_shared/visitorsRepository";
 
 export const formationEventsRouter = Router();
 formationEventsRouter.use(requireApiKey);
@@ -269,6 +270,7 @@ formationEventsRouter.get("/formation/profiles", async (req, res) => {
 
     let items: any[] = [];
 let nextCursor: string | null = null;
+let orphanProfilesExcluded = 0;
 
 if (visitorIdQ) {
   const one = await getFormationProfile(profilesTable as any, visitorIdQ);
@@ -282,11 +284,38 @@ if (visitorIdQ) {
     assignedTo,
     q,
   });
-  items = out.items;
+  const validatedItems: any[] = [];
+
+  for (const item of out.items) {
+    const profileVisitorId = String(item?.visitorId ?? item?.rowKey ?? "").trim();
+
+    if (!profileVisitorId) {
+      orphanProfilesExcluded++;
+      continue;
+    }
+
+    const visitor = await getVisitorById(profileVisitorId);
+
+    if (!visitor) {
+      orphanProfilesExcluded++;
+      continue;
+    }
+
+    validatedItems.push(item);
+  }
+
+  items = validatedItems;
   nextCursor = (out.cursor ?? null) as any;
 }
 
-    return res.status(200).json({ ok: true, items, cursor: nextCursor });
+    return res.status(200).json({
+      ok: true,
+      items,
+      cursor: nextCursor,
+      projectionIntegrity: {
+        orphanProfilesExcluded
+      }
+    });
   } catch (e: any) {
     return res.status(toHttpStatus(e, 400)).json({ ok: false, error: e?.message || "Bad Request" });
   }

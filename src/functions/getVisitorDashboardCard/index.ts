@@ -1,24 +1,17 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
-import { IntegrationService } from "../../services/integration/integrationService";
-import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { createGetVisitorSummaryAdapter } from "../../routes/visitors/createGetVisitorSummaryAdapter";
-import { deriveFollowupPriority } from "../../services/followups/deriveFollowupPriority";
-import { deriveFollowupUrgency } from "../../services/followups/deriveFollowupUrgency";
-import { projectFollowupState } from "../_shared/followupProjection";
-import { TIMELINE_DERIVATION_LIMIT } from "../../services/integration/timelineConstants";
+import { readCanonicalVisitorDashboardCard } from "../../services/dashboard/readCanonicalVisitorDashboardCard";
 import {
   apiErrorBody,
   getRequestId,
   logFunctionError
 } from "../../shared/observability/functionObservability";
 
-const integrationService = new IntegrationService(new EngagementEventsRepository());
-
 export async function getVisitorDashboardCard(context: any, req: any): Promise<void> {
   const requestId = getRequestId(req);
 
   try {
     const auth = requireApiKeyForFunction(req);
+
     if (!auth.ok) {
       context.res = {
         status: auth.status,
@@ -38,74 +31,7 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
       return;
     }
 
-    const page = await integrationService.readIntegratedTimeline(visitorId, TIMELINE_DERIVATION_LIMIT);
-    const items = Array.isArray(page?.items) ? page.items : [];
-    const latest = items[0] ?? null;
-
-
-    const getVisitorSummary = createGetVisitorSummaryAdapter();
-    const summaryResponse: any = {
-      status: (code: number) => ({
-        json: (body: any) => {
-          summaryResponse.statusCode = code;
-          summaryResponse.body = body;
-          return summaryResponse;
-        }
-      }),
-      json: (body: any) => {
-        summaryResponse.statusCode = 200;
-        summaryResponse.body = body;
-        return summaryResponse;
-      }
-    };
-
-    await getVisitorSummary(
-      { params: { id: visitorId } } as any,
-      summaryResponse as any,
-      (() => {}) as any
-    );
-
-    const profile = summaryResponse?.body?.summary?.formation?.profile ?? null;
-
-    const projection = projectFollowupState(profile);
-
-    const followupStatus =
-      projection.followupState === "Assigned"
-        ? "action_needed"
-        : projection.followupState === "Contacted"
-          ? "contact_made"
-          : projection.followupState === "Resolved"
-            ? "resolved"
-            : "unassigned";
-
-    const attentionState =
-      projection.attentionState === "Action needed"
-        ? "needs_attention"
-        : "clear";
-
-    const risk = summaryResponse?.body?.summary?.engagement?.risk ?? null;
-    const priority = deriveFollowupPriority({
-      needsFollowup: risk?.engagement?.needsFollowup ?? null,
-      riskLevel: risk?.riskLevel ?? null,
-      riskScore: risk?.riskScore ?? null
-    });
-
-    const assignedTo = projection.assignedTo;
-    const assignedToName = projection.assignedToName;
-
-    const lastFollowupAssignedAt =
-      typeof profile?.lastFollowupAssignedAt === "string" && profile.lastFollowupAssignedAt.trim().length > 0
-        ? profile.lastFollowupAssignedAt.trim()
-        : null;
-
-    const followupUrgency = deriveFollowupUrgency({
-      assignedTo,
-      followupStatus,
-      lastFollowupAssignedAt,
-      lastFollowupContactedAt: profile?.lastFollowupContactedAt ?? null
-    });
-
-    const followupOverdue = followupUrgency === "OVERDUE";
+    const card = await readCanonicalVisitorDashboardCard(visitorId);
 
     context.res = {
       status: 200,
@@ -114,26 +40,10 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
         ok: true,
         requestId,
         visitorId,
-        card: {
-          visitorId,
-          lastActivityAt: latest?.occurredAt ?? null,
-          lastActivitySummary: latest?.summary ?? null,
-          followupStatus,
-          assignedTo,
-          assignedToName,
-          attentionState,
-          followupUrgency,
-          followupOverdue,
-          riskLevel: risk?.riskLevel ?? null,
-          riskScore: risk?.riskScore ?? null,
-          needsFollowup: risk?.engagement?.needsFollowup ?? null,
-          recommendedAction: risk?.recommendedAction ?? null,
-          priorityBand: priority.priorityBand,
-          priorityScore: priority.priorityScore,
-          priorityReason: priority.priorityReason
-        }
+        card
       }
     };
+
   } catch (err: any) {
     logFunctionError(context, "getVisitorDashboardCard", err, {
       requestId,
@@ -151,7 +61,3 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
     };
   }
 }
-
-
-
-

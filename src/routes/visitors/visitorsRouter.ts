@@ -19,7 +19,7 @@ export default function visitorsRouter(visitorsRepository: VisitorsRepository) {
   router.post("/", createCreateVisitorAdapter(visitorsRepository));
   router.get("/:id", createGetVisitorAdapter(visitorsRepository));
   router.get("/:id/summary", requireApiKey, createGetVisitorSummaryAdapter());
-  router.get("/:id/dashboard-card", requireApiKey, createGetVisitorDashboardCardAdapter(integrationService));
+  router.get("/:id/dashboard-card", requireApiKey, createGetVisitorDashboardCardAdapter());
   router.get("/:id/journey", requireApiKey, createGetVisitorJourneyAdapter());
 
   // LIST /api/visitors?limit=5

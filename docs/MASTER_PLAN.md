@@ -911,3 +911,44 @@ Completed a major OPS read-only orchestration simulation contract wave through P
 - do not enable orchestration behavior from these contracts
 - next real work should either tighten regression coverage or move to a clearly separate backend contract slice
 
+
+## 2026-05-16 Update — Canonical Orchestration Infrastructure
+
+Completed the deterministic canonical orchestration infrastructure expansion.
+
+Established stable replay-safe orchestration substrate layers:
+
+- contracts
+- readers
+- enrichment contracts
+- enrichment builders
+- enrichment composition
+- synthesis
+- aggregation
+- projection
+- views
+- consumers
+- adapters
+- facades
+- gateways
+- registries
+
+Why this matters (master plan alignment)
+
+- establishes deterministic orchestration infrastructure before behavioral intelligence
+- preserves replay-safe operational semantics during orchestration expansion
+- creates stable future orchestration access seams for dashboards, cockpit systems, and future pastoral intelligence layers
+- preserves transport neutrality and thin transport discipline
+- avoids premature autonomous orchestration behavior
+- keeps orchestration infrastructure behavior-neutral and deterministic
+
+Critical preserved constraints:
+
+- no orchestration activation
+- no AI orchestration
+- no scheduler introduction
+- no queue mutation
+- no replay redesign
+- no operational autonomy
+
+The platform now contains stable deterministic orchestration infrastructure while preserving production-safe operational guarantees.

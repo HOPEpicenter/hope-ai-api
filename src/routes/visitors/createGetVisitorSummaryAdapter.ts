@@ -1,7 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
-import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
-import { readCanonicalVisitorNarrative } from "../../services/visitors/readCanonicalVisitorNarrative";
+import { readCanonicalVisitorSummary } from "../../services/visitors/readCanonicalVisitorSummary";
 
 export function createGetVisitorSummaryAdapter() {
   return async function getVisitorSummary(req: Request, res: Response, next: NextFunction) {
@@ -16,24 +14,9 @@ export function createGetVisitorSummaryAdapter() {
         });
       }
 
-      const storageConnectionString = process.env.STORAGE_CONNECTION_STRING;
-      if (!storageConnectionString) {
-        return res.status(500).json({ ok: false, error: "Missing STORAGE_CONNECTION_STRING" });
-      }
+      const summary = await readCanonicalVisitorSummary(visitorId);
 
-      const profilesTable = getFormationProfilesTableClient(storageConnectionString);
-
-      const summary = await readCanonicalVisitorNarrative(
-        visitorId,
-        async (id) => getFormationProfile(profilesTable as any, id)
-      );
-
-      return res.status(200).json({
-        ok: true,
-        v: 1,
-        visitorId,
-        summary,
-      });
+      return res.status(200).json(summary);
     } catch (err) {
       return next(err);
     }

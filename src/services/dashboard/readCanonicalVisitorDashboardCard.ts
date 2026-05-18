@@ -1,6 +1,6 @@
 import { IntegrationService } from "../integration/integrationService";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { createGetVisitorSummaryAdapter } from "../../routes/visitors/createGetVisitorSummaryAdapter";
+import { readCanonicalVisitorSummary } from "../visitors/readCanonicalVisitorSummary";
 import { deriveFollowupPriority } from "../followups/deriveFollowupPriority";
 import { deriveFollowupUrgency } from "../followups/deriveFollowupUrgency";
 import { projectFollowupState } from "../../functions/_shared/followupProjection";
@@ -34,29 +34,13 @@ export async function readCanonicalVisitorDashboardCard(
   const items = Array.isArray(page?.items) ? page.items : [];
   const latest = items[0] ?? null;
 
-  const getVisitorSummary = createGetVisitorSummaryAdapter();
-  const summaryResponse: any = {
-    status: (code: number) => ({
-      json: (body: any) => {
-        summaryResponse.statusCode = code;
-        summaryResponse.body = body;
-        return summaryResponse;
-      }
-    }),
-    json: (body: any) => {
-      summaryResponse.statusCode = 200;
-      summaryResponse.body = body;
-      return summaryResponse;
-    }
+  const visitorSummary = await readCanonicalVisitorSummary(visitorId);
+  const summary = visitorSummary.summary as {
+    formation?: { profile?: any };
+    engagement?: { risk?: any };
   };
 
-  await getVisitorSummary(
-    { params: { id: visitorId } } as any,
-    summaryResponse as any,
-    (() => {}) as any
-  );
-
-  const profile = summaryResponse?.body?.summary?.formation?.profile ?? null;
+  const profile = summary.formation?.profile ?? null;
   const projection = projectFollowupState(profile);
 
   const followupStatus =
@@ -73,7 +57,7 @@ export async function readCanonicalVisitorDashboardCard(
       ? "needs_attention"
       : "clear";
 
-  const risk = summaryResponse?.body?.summary?.engagement?.risk ?? null;
+  const risk = summary.engagement?.risk ?? null;
   const priority = deriveFollowupPriority({
     needsFollowup: risk?.engagement?.needsFollowup ?? null,
     riskLevel: risk?.riskLevel ?? null,

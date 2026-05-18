@@ -11,6 +11,7 @@ import {
   getRequestId,
   logFunctionError
 } from "../../shared/observability/functionObservability";
+import { readCanonicalVisitorIdentity, type CanonicalVisitorIdentity } from "../../services/dashboard/visitorIdentity";
 
 function parseLimit(val: unknown, fallback = 200): number {
   const n = typeof val === "string" ? Number(val) : fallback;
@@ -90,7 +91,7 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
         ? pageItems[pageItems.length - 1].rowKey
         : null;
 
-    const visitorIdentityById = new Map<string, { name: string; email: string | null }>();
+    const visitorIdentityById = new Map<string, CanonicalVisitorIdentity>();
 
     await Promise.all(
       pageItems.map(async (p) => {
@@ -98,13 +99,11 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
         if (!visitorId || visitorIdentityById.has(visitorId)) return;
 
         const visitor = await getVisitorById(visitorId);
-        visitorIdentityById.set(visitorId, {
-          name: String(visitor?.name ?? "").trim(),
-          email:
-            typeof visitor?.email === "string" && visitor.email.trim().length > 0
-              ? visitor.email.trim()
-              : null
-        });
+
+        visitorIdentityById.set(
+          visitorId,
+          readCanonicalVisitorIdentity(visitorId, visitor)
+        );
       })
     );
 
@@ -113,8 +112,15 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
 
       const visitorId = String(p.visitorId ?? "").trim();
       const profileDisplayName = String(p.displayName ?? "").trim();
-      const visitorIdentity = visitorIdentityById.get(visitorId) ?? { name: "", email: null };
-      const displayName = profileDisplayName || visitorIdentity.name || visitorId;
+
+      const visitorIdentity =
+        visitorIdentityById.get(visitorId) ??
+        readCanonicalVisitorIdentity(visitorId, null);
+
+      const displayName =
+        profileDisplayName ||
+        visitorIdentity.displayName ||
+        visitorId;
 
       return {
         visitorId: p.visitorId,

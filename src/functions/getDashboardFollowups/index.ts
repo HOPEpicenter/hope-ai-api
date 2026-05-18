@@ -90,34 +90,37 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
         ? pageItems[pageItems.length - 1].rowKey
         : null;
 
-    const visitorNameById = new Map<string, string>();
+    const visitorIdentityById = new Map<string, { name: string; email: string | null }>();
 
     await Promise.all(
-      pageItems
-        .filter((p) => !String(p.displayName ?? "").trim())
-        .map(async (p) => {
-          const visitorId = String(p.visitorId ?? "").trim();
-          if (!visitorId || visitorNameById.has(visitorId)) return;
+      pageItems.map(async (p) => {
+        const visitorId = String(p.visitorId ?? "").trim();
+        if (!visitorId || visitorIdentityById.has(visitorId)) return;
 
-          const visitor = await getVisitorById(visitorId);
-          const visitorName = String(visitor?.name ?? "").trim();
-          if (visitorName) {
-            visitorNameById.set(visitorId, visitorName);
-          }
-        })
+        const visitor = await getVisitorById(visitorId);
+        visitorIdentityById.set(visitorId, {
+          name: String(visitor?.name ?? "").trim(),
+          email:
+            typeof visitor?.email === "string" && visitor.email.trim().length > 0
+              ? visitor.email.trim()
+              : null
+        });
+      })
     );
 
     const items = pageItems.map((p) => {
       const projection = projectFollowupState(p);
 
       const visitorId = String(p.visitorId ?? "").trim();
-      const displayName = String(p.displayName ?? "").trim();
-      const visitorName = visitorNameById.get(visitorId) ?? "";
+      const profileDisplayName = String(p.displayName ?? "").trim();
+      const visitorIdentity = visitorIdentityById.get(visitorId) ?? { name: "", email: null };
+      const displayName = profileDisplayName || visitorIdentity.name || visitorId;
 
       return {
         visitorId: p.visitorId,
-        name: displayName || visitorName || visitorId,
-        email: null,
+        displayName,
+        name: displayName,
+        email: visitorIdentity.email,
         assignedTo: projection.assignedTo,
         assignedToName: projection.assignedToName,
         projectionMetadata: projection.projectionMetadata,

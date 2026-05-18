@@ -35,12 +35,9 @@ export async function readCanonicalVisitorDashboardCard(
   const latest = items[0] ?? null;
 
   const visitorSummary = await readCanonicalVisitorSummary(visitorId);
-  const summary = visitorSummary.summary as {
-    formation?: { profile?: any };
-    engagement?: { risk?: any };
-  };
+  const summary = visitorSummary.summary;
 
-  const profile = summary.formation?.profile ?? null;
+  const profile = summary.formation.profile ?? null;
   const projection = projectFollowupState(profile);
 
   const followupStatus =
@@ -72,11 +69,16 @@ export async function readCanonicalVisitorDashboardCard(
       ? profile.lastFollowupAssignedAt.trim()
       : null;
 
+  const lastFollowupContactedAt =
+    typeof profile?.lastFollowupContactedAt === "string" && profile.lastFollowupContactedAt.trim().length > 0
+      ? profile.lastFollowupContactedAt.trim()
+      : null;
+
   const followupUrgency = deriveFollowupUrgency({
     assignedTo,
     followupStatus,
     lastFollowupAssignedAt,
-    lastFollowupContactedAt: profile?.lastFollowupContactedAt ?? null
+    lastFollowupContactedAt
   });
 
   return {

@@ -39,9 +39,9 @@ export type CanonicalJourneyNarrative = {
   evidence?: CanonicalNarrativeEvidence[];};
 
 export type CanonicalVisitorNarrative = {
-  engagement: unknown;
+  engagement: CanonicalEngagementNarrative;
   integration: unknown | null;
-  formation: unknown;
+  formation: CanonicalFormationNarrative;
   journey: CanonicalJourneyNarrative | unknown;
 };
 export type CanonicalEngagementTimelinePreviewItem = {
@@ -54,12 +54,23 @@ export type CanonicalEngagementTimelinePreviewItem = {
   [key: string]: unknown;
 };
 
+export type CanonicalEngagementRisk = {
+  riskLevel?: string | null;
+  riskScore?: number | null;
+  recommendedAction?: string | null;
+  engagement?: {
+    needsFollowup?: boolean | null;
+    [key: string]: unknown;
+  } | null;
+  [key: string]: unknown;
+};
+
 export type CanonicalEngagementNarrative = {
   summary: unknown | null;
   status: string | null;
   lastChangedAt: string | null;
   lastEventId: string | null;
-  risk: unknown;
+  risk: CanonicalEngagementRisk | null;
   timelinePreview: CanonicalEngagementTimelinePreviewItem[];
 };
 export type CanonicalFormationProfile = {

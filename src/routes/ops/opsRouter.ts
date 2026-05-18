@@ -31,6 +31,7 @@ import {
   getFormationProfilesTableClient,
   listFormationProfiles
 } from "../../functions/_shared/formation";
+import { readCanonicalVisitorIdentity } from "../../services/dashboard/visitorIdentity";
 function isAllowedType(v: unknown): v is FormationEventType {
   return typeof v === "string" && (allowedTypes as string[]).includes(v);
 }
@@ -374,13 +375,16 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
             : "ON_TRACK";
 
     const followupOverdue = followupUrgency === "OVERDUE";
+    const identity = readCanonicalVisitorIdentity(visitorId, visitor);
+
     return res.json({
       requestId: getRequestId(req),
       visitorId,
       card: {
         visitorId,
-        name: visitor.name ?? null,
-        email: visitor.email ?? null,
+        displayName: identity.displayName,
+        name: identity.name,
+        email: identity.email,
         lastActivityAt: latest?.occurredAt ?? null,
         lastActivitySummary: latest?.summary ?? null,
         followupStatus,

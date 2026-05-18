@@ -4,13 +4,9 @@ import { readCanonicalUnifiedVisitorStory } from "../narratives/readCanonicalUni
 import { readCanonicalVisitorDashboardCard, type CanonicalVisitorDashboardCard } from "./readCanonicalVisitorDashboardCard";
 import type { CanonicalVisitorNarrative, ReadFormationProfile } from "../narratives/canonicalNarrativeContracts";
 import type { CanonicalUnifiedVisitorStory } from "../narratives/canonicalOperationalNarrativeContracts";
+import { readCanonicalVisitorIdentity, type CanonicalVisitorIdentity } from "./visitorIdentity";
 
-export type CanonicalVisitorSnapshotIdentity = {
-  visitorId: string;
-  name: string | null;
-  email: string | null;
-  phone: string | null;
-};
+export type CanonicalVisitorSnapshotIdentity = CanonicalVisitorIdentity;
 
 export type CanonicalVisitorSnapshot = {
   visitorId: string;
@@ -20,19 +16,6 @@ export type CanonicalVisitorSnapshot = {
   unifiedStory: CanonicalUnifiedVisitorStory;
 };
 
-function readVisitorIdentityField(visitor: any, field: string): string | null {
-  const value = visitor?.[field];
-
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim();
-
-  return trimmed.length > 0
-    ? trimmed
-    : null;
-}
 
 export async function readCanonicalVisitorSnapshot(
   visitorId: string,
@@ -55,12 +38,7 @@ export async function readCanonicalVisitorSnapshot(
 
   return {
     visitorId,
-    identity: {
-      visitorId,
-      name: readVisitorIdentityField(visitor, "name"),
-      email: readVisitorIdentityField(visitor, "email"),
-      phone: readVisitorIdentityField(visitor, "phone")
-    },
+    identity: readCanonicalVisitorIdentity(visitorId, visitor),
     dashboardCard,
     narrative,
     unifiedStory

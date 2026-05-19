@@ -1,4 +1,5 @@
 import { EngagementEventEnvelopeV1 } from "../../contracts/engagementEvent.v1";
+import { compareTimelineEventsOldestFirst } from "../../shared/timeline/engagementOrdering";
 
 export type CanonicalEngagementStatus = "ENGAGED" | "DISENGAGED";
 
@@ -37,11 +38,7 @@ function readStatusTransition(
   };
 }
 
-function toMillis(iso: string | null | undefined): number {
-  if (!iso || !isString(iso)) return 0;
-  const ms = Date.parse(iso);
-  return Number.isFinite(ms) ? ms : 0;
-}
+
 
 /**
  * Derive current status from status.transition events.
@@ -58,9 +55,9 @@ export function deriveEngagementStatusFromEvents(
   visitorId: string,
   events: EngagementEventEnvelopeV1[]
 ): EngagementStatusV1 {
-  const ordered = (Array.isArray(events) ? events.slice() : []).sort(
-    (a, b) => toMillis(a?.occurredAt) - toMillis(b?.occurredAt)
-  );
+  const ordered =
+    (Array.isArray(events) ? events.slice() : [])
+      .sort(compareTimelineEventsOldestFirst);
 
   let status: CanonicalEngagementStatus | null = null;
   let lastChangedAt: string | null = null;

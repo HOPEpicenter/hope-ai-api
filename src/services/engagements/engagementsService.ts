@@ -2,6 +2,7 @@ import { EngagementEventEnvelopeV1, validateEngagementEventEnvelopeV1 } from "..
 import { normalizeEngagementEventEnvelopeV1 } from "../../domain/engagement/normalizeEngagementEventEnvelopeV1";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { deriveEngagementStatusFromEvents } from "../../domain/engagement/deriveEngagementStatus.v1";
+import { compareTimelineEventsOldestFirst } from "../../shared/timeline/engagementOrdering";
 
 export class EngagementsService {
   constructor(private repo: EngagementEventsRepository) {}
@@ -122,11 +123,8 @@ try {
   async getCurrentStatus(visitorId: string) {
     const page = await this.repo.readTimeline(visitorId, 200, undefined);
 
-    const events = [...page.items].sort((a, b) => {
-      const aTime = Date.parse(a?.occurredAt ?? "");
-      const bTime = Date.parse(b?.occurredAt ?? "");
-      return aTime - bTime;
-    });
+    const events =
+      [...page.items].sort(compareTimelineEventsOldestFirst);
 
     return deriveEngagementStatusFromEvents(visitorId, events);
   }

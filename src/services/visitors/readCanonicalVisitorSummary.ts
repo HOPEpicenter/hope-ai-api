@@ -1,14 +1,7 @@
 import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
 import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
 import { readCanonicalVisitorNarrative } from "./readCanonicalVisitorNarrative";
-import type { CanonicalVisitorNarrative } from "../narratives/canonicalNarrativeContracts";
-
-export type CanonicalVisitorSummary = {
-  ok: true;
-  v: 1;
-  visitorId: string;
-  summary: CanonicalVisitorNarrative;
-};
+import type { CanonicalVisitorSummary } from "./canonicalVisitorContracts";
 
 export async function readCanonicalVisitorSummary(
   visitorId: string

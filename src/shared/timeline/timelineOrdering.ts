@@ -1,6 +1,7 @@
 export type TimelineOrderable = {
   occurredAt?: string | null;
   eventId?: string | null;
+  rowKey?: string | null;
   stream?: string | null;
 };
 
@@ -15,8 +16,8 @@ export function compareTimelineNewestFirst(
     return ao > bo ? -1 : 1;
   }
 
-  const ae = String(a?.eventId ?? "");
-  const be = String(b?.eventId ?? "");
+  const ae = String(a?.eventId ?? a?.rowKey ?? "");
+  const be = String(b?.eventId ?? b?.rowKey ?? "");
 
   if (ae !== be) {
     return ae > be ? -1 : 1;

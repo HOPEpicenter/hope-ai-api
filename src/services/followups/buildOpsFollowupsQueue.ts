@@ -9,6 +9,7 @@ import { isSyntheticOperationalRecord } from "../ops/isSyntheticOperationalRecor
 import { buildOperatorOwnerRef } from "../operators/operatorIdentity";
 import { getVisitorById } from "../../functions/_shared/visitorsRepository";
 import { readCanonicalVisitorIdentity } from "../dashboard/visitorIdentity";
+import { resolveCanonicalDisplayName } from "../dashboard/resolveCanonicalDisplayName";
 import type {
   FollowupAgingBucket,
   FollowupUrgency,
@@ -318,7 +319,11 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
     if (!includeSynthetic && isSyntheticOperationalRecord({
       visitorId: state.visitorId,
       email: visitorIdentity?.email,
-      displayName: visitorIdentity?.displayName ?? profile?.displayName,
+      displayName: resolveCanonicalDisplayName(
+        state.visitorId,
+        profile?.displayName,
+        visitorIdentity?.displayName
+      ),
       metadata: null
     })) {
       continue;

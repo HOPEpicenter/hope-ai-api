@@ -84,6 +84,18 @@ function compareIsoAsc(a: string | null, b: string | null): number {
   return String(a ?? "").localeCompare(String(b ?? ""));
 }
 
+function compareIsoDesc(a: string | null, b: string | null): number {
+  return compareIsoAsc(b, a);
+}
+
+function compareBooleanDesc(a: boolean, b: boolean): number {
+  return Number(b === true) - Number(a === true);
+}
+
+function compareNumberDesc(a: number, b: number): number {
+  return b - a;
+}
+
 function deriveQueueSignals(state: {
   assignedTo: string | null;
   lastFollowupAssignedAt: string | null;
@@ -174,18 +186,22 @@ function compareQueueItems(a: OpsFollowupsQueueItem, b: OpsFollowupsQueueItem): 
 
   const atA = String(a.lastFollowupAssignedAt ?? "");
   const atB = String(b.lastFollowupAssignedAt ?? "");
-  if (atA !== atB) return atB.localeCompare(atA);
+  if (atA !== atB) return compareIsoDesc(atA, atB);
 
-  const escalatedDiff = Number(b.followupEscalated === true) - Number(a.followupEscalated === true);
+  const escalatedDiff =
+    compareBooleanDesc(
+      a.followupEscalated === true,
+      b.followupEscalated === true
+    );
   if (escalatedDiff !== 0) return escalatedDiff;
 
   const riskA = Number(a.engagementRiskScore ?? 0);
   const riskB = Number(b.engagementRiskScore ?? 0);
-  if (riskB !== riskA) return riskB - riskA;
+  if (riskB !== riskA) return compareNumberDesc(riskA, riskB);
 
   const scoreA = Number(a.followupPriorityScore ?? 0);
   const scoreB = Number(b.followupPriorityScore ?? 0);
-  if (scoreB !== scoreA) return scoreB - scoreA;
+  if (scoreB !== scoreA) return compareNumberDesc(scoreA, scoreB);
 
   return a.visitorId.localeCompare(b.visitorId);
 }

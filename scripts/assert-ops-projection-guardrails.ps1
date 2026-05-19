@@ -60,6 +60,50 @@ Assert ($cursorHuge.ok -eq $true) "huge cursor should not fail"
 
 Assert (($cursorHuge.items | Measure-Object).Count -eq 0) "huge cursor should return empty item set"
 
+Write-Host "Checking orphan followup projection exclusion..."
+
+$orphanVisitorId = "orphan-projection-" + [Guid]::NewGuid().ToString("N")
+$orphanAssignedAt = (Get-Date).ToUniversalTime().AddMinutes(-5).ToString("o")
+
+$jsInsertOrphanProfile = @"
+(async () => {
+  const visitorId = process.argv[1];
+  const assignedAt = process.argv[2];
+  const conn = process.env.STORAGE_CONNECTION_STRING;
+  const tableName = process.env.FORMATION_PROFILES_TABLE || "devFormationProfiles";
+
+  if (!conn) throw new Error("STORAGE_CONNECTION_STRING is not set");
+
+  const { TableClient } = require("@azure/data-tables");
+  const table = TableClient.fromConnectionString(conn, tableName);
+
+  await table.upsertEntity({
+    partitionKey: "VISITOR",
+    rowKey: visitorId,
+    visitorId,
+    stage: "Guest",
+    stageUpdatedAt: assignedAt,
+    assignedTo: "ops-orphan-guardrails",
+    lastFollowupAssignedAt: assignedAt
+  }, "Replace");
+
+  console.log("OK: Inserted orphan formation profile:", visitorId);
+})().catch(err => { console.error(err && err.stack || err); process.exit(1); });
+"@
+
+node -e $jsInsertOrphanProfile "$orphanVisitorId" "$orphanAssignedAt" | Out-Host
+
+$orphanFollowups = Json-Get "$api/dashboard/followups?limit=100"
+
+Assert ($orphanFollowups.ok -eq $true) "orphan followups request should succeed"
+
+$orphanItems = @($orphanFollowups.items | Where-Object { $_.visitorId -eq $orphanVisitorId })
+Assert ($orphanItems.Count -eq 0) "orphan profile should not appear in followups queue"
+
+Assert ($null -ne $orphanFollowups.projectionIntegrity) "followups should expose projectionIntegrity"
+Assert ($null -ne $orphanFollowups.projectionIntegrity.PSObject.Properties["orphanFollowupsExcluded"]) "projectionIntegrity should expose orphanFollowupsExcluded"
+Assert ([int]$orphanFollowups.projectionIntegrity.orphanFollowupsExcluded -ge 1) "orphanFollowupsExcluded should increment for orphan profile"
+
 Write-Host "Checking projection lag + repair diagnostics..."
 
 $visitor = Json-Post "$api/visitors" @{

@@ -1,3 +1,4 @@
+import { compareTimelineNewestFirst } from "../../shared/timeline/timelineOrdering";
 import { TableClient } from "@azure/data-tables";
 import { GlobalTimelineRepository } from "../../repositories/globalTimelineRepository";
 import { logFunctionError } from "../../shared/observability/functionObservability";
@@ -441,7 +442,7 @@ export async function listFormationEventsByVisitorId(
     });
   }
 
-  results.sort((a, b) => String(b.rowKey).localeCompare(String(a.rowKey)));
+  results.sort(compareTimelineNewestFirst);
 
   const filtered = results.filter((item) => {
     const occurredAt = String(item.occurredAt ?? "");

@@ -1,8 +1,7 @@
-﻿import { AzureTableVisitorsRepository } from "../../repositories/visitorsRepository";
+import { AzureTableVisitorsRepository } from "../../repositories/visitorsRepository";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { FormationEventsRepository } from "../../repositories/formationEventsRepository";
 import { mergeTimelines } from "../../domain/integration/mergeTimelines.v1";
-import { makeStableKey } from "../../domain/integration/mergeTimelines.v1";
 import { EngagementEventEnvelopeV1 } from "../../contracts/engagementEvent.v1";
 
 export type LegacyExportV1 = {
@@ -36,8 +35,7 @@ export class LegacyExportService {
     const engagementItems = (engagementPage.items ?? []) as EngagementEventEnvelopeV1[];
     const formationItems = (formationPage.items ?? []) as EngagementEventEnvelopeV1[];
 
-    const integrationItems = mergeTimelines(engagementItems, formationItems)
-      .sort((x, y) => makeStableKey(x).localeCompare(makeStableKey(y)));
+    const integrationItems = mergeTimelines(engagementItems, formationItems);
 
     return {
       v: 1,

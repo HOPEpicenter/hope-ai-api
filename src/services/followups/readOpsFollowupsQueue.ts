@@ -12,6 +12,7 @@ export type ReadOpsFollowupsQueueOptions = {
   assignedToFilter?: string;
   visitorIdFilter?: string;
   includeResolved: boolean;
+  includeSynthetic?: boolean;
   sortBy?: string;
   sortDir?: "asc" | "desc";
 };

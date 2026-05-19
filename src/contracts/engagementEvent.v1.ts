@@ -1,3 +1,5 @@
+import { normalizeEventSource } from "../services/events/normalizeEventSource";
+
 export type EngagementEventEnvelopeV1 = {
   v: 1;
   eventId: string;
@@ -76,10 +78,7 @@ function normalizeEnvelopeValue(v: {
     visitorId: v.visitorId,
     type: t,
     occurredAt: v.occurredAt,
-    source: {
-      system: v.source.system,
-      actorId: v.source.actorId,
-    },
+    source: normalizeEventSource(v.source),
     data,
   };
 }
@@ -255,10 +254,7 @@ function validateEngagementEventEnvelopeV1Internal(
     visitorId: (visitorId as string).trim(),
     type: (type as string).trim(),
     occurredAt: (occurredAt as string).trim(),
-    source: {
-      system: isRecord(source) ? String((source as any).system ?? "").trim() : "",
-      actorId: isRecord(source) && (source as any).actorId !== undefined ? String((source as any).actorId).trim() : undefined,
-    },
+    source: normalizeEventSource(source),
     data: isRecord(data) ? (data as Record<string, unknown>) : undefined,
   });
 

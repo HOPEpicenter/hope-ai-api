@@ -12,6 +12,7 @@ import {
   logFunctionError
 } from "../../shared/observability/functionObservability";
 import { readCanonicalVisitorIdentity, type CanonicalVisitorIdentity } from "../../services/dashboard/visitorIdentity";
+import { resolveCanonicalDisplayName } from "../../services/dashboard/resolveCanonicalDisplayName";
 
 function parseLimit(val: unknown, fallback = 200): number {
   const n = typeof val === "string" ? Number(val) : fallback;
@@ -111,16 +112,16 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
       const projection = projectFollowupState(p);
 
       const visitorId = String(p.visitorId ?? "").trim();
-      const profileDisplayName = String(p.displayName ?? "").trim();
-
       const visitorIdentity =
         visitorIdentityById.get(visitorId) ??
         readCanonicalVisitorIdentity(visitorId, null);
 
       const displayName =
-        profileDisplayName ||
-        visitorIdentity.displayName ||
-        visitorId;
+        resolveCanonicalDisplayName(
+          visitorId,
+          p.displayName,
+          visitorIdentity.displayName
+        );
 
       return {
         visitorId: p.visitorId,

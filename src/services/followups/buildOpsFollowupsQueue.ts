@@ -6,6 +6,8 @@ import { computeEngagementScoreV1 } from "../../domain/engagement/computeEngagem
 import { deriveFormationState } from "../../ops/formationState";
 import { EngagementsService } from "../engagements/engagementsService";
 import { isSyntheticOperationalRecord } from "../ops/isSyntheticOperationalRecord";
+import { getVisitorById } from "../../functions/_shared/visitorsRepository";
+import { readCanonicalVisitorIdentity } from "../dashboard/visitorIdentity";
 import type {
   FollowupAgingBucket,
   FollowupUrgency,
@@ -198,6 +200,7 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
 
   const stateByVisitor = new Map<string, EventState>();
   const formationProfileByVisitor = new Map<string, { displayName: string | null; stage: string | null; lastFormationEventType: string | null; lastFormationEventAt: string | null }>();
+  const visitorIdentityByVisitor = new Map<string, { displayName: string | null; email: string | null }>();
 
   for await (const e of opts.eventsTable.listEntities<any>({})) {
     const type = String(e?.type ?? "").trim();
@@ -291,14 +294,30 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
     }
   }
 
+  for (const visitorId of stateByVisitor.keys()) {
+    try {
+      const visitor = await getVisitorById(visitorId);
+      const identity = readCanonicalVisitorIdentity(visitorId, visitor);
+
+      visitorIdentityByVisitor.set(visitorId, {
+        displayName: identity.displayName ?? null,
+        email: identity.email ?? null
+      });
+    } catch {
+      // fail safe: queue should still render
+    }
+  }
+
   const items: OpsFollowupsQueueItem[] = [];
 
   for (const state of stateByVisitor.values()) {
     const profile = formationProfileByVisitor.get(state.visitorId);
+    const visitorIdentity = visitorIdentityByVisitor.get(state.visitorId);
 
     if (!includeSynthetic && isSyntheticOperationalRecord({
       visitorId: state.visitorId,
-      displayName: profile?.displayName,
+      email: visitorIdentity?.email,
+      displayName: visitorIdentity?.displayName ?? profile?.displayName,
       metadata: null
     })) {
       continue;

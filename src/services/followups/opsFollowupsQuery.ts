@@ -4,6 +4,7 @@ export type OpsFollowupsQueryInput = {
   assignedTo?: unknown;
   visitorId?: unknown;
   includeResolved?: unknown;
+  includeSynthetic?: unknown;
   sortBy?: unknown;
   sortDir?: unknown;
 };
@@ -14,6 +15,7 @@ export type NormalizedOpsFollowupsQuery = {
   assignedToFilter: string;
   visitorIdFilter: string;
   includeResolved: boolean;
+  includeSynthetic: boolean;
   sortBy: string;
   sortDir: "asc" | "desc";
 };
@@ -37,6 +39,7 @@ export function normalizeOpsFollowupsQuery(input: OpsFollowupsQueryInput): Norma
     assignedToFilter: String(firstValue(input.assignedTo) ?? "").trim(),
     visitorIdFilter: String(firstValue(input.visitorId) ?? "").trim(),
     includeResolved: String(firstValue(input.includeResolved) ?? "").trim().toLowerCase() === "true",
+    includeSynthetic: String(firstValue(input.includeSynthetic) ?? "").trim().toLowerCase() === "true",
     sortBy: String(firstValue(input.sortBy) ?? "").trim(),
     sortDir: String(firstValue(input.sortDir) ?? "").trim().toLowerCase() === "asc" ? "asc" : "desc",
   };

@@ -34,6 +34,7 @@ opsFollowupsRouter.get("/", async (req, res) => {
     assignedToFilter: query.assignedToFilter,
     visitorIdFilter: query.visitorIdFilter,
     includeResolved: query.includeResolved,
+    includeSynthetic: query.includeSynthetic,
     sortBy: query.sortBy,
     sortDir: query.sortDir,
   });

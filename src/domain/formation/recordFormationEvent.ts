@@ -22,6 +22,7 @@ import {
 } from "../../storage/formation/formationProfilesRepo";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import { GlobalTimelineRepository } from "../../repositories/globalTimelineRepository";
+import { resolveMutationSource } from "../../services/events/resolveMutationSource";
 
 /**
  * Formation event recorder (Phase 3)
@@ -352,7 +353,7 @@ try {
     type: input.type,
     occurredAt,
     summary: null,
-    source: typeof input.channel === "string" ? input.channel : null,
+    source: resolveMutationSource({ system: input.channel }).system,
     raw: eventEntity
   });
 } catch (err: any) {

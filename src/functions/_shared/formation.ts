@@ -3,6 +3,7 @@ import { GlobalTimelineRepository } from "../../repositories/globalTimelineRepos
 import { logFunctionError } from "../../shared/observability/functionObservability";
 import { getConnString } from "./tableClient";
 import { getVisitorById } from "./visitorsRepository";
+import { resolveMutationSource } from "../../services/events/resolveMutationSource";
 import {
   compareEventOrder,
   shouldAdvanceEventState,
@@ -700,7 +701,7 @@ try {
     type: eventEntity.type,
     occurredAt: eventEntity.occurredAt,
     summary: eventEntity.summary ?? null,
-    source: typeof eventEntity.channel === "string" ? eventEntity.channel : null,
+    source: resolveMutationSource({ system: eventEntity.channel }).system,
     raw: eventEntity
   });
 } catch (err: any) {

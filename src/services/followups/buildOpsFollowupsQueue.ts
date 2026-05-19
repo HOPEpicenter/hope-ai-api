@@ -5,6 +5,7 @@ import { deriveEngagementRiskV1 } from "../../domain/engagement/deriveEngagement
 import { computeEngagementScoreV1 } from "../../domain/engagement/computeEngagementScore.v1";
 import { deriveFormationState } from "../../ops/formationState";
 import { EngagementsService } from "../engagements/engagementsService";
+import { isSyntheticOperationalRecord } from "../ops/isSyntheticOperationalRecord";
 import type {
   FollowupAgingBucket,
   FollowupUrgency,
@@ -29,6 +30,7 @@ export type BuildOpsFollowupsQueueOptions = {
   assignedToFilter?: string;
   visitorIdFilter?: string;
   includeResolved: boolean;
+  includeSynthetic?: boolean;
   sortBy?: string;
   sortDir?: "asc" | "desc";
 };
@@ -190,11 +192,12 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
   const sortBy = String(opts.sortBy ?? "").trim();
   const sortDir = opts.sortDir === "asc" ? "asc" : "desc";
   const includeResolved = opts.includeResolved === true;
+  const includeSynthetic = opts.includeSynthetic === true;
   const limit = Math.max(1, Math.min(500, Math.trunc(opts.limit || 25)));
   const cursor = Math.max(0, Math.trunc(opts.cursor || 0));
 
   const stateByVisitor = new Map<string, EventState>();
-  const formationProfileByVisitor = new Map<string, { stage: string | null; lastFormationEventType: string | null; lastFormationEventAt: string | null }>();
+  const formationProfileByVisitor = new Map<string, { displayName: string | null; stage: string | null; lastFormationEventType: string | null; lastFormationEventAt: string | null }>();
 
   for await (const e of opts.eventsTable.listEntities<any>({})) {
     const type = String(e?.type ?? "").trim();
@@ -260,6 +263,7 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
     if (!visitorId) continue;
 
     formationProfileByVisitor.set(visitorId, {
+      displayName: (p as any)?.displayName ?? null,
       stage: (p as any)?.stage ?? null,
       lastFormationEventType: (p as any)?.lastEventType ?? null,
       lastFormationEventAt: (p as any)?.lastEventAt ?? null,
@@ -290,6 +294,16 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
   const items: OpsFollowupsQueueItem[] = [];
 
   for (const state of stateByVisitor.values()) {
+    const profile = formationProfileByVisitor.get(state.visitorId);
+
+    if (!includeSynthetic && isSyntheticOperationalRecord({
+      visitorId: state.visitorId,
+      displayName: profile?.displayName,
+      metadata: null
+    })) {
+      continue;
+    }
+
     const signals = deriveQueueSignals(state);
     if (!includeResolved && signals.followupResolved) continue;
     if (!signals.followupResolved && !signals.needsFollowup) continue;

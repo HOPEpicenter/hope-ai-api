@@ -450,6 +450,18 @@ export function dedupeTaskPreviews(
   );
 }
 
+function compareLexAsc(a: unknown, b: unknown): number {
+  return String(a ?? "").localeCompare(String(b ?? ""));
+}
+
+function compareBooleanDesc(a: boolean, b: boolean): number {
+  return Number(b === true) - Number(a === true);
+}
+
+function compareNumberDesc(a: number, b: number): number {
+  return b - a;
+}
+
 function escalationSortWeight(
   level: TaskPreviewEscalationLevel
 ): number {
@@ -470,11 +482,9 @@ export function sortTaskPreviews(
 ): TaskPreview[] {
   return [...previews].sort((a, b) => {
     const escalationDelta =
-      escalationSortWeight(
-        b.previewEscalationLevel
-      ) -
-      escalationSortWeight(
-        a.previewEscalationLevel
+      compareNumberDesc(
+        escalationSortWeight(a.previewEscalationLevel),
+        escalationSortWeight(b.previewEscalationLevel)
       );
 
     if (escalationDelta !== 0) {
@@ -482,14 +492,17 @@ export function sortTaskPreviews(
     }
 
     const eligibilityDelta =
-      Number(b.candidateTaskEligible) -
-      Number(a.candidateTaskEligible);
+      compareBooleanDesc(
+        a.candidateTaskEligible,
+        b.candidateTaskEligible
+      );
 
     if (eligibilityDelta !== 0) {
       return eligibilityDelta;
     }
 
-    return a.candidateIdentityKey.localeCompare(
+    return compareLexAsc(
+      a.candidateIdentityKey,
       b.candidateIdentityKey
     );
   });
@@ -534,6 +547,6 @@ export function groupTaskPreviews(
   return Array.from(
     grouped.values()
   ).sort((a, b) =>
-    a.groupKey.localeCompare(b.groupKey)
+    compareLexAsc(a.groupKey, b.groupKey)
   );
 }

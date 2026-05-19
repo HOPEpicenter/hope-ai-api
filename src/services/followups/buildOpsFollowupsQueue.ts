@@ -1,4 +1,10 @@
 import { paginateOffsetItems } from "../../shared/timeline/offsetPaginator";
+import {
+  compareBooleanDesc,
+  compareIsoAsc,
+  compareIsoDesc,
+  compareNumberDesc
+} from "../../shared/comparators/basicComparators";
 import { TableClient } from "@azure/data-tables";
 import { deriveFollowupPriority } from "./deriveFollowupPriority";
 import { deriveEngagementRiskV1 } from "../../domain/engagement/deriveEngagementRisk.v1";
@@ -80,21 +86,6 @@ function safeParseJson(value: string): any {
   }
 }
 
-function compareIsoAsc(a: string | null, b: string | null): number {
-  return String(a ?? "").localeCompare(String(b ?? ""));
-}
-
-function compareIsoDesc(a: string | null, b: string | null): number {
-  return compareIsoAsc(b, a);
-}
-
-function compareBooleanDesc(a: boolean, b: boolean): number {
-  return Number(b === true) - Number(a === true);
-}
-
-function compareNumberDesc(a: number, b: number): number {
-  return b - a;
-}
 
 function pickLatestIso(values: Array<string | null | undefined>): string | null {
   const normalized =
@@ -557,9 +548,4 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
     items: pagedItems,
   };
 }
-
-
-
-
-
 

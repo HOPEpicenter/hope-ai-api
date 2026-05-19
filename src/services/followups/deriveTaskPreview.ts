@@ -1,3 +1,8 @@
+import {
+  compareBooleanDesc,
+  compareNumberDesc
+} from "../../shared/comparators/basicComparators";
+
 export type TaskPreviewInput = {
   followup: any;
   audit: any;
@@ -454,13 +459,6 @@ function compareLexAsc(a: unknown, b: unknown): number {
   return String(a ?? "").localeCompare(String(b ?? ""));
 }
 
-function compareBooleanDesc(a: boolean, b: boolean): number {
-  return Number(b === true) - Number(a === true);
-}
-
-function compareNumberDesc(a: number, b: number): number {
-  return b - a;
-}
 
 function escalationSortWeight(
   level: TaskPreviewEscalationLevel
@@ -550,3 +548,4 @@ export function groupTaskPreviews(
     compareLexAsc(a.groupKey, b.groupKey)
   );
 }
+

@@ -1,3 +1,44 @@
+## 2026-05-19 Update — Projection Integrity + Pagination Hardening Wave
+
+### What landed
+
+Completed a major backend regression-hardening and canonical contract stabilization wave.
+
+Canonical contract extraction + normalization:
+- extracted canonical dashboard card contracts
+- extracted canonical visitor snapshot contracts
+- strengthened canonical narrative typing contracts
+- centralized dashboard/snapshot contract ownership
+
+Projection integrity hardening:
+- added orphan followup exclusion assertions
+- added projection integrity assertion coverage
+- validated projection lag + repair diagnostics
+
+Followups pagination hardening:
+- added deterministic cursor replay assertions
+- added pagination overlap detection
+- added pagination boundary assertions
+- added past-end cursor assertions
+- added limit=1 pagination assertions
+
+Formation projection repair hardening:
+- added steady-state repair assertions
+- validated post-repair drift-free behavior
+- validated stable repair audit semantics
+
+### Why this matters
+
+- strengthens replay-safe operational guarantees
+- hardens deterministic pagination semantics
+- reduces future projection drift/debugging risk
+- preserves backend-first operational architecture
+
+### Validation
+
+- CI green across merged slices
+- staging deploy green across merged slices
+- regression assertions green
 
 ## 2026-04-24 — Backend hardening final closeout
 

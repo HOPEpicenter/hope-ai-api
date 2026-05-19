@@ -1,3 +1,13 @@
+## 2026-05-19 Projection integrity + pagination hardening
+
+- [x] Canonical dashboard contract extraction completed
+- [x] Canonical snapshot contract extraction completed
+- [x] Canonical narrative typing hardening completed
+- [x] Followups cursor replay regression coverage enforced
+- [x] Followups pagination boundary regression coverage enforced
+- [x] Projection integrity orphan exclusion assertions enforced
+- [x] Formation projection repair steady-state assertions enforced
+
 ## 2026-04-24 Backend hardening closeout
 
 - [x] `/ops/engagements` create/list/summary required and covered by focused assertions — #687, #692

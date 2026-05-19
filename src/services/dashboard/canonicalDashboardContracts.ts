@@ -1,3 +1,6 @@
+import type { CanonicalVisitorNarrative } from "../narratives/canonicalNarrativeContracts";
+import type { CanonicalUnifiedVisitorStory } from "../narratives/canonicalOperationalNarrativeContracts";
+import type { CanonicalVisitorIdentity } from "./visitorIdentity";
 export type CanonicalVisitorDashboardCard = {
   visitorId: string;
   lastActivityAt: string | null;
@@ -16,3 +19,14 @@ export type CanonicalVisitorDashboardCard = {
   priorityScore: number;
   priorityReason: string;
 };
+
+export type CanonicalVisitorSnapshotIdentity = CanonicalVisitorIdentity;
+
+export type CanonicalVisitorSnapshot = {
+  visitorId: string;
+  identity: CanonicalVisitorSnapshotIdentity;
+  dashboardCard: CanonicalVisitorDashboardCard;
+  narrative: CanonicalVisitorNarrative;
+  unifiedStory: CanonicalUnifiedVisitorStory;
+};
+

@@ -131,4 +131,30 @@ foreach ($field in $fields) {
   Assert ($v1 -eq $v2) "repair idempotency drift for '$field'"
 }
 
+$reportAfterRepair = Json-Post `
+  -Url "$api/_ops/formation/profile-audit" `
+  -Body @{
+    visitorId = $visitorId
+    repair = $false
+  }
+
+Assert ($reportAfterRepair.ok -eq $true) "repair=false after repair should succeed"
+Assert ($reportAfterRepair.repair -eq $false) "repair=false after repair should echo false"
+Assert (-not [bool]$reportAfterRepair.drifted) "repair=false after repair should remain not drifted"
+Assert (-not [bool]$reportAfterRepair.profileBehind) "repair=false after repair should remain not profileBehind"
+Assert (@($reportAfterRepair.driftFields).Count -eq 0) "repair=false after repair should have no driftFields"
+
+$stableFields = @(
+  "latestEventAt",
+  "profileLastEventAt",
+  "lagMs"
+)
+
+foreach ($field in $stableFields) {
+  $v1 = $reportRepair2.$field | ConvertTo-Json -Compress
+  $v2 = $reportAfterRepair.$field | ConvertTo-Json -Compress
+
+  Assert ($v1 -eq $v2) "post-repair stability drift for '$field'"
+}
+
 Write-Host "OK: formation projection health repair contract assertion passed."

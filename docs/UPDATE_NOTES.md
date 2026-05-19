@@ -1,3 +1,13 @@
+
+## 2026-05-19 — Ordering governance consolidation
+
+- centralized followups queue comparison helpers
+- unified canonical timeline newest-first ordering usage
+- removed redundant legacy export re-sorting
+- aligned formation timeline retrieval with shared ordering semantics
+- added rowKey-aware tie-break support to shared timeline ordering helpers
+- centralized preview ordering comparator semantics
+- reduced duplicated inline Date.parse / localeCompare ordering logic across followups, integration, legacy export, and reconciliation paths
 ## 2026-05-19 Update — Projection Integrity + Pagination Hardening Wave
 
 ### What landed

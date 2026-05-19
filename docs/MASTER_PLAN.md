@@ -1,3 +1,13 @@
+### Ordering governance hardening (2026-05-19)
+
+- centralized timeline ordering semantics across engagements/followups/integration layers
+- removed duplicated inline ordering logic
+- normalized preview/followup comparator behavior
+- aligned legacy export ordering with canonical merge semantics
+- expanded deterministic tie-break handling for
+rowKey-aware timeline ordering
+- preserved backend-first governance discipline while keeping dashboard work deferred
+
 ## 2026-05-19 Update — Projection Integrity + Pagination Hardening
 
 What landed:

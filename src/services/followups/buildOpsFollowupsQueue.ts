@@ -6,6 +6,7 @@ import { computeEngagementScoreV1 } from "../../domain/engagement/computeEngagem
 import { deriveFormationState } from "../../ops/formationState";
 import { EngagementsService } from "../engagements/engagementsService";
 import { isSyntheticOperationalRecord } from "../ops/isSyntheticOperationalRecord";
+import { buildOperatorOwnerRef } from "../operators/operatorIdentity";
 import { getVisitorById } from "../../functions/_shared/visitorsRepository";
 import { readCanonicalVisitorIdentity } from "../dashboard/visitorIdentity";
 import type {
@@ -397,7 +398,7 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
 
     items.push({
       visitorId: state.visitorId,
-      assignedTo: ownerId ? { ownerType: "user", ownerId } : null,
+      assignedTo: buildOperatorOwnerRef(ownerId),
       lastFollowupAssignedAt: state.lastFollowupAssignedAt,
       lastFollowupContactedAt: state.lastFollowupContactedAt,
       lastFollowupOutcomeAt: state.lastFollowupOutcomeAt,

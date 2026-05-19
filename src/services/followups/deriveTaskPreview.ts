@@ -1,5 +1,6 @@
 import {
   compareBooleanDesc,
+  compareLexAsc,
   compareNumberDesc
 } from "../../shared/comparators/basicComparators";
 
@@ -455,9 +456,6 @@ export function dedupeTaskPreviews(
   );
 }
 
-function compareLexAsc(a: unknown, b: unknown): number {
-  return String(a ?? "").localeCompare(String(b ?? ""));
-}
 
 
 function escalationSortWeight(

@@ -1,7 +1,8 @@
 import { getVisitorById } from "../visitors/getVisitorById";
 import { readCanonicalVisitorNarrative } from "../visitors/readCanonicalVisitorNarrative";
 import { readCanonicalUnifiedVisitorStory } from "../narratives/readCanonicalUnifiedVisitorStory";
-import { readCanonicalVisitorDashboardCard, type CanonicalVisitorDashboardCard } from "./readCanonicalVisitorDashboardCard";
+import { readCanonicalVisitorDashboardCard } from "./readCanonicalVisitorDashboardCard";
+import type { CanonicalVisitorDashboardCard } from "./canonicalDashboardContracts";
 import type { CanonicalVisitorNarrative, ReadFormationProfile } from "../narratives/canonicalNarrativeContracts";
 import type { CanonicalUnifiedVisitorStory } from "../narratives/canonicalOperationalNarrativeContracts";
 import { readCanonicalVisitorIdentity, type CanonicalVisitorIdentity } from "./visitorIdentity";

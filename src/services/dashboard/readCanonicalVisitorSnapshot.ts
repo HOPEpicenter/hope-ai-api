@@ -2,20 +2,9 @@ import { getVisitorById } from "../visitors/getVisitorById";
 import { readCanonicalVisitorNarrative } from "../visitors/readCanonicalVisitorNarrative";
 import { readCanonicalUnifiedVisitorStory } from "../narratives/readCanonicalUnifiedVisitorStory";
 import { readCanonicalVisitorDashboardCard } from "./readCanonicalVisitorDashboardCard";
-import type { CanonicalVisitorDashboardCard } from "./canonicalDashboardContracts";
-import type { CanonicalVisitorNarrative, ReadFormationProfile } from "../narratives/canonicalNarrativeContracts";
-import type { CanonicalUnifiedVisitorStory } from "../narratives/canonicalOperationalNarrativeContracts";
-import { readCanonicalVisitorIdentity, type CanonicalVisitorIdentity } from "./visitorIdentity";
-
-export type CanonicalVisitorSnapshotIdentity = CanonicalVisitorIdentity;
-
-export type CanonicalVisitorSnapshot = {
-  visitorId: string;
-  identity: CanonicalVisitorSnapshotIdentity;
-  dashboardCard: CanonicalVisitorDashboardCard;
-  narrative: CanonicalVisitorNarrative;
-  unifiedStory: CanonicalUnifiedVisitorStory;
-};
+import type { ReadFormationProfile } from "../narratives/canonicalNarrativeContracts";
+import type { CanonicalVisitorSnapshot } from "./canonicalDashboardContracts";
+import { readCanonicalVisitorIdentity } from "./visitorIdentity";
 
 
 export async function readCanonicalVisitorSnapshot(

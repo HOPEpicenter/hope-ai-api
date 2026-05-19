@@ -57,7 +57,6 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
     res.json({ ok: true, requestId: getRequestId(req) });
   });
 
-  opsRouter.post("/visitors", async (req, res) => {
   // GET /ops/visitors (list)
   opsRouter.get("/visitors", async (req, res) => {
     const limit = parseLimit(req.query, 5);
@@ -74,6 +73,7 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
     });
   });
 
+  opsRouter.post("/visitors", async (req, res) => {
     const body = parseCreateVisitorBody(req.body);
 
     const visitor = await visitorsRepository.create({

@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { getTableClient } from "../storage/tableClient";
+import { resolveMutationSource } from "../services/events/resolveMutationSource";
 
 const TABLE = "EngagementEvents";
 
@@ -72,6 +73,10 @@ export class AzureTableEngagementsRepository implements EngagementsRepository {
     const id = randomUUID();
     const createdAt = nowIso();
     const occurredAt = (input.occurredAt && String(input.occurredAt).trim()) ? String(input.occurredAt).trim() : createdAt;
+    const metadata = {
+      ...(input.metadata ?? {}),
+      source: input.metadata?.source ?? resolveMutationSource({ system: "engagements.repository" })
+    };
 
     // rowKey sorts by time, then uuid
     const rowKey = `${occurredAt}_${id}`;
@@ -84,7 +89,7 @@ export class AzureTableEngagementsRepository implements EngagementsRepository {
       kind,
       occurredAt,
       createdAt,
-      metadata: input.metadata ? JSON.stringify(input.metadata) : undefined,
+      metadata: JSON.stringify(metadata),
     };
 
     await table.upsertEntity(entity as any, "Merge");

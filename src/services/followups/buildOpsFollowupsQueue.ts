@@ -96,6 +96,19 @@ function compareNumberDesc(a: number, b: number): number {
   return b - a;
 }
 
+function pickLatestIso(values: Array<string | null | undefined>): string | null {
+  const normalized =
+    values
+      .map(v => String(v ?? "").trim())
+      .filter(v => v.length > 0);
+
+  if (normalized.length === 0) {
+    return null;
+  }
+
+  return normalized.sort(compareIsoAsc).pop() ?? null;
+}
+
 function deriveQueueSignals(state: {
   assignedTo: string | null;
   lastFollowupAssignedAt: string | null;
@@ -439,11 +452,11 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
       engagementRiskScore: riskScore,
       priorityBand,
       priorityReason: formationState.priorityReason,
-      lastActivityAt: [
+      lastActivityAt: pickLatestIso([
         state.lastFollowupOutcomeAt,
         state.lastFollowupContactedAt,
         state.lastFollowupAssignedAt
-      ].filter(Boolean).sort().pop() ?? null,
+      ]),
     });
   }
 
@@ -465,18 +478,24 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
       let result = 0;
 
       if (sortBy === "assignedAt") {
-        result = String(a.lastFollowupAssignedAt ?? "").localeCompare(String(b.lastFollowupAssignedAt ?? ""));
+        result = compareIsoAsc(a.lastFollowupAssignedAt ?? null, b.lastFollowupAssignedAt ?? null);
       } else if (sortBy === "urgency") {
         const urgencyRank: Record<string, number> = {
           OVERDUE: 3,
           AT_RISK: 2,
           ON_TRACK: 1,
         };
-        result = (urgencyRank[a.followupUrgency ?? ""] ?? 0) - (urgencyRank[b.followupUrgency ?? ""] ?? 0);
+        result = compareNumberDesc(
+          urgencyRank[b.followupUrgency ?? ""] ?? 0,
+          urgencyRank[a.followupUrgency ?? ""] ?? 0
+        );
       } else if (sortBy === "risk") {
-        result = Number(a.engagementRiskScore ?? 0) - Number(b.engagementRiskScore ?? 0);
+        result = compareNumberDesc(
+          Number(b.engagementRiskScore ?? 0),
+          Number(a.engagementRiskScore ?? 0)
+        );
       } else if (sortBy === "lastActivityAt") {
-        result = String(a.lastActivityAt ?? "").localeCompare(String(b.lastActivityAt ?? ""));
+        result = compareIsoAsc(a.lastActivityAt ?? null, b.lastActivityAt ?? null);
       }
 
       return sortDir === "asc" ? result : -result;

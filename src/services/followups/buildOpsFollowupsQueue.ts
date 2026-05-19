@@ -485,9 +485,15 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
           AT_RISK: 2,
           ON_TRACK: 1,
         };
-        result = (urgencyRank[a.followupUrgency ?? ""] ?? 0) - (urgencyRank[b.followupUrgency ?? ""] ?? 0);
+        result = compareNumberDesc(
+          urgencyRank[b.followupUrgency ?? ""] ?? 0,
+          urgencyRank[a.followupUrgency ?? ""] ?? 0
+        );
       } else if (sortBy === "risk") {
-        result = Number(a.engagementRiskScore ?? 0) - Number(b.engagementRiskScore ?? 0);
+        result = compareNumberDesc(
+          Number(b.engagementRiskScore ?? 0),
+          Number(a.engagementRiskScore ?? 0)
+        );
       } else if (sortBy === "lastActivityAt") {
         result = compareIsoAsc(a.lastActivityAt ?? null, b.lastActivityAt ?? null);
       }

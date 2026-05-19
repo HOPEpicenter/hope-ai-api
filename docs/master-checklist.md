@@ -1,3 +1,11 @@
+## 2026-05-19 Ordering governance consolidation
+
+- [x] Centralized followups queue comparison helpers
+- [x] Unified canonical timeline newest-first ordering usage
+- [x] Removed redundant legacy export re-sorting
+- [x] Aligned formation timeline retrieval with shared ordering semantics
+- [x] Added rowKey-aware tie-break support to shared timeline ordering helpers
+- [x] Centralized preview ordering comparator semantics
 ## 2026-05-19 Projection integrity + pagination hardening
 
 - [x] Canonical dashboard contract extraction completed

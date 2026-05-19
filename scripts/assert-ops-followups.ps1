@@ -547,6 +547,38 @@ if ($fuPage2.cursor -eq $fuPage1.cursor) {
 if ($fuPage3.cursor -eq $fuPage2.cursor) {
   throw "Expected cursor to advance between page 2 and page 3."
 }
+
+# Pagination boundary behavior
+$singleItemPage = GetJson "$OpsBase/followups?limit=1"
+
+if ($null -eq $singleItemPage.ok -or -not $singleItemPage.ok) {
+  throw "Expected limit=1 pagination response ok=true."
+}
+
+if (@($singleItemPage.items).Count -ne 1) {
+  throw "Expected limit=1 to return exactly one item."
+}
+
+$pastEndCursor = [int]$fuPage1.stats.total + 100
+$pastEndPage = GetJson "$OpsBase/followups?limit=$limit&cursor=$pastEndCursor"
+
+if ($null -eq $pastEndPage.ok -or -not $pastEndPage.ok) {
+  throw "Expected past-end cursor response ok=true."
+}
+
+if (@($pastEndPage.items).Count -ne 0) {
+  throw "Expected past-end cursor to return empty items."
+}
+
+$pastEndReplay = GetJson "$OpsBase/followups?limit=$limit&cursor=$pastEndCursor"
+
+if ($null -eq $pastEndReplay.ok -or -not $pastEndReplay.ok) {
+  throw "Expected past-end cursor replay response ok=true."
+}
+
+if (@($pastEndReplay.items).Count -ne 0) {
+  throw "Expected past-end cursor replay to remain empty."
+}
 # 11) Resolve all seeded visitors so the regression cleans up after itself
 $cleanupVisitorIds = @(
   $primaryVisitorId,

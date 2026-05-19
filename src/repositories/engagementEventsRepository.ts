@@ -1,4 +1,5 @@
 import { EngagementEventEnvelopeV1 } from "../contracts/engagementEvent.v1";
+import { normalizeEventSource } from "../services/events/normalizeEventSource";
 import { decodeCursorV1, encodeCursorV1 } from "../contracts/timeline.v1";
 import { getTableClient } from "../storage/tableClient";
 import { makeNewestFirstRowKey } from "../shared/timeline/timelineOrdering";
@@ -143,20 +144,12 @@ try {
     const iter = table.listEntities<any>({ queryOptions: { filter } });
 
     for await (const e of iter) {
-      const sourceParsed = safeJsonParse<{ system?: string; actorId?: string }>(
+      const sourceParsed = safeJsonParse<Record<string, unknown>>(
         e.sourceJson ?? e.source,
         {}
       );
 
-      const system =
-        typeof sourceParsed.system === "string" && sourceParsed.system.trim()
-          ? sourceParsed.system
-          : "unknown";
-
-      const actorId =
-        typeof sourceParsed.actorId === "string" && sourceParsed.actorId.trim()
-          ? sourceParsed.actorId
-          : undefined;
+      const source = normalizeEventSource(sourceParsed);
 
       const evt: EngagementEventEnvelopeV1 = {
         v: e.v,
@@ -164,7 +157,7 @@ try {
         visitorId: e.visitorId,
         type: e.type,
         occurredAt: e.occurredAt,
-        source: actorId ? { system, actorId } : { system },
+        source,
         data: safeJsonParse<Record<string, unknown>>(e.dataJson ?? e.data, {}),
       };
 

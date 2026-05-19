@@ -1,3 +1,30 @@
+## 2026-05-19 Update — Projection Integrity + Pagination Hardening
+
+What landed:
+- canonical dashboard/snapshot contract extraction
+- canonical narrative typing hardening
+- orphan projection exclusion assertions
+- deterministic followups pagination hardening
+- cursor replay + pagination boundary assertions
+- formation projection repair steady-state assertions
+
+Why this matters (master plan alignment)
+
+- strengthens replay-safe backend operational guarantees
+- hardens deterministic pagination semantics
+- centralizes canonical contract ownership
+- preserves backend-first architecture discipline
+
+Validation:
+- CI green
+- staging deploy green
+- regression assertions green
+
+Current rule:
+- treat old dashboard as temporary
+- prioritize backend operational correctness and replay integrity
+- continue expanding regression protection before widening operational surfaces
+
 
 ## ✅ Formation profile truth / parity lane CLOSED (PRs #451–#457)
 

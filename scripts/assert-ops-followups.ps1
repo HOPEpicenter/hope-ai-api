@@ -483,6 +483,30 @@ if (@($fuPage2.items).Count -eq 0) {
 }
 
 $page2VisitorIds = @($fuPage2.items | ForEach-Object { $_.visitorId })
+
+# Replay same cursor: should return the exact same page and not mutate pagination state.
+$fuPage2Replay = GetJson "$OpsBase/followups?limit=$limit&cursor=$cursor"
+
+if ($null -eq $fuPage2Replay.ok -or -not $fuPage2Replay.ok) {
+  throw "Expected pagination response ok=true (page 2 replay)."
+}
+
+$page2ReplayVisitorIds = @($fuPage2Replay.items | ForEach-Object { $_.visitorId })
+
+if (@($page2ReplayVisitorIds).Count -ne @($page2VisitorIds).Count) {
+  throw "Expected page 2 replay item count to match original page 2."
+}
+
+for ($i = 0; $i -lt @($page2VisitorIds).Count; $i++) {
+  if ([string]$page2ReplayVisitorIds[$i] -ne [string]$page2VisitorIds[$i]) {
+    throw "Expected page 2 replay visitor ordering to match at index $i."
+  }
+}
+
+if ([string]$fuPage2Replay.nextCursor -ne [string]$fuPage2.nextCursor) {
+  throw "Expected page 2 replay nextCursor to match original page 2."
+}
+
 foreach ($id in $page2VisitorIds) {
   if (-not $seenVisitorIds.Add([string]$id)) {
     throw "Pagination overlap detected: visitorId=$id appears before or on page 2."

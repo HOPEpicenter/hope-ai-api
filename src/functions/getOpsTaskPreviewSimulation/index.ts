@@ -95,6 +95,11 @@ export default async function (context: any, req: any): Promise<void> {
         .trim()
         .toLowerCase() === "true";
 
+    const includeSynthetic =
+      String(readQuery(req, "includeSynthetic") ?? "")
+        .trim()
+        .toLowerCase() === "true";
+
     const engagementService =
       new EngagementsService(
         new EngagementEventsRepository()
@@ -112,6 +117,7 @@ export default async function (context: any, req: any): Promise<void> {
         visitorIdFilter:
           String(readQuery(req, "visitorId") ?? "").trim(),
         includeResolved,
+        includeSynthetic,
         sortBy:
           String(readQuery(req, "sortBy") ?? "").trim(),
         sortDir:

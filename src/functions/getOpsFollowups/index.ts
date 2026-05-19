@@ -62,6 +62,7 @@ export default async function (context: any, req: any): Promise<void> {
       assignedTo: readQueryValue(req?.query, "assignedTo"),
       visitorId: readQueryValue(req?.query, "visitorId"),
       includeResolved: readQueryValue(req?.query, "includeResolved"),
+      includeSynthetic: readQueryValue(req?.query, "includeSynthetic"),
       sortBy: readQueryValue(req?.query, "sortBy"),
       sortDir: readQueryValue(req?.query, "sortDir")
     });
@@ -74,6 +75,7 @@ export default async function (context: any, req: any): Promise<void> {
       assignedToFilter: query.assignedToFilter,
       visitorIdFilter: query.visitorIdFilter,
       includeResolved: query.includeResolved,
+      includeSynthetic: query.includeSynthetic,
       sortBy: query.sortBy,
       sortDir: query.sortDir,
     });

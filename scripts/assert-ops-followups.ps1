@@ -149,6 +149,27 @@ function New-Visitor([string]$FirstName, [string]$LastName, [string]$Prefix) {
   return $visitorId
 }
 
+function New-SyntheticVisitor([string]$Prefix) {
+  $email = "dummy+{0}@example.com" -f (Get-Date -Format "yyyyMMddHHmmssfff")
+
+  $visitor = PostJson "$ApiBase/visitors" @{
+    firstName = "Dummy"
+    lastName  = "Visitor"
+    email     = $email
+  }
+
+  $visitorId = $visitor.visitorId
+  if ([string]::IsNullOrWhiteSpace($visitorId)) { $visitorId = $visitor.id }
+
+  if ([string]::IsNullOrWhiteSpace($visitorId)) {
+    throw "Synthetic visitor id missing."
+  }
+
+  Write-Host ("[assert-ops-followups] synthetic visitorId={0}" -f $visitorId)
+
+  return $visitorId
+}
+
 function Add-FormationEvent([string]$VisitorId, [string]$Type, [string]$OccurredAt, [hashtable]$Metadata) {
   $null = PostJson "$ApiBase/formation/events" @{
     v          = 1
@@ -579,8 +600,37 @@ if ($null -eq $pastEndReplay.ok -or -not $pastEndReplay.ok) {
 if (@($pastEndReplay.items).Count -ne 0) {
   throw "Expected past-end cursor replay to remain empty."
 }
+# 10d) Synthetic operational record filtering contract
+Write-Host "[assert-ops-followups] GET /ops/followups (synthetic filtering contract) ..."
+
+$syntheticVisitorId = New-SyntheticVisitor -Prefix "ops-followups-synth"
+$syntheticAssignedAt = $now.AddSeconds(14).ToString("o")
+
+Add-FormationEvent `
+  -VisitorId $syntheticVisitorId `
+  -Type "FOLLOWUP_ASSIGNED" `
+  -OccurredAt $syntheticAssignedAt `
+  -Metadata @{ assigneeId = "ops-user-1" }
+
+Start-Sleep -Milliseconds 250
+
+$fuDefaultSynthetic = GetJson "$OpsBase/followups"
+$syntheticDefaultItem = GetFollowupItem -Items $fuDefaultSynthetic.items -VisitorId $syntheticVisitorId
+
+if ($syntheticDefaultItem) {
+  throw "Expected synthetic visitor to be excluded by default."
+}
+
+$fuIncludedSynthetic = GetJson "$OpsBase/followups?includeSynthetic=true"
+$syntheticIncludedItem = GetFollowupItem -Items $fuIncludedSynthetic.items -VisitorId $syntheticVisitorId
+
+if (-not $syntheticIncludedItem) {
+  throw "Expected synthetic visitor to appear when includeSynthetic=true."
+}
+
 # 11) Resolve all seeded visitors so the regression cleans up after itself
 $cleanupVisitorIds = @(
+  $syntheticVisitorId,
   $primaryVisitorId,
   $secondaryVisitorId,
   $olderHighRiskVisitorId,

@@ -32,6 +32,7 @@ import {
   listFormationProfiles
 } from "../../functions/_shared/formation";
 import { readCanonicalVisitorIdentity } from "../../services/dashboard/visitorIdentity";
+import { resolveMutationSource } from "../../services/events/resolveMutationSource";
 function isAllowedType(v: unknown): v is FormationEventType {
   return typeof v === "string" && (allowedTypes as string[]).includes(v);
 }
@@ -131,7 +132,13 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
         type,
         occurredAt: new Date(t).toISOString(),
         summary,
-        metadata,
+        metadata: {
+          ...(metadata ?? {}),
+          source: resolveMutationSource({
+            system: "ops",
+            requestId: getRequestId(req)
+          })
+        },
       });
 
       res.status(201).json({
@@ -243,7 +250,14 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
         type: s.type,
         occurredAt: new Date(now - s.minutesAgo * 60_000).toISOString(),
         summary: s.summary,
-        metadata: { dummy: true, minutesAgo: s.minutesAgo },
+        metadata: {
+          dummy: true,
+          minutesAgo: s.minutesAgo,
+          source: resolveMutationSource({
+            system: "ops.populate-dummy",
+            requestId: getRequestId(req)
+          })
+        },
       });
     }
 

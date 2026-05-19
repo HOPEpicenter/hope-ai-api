@@ -1,3 +1,5 @@
+import { buildOperatorOwnerRef } from "../../services/operators/operatorIdentity";
+
 import type {
   GroupRefV1,
   IntegrationSummaryV1,
@@ -125,9 +127,7 @@ export function deriveIntegrationSummaryV1(
   const assignedTo: OwnerRefV1 | undefined =
     followupResolved
       ? undefined
-      : assignedToUserId
-        ? { ownerType: "user", ownerId: assignedToUserId }
-        : undefined;
+      : buildOperatorOwnerRef(assignedToUserId) ?? undefined;
 
   let needsFollowup: boolean;
 

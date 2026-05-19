@@ -1,3 +1,4 @@
+import { compareTimelineNewestFirst } from "../../shared/timeline/timelineOrdering";
 export type TimelineBaseV1 = {
   occurredAt: string;
   eventId: string;
@@ -22,6 +23,6 @@ export function mergeTimelines<
   const b = formation.map(e => ({ ...e, stream: "formation" as const }));
 
   const merged = [...a, ...b];
-  merged.sort((x, y) => makeStableKey(y).localeCompare(makeStableKey(x)));
+  merged.sort(compareTimelineNewestFirst);
   return merged;
 }

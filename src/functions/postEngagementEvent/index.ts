@@ -2,6 +2,7 @@ import { validateEngagementEventEnvelopeV1Strict } from "../../contracts/engagem
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { EngagementsService } from "../../services/engagements/engagementsService";
 import { recordFormationEventV1 } from "../_shared/formation";
+import { resolveMutationSource } from "../../services/events/resolveMutationSource";
 
 const service = new EngagementsService(new EngagementEventsRepository());
 
@@ -67,7 +68,10 @@ export async function postEngagementEvent(context: any, req: any): Promise<void>
         visitorId: evt.visitorId,
         type,
         occurredAt: evt.occurredAt,
-        source: { system: "engagements" },
+        source: resolveMutationSource({
+          system: "engagements",
+          actorId: evt.source.actorId
+        }),
         data: evt.data ?? {}
       });
     }

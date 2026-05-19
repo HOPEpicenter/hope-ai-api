@@ -5,27 +5,11 @@ import { deriveFollowupPriority } from "../followups/deriveFollowupPriority";
 import { deriveFollowupUrgency } from "../followups/deriveFollowupUrgency";
 import { projectFollowupState } from "../../functions/_shared/followupProjection";
 import { TIMELINE_DERIVATION_LIMIT } from "../integration/timelineConstants";
+import type { CanonicalVisitorDashboardCard } from "./canonicalDashboardContracts";
 
 const integrationService = new IntegrationService(new EngagementEventsRepository());
 
-export type CanonicalVisitorDashboardCard = {
-  visitorId: string;
-  lastActivityAt: string | null;
-  lastActivitySummary: string | null;
-  followupStatus: "action_needed" | "contact_made" | "resolved" | "unassigned";
-  assignedTo: string | null;
-  assignedToName: string | null;
-  attentionState: "needs_attention" | "clear";
-  followupUrgency: "OVERDUE" | "AT_RISK" | "ON_TRACK" | null;
-  followupOverdue: boolean;
-  riskLevel: string | null;
-  riskScore: number | null;
-  needsFollowup: boolean | null;
-  recommendedAction: string | null;
-  priorityBand: "urgent" | "high" | "normal" | "low";
-  priorityScore: number;
-  priorityReason: string;
-};
+
 
 export async function readCanonicalVisitorDashboardCard(
   visitorId: string

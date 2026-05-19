@@ -463,6 +463,13 @@ if (-not $fuPage1.nextCursor) {
 
 $page1VisitorIds = @($fuPage1.items | ForEach-Object { $_.visitorId })
 
+$seenVisitorIds = [System.Collections.Generic.HashSet[string]]::new()
+foreach ($id in $page1VisitorIds) {
+  if (-not $seenVisitorIds.Add([string]$id)) {
+    throw "Pagination duplicate detected on page 1: visitorId=$id"
+  }
+}
+
 # page 2
 $cursor = $fuPage1.nextCursor
 $fuPage2 = GetJson "$OpsBase/followups?limit=$limit&cursor=$cursor"
@@ -476,19 +483,45 @@ if (@($fuPage2.items).Count -eq 0) {
 }
 
 $page2VisitorIds = @($fuPage2.items | ForEach-Object { $_.visitorId })
-
-foreach ($id in $page1VisitorIds) {
-  if ($page2VisitorIds -contains $id) {
-    throw "Pagination overlap detected: visitorId=$id appears in both page 1 and page 2."
+foreach ($id in $page2VisitorIds) {
+  if (-not $seenVisitorIds.Add([string]$id)) {
+    throw "Pagination overlap detected: visitorId=$id appears before or on page 2."
   }
 }
 
-if ($fuPage1.stats.total -le $limit) {
-  throw "Expected stats.total to exceed page size when pagination is active."
+if (-not $fuPage2.nextCursor) {
+  throw "Expected nextCursor to be present on page 2 for three-page pagination coverage."
+}
+
+# page 3
+$cursor = $fuPage2.nextCursor
+$fuPage3 = GetJson "$OpsBase/followups?limit=$limit&cursor=$cursor"
+
+if ($null -eq $fuPage3.ok -or -not $fuPage3.ok) {
+  throw "Expected pagination response ok=true (page 3)."
+}
+
+if (@($fuPage3.items).Count -eq 0) {
+  throw "Expected page 3 to return items."
+}
+
+$page3VisitorIds = @($fuPage3.items | ForEach-Object { $_.visitorId })
+foreach ($id in $page3VisitorIds) {
+  if (-not $seenVisitorIds.Add([string]$id)) {
+    throw "Pagination overlap detected: visitorId=$id appears before or on page 3."
+  }
+}
+
+if ($fuPage1.stats.total -le ($limit * 2)) {
+  throw "Expected stats.total to exceed two pages when three-page pagination is active."
 }
 
 if ($fuPage2.cursor -eq $fuPage1.cursor) {
   throw "Expected cursor to advance between page 1 and page 2."
+}
+
+if ($fuPage3.cursor -eq $fuPage2.cursor) {
+  throw "Expected cursor to advance between page 2 and page 3."
 }
 # 11) Resolve all seeded visitors so the regression cleans up after itself
 $cleanupVisitorIds = @(

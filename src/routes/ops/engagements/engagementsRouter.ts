@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import type { EngagementsRepository } from "../../../repositories/engagementsRepository";
+import { resolveMutationSource } from "../../../services/events/resolveMutationSource";
 
 export function createEngagementsRouter(engagementsRepository: EngagementsRepository) {
   const router = Router();
@@ -19,7 +20,17 @@ export function createEngagementsRouter(engagementsRepository: EngagementsReposi
       if (!visitorId) return res.status(400).json({ ok: false, error: "VISITOR_ID_REQUIRED" });
       if (!kind) return res.status(400).json({ ok: false, error: "KIND_REQUIRED" });
 
-      const created = await engagementsRepository.create({ visitorId, kind: kind.trim(), occurredAt, metadata });
+      const created = await engagementsRepository.create({
+        visitorId,
+        kind: kind.trim(),
+        occurredAt,
+        metadata: {
+          ...(metadata && typeof metadata === "object" ? metadata as Record<string, unknown> : {}),
+          source: resolveMutationSource({
+            system: "ops.engagements"
+          })
+        }
+      });
       return res.status(201).json({ ok: true, ...created });
     } catch (err: any) {
       console.error("OPS_CREATE_ENGAGEMENT_FAILED", err?.message || err);

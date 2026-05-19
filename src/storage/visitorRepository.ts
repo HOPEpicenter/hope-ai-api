@@ -1,6 +1,7 @@
-﻿import { TableClient } from "@azure/data-tables";
+import { TableClient } from "@azure/data-tables";
 
 import { resolveStorageConnectionString } from "../shared/storage/resolveStorageConnectionString";
+import { resolveMutationSource } from "../services/events/resolveMutationSource";
 export type Visitor = {
   id: string;
 
@@ -90,6 +91,11 @@ export class VisitorRepository {
     const createdIso = toIso(visitor.createdAt ?? visitor.created);
     const updatedIso = toIso(visitor.updatedAt ?? visitor.updated ?? createdIso);
 
+    const normalizedSource =
+      typeof visitor.source === "string" && visitor.source.trim().length > 0
+        ? resolveMutationSource({ system: visitor.source }).system
+        : undefined;
+
     // IMPORTANT: Table SDK entity uses lowercase partitionKey/rowKey fields
     const entity: any = {
       partitionKey: VISITOR_PARTITION_KEY,
@@ -101,7 +107,7 @@ export class VisitorRepository {
       phone: visitor.phone,
       status: visitor.status,
       notes: visitor.notes,
-      source: visitor.source,
+      source: normalizedSource,
 
       createdAt: createdIso,
       updatedAt: updatedIso,

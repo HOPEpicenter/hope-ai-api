@@ -1,4 +1,7 @@
-import { resolveOperatorDisplayName } from "./formation";
+import {
+  normalizeOperatorId,
+  resolveOperatorDisplayName
+} from "../../services/operators/operatorIdentity";
 
 export type FollowupProjectionMetadata = {
   sourceSystem: string | null;
@@ -44,15 +47,8 @@ function getFollowupProjectionMetadata(profile: any): FollowupProjectionMetadata
 export function projectFollowupState(profile: any): FollowupProjection {
   const projectionMetadata = getFollowupProjectionMetadata(profile);
 
-  const assignedToRaw =
-    typeof profile?.assignedTo === "string"
-      ? profile.assignedTo.trim()
-      : "";
-
   const assignedTo =
-    assignedToRaw.length > 0
-      ? assignedToRaw
-      : null;
+    normalizeOperatorId(profile?.assignedTo);
 
   const assignedToName =
     assignedTo

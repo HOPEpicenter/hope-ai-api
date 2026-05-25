@@ -616,3 +616,5 @@ Next constraints:
 
 
 - [ ] Add deterministic replay parity snapshots for future orchestration workflows
+
+- [x] Extract deterministic formation projection kernel infrastructure

@@ -140,7 +140,7 @@ Current rule:
 **Next**
 - Treat the dashboard v1.1 operator-flow work as complete for now unless a real blocker appears.
 - Do not reopen backend scope unless a real workflow blocker appears.
-- Track deploy maintenance separately: `azure/login@v2` still surfaces the GitHub Actions Node 20 deprecation warning and remains a follow-up workflow/tooling item.
+- Deploy maintenance resolved: workflows now use `azure/login@v3`, which is the Node 24-compatible major version.
 ## 2026-03-14 Update
 
 **What landed**
@@ -601,7 +601,7 @@ Operational verification:
 - Main merged cleanly.
 - CI green after merge.
 - Staging deploy green after merge.
-- azure/login@v2.3.0 Node 20 deprecation warning still appears but remains non-blocking.
+- azure/login Node 20 deprecation warning resolved by using `azure/login@v3`.
 
 ## 2026-04-06 — Next Backend Slice: Journey Read Model
 

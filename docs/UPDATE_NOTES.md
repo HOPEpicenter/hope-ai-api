@@ -192,7 +192,7 @@ These post-v1 slices improved the dashboard’s operator workflow without wideni
 ### Deploy/workflow maintenance note
 
 - staging and CI remained green after the workflow maintenance slice
-- `azure/login@v2` still reports the GitHub Actions Node 20 deprecation warning and remains a tracked follow-up
+- `azure/login@v3` is now used for the deploy workflow Node 24 runtime path; prior Node 20 deprecation follow-up is resolved
 ## 2026-03-14
 
 - ✅ Merged **#330**: staging deploy switched from config-zip to `func azure functionapp publish --no-build`.
@@ -459,7 +459,7 @@ Verification:
 
 Notes:
 - Journey is backend-only at this point and is not yet consumed by visitor summary or dashboard views.
-- azure/login@v2.3.0 Node 20 deprecation warning remains non-blocking and deferred.
+- azure/login Node 20 deprecation warning resolved by using `azure/login@v3`.
 
 
 

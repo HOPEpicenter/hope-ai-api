@@ -20,14 +20,8 @@ import {
   applyTouchpointTimestamp
 } from "../../domain/formation/projection/applyTouchpointTimestamp";
 import {
-  applyFollowupAssignedMutation
-} from "../../domain/formation/projection/applyFollowupAssignedMutation";
-import {
-  applyFollowupOutcomeMutation
-} from "../../domain/formation/projection/applyFollowupOutcomeMutation";
-import {
-  applyNextStepMutation
-} from "../../domain/formation/projection/applyNextStepMutation";
+  formationMutationDispatchers
+} from "../../domain/formation/projection/formationMutationDispatchers";
 
 function normalizeAssignedTo(input: any): string | null {
   if (input === null || input === undefined) return null;
@@ -519,11 +513,11 @@ async function applyFormationEventToProfile(params: {
       }
     }
 
-    applyFollowupAssignedMutation({
+    formationMutationDispatchers.FOLLOWUP_ASSIGNED({
+      type,
       profile,
-      assigneeId,
+      data,
       occurredAtIso: occurredAt,
-      eventType: type,
       eventId
     });
   }
@@ -549,12 +543,11 @@ async function applyFormationEventToProfile(params: {
       throw new Error("FOLLOWUP_OUTCOME_RECORDED requires data.outcome (string)");
     }
 
-    applyFollowupOutcomeMutation({
+    formationMutationDispatchers.FOLLOWUP_OUTCOME_RECORDED({
+      type,
       profile,
-      outcome,
-      notes: typeof data.notes === "string" ? data.notes : undefined,
+      data,
       occurredAtIso: occurredAt,
-      eventType: type,
       eventId
     });
   }
@@ -565,11 +558,11 @@ async function applyFormationEventToProfile(params: {
       throw new Error("NEXT_STEP event requires data.nextStep (string)");
     }
 
-    applyNextStepMutation({
+    formationMutationDispatchers[type]({
+      type,
       profile,
-      completed: type === "NEXT_STEP_COMPLETED",
+      data,
       occurredAtIso: occurredAt,
-      eventType: type,
       eventId
     });
   }

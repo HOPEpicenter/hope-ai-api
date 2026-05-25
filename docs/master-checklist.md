@@ -374,7 +374,7 @@ Post-v1 rule:
 Current rule:
 - [x] Treat the current dashboard v1.1 operator-flow work as complete unless a real blocker appears
 - [x] Do not widen backend scope unless a real blocker appears
-- [ ] Follow up later on `azure/login@v2` GitHub Actions Node 20 deprecation warning in deploy workflows
+- [x] Resolve `azure/login` GitHub Actions Node 20 deprecation warning by using `azure/login@v3` in deploy workflows
 
 
 

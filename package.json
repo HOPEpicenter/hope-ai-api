@@ -14,7 +14,8 @@
     "start:dist": "node dist/index.js",
     "test": "npm run test:smoke",
     "test:smoke": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/run-smoke.ps1",
-    "verify:layout": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify-functions-layout.ps1"
+    "verify:layout": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify-functions-layout.ps1",
+    "test:regression": "ts-node tests/timeline/timelineOrdering.test.ts && ts-node tests/engagements/deriveEngagementStatus.v1.test.ts"
   },
   "dependencies": {
     "@azure/data-tables": "^13.3.2",

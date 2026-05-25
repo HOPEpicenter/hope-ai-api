@@ -777,3 +777,32 @@ Validation outcomes:
 - staging deployments remained healthy
 
 The platform now contains stable deterministic orchestration infrastructure suitable for future pastoral intelligence systems without enabling behavioral automation.
+
+## 2026-05-25 — Replay/projection hardening regression layer
+
+Completed combined backend hardening slices for deterministic replay and projection safety.
+
+What landed:
+- Added deterministic regression suite foundation.
+- Added timeline ordering and tie-break coverage.
+- Added reconciliation ordering invariant coverage.
+- Added delayed/out-of-order event protection tests.
+- Added engagement status replay consistency tests.
+- Added engagement summary accumulation coverage.
+- Added timeline pagination determinism coverage.
+- Added global timeline row-key ordering coverage.
+- Added formation profile cursor safety coverage.
+- Hardened malformed formation profile cursor decoding.
+- Expanded `npm run test:regression`.
+
+Validation:
+- Regression suite passed.
+- TypeScript build passed.
+- CI passed on PRs.
+- Staging deploys completed successfully.
+- Azure OIDC deployment path remained healthy.
+
+Impact:
+- Backend replay, pagination, cursor, and projection behavior now has reusable deterministic regression coverage.
+- No dashboard scope widened.
+- Public API behavior remained stable except for safer malformed cursor handling.

@@ -530,9 +530,9 @@ Current rule:
 - [x] Validated assign → contact → unassign → reassign → outcome lifecycle on staging
 - [x] Verified resolved followups correctly exit open queue surfaces
 - [x] Verified queue/dashboard/timeline semantic alignment after reassignment
-- [ ] Validate duplicate replay/idempotency edge cases
-- [ ] Validate delayed/out-of-order event handling
-- [ ] Validate stale projection recovery behavior
+- [x] Validate duplicate replay/idempotency edge cases
+- [x] Validate delayed/out-of-order event handling
+- [x] Validate stale projection recovery behavior
 
 ### 2026-05-08 — Replay and out-of-order validation
 
@@ -613,3 +613,4 @@ Next constraints:
 - [ ] Keep orchestration behavior deterministic and read-side only
 - [ ] Do not introduce AI orchestration without explicit activation architecture
 - [ ] Preserve replay-safe operational semantics during future orchestration work
+

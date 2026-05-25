@@ -806,3 +806,55 @@ Impact:
 - Backend replay, pagination, cursor, and projection behavior now has reusable deterministic regression coverage.
 - No dashboard scope widened.
 - Public API behavior remained stable except for safer malformed cursor handling.
+
+## 2026-05-25 — Operational replay integrity hardening wave
+
+Completed a combined backend hardening wave focused on deterministic replay correctness, projection safety, pagination stability, rebuild parity, and operational audit integrity.
+
+Merged slices:
+- #917 deterministic replay regression foundation
+- #918 projection pagination + cursor hardening
+- #919 replay/projection checklist closeout
+- #920 integration projection hardening coverage
+- #921 global timeline parity hardening
+- #923 rebuild audit + replay gap hardening
+
+What landed:
+
+Replay + ordering hardening
+- Added deterministic timeline ordering assertions.
+- Added row-key parity ordering coverage.
+- Added replay-safe rebuild ordering coverage.
+- Added integration merge precedence assertions.
+- Added delayed/out-of-order replay protection coverage.
+
+Pagination + cursor safety
+- Added deterministic pagination boundary coverage.
+- Added cross-stream cursor stability coverage.
+- Hardened malformed formation cursor decode behavior.
+- Added safe cursor rejection regression coverage.
+
+Projection + rebuild integrity
+- Added projection repair parity assertions.
+- Added deterministic rebuild snapshot coverage.
+- Added replay lag/gap detection assertions.
+- Added rebuild idempotency verification coverage.
+
+Integration + parity semantics
+- Added grouped activity dedupe invariants.
+- Added integration summary determinism coverage.
+- Added shadow/global parity invariant coverage.
+- Added replay envelope deterministic hashing coverage.
+
+Operational outcomes
+- Expanded `npm run test:regression` into a reusable backend replay/projection guardrail layer.
+- CI remained green across all hardening PRs.
+- Azure OIDC deploy path remained healthy.
+- Staging deployments completed successfully after every merge.
+- Backend operational replay semantics materially strengthened without widening public API scope.
+
+Strategic impact
+- Replay-safe backend behavior is now significantly more regression-protected.
+- Projection rebuilds and audit flows are now deterministically validated.
+- Timeline ordering/cursor semantics are protected against future drift.
+- Backend foundation is safer for future endpoint and orchestration expansion.

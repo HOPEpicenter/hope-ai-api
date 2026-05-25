@@ -6,6 +6,8 @@ import { EngagementEventsRepository } from "../../repositories/engagementEventsR
 import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
 import { IntegrationService } from "../../services/integration/integrationService";
 import { GlobalTimelineRepository } from "../../repositories/globalTimelineRepository";
+import { normalizeIntegrationQuery } from "../../shared/integration/normalizeIntegrationQuery";
+import { buildProjectionIntegrityEnvelope } from "../../shared/integration/projectionIntegrityEnvelope";
 
 export const integrationRouter = Router();
 
@@ -79,11 +81,11 @@ integrationRouter.get("/integration/summary", async (req, res, next) => {
 
 integrationRouter.get("/integration/timeline/global", async (req, res, next) => {
   try {
-    const limit = Number(req.query.limit ?? 50);
-    const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
-    const debugShadow =
-      String(req.query.debugShadow ?? "").trim() === "1" ||
-      String(req.query.debugShadow ?? "").trim().toLowerCase() === "true";
+    const {
+      limit,
+      cursor,
+      debugShadow
+    } = normalizeIntegrationQuery(req.query);
 
     const page = await service.readGlobalIntegratedTimeline(limit, cursor);
 
@@ -121,13 +123,3 @@ integrationRouter.get("/integration/timeline/global", async (req, res, next) => 
     return next(err);
   }
 });
-
-
-
-
-
-
-
-
-
-

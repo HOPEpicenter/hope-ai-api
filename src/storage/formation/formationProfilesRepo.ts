@@ -80,9 +80,23 @@ function encodeCursor(token?: string): string | undefined {
 
 function decodeCursor(cursor?: string): string | undefined {
   const c = String(cursor ?? "").trim();
+
   if (!c) return undefined;
+
+  // Reject malformed base64 before decode.
+  if (!/^[A-Za-z0-9+/=]+$/.test(c)) {
+    return undefined;
+  }
+
   try {
-    return Buffer.from(c, "base64").toString("utf8");
+    const decoded = Buffer.from(c, "base64").toString("utf8");
+
+    // Reject empty/binary-garbage decodes.
+    if (!decoded.trim()) {
+      return undefined;
+    }
+
+    return decoded;
   } catch {
     return undefined;
   }

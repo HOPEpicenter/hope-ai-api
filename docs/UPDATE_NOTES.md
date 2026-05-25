@@ -858,3 +858,31 @@ Strategic impact
 - Projection rebuilds and audit flows are now deterministically validated.
 - Timeline ordering/cursor semantics are protected against future drift.
 - Backend foundation is safer for future endpoint and orchestration expansion.
+
+## 2026-05-25 — Formation projection kernel extraction wave
+
+Completed a backend architecture wave extracting deterministic formation replay/projection behavior from runtime glue into reusable domain infrastructure.
+
+Merged slices:
+- #925 extracted comparable formation projection state helper
+- #926 extracted deterministic stage transition helper
+- #927 extracted deterministic touchpoint advancement helper
+- #928 extracted deterministic followup assignment mutation helper
+- #929 extracted deterministic milestone mutation helpers
+- #930 extracted deterministic formation mutation dispatcher
+
+What landed:
+- Centralized comparable profile state semantics.
+- Centralized replay-safe stage advancement policy.
+- Centralized replay-safe touchpoint timestamp advancement.
+- Extracted followup assignment, outcome, and next-step mutation kernels.
+- Added deterministic mutation dispatcher contract and event-to-kernel registry.
+- Rewired formation runtime to route through dispatcher infrastructure.
+- Expanded replay/projection regression coverage for each extracted kernel.
+
+Impact:
+- `_shared/formation.ts` is now closer to orchestration/runtime glue.
+- Deterministic replay semantics now live in `src/domain/formation/projection`.
+- Future orchestration/runtime activation can reuse explicit replay-safe mutation infrastructure.
+- Public API behavior remained unchanged.
+- CI and staging deploy stayed green across the full extraction wave.

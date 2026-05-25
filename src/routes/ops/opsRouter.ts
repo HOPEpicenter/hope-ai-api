@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { buildReplayAuditEnvelope } from "../../shared/integration/replayAuditEnvelope";
+import { buildReplayRepairOrchestrationEnvelope } from "../../shared/integration/replayRepairOrchestrationEnvelope";
 import type { VisitorsRepository } from "../../repositories/visitorsRepository";
 import type {
   FormationEventsRepository,
@@ -668,7 +669,14 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
         repaired,
         failed,
         count: items.length,
-        items
+        items,
+        ...buildReplayRepairOrchestrationEnvelope({
+          scanned: page.items.length,
+          drifted,
+          repaired,
+          failed,
+          nextCursor: page.cursor
+        })
       });
     } catch (err: any) {
       return res.status(400).json({

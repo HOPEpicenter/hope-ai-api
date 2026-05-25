@@ -10,6 +10,9 @@ import {
   shouldAdvanceEventState,
   shouldAdvanceTouchpointAt
 } from "./reconciliation";
+import {
+  toComparableFormationProfileState
+} from "../../domain/formation/projection/comparableFormationProfile";
 
 function normalizeAssignedTo(input: any): string | null {
   if (input === null || input === undefined) return null;
@@ -254,37 +257,7 @@ function maybeSetStage(
 
 
 function toComparableProfileState(profile: FunctionFormationProfileEntity | null): string {
-  if (!profile) {
-    return "";
-  }
-
-  const comparable = {
-    stage: profile.stage ?? null,
-    stageUpdatedAt: profile.stageUpdatedAt ?? null,
-    stageUpdatedBy: profile.stageUpdatedBy ?? null,
-    stageReason: profile.stageReason ?? null,
-    stageEventId: (profile as any).stageEventId ?? null,
-    assignedTo: profile.assignedTo ?? null,
-    lastEventType: profile.lastEventType ?? null,
-    lastEventAt: profile.lastEventAt ?? null,
-    lastEventId: (profile as any).lastEventId ?? null,
-    lastSourceSystem:
-      (profile as any).lastSourceSystem ?? null,
-    lastSourceCategory:
-      (profile as any).lastSourceCategory ?? null,
-    lastServiceAttendedAt: profile.lastServiceAttendedAt ?? null,
-    lastFollowupAssignedAt: profile.lastFollowupAssignedAt ?? null,
-    lastFollowupContactedAt: profile.lastFollowupContactedAt ?? null,
-    lastFollowupOutcomeAt: profile.lastFollowupOutcomeAt ?? null,
-    lastFollowupOutcome: profile.lastFollowupOutcome ?? null,
-    lastFollowupOutcomeNotes: profile.lastFollowupOutcomeNotes ?? null,
-    lastNextStepAt: profile.lastNextStepAt ?? null,
-    lastPrayerRequestedAt: profile.lastPrayerRequestedAt ?? null,
-    displayName: profile.displayName ?? null,
-    groups: Array.isArray((profile as any).groups) ? (profile as any).groups : null,
-  };
-
-  return JSON.stringify(comparable);
+  return toComparableFormationProfileState(profile as any);
 }
 
 function logFormationEventDecision(payload: Record<string, unknown>): void {

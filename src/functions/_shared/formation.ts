@@ -13,6 +13,9 @@ import {
 import {
   toComparableFormationProfileState
 } from "../../domain/formation/projection/comparableFormationProfile";
+import {
+  applyStageTransition
+} from "../../domain/formation/projection/applyStageTransition";
 
 function normalizeAssignedTo(input: any): string | null {
   if (input === null || input === undefined) return null;
@@ -235,24 +238,13 @@ function maybeSetStage(
   eventType: string,
   eventId: string
 ): void {
-  const currentStageEventId = String((profile as any).stageEventId ?? "").trim();
-
-  const shouldApplyStage =
-    profile.stage !== stage &&
-    compareEventOrder(
-      occurredAtIso,
-      eventId,
-      profile.stageUpdatedAt,
-      currentStageEventId
-    ) > 0;
-
-  if (shouldApplyStage) {
-    profile.stage = stage;
-    profile.stageUpdatedAt = occurredAtIso;
-    profile.stageUpdatedBy = "system";
-    profile.stageReason = "event:" + eventType;
-    (profile as any).stageEventId = eventId;
-  }
+  applyStageTransition({
+    profile: profile as any,
+    stage,
+    occurredAtIso,
+    eventType,
+    eventId
+  });
 }
 
 

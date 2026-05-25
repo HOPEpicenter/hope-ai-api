@@ -16,6 +16,9 @@ import {
 import {
   applyStageTransition
 } from "../../domain/formation/projection/applyStageTransition";
+import {
+  applyTouchpointTimestamp
+} from "../../domain/formation/projection/applyTouchpointTimestamp";
 
 function normalizeAssignedTo(input: any): string | null {
   if (input === null || input === undefined) return null;
@@ -507,9 +510,12 @@ async function applyFormationEventToProfile(params: {
       }
     }
 
-    if (shouldAdvanceTouchpointAt(profile.lastFollowupAssignedAt, occurredAt)) {
+    if (applyTouchpointTimestamp({
+      profile,
+      field: "lastFollowupAssignedAt",
+      occurredAtIso: occurredAt
+    })) {
       profile.assignedTo = assigneeId;
-      profile.lastFollowupAssignedAt = occurredAt;
       maybeSetStage(profile, "Guest", occurredAt, type, eventId);
     }
   }
@@ -535,8 +541,11 @@ async function applyFormationEventToProfile(params: {
       throw new Error("FOLLOWUP_OUTCOME_RECORDED requires data.outcome (string)");
     }
 
-    if (shouldAdvanceTouchpointAt(profile.lastFollowupOutcomeAt, occurredAt)) {
-      profile.lastFollowupOutcomeAt = occurredAt;
+    if (applyTouchpointTimestamp({
+      profile,
+      field: "lastFollowupOutcomeAt",
+      occurredAtIso: occurredAt
+    })) {
       profile.lastFollowupOutcome = outcome;
       profile.lastFollowupOutcomeNotes =
         typeof data.notes === "string" ? data.notes.trim() || undefined : undefined;
@@ -550,16 +559,23 @@ async function applyFormationEventToProfile(params: {
       throw new Error("NEXT_STEP event requires data.nextStep (string)");
     }
 
-    if (shouldAdvanceTouchpointAt(profile.lastNextStepAt, occurredAt)) {
-      profile.lastNextStepAt = occurredAt;
+    if (applyTouchpointTimestamp({
+      profile,
+      field: "lastNextStepAt",
+      occurredAtIso: occurredAt
+    })) {
       maybeSetStage(profile, "Connected", occurredAt, type, eventId);
     }
 
     if (
       type === "NEXT_STEP_COMPLETED" &&
-      shouldAdvanceTouchpointAt(profile.lastNextStepCompletedAt, occurredAt)
+      applyTouchpointTimestamp({
+        profile,
+        field: "lastNextStepCompletedAt",
+        occurredAtIso: occurredAt
+      })
     ) {
-      profile.lastNextStepCompletedAt = occurredAt;
+
     }
   }
 }

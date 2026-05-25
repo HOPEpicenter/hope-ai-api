@@ -10,6 +10,8 @@ import { getFormationProfile,
 import { looksLikeFormationEnvelopeV1, validateFormationEventEnvelopeV1Strict } from "../../contracts/formationEventEnvelope.v1";
 import { rebuildFormationProfileForVisitor } from "../../functions/_shared/formation";
 import { getVisitorById } from "../../functions/_shared/visitorsRepository";
+import { buildProjectionIntegrityEnvelope } from "../../shared/integration/projectionIntegrityEnvelope";
+import { buildReplayDiagnosticsEnvelope } from "../../shared/integration/replayDiagnosticsEnvelope";
 
 export const formationEventsRouter = Router();
 formationEventsRouter.use(requireApiKey);
@@ -312,9 +314,9 @@ if (visitorIdQ) {
       ok: true,
       items,
       cursor: nextCursor,
-      projectionIntegrity: {
+      ...buildProjectionIntegrityEnvelope({
         orphanProfilesExcluded
-      }
+      })
     });
   } catch (e: any) {
     return res.status(toHttpStatus(e, 400)).json({ ok: false, error: e?.message || "Bad Request" });
@@ -347,10 +349,12 @@ formationEventsRouter.post("/visitors/:id/formation/profile/rebuild", async (req
       ok: true,
       visitorId: result.visitorId,
       eventCount: result.eventCount,
-      profile: result.profile
+      profile: result.profile,
+      ...buildReplayDiagnosticsEnvelope({
+        eventCount: result.eventCount
+      })
     });
   } catch (e: any) {
     return res.status(toHttpStatus(e, 400)).json({ ok: false, error: e?.message || "Bad Request" });
   }
 });
-

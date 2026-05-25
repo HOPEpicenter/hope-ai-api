@@ -22,6 +22,12 @@ import {
 import {
   applyFollowupAssignedMutation
 } from "../../domain/formation/projection/applyFollowupAssignedMutation";
+import {
+  applyFollowupOutcomeMutation
+} from "../../domain/formation/projection/applyFollowupOutcomeMutation";
+import {
+  applyNextStepMutation
+} from "../../domain/formation/projection/applyNextStepMutation";
 
 function normalizeAssignedTo(input: any): string | null {
   if (input === null || input === undefined) return null;
@@ -543,16 +549,14 @@ async function applyFormationEventToProfile(params: {
       throw new Error("FOLLOWUP_OUTCOME_RECORDED requires data.outcome (string)");
     }
 
-    if (applyTouchpointTimestamp({
+    applyFollowupOutcomeMutation({
       profile,
-      field: "lastFollowupOutcomeAt",
-      occurredAtIso: occurredAt
-    })) {
-      profile.lastFollowupOutcome = outcome;
-      profile.lastFollowupOutcomeNotes =
-        typeof data.notes === "string" ? data.notes.trim() || undefined : undefined;
-      maybeSetStage(profile, "Connected", occurredAt, type, eventId);
-    }
+      outcome,
+      notes: typeof data.notes === "string" ? data.notes : undefined,
+      occurredAtIso: occurredAt,
+      eventType: type,
+      eventId
+    });
   }
 
   if (type === "NEXT_STEP_SELECTED" || type === "NEXT_STEP_COMPLETED") {
@@ -561,24 +565,13 @@ async function applyFormationEventToProfile(params: {
       throw new Error("NEXT_STEP event requires data.nextStep (string)");
     }
 
-    if (applyTouchpointTimestamp({
+    applyNextStepMutation({
       profile,
-      field: "lastNextStepAt",
-      occurredAtIso: occurredAt
-    })) {
-      maybeSetStage(profile, "Connected", occurredAt, type, eventId);
-    }
-
-    if (
-      type === "NEXT_STEP_COMPLETED" &&
-      applyTouchpointTimestamp({
-        profile,
-        field: "lastNextStepCompletedAt",
-        occurredAtIso: occurredAt
-      })
-    ) {
-
-    }
+      completed: type === "NEXT_STEP_COMPLETED",
+      occurredAtIso: occurredAt,
+      eventType: type,
+      eventId
+    });
   }
 }
 export async function recordFormationEventV1(body: unknown): Promise<{

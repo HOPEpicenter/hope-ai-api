@@ -614,3 +614,5 @@ Next constraints:
 - [ ] Do not introduce AI orchestration without explicit activation architecture
 - [ ] Preserve replay-safe operational semantics during future orchestration work
 
+
+- [ ] Add deterministic replay parity snapshots for future orchestration workflows

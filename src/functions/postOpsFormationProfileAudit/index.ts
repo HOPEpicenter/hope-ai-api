@@ -1,5 +1,6 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { auditFormationProfileForVisitor } from "../_shared/formation";
+import { buildReplayAuditEnvelope } from "../../shared/integration/replayAuditEnvelope";
 
 export async function postOpsFormationProfileAudit(context: any, req: any): Promise<void> {
   try {
@@ -41,7 +42,14 @@ export async function postOpsFormationProfileAudit(context: any, req: any): Prom
       body: {
         ok: true,
         repair,
-        ...result
+        ...result,
+        ...buildReplayAuditEnvelope({
+          visitorId: result.visitorId,
+          eventCount: result.eventCount,
+          drifted: result.drifted,
+          repaired: result.repaired,
+          driftFields: result.driftFields
+        })
       }
     };
   } catch (err: any) {

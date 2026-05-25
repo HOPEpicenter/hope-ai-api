@@ -1,5 +1,6 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { rebuildFormationProfileForVisitor } from "../_shared/formation";
+import { buildReplayDiagnosticsEnvelope } from "../../shared/integration/replayDiagnosticsEnvelope";
 
 export async function postFormationProfileRebuild(context: any, req: any): Promise<void> {
   try {
@@ -32,7 +33,10 @@ export async function postFormationProfileRebuild(context: any, req: any): Promi
         ok: true,
         visitorId: result.visitorId,
         eventCount: result.eventCount,
-        profile: result.profile
+        profile: result.profile,
+        ...buildReplayDiagnosticsEnvelope({
+          eventCount: result.eventCount
+        })
       }
     };
   } catch (err: any) {

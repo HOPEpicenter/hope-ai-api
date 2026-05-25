@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { buildReplayAuditEnvelope } from "../../shared/integration/replayAuditEnvelope";
 import type { VisitorsRepository } from "../../repositories/visitorsRepository";
 import type {
   FormationEventsRepository,
@@ -471,10 +472,13 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
           }
 
           items.push({
-            visitorId: audit.visitorId,
-            eventCount: audit.eventCount,
-            drifted: audit.drifted,
-            repaired: audit.repaired
+            ...buildReplayAuditEnvelope({
+              visitorId: audit.visitorId,
+              eventCount: audit.eventCount,
+              drifted: audit.drifted,
+              repaired: audit.repaired,
+              driftFields: audit.driftFields
+            })
           });
 
           if (items.length >= limit) {
@@ -533,7 +537,14 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
       return res.status(200).json({
         ok: true,
         repair: false,
-        ...result
+        ...result,
+        ...buildReplayAuditEnvelope({
+          visitorId: result.visitorId,
+          eventCount: result.eventCount,
+          drifted: result.drifted,
+          repaired: result.repaired,
+          driftFields: result.driftFields
+        })
       });
     } catch (err: any) {
       return res.status(400).json({
@@ -557,7 +568,14 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
           ok: true,
           repair,
           bulk: false,
-          ...result
+          ...result,
+          ...buildReplayAuditEnvelope({
+            visitorId: result.visitorId,
+            eventCount: result.eventCount,
+            drifted: result.drifted,
+            repaired: result.repaired,
+            driftFields: result.driftFields
+          })
         });
       }
 
@@ -662,4 +680,3 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
 
   return opsRouter;
 }
-

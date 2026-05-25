@@ -19,6 +19,9 @@ import {
 import {
   applyTouchpointTimestamp
 } from "../../domain/formation/projection/applyTouchpointTimestamp";
+import {
+  applyFollowupAssignedMutation
+} from "../../domain/formation/projection/applyFollowupAssignedMutation";
 
 function normalizeAssignedTo(input: any): string | null {
   if (input === null || input === undefined) return null;
@@ -510,14 +513,13 @@ async function applyFormationEventToProfile(params: {
       }
     }
 
-    if (applyTouchpointTimestamp({
+    applyFollowupAssignedMutation({
       profile,
-      field: "lastFollowupAssignedAt",
-      occurredAtIso: occurredAt
-    })) {
-      profile.assignedTo = assigneeId;
-      maybeSetStage(profile, "Guest", occurredAt, type, eventId);
-    }
+      assigneeId,
+      occurredAtIso: occurredAt,
+      eventType: type,
+      eventId
+    });
   }
 
   if (type === "FOLLOWUP_UNASSIGNED") {

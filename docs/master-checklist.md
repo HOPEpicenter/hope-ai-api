@@ -16,6 +16,29 @@
 - [x] Projection integrity orphan exclusion assertions enforced
 - [x] Formation projection repair steady-state assertions enforced
 
+
+## 2026-05-26 Replay + Projection Governance Convergence
+
+- [x] Canonical replay resilience governance
+- [x] Canonical runtime alias governance
+- [x] Canonical projection integrity governance
+- [x] Canonical projection metadata governance
+- [x] Canonical replay lineage governance
+- [x] Canonical replay envelope governance
+- [x] Centralized diagnostic projection classification
+- [x] Centralized replay lineage consistency semantics
+- [x] Centralized deterministic replay envelope semantics
+- [x] Replay regression coverage expansion
+- [x] Azure Functions deploy workflow stabilization (Node 22 alignment)
+- [x] CI validation passed
+- [x] Regression validation passed
+- [x] Staging deployment validation passed
+
+Current governance rule:
+- continue converging replay/projection semantics onto canonical shared infrastructure
+- preserve deterministic replay-safe behavior
+- avoid orchestration/runtime activation expansion
+- keep backend governance correctness prioritized over dashboard expansion
 ## 2026-04-24 Backend hardening closeout
 
 - [x] `/ops/engagements` create/list/summary required and covered by focused assertions — #687, #692

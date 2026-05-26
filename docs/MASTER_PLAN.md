@@ -8,6 +8,40 @@
 rowKey-aware timeline ordering
 - preserved backend-first governance discipline while keeping dashboard work deferred
 
+
+## 2026-05-26 Update — Replay + Projection Governance Convergence
+
+What landed:
+- canonical replay resilience governance
+- canonical runtime alias governance
+- canonical projection integrity governance
+- canonical projection metadata governance
+- canonical replay lineage governance
+- canonical replay envelope governance
+- centralized diagnostic projection classification
+- deterministic replay consistency centralization
+- deploy workflow stabilization (Node 22 alignment for Azure Functions tooling)
+- replay regression coverage expansion
+
+Why this matters (master plan alignment)
+
+- centralizes replay/projection governance ownership into canonical shared infrastructure
+- reduces future semantic drift across replay, lineage, integrity, and operational metadata layers
+- strengthens deterministic replay-safe operational guarantees
+- preserves backend-first governance discipline
+- avoids speculative orchestration/runtime redesign
+
+Validation:
+- CI green across merged governance PR wave
+- staging deploy green after convergence merges
+- regression coverage expanded and passing
+- replay lineage and replay envelope semantics validated after canonicalization
+
+Current rule:
+- continue converging governance semantics onto canonical backend primitives
+- preserve replay-safe deterministic behavior
+- avoid widening into orchestration activation or runtime autonomy
+- keep dashboard/frontend work secondary to backend governance integrity
 ## 2026-05-19 Update — Projection Integrity + Pagination Hardening
 
 What landed:

@@ -34,6 +34,7 @@ import {
   listFormationProfiles
 } from "../../functions/_shared/formation";
 import { readCanonicalVisitorIdentity } from "../../services/dashboard/visitorIdentity";
+import { readCanonicalVisitorDashboardCard } from "../../services/dashboard/readCanonicalVisitorDashboardCard";
 import { resolveMutationSource } from "../../services/events/resolveMutationSource";
 function isAllowedType(v: unknown): v is FormationEventType {
   return typeof v === "string" && (allowedTypes as string[]).includes(v);
@@ -328,81 +329,9 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
         })()
       : [];
 
-    const assignedTo = Array.isArray(page.items)
-      ? (() => {
-          for (const item of page.items) {
-            if (item?.type === "FOLLOWUP_ASSIGNED") {
-              const id =
-                typeof item?.data?.assigneeId === "string"
-                  ? item.data.assigneeId.trim()
-                  : "";
-              if (id) return id;
-            }
+    const canonicalCard =
+      await readCanonicalVisitorDashboardCard(visitorId);
 
-            if (item?.type === "FOLLOWUP_UNASSIGNED") {
-              return null;
-            }
-          }
-          return null;
-        })()
-      : null;
-
-    const followupStatus =
-      latest?.type === "FOLLOWUP_OUTCOME_RECORDED"
-        ? "resolved"
-        : latest?.type === "FOLLOWUP_CONTACTED" || latest?.type === "CONTACT_CALL" || latest?.type === "CONTACT_TEXT" || latest?.type === "CONTACT_MEETING"
-          ? "contacted"
-          : latest?.type === "FOLLOWUP_ASSIGNED" || latest?.type === "FOLLOWUP_UNASSIGNED" || latest?.type === "follow_up"
-            ? "pending"
-            : "none";
-
-    const attentionState =
-      followupStatus === "resolved" || followupStatus === "contacted"
-        ? "clear"
-        : "needs_attention";
-
-    const lastFollowupAssignedAt = Array.isArray(page.items)
-      ? (() => {
-          for (const item of page.items) {
-            if (item?.type === "FOLLOWUP_ASSIGNED") {
-              const at =
-                typeof item?.occurredAt === "string" && item.occurredAt.trim().length > 0
-                  ? item.occurredAt.trim()
-                  : null;
-              if (at) return at;
-            }
-
-            if (item?.type === "FOLLOWUP_UNASSIGNED") {
-              return null;
-            }
-          }
-          return null;
-        })()
-      : null;
-
-    function getAgeHours(value: string | null): number | null {
-      if (!value) return null;
-      const assignedMs = new Date(value).getTime();
-      if (Number.isNaN(assignedMs)) return null;
-
-      const diffMs = Date.now() - assignedMs;
-      if (diffMs < 0) return 0;
-
-      return Math.floor(diffMs / (1000 * 60 * 60));
-    }
-
-    const ageHours = getAgeHours(lastFollowupAssignedAt);
-
-    const followupUrgency =
-      !assignedTo || followupStatus === "resolved" || followupStatus === "contacted"
-        ? null
-        : ageHours !== null && ageHours >= 48
-          ? "OVERDUE"
-          : ageHours !== null && ageHours >= 24
-            ? "AT_RISK"
-            : "ON_TRACK";
-
-    const followupOverdue = followupUrgency === "OVERDUE";
     const identity = readCanonicalVisitorIdentity(visitorId, visitor);
 
     return res.json({
@@ -415,11 +344,12 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
         email: identity.email,
         lastActivityAt: latest?.occurredAt ?? null,
         lastActivitySummary: latest?.summary ?? null,
-        followupStatus,
-        assignedTo,
-        attentionState,
-        followupUrgency,
-        followupOverdue,
+        followupStatus: canonicalCard.followupStatus,
+        assignedTo: canonicalCard.assignedTo,
+        assignedToName: canonicalCard.assignedToName,
+        attentionState: canonicalCard.attentionState,
+        followupUrgency: canonicalCard.followupUrgency,
+        followupOverdue: canonicalCard.followupOverdue,
         tags: derivedTags,
       },
     });

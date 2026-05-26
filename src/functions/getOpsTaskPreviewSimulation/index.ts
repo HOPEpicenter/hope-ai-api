@@ -21,6 +21,9 @@ import {
 import {
   buildReplayObservabilityEnvelope
 } from "../../shared/observability/replayObservabilityEnvelope";
+import {
+  buildRuntimeVerificationState
+} from "../../shared/governance/runtimeVerificationState";
 
 // Repo pattern: legacy default export invoked as (context, req) via function.json.
 export default async function (context: any, req: any): Promise<void> {
@@ -575,19 +578,39 @@ export default async function (context: any, req: any): Promise<void> {
         governanceSummary.opsSurfaceOnly === true
     };
 
-    const policy = {
-      deterministic: true,
-      policyVersion: 1,
-      policyState: "ENFORCED_READ_ONLY",
-      orchestrationPolicy: "PROHIBITED",
-      persistencePolicy: "PROHIBITED",
-      schedulerPolicy: "PROHIBITED",
-      mutationPolicy: "PROHIBITED",
-      executionPolicy: "PROHIBITED",
-      simulatedOnly: true,
-      policyProofs,
-      policyStable: true
-    };
+    const policy =
+      buildRuntimeVerificationState({
+        versionKey: "policyVersion",
+        version: 1,
+        stateKey: "policyState",
+        state: "ENFORCED_READ_ONLY",
+        orchestrationKey:
+          "orchestrationPolicy",
+        orchestrationValue:
+          "PROHIBITED",
+        persistenceKey:
+          "persistencePolicy",
+        persistenceValue:
+          "PROHIBITED",
+        schedulerKey:
+          "schedulerPolicy",
+        schedulerValue:
+          "PROHIBITED",
+        mutationKey:
+          "mutationPolicy",
+        mutationValue:
+          "PROHIBITED",
+        executionKey:
+          "executionPolicy",
+        executionValue:
+          "PROHIBITED",
+        proofsKey:
+          "policyProofs",
+        proofs:
+          policyProofs,
+        stableKey:
+          "policyStable"
+      });
     const complianceSummary = {
       deterministic: true,
       complianceReady: true,
@@ -619,19 +642,42 @@ export default async function (context: any, req: any): Promise<void> {
         governanceSummary.opsSurfaceOnly === true
     };
 
-    const compliance = {
-      deterministic: true,
-      complianceVersion: 1,
-      complianceState: "VERIFIED_READ_ONLY",
-      orchestrationCompliance: "VERIFIED_PROHIBITED",
-      persistenceCompliance: "VERIFIED_PROHIBITED",
-      schedulerCompliance: "VERIFIED_PROHIBITED",
-      mutationCompliance: "VERIFIED_PROHIBITED",
-      executionCompliance: "VERIFIED_PROHIBITED",
-      simulatedOnly: true,
-      complianceProofs,
-      complianceStable: true
-    };
+    const compliance =
+      buildRuntimeVerificationState({
+        versionKey:
+          "complianceVersion",
+        version: 1,
+        stateKey:
+          "complianceState",
+        state:
+          "VERIFIED_READ_ONLY",
+        orchestrationKey:
+          "orchestrationCompliance",
+        orchestrationValue:
+          "VERIFIED_PROHIBITED",
+        persistenceKey:
+          "persistenceCompliance",
+        persistenceValue:
+          "VERIFIED_PROHIBITED",
+        schedulerKey:
+          "schedulerCompliance",
+        schedulerValue:
+          "VERIFIED_PROHIBITED",
+        mutationKey:
+          "mutationCompliance",
+        mutationValue:
+          "VERIFIED_PROHIBITED",
+        executionKey:
+          "executionCompliance",
+        executionValue:
+          "VERIFIED_PROHIBITED",
+        proofsKey:
+          "complianceProofs",
+        proofs:
+          complianceProofs,
+        stableKey:
+          "complianceStable"
+      });
     const attestationSummary = {
       deterministic: true,
       attestationReady: true,
@@ -666,19 +712,42 @@ export default async function (context: any, req: any): Promise<void> {
         governanceSummary.opsSurfaceOnly === true
     };
 
-    const attestation = {
-      deterministic: true,
-      attestationVersion: 1,
-      attestationState: "TRUST_VERIFIED_READ_ONLY",
-      orchestrationAttestation: "ATTESTED_PROHIBITED",
-      persistenceAttestation: "ATTESTED_PROHIBITED",
-      schedulerAttestation: "ATTESTED_PROHIBITED",
-      mutationAttestation: "ATTESTED_PROHIBITED",
-      executionAttestation: "ATTESTED_PROHIBITED",
-      simulatedOnly: true,
-      attestationProofs,
-      attestationStable: true
-    };
+    const attestation =
+      buildRuntimeVerificationState({
+        versionKey:
+          "attestationVersion",
+        version: 1,
+        stateKey:
+          "attestationState",
+        state:
+          "TRUST_VERIFIED_READ_ONLY",
+        orchestrationKey:
+          "orchestrationAttestation",
+        orchestrationValue:
+          "ATTESTED_PROHIBITED",
+        persistenceKey:
+          "persistenceAttestation",
+        persistenceValue:
+          "ATTESTED_PROHIBITED",
+        schedulerKey:
+          "schedulerAttestation",
+        schedulerValue:
+          "ATTESTED_PROHIBITED",
+        mutationKey:
+          "mutationAttestation",
+        mutationValue:
+          "ATTESTED_PROHIBITED",
+        executionKey:
+          "executionAttestation",
+        executionValue:
+          "ATTESTED_PROHIBITED",
+        proofsKey:
+          "attestationProofs",
+        proofs:
+          attestationProofs,
+        stableKey:
+          "attestationStable"
+      });
     const certificationSummary = {
       deterministic: true,
       certificationReady: true,

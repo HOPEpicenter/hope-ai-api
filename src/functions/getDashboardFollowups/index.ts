@@ -13,6 +13,7 @@ import {
 } from "../../shared/observability/functionObservability";
 import { readCanonicalVisitorIdentity, type CanonicalVisitorIdentity } from "../../services/dashboard/visitorIdentity";
 import { resolveCanonicalDisplayName } from "../../services/dashboard/resolveCanonicalDisplayName";
+import { buildProjectionIntegrityEnvelope } from "../../shared/integration/projectionIntegrityEnvelope";
 
 function parseLimit(val: unknown, fallback = 200): number {
   const n = typeof val === "string" ? Number(val) : fallback;
@@ -138,6 +139,11 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
       };
     });
 
+    const projectionIntegrity =
+      buildProjectionIntegrityEnvelope({
+        orphanProfilesExcluded: orphanFollowupsExcluded
+      });
+
     context.res = {
       status: 200,
       headers: { "content-type": "application/json; charset=utf-8" },
@@ -150,6 +156,7 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
         nextCursor,
         items,
         projectionIntegrity: {
+          ...projectionIntegrity.projectionIntegrity,
           orphanFollowupsExcluded
         }
       }

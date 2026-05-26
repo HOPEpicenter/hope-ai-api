@@ -192,7 +192,21 @@ followupQueueRouter.get("/debug/tables/formation-profiles2", async (req, res, ne
 });
 
 /**
- * Followup queue v2:
+ * LEGACY transitional operational route.
+ *
+ * NOT a canonical dashboard contract.
+ *
+ * Preserved temporarily for backward compatibility /
+ * operational transition safety only.
+ *
+ * Canonical dashboard flows must use:
+ * - getDashboardFollowups
+ * - canonical followup projection contracts
+ * - canonical visitor identity surfaces
+ *
+ * Avoid introducing new dashboard dependencies
+ * against this route.
+ *
  * GET /api/formation/followup-queue2?limit=10[&debug=1]
  */
 function needsFollowup(e: any): boolean {

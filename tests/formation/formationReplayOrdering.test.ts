@@ -1,20 +1,5 @@
 import assert from "node:assert/strict";
-
-function compareEventOrder(
-  occurredAtA?: string | null,
-  eventIdA?: string | null,
-  occurredAtB?: string | null,
-  eventIdB?: string | null
-): number {
-  const aTime = String(occurredAtA ?? "");
-  const bTime = String(occurredAtB ?? "");
-
-  if (aTime !== bTime) {
-    return aTime.localeCompare(bTime);
-  }
-
-  return String(eventIdA ?? "").localeCompare(String(eventIdB ?? ""));
-}
+import { compareEventOrder } from "../../src/functions/_shared/reconciliation";
 
 const events = [
   {

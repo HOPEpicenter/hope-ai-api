@@ -2,6 +2,7 @@ import {
   normalizeOperatorId,
   resolveOperatorDisplayName
 } from "../../services/operators/operatorIdentity";
+import { isDiagnosticProjectionSource } from "../../shared/integration/isDiagnosticProjectionSource";
 
 export type FollowupProjectionMetadata = {
   sourceSystem: string | null;
@@ -34,13 +35,10 @@ function getFollowupProjectionMetadata(profile: any): FollowupProjectionMetadata
       ? profile.lastSourceSystem.trim()
       : null;
 
-  const normalizedSourceSystem = sourceSystem?.toLowerCase() ?? "";
-
   return {
     sourceSystem,
     isDiagnostic:
-      normalizedSourceSystem.startsWith("scripts/") ||
-      normalizedSourceSystem.includes("assert")
+      isDiagnosticProjectionSource(sourceSystem)
   };
 }
 

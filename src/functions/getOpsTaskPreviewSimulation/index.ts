@@ -18,6 +18,9 @@ import {
 import {
   buildReplayEnvelope
 } from "../../shared/integration/replayEnvelope";
+import {
+  buildReplayObservabilityEnvelope
+} from "../../shared/observability/replayObservabilityEnvelope";
 
 // Repo pattern: legacy default export invoked as (context, req) via function.json.
 export default async function (context: any, req: any): Promise<void> {
@@ -434,6 +437,22 @@ export default async function (context: any, req: any): Promise<void> {
       simulatedOnly: true
     };
 
+    const replayObservability =
+      buildReplayObservabilityEnvelope({
+        replayHash:
+          replay.replayHash,
+        exportHash:
+          exportEnvelope.exportHash,
+        snapshotHash:
+          snapshot.snapshotHash,
+        lineageReplayHash:
+          lineage.currentReplayHash,
+        replayDriftDetected:
+          driftDiagnostics.replayDriftDetected === true,
+        lineageConsistent:
+          lineageReplayConsistent
+      });
+
     const snapshotCompatibility = {
       deterministic: true,
       replayCompatible: true,
@@ -842,7 +861,7 @@ export default async function (context: any, req: any): Promise<void> {
       exportHash:
         exportEnvelope.exportHash,
       snapshotHash:
-        snapshot.snapshotHash,
+        replayObservability.snapshotHash,
       lineageReplayHash:
         lineage.currentReplayHash,
       totalProofFamilies: 9,
@@ -916,9 +935,9 @@ export default async function (context: any, req: any): Promise<void> {
       replayStable:
         comparison.replayEquivalent === true,
       replayDriftDetected:
-        driftDiagnostics.replayDriftDetected === true,
+        replayObservability.replayDriftDetected,
       lineageConsistent:
-        lineageReplayConsistent,
+        replayObservability.lineageConsistent,
       simulatedOnly: true
     };
 
@@ -963,9 +982,7 @@ export default async function (context: any, req: any): Promise<void> {
       observabilityReady:
         observabilitySummary.observabilityReady === true,
       telemetryAligned:
-        verificationTelemetry.replayHash === replay.replayHash &&
-        verificationTelemetry.exportHash === exportEnvelope.exportHash &&
-        verificationTelemetry.snapshotHash === snapshot.snapshotHash,
+        replayObservability.telemetryAligned,
       observableRecordCount:
         observabilitySummary.previewCount +
         observabilitySummary.planCount +

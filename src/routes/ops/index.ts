@@ -3,6 +3,7 @@ import { requireApiKey } from "../../shared/auth/requireApiKey";
 import { getVisitorById } from "../../services/visitors/getVisitorById";
 import { EngagementRepository } from "../../storage/engagementRepository";
 import { EngagementSummaryRepository } from "../../storage/engagementSummaryRepository";
+import { parseLimit, parseCursor } from "../../http/opsValidation";
 
 export const opsRouter = Router();
 opsRouter.use(requireApiKey);
@@ -22,9 +23,8 @@ opsRouter.get("/visitors/:id/dashboard", async (req, res) => {
   try {
     const visitorId = req.params.id;
 
-    const timelineLimitRaw = (req.query.timelineLimit as any) ?? "50";
-    const timelineCursor = (req.query.timelineCursor as any) ?? undefined;
-    const timelineLimit = Math.max(1, Math.min(parseInt(timelineLimitRaw, 10) || 50, 200));
+    const timelineLimit = parseLimit(req.query, 50);
+    const timelineCursor = parseCursor(req.query) ?? undefined;
 
     const visitor = await getVisitorById(visitorId);
 

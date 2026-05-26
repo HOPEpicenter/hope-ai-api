@@ -12,6 +12,9 @@ import {
   summarizeTaskPreviewPlans,
   summarizeTaskPreviews
 } from "../../services/followups/deriveTaskPreview";
+import {
+  buildProjectionLineageEnvelope
+} from "../../shared/integration/projectionLineageEnvelope";
 
 // Repo pattern: legacy default export invoked as (context, req) via function.json.
 export default async function (context: any, req: any): Promise<void> {
@@ -332,8 +335,18 @@ export default async function (context: any, req: any): Promise<void> {
       exportReady:
         exportSummary.exportReady
     };
+    const lineageEnvelope =
+      buildProjectionLineageEnvelope({
+        replayHash:
+          replay.replayHash,
+        snapshotHash: null,
+        checkpointHash: null,
+        continuationHash: null,
+        lineageDepth: 1
+      });
+
     const lineage = {
-      lineageVersion: 1,
+      ...lineageEnvelope,
       deterministic: true,
       lineageMode: "SIMULATED_ONLY",
       currentReplayHash:
@@ -344,6 +357,9 @@ export default async function (context: any, req: any): Promise<void> {
         exportEnvelope.exportHash,
       replayGeneration: 1
     };
+
+    const lineageReplayConsistent =
+      lineage.currentReplayHash === replay.replayHash;
 
     const runComparison = {
       deterministic: true,
@@ -445,7 +461,7 @@ export default async function (context: any, req: any): Promise<void> {
       exportHashProof:
         exportEnvelope.exportHash === lineage.exportHash,
       lineageReplayProof:
-        lineage.currentReplayHash === replay.replayHash,
+        lineageReplayConsistent,
       snapshotReplayProof:
         snapshot.replayHash === replay.replayHash,
       snapshotExportProof:
@@ -899,7 +915,7 @@ export default async function (context: any, req: any): Promise<void> {
       replayDriftDetected:
         driftDiagnostics.replayDriftDetected === true,
       lineageConsistent:
-        lineage.currentReplayHash === replay.replayHash,
+        lineageReplayConsistent,
       simulatedOnly: true
     };
 

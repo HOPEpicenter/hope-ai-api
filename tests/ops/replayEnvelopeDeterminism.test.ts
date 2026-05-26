@@ -1,27 +1,9 @@
 import assert from "node:assert/strict";
 
-function buildReplayEnvelope(args: {
-  previews: any[];
-  plans: any[];
-  timeline: any[];
-}) {
-  const canonical =
-    JSON.stringify({
-      previews: args.previews,
-      plans: args.plans,
-      timeline: args.timeline
-    });
+import {
+  buildReplayEnvelope
+} from "../../src/shared/integration/replayEnvelope";
 
-  return {
-    replayVersion: 1,
-    replayDeterministic: true,
-    replayHash:
-      Buffer.from(canonical)
-        .toString("base64")
-        .slice(0, 32),
-    simulatedOnly: true
-  };
-}
 
 const args = {
   previews: [{ id: 1 }],

@@ -100,7 +100,19 @@ app.listen(port, () => {
 });
 
 
-if (process.env.DEBUG_ROUTES === "1") {
+/**
+ * Runtime route topology diagnostics.
+ *
+ * Intentionally disabled in production to avoid exposing
+ * operational/transitional route surfaces.
+ *
+ * Local/dev debugging only.
+ */
+const debugRoutesEnabled =
+  process.env.DEBUG_ROUTES === "1" &&
+  process.env.NODE_ENV !== "production";
+
+if (debugRoutesEnabled) {
   const seen: string[] = [];
 
   const walk = (stack: any[]) => {

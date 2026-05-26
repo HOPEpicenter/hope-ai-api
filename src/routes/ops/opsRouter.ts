@@ -231,6 +231,18 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
     });
   });
 
+  /**
+   * Transitional operational synthetic-data generator.
+   *
+   * Generates intentionally synthetic visitors/events for:
+   * - smoke validation
+   * - regression validation
+   * - operational parity testing
+   *
+   * Records generated here are expected to be excluded
+   * from canonical operational/dashboard surfaces through
+   * synthetic operational record governance filters.
+   */
   opsRouter.post("/populate-dummy", async (req, res) => {
     const visitor = await visitorsRepository.create({
       name: `Dummy Visitor ${new Date().toISOString()}`,

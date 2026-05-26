@@ -15,6 +15,9 @@ import {
 import {
   buildProjectionLineageEnvelope
 } from "../../shared/integration/projectionLineageEnvelope";
+import {
+  buildReplayEnvelope
+} from "../../shared/integration/replayEnvelope";
 
 // Repo pattern: legacy default export invoked as (context, req) via function.json.
 export default async function (context: any, req: any): Promise<void> {
@@ -1078,28 +1081,6 @@ export default async function (context: any, req: any): Promise<void> {
   }
 }
 
-function buildReplayEnvelope(args: {
-  previews: any[];
-  plans: any[];
-  timeline: any[];
-}) {
-  const canonical =
-    JSON.stringify({
-      previews: args.previews,
-      plans: args.plans,
-      timeline: args.timeline
-    });
-
-  return {
-    replayVersion: 1,
-    replayDeterministic: true,
-    replayHash:
-      Buffer.from(canonical)
-        .toString("base64")
-        .slice(0, 32),
-    simulatedOnly: true
-  };
-}
 
 function readQuery(req: any, name: string): any {
   const value = req?.query?.[name];

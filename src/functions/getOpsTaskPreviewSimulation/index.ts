@@ -24,6 +24,18 @@ import {
 import {
   buildRuntimeVerificationState
 } from "../../shared/governance/runtimeVerificationState";
+import {
+  buildGovernanceSummary
+} from "../../services/runtimeSimulation/buildGovernanceSummary";
+import {
+  buildPolicySummary
+} from "../../services/runtimeSimulation/buildPolicySummary";
+import {
+  buildComplianceSummary
+} from "../../services/runtimeSimulation/buildComplianceSummary";
+import {
+  buildAttestationSummary
+} from "../../services/runtimeSimulation/buildAttestationSummary";
 
 // Repo pattern: legacy default export invoked as (context, req) via function.json.
 export default async function (context: any, req: any): Promise<void> {
@@ -506,17 +518,8 @@ export default async function (context: any, req: any): Promise<void> {
       integrityProofs,
       consistencyStable: true
     };
-    const governanceSummary = {
-      deterministic: true,
-      governanceReady: true,
-      orchestrationPermitted: false,
-      persistencePermitted: false,
-      schedulerPermitted: false,
-      mutationPermitted: false,
-      executionPermitted: false,
-      readOnlyVerified: true,
-      opsSurfaceOnly: true
-    };
+    const governanceSummary =
+      buildGovernanceSummary();
 
     const safetyProofs = {
       deterministic: true,
@@ -548,17 +551,8 @@ export default async function (context: any, req: any): Promise<void> {
       safetyProofs,
       governanceStable: true
     };
-    const policySummary = {
-      deterministic: true,
-      policyReady: true,
-      policyMode: "READ_ONLY_POLICY",
-      governanceAligned: true,
-      replayPolicyAligned: true,
-      snapshotPolicyAligned: true,
-      exportPolicyAligned: true,
-      consistencyPolicyAligned: true,
-      opsOnlyPolicy: true
-    };
+    const policySummary =
+      buildPolicySummary();
 
     const policyProofs = {
       deterministic: true,
@@ -611,18 +605,8 @@ export default async function (context: any, req: any): Promise<void> {
         stableKey:
           "policyStable"
       });
-    const complianceSummary = {
-      deterministic: true,
-      complianceReady: true,
-      complianceMode: "OPS_READ_ONLY_COMPLIANT",
-      governanceCompliant: true,
-      policyCompliant: true,
-      replayCompliant: true,
-      snapshotCompliant: true,
-      exportCompliant: true,
-      consistencyCompliant: true,
-      opsOnlyCompliant: true
-    };
+    const complianceSummary =
+      buildComplianceSummary();
 
     const complianceProofs = {
       deterministic: true,
@@ -678,19 +662,8 @@ export default async function (context: any, req: any): Promise<void> {
         stableKey:
           "complianceStable"
       });
-    const attestationSummary = {
-      deterministic: true,
-      attestationReady: true,
-      attestationMode: "OPS_READ_ONLY_ATTESTED",
-      governanceAttested: true,
-      policyAttested: true,
-      complianceAttested: true,
-      replayAttested: true,
-      snapshotAttested: true,
-      exportAttested: true,
-      consistencyAttested: true,
-      opsOnlyAttested: true
-    };
+    const attestationSummary =
+      buildAttestationSummary();
 
     const attestationProofs = {
       deterministic: true,

@@ -36,6 +36,9 @@ import {
 import {
   buildAttestationSummary
 } from "../../services/runtimeSimulation/buildAttestationSummary";
+import {
+  buildReplayAnalyticsSummary
+} from "../../services/runtimeAnalytics/buildReplayAnalyticsSummary";
 
 // Repo pattern: legacy default export invoked as (context, req) via function.json.
 export default async function (context: any, req: any): Promise<void> {
@@ -950,55 +953,28 @@ export default async function (context: any, req: any): Promise<void> {
       opsOnlyIntelligence: true
     };
 
-    const analyticsSummary = {
-      deterministic: true,
-      analyticsVersion: 1,
-      analyticsMode: "IN_MEMORY_ROLLUP_ONLY",
-      totalPreviews:
-        serializedPreviews.length,
-      totalPlans:
-        plans.length,
-      totalTimelineEvents:
-        simulationTimeline.length,
-      totalExplainabilityRecords:
-        explainability.length,
-      totalAnomalies:
-        diagnostics.anomalyCount,
-      totalSuppressed:
-        diagnostics.suppressedCount,
-      simulatedOnly: true
-    };
-
-    const replayAnalytics = {
-      deterministic: true,
-      replayAnalyticsVersion: 1,
-      replayHash:
-        replay.replayHash,
-      replayStable:
-        comparison.replayEquivalent === true,
-      replayDriftDetected:
-        replayObservability.replayDriftDetected,
-      lineageConsistent:
-        replayObservability.lineageConsistent,
-      simulatedOnly: true
-    };
-
-    const trustAnalytics = {
-      deterministic: true,
-      trustAnalyticsVersion: 1,
-      trustSealVerified:
-        trustSeal.trustSealState === "TRUST_SEAL_VERIFIED",
-      trustDiagnosticsHealthy:
-        trustDiagnostics.trustSealVerified === true &&
-        trustDiagnostics.assuranceStable === true,
-      assuranceTrusted:
-        assurance.assuranceStable === true,
-      accreditationTrusted:
-        accreditation.accreditationStable === true,
-      certificationTrusted:
-        certification.certificationStable === true,
-      simulatedOnly: true
-    };
+    const {
+      analyticsSummary,
+      replayAnalytics,
+      trustAnalytics,
+      observabilityAnalytics
+    } = buildReplayAnalyticsSummary({
+      serializedPreviews,
+      plans,
+      simulationTimeline,
+      explainability,
+      diagnostics,
+      replay,
+      comparison,
+      replayObservability,
+      trustSeal,
+      trustDiagnostics,
+      assurance,
+      accreditation,
+      certification,
+      observabilitySummary,
+      verificationTelemetry
+    });
 
     const governanceIntelligence = {
       deterministic: true,
@@ -1018,22 +994,6 @@ export default async function (context: any, req: any): Promise<void> {
       simulatedOnly: true
     };
 
-    const observabilityAnalytics = {
-      deterministic: true,
-      observabilityAnalyticsVersion: 1,
-      observabilityReady:
-        observabilitySummary.observabilityReady === true,
-      telemetryAligned:
-        replayObservability.telemetryAligned,
-      observableRecordCount:
-        observabilitySummary.previewCount +
-        observabilitySummary.planCount +
-        observabilitySummary.timelineCount +
-        observabilitySummary.explainabilityCount,
-      telemetryRecordCount:
-        verificationTelemetry.totalSimulationRecords,
-      simulatedOnly: true
-    };
 
     context.res = {
       status: 200,

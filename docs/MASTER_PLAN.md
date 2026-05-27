@@ -9,6 +9,34 @@ rowKey-aware timeline ordering
 - preserved backend-first governance discipline while keeping dashboard work deferred
 
 
+
+## 2026-05-27 Update — Runtime Governance Maintainability
+
+What landed:
+- canonical governance regression hardening
+- replay observability telemetry convergence
+- runtime verification governance state convergence
+- deterministic runtime simulation summary segmentation
+- governance, policy, compliance, and attestation summary builders
+
+Why this matters (master plan alignment)
+
+- strengthens direct regression protection around canonical governance primitives
+- centralizes replay observability and runtime verification semantics
+- reduces maintainability risk in the ops simulation surface
+- preserves replay-safe deterministic behavior
+- keeps orchestration activation explicitly out of scope
+
+Validation:
+- CI green across merged runtime governance PR wave
+- staging deploy green after merges
+- regression coverage passing
+- build/smoke validation passing
+
+Current rule:
+- continue backend-first runtime maintainability work only when it reduces drift risk
+- avoid orchestration activation, scheduler behavior, task persistence, or frontend widening
+- batch future documentation updates at end-of-day unless a branch is already open
 ## 2026-05-26 Update — Replay + Projection Governance Convergence
 
 What landed:

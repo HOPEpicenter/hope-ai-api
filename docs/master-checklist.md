@@ -17,6 +17,25 @@
 - [x] Formation projection repair steady-state assertions enforced
 
 
+
+## 2026-05-27 Runtime Governance Maintainability
+
+- [x] Canonical governance regression coverage hardened
+- [x] Replay observability telemetry centralized
+- [x] Runtime verification governance state centralized
+- [x] Policy/compliance/attestation verification state converged
+- [x] Runtime simulation governance summary segmented
+- [x] Runtime simulation policy summary segmented
+- [x] Runtime simulation compliance summary segmented
+- [x] Runtime simulation attestation summary segmented
+- [x] CI validation passed
+- [x] Regression validation passed
+- [x] Staging deployment validation passed
+
+Current rule:
+- keep orchestration activation out of scope
+- preserve replay-safe deterministic runtime behavior
+- prefer EOD documentation batching unless a docs branch is already open
 ## 2026-05-26 Replay + Projection Governance Convergence
 
 - [x] Canonical replay resilience governance

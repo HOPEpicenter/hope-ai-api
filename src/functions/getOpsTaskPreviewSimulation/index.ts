@@ -49,6 +49,9 @@ import {
   buildTrustProofFamilies
 } from "../../services/runtimeSimulation/buildTrustProofFamilies";
 import {
+  buildVerificationProofFamilies
+} from "../../services/runtimeSimulation/buildVerificationProofFamilies";
+import {
   buildReplayAnalyticsSummary
 } from "../../services/runtimeAnalytics/buildReplayAnalyticsSummary";
 
@@ -540,23 +543,16 @@ export default async function (context: any, req: any): Promise<void> {
     const policySummary =
       buildPolicySummary();
 
-    const policyProofs = {
-      deterministic: true,
-      governancePolicyProof:
-        governance.governanceMode === "OPS_READ_ONLY",
-      replayPolicyProof:
-        replay.simulatedOnly === true,
-      exportPolicyProof:
-        exportEnvelope.exportMode === "READ_ONLY",
-      snapshotPolicyProof:
-        snapshot.snapshotMode === "IN_MEMORY_ONLY",
-      consistencyPolicyProof:
-        consistency.consistencyMode === "READ_ONLY_IN_MEMORY",
-      safetyBoundaryProof:
-        governance.executionProhibited === true,
-      opsBoundaryProof:
-        governanceSummary.opsSurfaceOnly === true
-    };
+    const {
+      policyProofs
+    } = buildVerificationProofFamilies({
+      governance,
+      replay,
+      exportEnvelope,
+      snapshot,
+      consistency,
+      governanceSummary
+    });
 
     const policy =
       buildRuntimeVerificationState({
@@ -594,23 +590,17 @@ export default async function (context: any, req: any): Promise<void> {
     const complianceSummary =
       buildComplianceSummary();
 
-    const complianceProofs = {
-      deterministic: true,
-      governanceComplianceProof:
-        governance.governanceStable === true,
-      policyComplianceProof:
-        policy.policyStable === true,
-      replayComplianceProof:
-        replay.simulatedOnly === true,
-      exportComplianceProof:
-        exportEnvelope.simulatedOnly === true,
-      snapshotComplianceProof:
-        snapshot.simulatedOnly === true,
-      consistencyComplianceProof:
-        consistency.consistencyStable === true,
-      opsBoundaryComplianceProof:
-        governanceSummary.opsSurfaceOnly === true
-    };
+    const {
+      complianceProofs
+    } = buildVerificationProofFamilies({
+      governance,
+      replay,
+      exportEnvelope,
+      snapshot,
+      consistency,
+      governanceSummary,
+      policy
+    });
 
     const compliance =
       buildRuntimeVerificationState({
@@ -651,25 +641,18 @@ export default async function (context: any, req: any): Promise<void> {
     const attestationSummary =
       buildAttestationSummary();
 
-    const attestationProofs = {
-      deterministic: true,
-      governanceAttestationProof:
-        governance.governanceStable === true,
-      policyAttestationProof:
-        policy.policyStable === true,
-      complianceAttestationProof:
-        compliance.complianceStable === true,
-      replayAttestationProof:
-        replay.simulatedOnly === true,
-      exportAttestationProof:
-        exportEnvelope.simulatedOnly === true,
-      snapshotAttestationProof:
-        snapshot.simulatedOnly === true,
-      consistencyAttestationProof:
-        consistency.consistencyStable === true,
-      opsBoundaryAttestationProof:
-        governanceSummary.opsSurfaceOnly === true
-    };
+    const {
+      attestationProofs
+    } = buildVerificationProofFamilies({
+      governance,
+      replay,
+      exportEnvelope,
+      snapshot,
+      consistency,
+      governanceSummary,
+      policy,
+      compliance
+    });
 
     const attestation =
       buildRuntimeVerificationState({

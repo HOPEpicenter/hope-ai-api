@@ -37,6 +37,9 @@ import {
   buildAttestationSummary
 } from "../../services/runtimeSimulation/buildAttestationSummary";
 import {
+  buildCoreProofFamilies
+} from "../../services/runtimeSimulation/buildCoreProofFamilies";
+import {
   buildObservabilitySummary
 } from "../../services/runtimeSimulation/buildObservabilitySummary";
 import {
@@ -503,53 +506,24 @@ export default async function (context: any, req: any): Promise<void> {
       consistencyReady: true
     };
 
-    const integrityProofs = {
-      deterministic: true,
-      replayHashProof:
-        replay.replayHash === comparison.replayHash,
-      exportHashProof:
-        exportEnvelope.exportHash === lineage.exportHash,
-      lineageReplayProof:
-        lineageReplayConsistent,
-      snapshotReplayProof:
-        snapshot.replayHash === replay.replayHash,
-      snapshotExportProof:
-        snapshot.exportHash === exportEnvelope.exportHash,
-      multirunReplayProof:
-        multiRun.runComparison.currentReplayHash === replay.replayHash
-    };
-
-    const consistency = {
-      deterministic: true,
-      consistencyMode: "READ_ONLY_IN_MEMORY",
-      replayExportConverged: true,
-      replaySnapshotConverged: true,
-      lineageSnapshotConverged: true,
-      diagnosticsConverged: true,
-      explainabilityConverged: true,
-      integrityProofs,
-      consistencyStable: true
-    };
     const governanceSummary =
       buildGovernanceSummary();
 
-    const safetyProofs = {
-      deterministic: true,
-      orchestrationInactiveProof:
-        auditEnvelope.orchestrationActive === false,
-      persistenceInactiveProof:
-        auditEnvelope.taskPersistenceActive === false,
-      replaySimulatedOnlyProof:
-        replay.simulatedOnly === true,
-      exportSimulatedOnlyProof:
-        exportEnvelope.simulatedOnly === true,
-      snapshotSimulatedOnlyProof:
-        snapshot.simulatedOnly === true,
-      readOnlyModeProof:
-        consistency.consistencyMode === "READ_ONLY_IN_MEMORY",
-      governanceBoundaryProof:
-        governanceSummary.opsSurfaceOnly === true
-    };
+    const {
+      integrityProofs,
+      consistency,
+      safetyProofs
+    } = buildCoreProofFamilies({
+      replay,
+      comparison,
+      exportEnvelope,
+      lineage,
+      snapshot,
+      multiRun,
+      lineageReplayConsistent,
+      auditEnvelope,
+      governanceSummary
+    });
 
     const governance = {
       deterministic: true,

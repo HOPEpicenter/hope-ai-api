@@ -37,6 +37,9 @@ import {
   buildAttestationSummary
 } from "../../services/runtimeSimulation/buildAttestationSummary";
 import {
+  buildObservabilitySummary
+} from "../../services/runtimeSimulation/buildObservabilitySummary";
+import {
   buildReplayAnalyticsSummary
 } from "../../services/runtimeAnalytics/buildReplayAnalyticsSummary";
 
@@ -878,45 +881,20 @@ export default async function (context: any, req: any): Promise<void> {
       assuranceStable: true
     };
 
-    const observabilitySummary = {
-      deterministic: true,
-      observabilityReady: true,
-      observabilityMode: "OPS_READ_ONLY_OBSERVABLE",
-      previewCount:
-        serializedPreviews.length,
-      planCount:
-        plans.length,
-      timelineCount:
-        simulationTimeline.length,
-      explainabilityCount:
-        explainability.length,
-      anomalyCount:
-        diagnostics.anomalyCount,
-      suppressedCount:
-        diagnostics.suppressedCount,
-      trustSealVisible: true,
-      assuranceVisible: true
-    };
-
-    const verificationTelemetry = {
-      deterministic: true,
-      telemetryVersion: 1,
-      replayHash:
-        replay.replayHash,
-      exportHash:
-        exportEnvelope.exportHash,
-      snapshotHash:
-        replayObservability.snapshotHash,
-      lineageReplayHash:
-        lineage.currentReplayHash,
-      totalProofFamilies: 9,
-      totalSimulationRecords:
-        serializedPreviews.length +
-        plans.length +
-        simulationTimeline.length +
-        explainability.length,
-      simulatedOnly: true
-    };
+    const {
+      observabilitySummary,
+      verificationTelemetry
+    } = buildObservabilitySummary({
+      serializedPreviews,
+      plans,
+      simulationTimeline,
+      explainability,
+      diagnostics,
+      replay,
+      exportEnvelope,
+      replayObservability,
+      lineage
+    });
 
     const trustDiagnostics = {
       deterministic: true,

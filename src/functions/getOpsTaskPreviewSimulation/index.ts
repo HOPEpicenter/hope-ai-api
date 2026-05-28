@@ -40,6 +40,9 @@ import {
   buildObservabilitySummary
 } from "../../services/runtimeSimulation/buildObservabilitySummary";
 import {
+  buildTrustGovernanceDiagnostics
+} from "../../services/runtimeSimulation/buildTrustGovernanceDiagnostics";
+import {
   buildReplayAnalyticsSummary
 } from "../../services/runtimeAnalytics/buildReplayAnalyticsSummary";
 
@@ -896,40 +899,21 @@ export default async function (context: any, req: any): Promise<void> {
       lineage
     });
 
-    const trustDiagnostics = {
-      deterministic: true,
-      diagnosticsVersion: 1,
-      trustDiagnosticsMode: "OPS_READ_ONLY_DIAGNOSTICS",
-      trustSealVerified:
-        trustSeal.trustSealState === "TRUST_SEAL_VERIFIED",
-      assuranceStable:
-        assurance.assuranceStable === true,
-      governanceStable:
-        governance.governanceStable === true,
-      policyStable:
-        policy.policyStable === true,
-      complianceStable:
-        compliance.complianceStable === true,
-      attestationStable:
-        attestation.attestationStable === true,
-      certificationStable:
-        certification.certificationStable === true,
-      accreditationStable:
-        accreditation.accreditationStable === true,
-      simulatedOnly: true,
-      opsOnlyDiagnostic: true
-    };
-    const intelligenceSummary = {
-      deterministic: true,
-      intelligenceReady: true,
-      intelligenceMode: "OPS_READ_ONLY_INTELLIGENCE",
-      analyticsReady: true,
-      trustInsightsReady: true,
-      governanceInsightsReady: true,
-      observabilityInsightsReady: true,
-      simulatedOnly: true,
-      opsOnlyIntelligence: true
-    };
+    const {
+      trustDiagnostics,
+      intelligenceSummary,
+      governanceIntelligence
+    } = buildTrustGovernanceDiagnostics({
+      trustSeal,
+      assurance,
+      governance,
+      policy,
+      compliance,
+      attestation,
+      certification,
+      accreditation,
+      governanceSummary
+    });
 
     const {
       analyticsSummary,
@@ -953,24 +937,6 @@ export default async function (context: any, req: any): Promise<void> {
       observabilitySummary,
       verificationTelemetry
     });
-
-    const governanceIntelligence = {
-      deterministic: true,
-      governanceIntelligenceVersion: 1,
-      governanceStable:
-        governance.governanceStable === true,
-      policyStable:
-        policy.policyStable === true,
-      complianceStable:
-        compliance.complianceStable === true,
-      executionStillProhibited:
-        governance.executionProhibited === true &&
-        policy.executionPolicy === "PROHIBITED" &&
-        compliance.executionCompliance === "VERIFIED_PROHIBITED",
-      opsBoundaryStable:
-        governanceSummary.opsSurfaceOnly === true,
-      simulatedOnly: true
-    };
 
 
     context.res = {

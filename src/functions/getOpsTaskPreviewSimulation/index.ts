@@ -43,6 +43,9 @@ import {
   buildTrustGovernanceDiagnostics
 } from "../../services/runtimeSimulation/buildTrustGovernanceDiagnostics";
 import {
+  buildTrustProofFamilies
+} from "../../services/runtimeSimulation/buildTrustProofFamilies";
+import {
   buildReplayAnalyticsSummary
 } from "../../services/runtimeAnalytics/buildReplayAnalyticsSummary";
 
@@ -730,159 +733,28 @@ export default async function (context: any, req: any): Promise<void> {
         stableKey:
           "attestationStable"
       });
-    const certificationSummary = {
-      deterministic: true,
-      certificationReady: true,
-      certificationMode: "OPS_READ_ONLY_CERTIFIED",
-      governanceCertified: true,
-      policyCertified: true,
-      complianceCertified: true,
-      attestationCertified: true,
-      replayCertified: true,
-      exportCertified: true,
-      snapshotCertified: true,
-      consistencyCertified: true,
-      opsOnlyCertified: true
-    };
-
-    const certificationProofs = {
-      deterministic: true,
-      governanceCertificationProof:
-        governance.governanceStable === true,
-      policyCertificationProof:
-        policy.policyStable === true,
-      complianceCertificationProof:
-        compliance.complianceStable === true,
-      attestationCertificationProof:
-        attestation.attestationStable === true,
-      replayCertificationProof:
-        replay.simulatedOnly === true,
-      exportCertificationProof:
-        exportEnvelope.simulatedOnly === true,
-      snapshotCertificationProof:
-        snapshot.simulatedOnly === true,
-      consistencyCertificationProof:
-        consistency.consistencyStable === true,
-      opsBoundaryCertificationProof:
-        governanceSummary.opsSurfaceOnly === true
-    };
-
-    const certification = {
-      deterministic: true,
-      certificationVersion: 1,
-      certificationState: "CERTIFIED_READ_ONLY",
-      orchestrationCertification: "CERTIFIED_PROHIBITED",
-      persistenceCertification: "CERTIFIED_PROHIBITED",
-      schedulerCertification: "CERTIFIED_PROHIBITED",
-      mutationCertification: "CERTIFIED_PROHIBITED",
-      executionCertification: "CERTIFIED_PROHIBITED",
-      simulatedOnly: true,
+    const {
+      certificationSummary,
       certificationProofs,
-      certificationStable: true
-    };
-
-    const accreditationSummary = {
-      deterministic: true,
-      accreditationReady: true,
-      accreditationMode: "OPS_READ_ONLY_ACCREDITED",
-      governanceAccredited: true,
-      policyAccredited: true,
-      complianceAccredited: true,
-      attestationAccredited: true,
-      certificationAccredited: true,
-      opsOnlyAccredited: true
-    };
-
-    const accreditationProofs = {
-      deterministic: true,
-      governanceAccreditationProof:
-        governance.governanceStable === true,
-      policyAccreditationProof:
-        policy.policyStable === true,
-      complianceAccreditationProof:
-        compliance.complianceStable === true,
-      attestationAccreditationProof:
-        attestation.attestationStable === true,
-      certificationAccreditationProof:
-        certification.certificationStable === true,
-      opsBoundaryAccreditationProof:
-        governanceSummary.opsSurfaceOnly === true
-    };
-
-    const accreditation = {
-      deterministic: true,
-      accreditationVersion: 1,
-      accreditationState: "ACCREDITED_READ_ONLY",
-      orchestrationAccreditation: "ACCREDITED_PROHIBITED",
-      persistenceAccreditation: "ACCREDITED_PROHIBITED",
-      schedulerAccreditation: "ACCREDITED_PROHIBITED",
-      mutationAccreditation: "ACCREDITED_PROHIBITED",
-      executionAccreditation: "ACCREDITED_PROHIBITED",
-      simulatedOnly: true,
+      certification,
+      accreditationSummary,
       accreditationProofs,
-      accreditationStable: true
-    };
-
-    const trustSeal = {
-      deterministic: true,
-      trustSealVersion: 1,
-      trustSealState: "TRUST_SEAL_VERIFIED",
-      governanceTrusted: true,
-      policyTrusted: true,
-      complianceTrusted: true,
-      attestationTrusted: true,
-      certificationTrusted: true,
-      accreditationTrusted: true,
-      simulatedOnly: true,
-      opsOnlyTrusted: true
-    };
-    const assuranceSummary = {
-      deterministic: true,
-      assuranceReady: true,
-      assuranceMode: "OPS_READ_ONLY_ASSURED",
-      governanceAssured: true,
-      policyAssured: true,
-      complianceAssured: true,
-      attestationAssured: true,
-      certificationAssured: true,
-      accreditationAssured: true,
-      trustSealAssured: true,
-      opsOnlyAssured: true
-    };
-
-    const assuranceProofs = {
-      deterministic: true,
-      governanceAssuranceProof:
-        governance.governanceStable === true,
-      policyAssuranceProof:
-        policy.policyStable === true,
-      complianceAssuranceProof:
-        compliance.complianceStable === true,
-      attestationAssuranceProof:
-        attestation.attestationStable === true,
-      certificationAssuranceProof:
-        certification.certificationStable === true,
-      accreditationAssuranceProof:
-        accreditation.accreditationStable === true,
-      trustSealAssuranceProof:
-        trustSeal.trustSealState === "TRUST_SEAL_VERIFIED",
-      opsBoundaryAssuranceProof:
-        governanceSummary.opsSurfaceOnly === true
-    };
-
-    const assurance = {
-      deterministic: true,
-      assuranceVersion: 1,
-      assuranceState: "ASSURED_READ_ONLY",
-      orchestrationAssurance: "ASSURED_PROHIBITED",
-      persistenceAssurance: "ASSURED_PROHIBITED",
-      schedulerAssurance: "ASSURED_PROHIBITED",
-      mutationAssurance: "ASSURED_PROHIBITED",
-      executionAssurance: "ASSURED_PROHIBITED",
-      simulatedOnly: true,
+      accreditation,
+      trustSeal,
+      assuranceSummary,
       assuranceProofs,
-      assuranceStable: true
-    };
+      assurance
+    } = buildTrustProofFamilies({
+      governance,
+      policy,
+      compliance,
+      attestation,
+      governanceSummary,
+      replay,
+      exportEnvelope,
+      snapshot,
+      consistency
+    });
 
     const {
       observabilitySummary,

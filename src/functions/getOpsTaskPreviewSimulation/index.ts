@@ -65,6 +65,9 @@ import {
 import {
   buildReplayAnalyticsSummary
 } from "../../services/runtimeAnalytics/buildReplayAnalyticsSummary";
+import {
+  buildOpsTaskPreviewSimulationResponse
+} from "../../services/runtimeSimulation/buildOpsTaskPreviewSimulationResponse";
 
 // Repo pattern: legacy default export invoked as (context, req) via function.json.
 export default async function (context: any, req: any): Promise<void> {
@@ -467,83 +470,62 @@ export default async function (context: any, req: any): Promise<void> {
         "X-HOPE-Product-Use":
           "Read-only orchestration simulation only. Does not create or persist tasks."
       },
-      body: {
-        ok: true,
-        v: 1,
-        schemaVersion:
-          TASK_PREVIEW_SCHEMA_VERSION,
-        mode: "read-only",
-        orchestrationActive: false,
-        taskPersistenceActive: false,
-        assignedTo:
-          queue.assignedTo,
-        visitorId:
-          queue.visitorId,
-        includeResolved,
-        cursor:
-          queue.cursor,
-        nextCursor:
-          queue.nextCursor,
-        queueStats:
-          queue.stats,
-        previewSummary:
-          summarizeTaskPreviews(previews),
-        planSummary:
-          summarizeTaskPreviewPlans(plans),
-        groupedPreviews:
-          groupTaskPreviews(previews),
-        previews:
+      body:
+        buildOpsTaskPreviewSimulationResponse({
+          queue,
+          includeResolved,
+          previews,
+          plans,
           serializedPreviews,
-        plans,
-        simulationTimeline,
-        replay,
-        auditEnvelope,
-        explainability,
-        diagnostics,
-        comparison,
-        driftDiagnostics,
-        exportSummary,
-        exportEnvelope,
-        lineage,
-        multiRun,
-        snapshotSummary,
-        snapshot,
-        snapshotCompatibility,
-        consistencySummary,
-        integrityProofs,
-        consistency,
-        governanceSummary,
-        safetyProofs,
-        governance,
-        policySummary,
-        policyProofs,
-        policy,
-        complianceSummary,
-        complianceProofs,
-        compliance,
-        attestationSummary,
-        attestationProofs,
-        attestation,
-        certificationSummary,
-        certificationProofs,
-        certification,
-        accreditationSummary,
-        accreditationProofs,
-        accreditation,
-        trustSeal,
-        assuranceSummary,
-        assuranceProofs,
-        assurance,
-        observabilitySummary,
-        verificationTelemetry,
-        trustDiagnostics,
-        intelligenceSummary,
-        analyticsSummary,
-        replayAnalytics,
-        trustAnalytics,
-        governanceIntelligence,
-        observabilityAnalytics
-      }
+          simulationTimeline,
+          replay,
+          auditEnvelope,
+          explainability,
+          diagnostics,
+          comparison,
+          driftDiagnostics,
+          exportSummary,
+          exportEnvelope,
+          lineage,
+          multiRun,
+          snapshotSummary,
+          snapshot,
+          snapshotCompatibility,
+          consistencySummary,
+          integrityProofs,
+          consistency,
+          governanceSummary,
+          safetyProofs,
+          governance,
+          policySummary,
+          policyProofs,
+          policy,
+          complianceSummary,
+          complianceProofs,
+          compliance,
+          attestationSummary,
+          attestationProofs,
+          attestation,
+          certificationSummary,
+          certificationProofs,
+          certification,
+          accreditationSummary,
+          accreditationProofs,
+          accreditation,
+          trustSeal,
+          assuranceSummary,
+          assuranceProofs,
+          assurance,
+          observabilitySummary,
+          verificationTelemetry,
+          trustDiagnostics,
+          intelligenceSummary,
+          analyticsSummary,
+          replayAnalytics,
+          trustAnalytics,
+          governanceIntelligence,
+          observabilityAnalytics
+        })
     };
   } catch (err: any) {
     context.res = {

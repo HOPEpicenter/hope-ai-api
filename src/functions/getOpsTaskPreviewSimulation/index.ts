@@ -43,6 +43,9 @@ import {
   buildObservabilitySummary
 } from "../../services/runtimeSimulation/buildObservabilitySummary";
 import {
+  buildReplaySnapshotArtifacts
+} from "../../services/runtimeSimulation/buildReplaySnapshotArtifacts";
+import {
   buildTrustGovernanceDiagnostics
 } from "../../services/runtimeSimulation/buildTrustGovernanceDiagnostics";
 import {
@@ -333,163 +336,25 @@ export default async function (context: any, req: any): Promise<void> {
         ),
       readinessTransitions
     };
-    const exportSummary = {
-      deterministic: true,
-      totalPreviews:
-        serializedPreviews.length,
-      totalPlans:
-        plans.length,
-      totalTimelineEvents:
-        simulationTimeline.length,
-      totalExplainabilityRecords:
-        explainability.length,
-      totalDriftTransitions:
-        readinessTransitions.length,
-      exportReady: true
-    };
-
-    const exportCanonical =
-      JSON.stringify({
-        schemaVersion:
-          TASK_PREVIEW_SCHEMA_VERSION,
-        previews:
-          serializedPreviews,
-        plans,
-        simulationTimeline,
-        explainability,
-        diagnostics,
-        comparison,
-        driftDiagnostics,
-        exportSummary
-      });
-
-    const exportEnvelope = {
-      exportVersion: 1,
-      deterministic: true,
-      exportMode: "READ_ONLY",
-      simulatedOnly: true,
-      exportHash:
-        Buffer.from(exportCanonical)
-          .toString("base64")
-          .slice(0, 32),
-      generatedAt:
-        new Date().toISOString(),
-      replayHash:
-        replay.replayHash,
-      exportReady:
-        exportSummary.exportReady
-    };
-    const lineageEnvelope =
-      buildProjectionLineageEnvelope({
-        replayHash:
-          replay.replayHash,
-        snapshotHash: null,
-        checkpointHash: null,
-        continuationHash: null,
-        lineageDepth: 1
-      });
-
-    const lineage = {
-      ...lineageEnvelope,
-      deterministic: true,
-      lineageMode: "SIMULATED_ONLY",
-      currentReplayHash:
-        replay.replayHash,
-      parentReplayHash:
-        replay.replayHash,
-      exportHash:
-        exportEnvelope.exportHash,
-      replayGeneration: 1
-    };
-
-    const lineageReplayConsistent =
-      lineage.currentReplayHash === replay.replayHash;
-
-    const runComparison = {
-      deterministic: true,
-      baselineReplayHash:
-        replay.replayHash,
-      currentReplayHash:
-        replay.replayHash,
-      replayEquivalent: true,
-      exportEquivalent: true,
-      diagnosticsEquivalent: true,
-      explainabilityEquivalent: true,
-      driftEquivalent: true
-    };
-
-    const multiRun = {
-      deterministic: true,
-      comparedRuns: 1,
-      lineageConsistent: true,
-      replayStable: true,
-      exportStable: true,
-      comparisonMode: "IN_MEMORY_ONLY",
-      runComparison
-    };
-    const snapshotSummary = {
-      deterministic: true,
-      snapshotReady: true,
-      previewCount:
-        serializedPreviews.length,
-      planCount:
-        plans.length,
-      timelineCount:
-        simulationTimeline.length,
-      explainabilityCount:
-        explainability.length,
-      replayHash:
-        replay.replayHash,
-      exportHash:
-        exportEnvelope.exportHash
-    };
-
-    const snapshotCanonical =
-      JSON.stringify({
-        replay,
-        exportEnvelope,
-        lineage,
-        multiRun,
-        diagnostics,
-        comparison,
-        driftDiagnostics,
-        snapshotSummary
-      });
-
-    const snapshot = {
-      snapshotVersion: 1,
-      deterministic: true,
-      snapshotMode: "IN_MEMORY_ONLY",
-      snapshotHash:
-        Buffer.from(snapshotCanonical)
-          .toString("base64")
-          .slice(0, 32),
-      replayHash:
-        replay.replayHash,
-      exportHash:
-        exportEnvelope.exportHash,
-      lineageReplayHash:
-        lineage.currentReplayHash,
-      snapshotReady:
-        snapshotSummary.snapshotReady,
-      simulatedOnly: true
-    };
-
-    const replayObservability =
-      buildReplayObservabilityEnvelope({
-        replayHash:
-          replay.replayHash,
-        exportHash:
-          exportEnvelope.exportHash,
-        snapshotHash:
-          snapshot.snapshotHash,
-        lineageReplayHash:
-          lineage.currentReplayHash,
-        replayDriftDetected:
-          driftDiagnostics.replayDriftDetected === true,
-        lineageConsistent:
-          lineageReplayConsistent
-      });
+    const {
+      exportSummary,
+      exportEnvelope,
+      lineage,
+      lineageReplayConsistent,
+      multiRun,
+      snapshotSummary,
+      snapshot,
+      replayObservability
+    } = buildReplaySnapshotArtifacts({
+      serializedPreviews,
+      plans,
+      simulationTimeline,
+      explainability,
+      diagnostics,
+      comparison,
+      driftDiagnostics,
+      replay
+    });
 
     const snapshotCompatibility = {
       deterministic: true,

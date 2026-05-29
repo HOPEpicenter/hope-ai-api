@@ -886,3 +886,47 @@ Impact:
 - Future orchestration/runtime activation can reuse explicit replay-safe mutation infrastructure.
 - Public API behavior remained unchanged.
 - CI and staging deploy stayed green across the full extraction wave.
+
+## 2026-05-29 - Today Cockpit MVP / EOD Update
+
+### Completed
+
+- Promoted the Today cockpit as the primary operator-facing dashboard surface.
+- Integrated deterministic backend task preview intelligence into the Today cockpit.
+- Added Ready Care, High Escalation, and Suppressed operational metrics.
+- Added Ready Care cards sourced from backend preview plans.
+- Added direct operator actions from Today:
+  - Open Visitor
+  - Mark Contacted
+  - Record Outcome shortcut to the existing visitor action zone
+- Validated the full care workflow end-to-end:
+  - assigned followup appears in Today
+  - operator opens visitor detail
+  - contact can be recorded
+  - outcome can be recorded
+  - visitor transitions to Resolved
+  - attention clears
+  - formation/activity timelines update
+  - Today queue reprioritizes after completion
+- Added lightweight ops/task-preview-summary backend endpoint for dashboard consumption.
+- Switched dashboard ops preview proxy to the lightweight summary endpoint.
+- Preserved backend-authoritative semantics and kept dashboard frontend thin.
+- Completed all implementation through PR-only workflow.
+
+### Known Deferred Item
+
+- Production ops-preview latency remains higher than desired, likely due to Azure Function cold start and/or production table access.
+- This is not blocking pilot readiness because the workflow is functionally correct.
+- Deeper Azure performance investigation is deferred.
+
+### Current Status
+
+The Today cockpit MVP is functionally complete for pilot-readiness purposes. Operators can now start from Today, identify ready care work, open the visitor, record contact/outcome activity, and confirm the backend state transitions correctly.
+
+### Next Safe Lane
+
+- Continue backend/operator readiness work before additional dashboard polish.
+- Keep using Today as the primary operator cockpit.
+- Continue replacing legacy dashboard surfaces incrementally.
+- Avoid frontend-owned orchestration logic.
+- Preserve PowerShell-only implementation workflow and PR-only merge discipline.

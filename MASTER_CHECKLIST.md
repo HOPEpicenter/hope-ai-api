@@ -17,3 +17,16 @@
 - [x] Formation profiles list checks enforced
 - [x] Stale backend SKIP paths removed except local secret-gated Engagement E2E
 
+
+## Today Cockpit MVP Checkpoint
+
+- [x] Today promoted as primary operator cockpit.
+- [x] Deterministic task preview intelligence integrated.
+- [x] Ready Care cards render from backend preview plans.
+- [x] Open Visitor action available from Today.
+- [x] Mark Contacted action available from Today.
+- [x] Record Outcome shortcut available from Today.
+- [x] End-to-end care loop validated through resolved followup state.
+- [x] Lightweight task preview summary endpoint added.
+- [x] Dashboard ops preview proxy switched to summary endpoint.
+- [ ] Production ops-preview latency investigation deferred.

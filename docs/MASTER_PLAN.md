@@ -1051,3 +1051,13 @@ Critical preserved constraints:
 - no operational autonomy
 
 The platform now contains stable deterministic orchestration infrastructure while preserving production-safe operational guarantees.
+
+## Current Checkpoint - Today Cockpit MVP
+
+Status: Completed for pilot-readiness MVP.
+
+The Today cockpit is now the primary operator surface for ready care work. It consumes deterministic backend task preview intelligence, displays prioritized Ready Care plans, and supports the first complete operator loop through visitor detail actions: open visitor, mark contacted, record outcome, and resolve the followup.
+
+Keep backend semantics authoritative. The dashboard should remain a thin operational cockpit on top of stabilized backend contracts.
+
+Deferred: production ops-preview latency investigation. Do not block the current pilot-readiness lane on this unless it becomes operationally disruptive.

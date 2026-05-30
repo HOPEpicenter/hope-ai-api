@@ -132,6 +132,20 @@ function requireNonEmptyString(value: unknown, fieldName: string): string {
   return text;
 }
 
+function normalizeOptionalActorId(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const text = String(value).trim();
+
+  if (!text || text.length > 128) {
+    throw new Error("source.actorId must be a string (1-128 chars) if provided");
+  }
+
+  return text;
+}
+
 function serializeGroups(entity: any): any {
   if (Array.isArray(entity?.groups)) {
     const { groups, ...rest } = entity;
@@ -202,6 +216,7 @@ function validateFormationEventEnvelopeV1Strict(body: unknown): {
 
   const source = asObject(obj.source);
   const sourceSystem = requireNonEmptyString(source.system, "source.system");
+  const actorId = normalizeOptionalActorId(source.actorId);
 
   const data = asObject(obj.data);
 
@@ -225,7 +240,8 @@ function validateFormationEventEnvelopeV1Strict(body: unknown): {
     occurredAt,
     source: {
       ...source,
-      system: sourceSystem
+      system: sourceSystem,
+      ...(actorId ? { actorId } : {})
     },
     data
   };
@@ -1098,3 +1114,4 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
+

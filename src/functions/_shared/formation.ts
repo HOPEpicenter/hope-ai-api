@@ -191,6 +191,13 @@ const SUPPORTED_FORMATION_EVENT_TYPES = new Set([
   "GROUP_LEFT",
 ]);
 
+const OPERATOR_MUTATION_EVENT_TYPES = new Set([
+  "FOLLOWUP_ASSIGNED",
+  "FOLLOWUP_UNASSIGNED",
+  "FOLLOWUP_CONTACTED",
+  "FOLLOWUP_OUTCOME_RECORDED"
+]);
+
 function validateFormationEventEnvelopeV1Strict(body: unknown): {
   v: number;
   eventId: string;
@@ -220,6 +227,10 @@ function validateFormationEventEnvelopeV1Strict(body: unknown): {
   const actorId = normalizeOptionalActorId(source.actorId);
 
   const data = asObject(obj.data);
+
+  if (OPERATOR_MUTATION_EVENT_TYPES.has(type) && !actorId) {
+    throw new Error("source.actorId is required for operator followup mutations");
+  }
 
   if (type === "FOLLOWUP_ASSIGNED") {
     requireNonEmptyString(data.assigneeId, "data.assigneeId");
@@ -1117,5 +1128,6 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
+
 
 

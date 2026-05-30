@@ -4,7 +4,10 @@ export type FormationEventEnvelopeV1 = {
   visitorId: string;
   type: string;
   occurredAt: string;
-  source: { system: string };
+  source: {
+    system: string;
+    actorId?: string;
+  };
   data?: Record<string, any>;
 };
 
@@ -79,5 +82,6 @@ export function looksLikeFormationEnvelopeV1(body: any): boolean {
   if (!body || typeof body !== "object") return false;
   return body.v === 1 || isNonEmptyString(body.eventId) || (body.source && isNonEmptyString(body.source.system));
 }
+
 
 

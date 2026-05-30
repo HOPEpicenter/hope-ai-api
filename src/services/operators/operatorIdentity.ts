@@ -1,12 +1,26 @@
-const OPERATOR_DISPLAY_NAMES = new Map<string, string>([
-  ["ops-user-1", "Operations Team"],
-  ["ops-user-2", "Guest Services"]
-]);
+export const OPERATOR_REGISTRY = [
+  {
+    operatorId: "ops-user-1",
+    displayName: "Operations Team"
+  },
+  {
+    operatorId: "ops-user-2",
+    displayName: "Guest Services"
+  }
+] as const;
+
+const OPERATOR_DISPLAY_NAMES = new Map<string, string>(
+  OPERATOR_REGISTRY.map(x => [x.operatorId, x.displayName])
+);
 
 export type OperatorOwnerRef = {
   ownerType: "user";
   ownerId: string;
 };
+
+export function listKnownOperators() {
+  return [...OPERATOR_REGISTRY];
+}
 
 export function normalizeOperatorId(input: unknown): string | null {
   if (typeof input !== "string") {

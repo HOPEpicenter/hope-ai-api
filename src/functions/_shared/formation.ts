@@ -22,6 +22,9 @@ import {
 import {
   formationMutationDispatchers
 } from "../../domain/formation/projection/formationMutationDispatchers";
+import {
+  isKnownOperatorId
+} from "../../services/operators/operatorIdentity";
 
 function normalizeAssignedTo(input: any): string | null {
   if (input === null || input === undefined) return null;
@@ -216,6 +219,10 @@ function validateFormationEventEnvelopeV1Strict(body: unknown): {
 
   if (OPERATOR_MUTATION_EVENT_TYPES.has(type) && !actorId) {
     throw new Error("source.actorId is required for operator followup mutations");
+  }
+
+  if (OPERATOR_MUTATION_EVENT_TYPES.has(type) && !isKnownOperatorId(actorId)) {
+    throw new Error("source.actorId must reference a known operator for followup mutations");
   }
 
   if (type === "FOLLOWUP_ASSIGNED") {
@@ -1114,6 +1121,7 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
+
 
 
 

@@ -110,13 +110,19 @@ Write-Host "[OK] v1 envelope accepted" -ForegroundColor Green
 $badV1_missingActor = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_CONTACTED" -occurredAt $now.AddSeconds(4) -data @{} -sourceSystem "assert-formation-envelope-v1-strict"
 Expect-HttpFailure { PostJson "$ApiBase/formation/events" $headers $badV1_missingActor } "v1 FOLLOWUP_CONTACTED missing source.actorId"
 
-# 7) Operator followup mutation v1 with source.actorId should pass
-$goodV1WithActor = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_CONTACTED" -occurredAt $now.AddSeconds(5) -data @{} -sourceSystem "assert-formation-envelope-v1-strict"
+# 7) Operator followup mutation v1 requires a known source.actorId
+$badV1_unknownActor = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_CONTACTED" -occurredAt $now.AddSeconds(5) -data @{} -sourceSystem "assert-formation-envelope-v1-strict"
+$badV1_unknownActor.source.actorId = "unknown-operator"
+Expect-HttpFailure { PostJson "$ApiBase/formation/events" $headers $badV1_unknownActor } "v1 FOLLOWUP_CONTACTED unknown source.actorId"
+
+# 8) Operator followup mutation v1 with known source.actorId should pass
+$goodV1WithActor = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_CONTACTED" -occurredAt $now.AddSeconds(6) -data @{} -sourceSystem "assert-formation-envelope-v1-strict"
 $goodV1WithActor.source.actorId = "ops-user-1"
 PostJson "$ApiBase/formation/events" $headers $goodV1WithActor | Out-Null
-Write-Host "[OK] v1 operator followup mutation with source.actorId accepted" -ForegroundColor Green
+Write-Host "[OK] v1 operator followup mutation with known source.actorId accepted" -ForegroundColor Green
 
 Write-Host "[assert-formation-envelope-v1-strict] OK" -ForegroundColor Green
+
 
 
 

@@ -1,4 +1,4 @@
-﻿# scripts/guard-scripts.ps1
+# scripts/guard-scripts.ps1
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -31,4 +31,13 @@ if ($ops -notmatch '\$_\.ErrorDetails\s*-and\s*\$_\.ErrorDetails\.Message') {
 try { . $opsPath | Out-Null }
 catch { throw "Guard failed: ops.ps1 does not parse: $($_.Exception.Message)" }
 
+$routeInventoryAssert = Join-Path $PSScriptRoot "assert-runtime-route-inventory.ps1"
+
+if (-not (Test-Path -LiteralPath $routeInventoryAssert)) {
+  throw "Guard failed: missing scripts/assert-runtime-route-inventory.ps1"
+}
+
+& $routeInventoryAssert
+
 Write-Host "OK: guard-scripts passed." -ForegroundColor Green
+

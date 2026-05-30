@@ -221,7 +221,7 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
   const cursor = Math.max(0, Math.trunc(opts.cursor || 0));
 
   const stateByVisitor = new Map<string, EventState>();
-  const formationProfileByVisitor = new Map<string, { displayName: string | null; stage: string | null; lastFormationEventType: string | null; lastFormationEventAt: string | null }>();
+  const formationProfileByVisitor = new Map<string, { displayName: string | null; stage: string | null; lastFormationEventType: string | null; lastFormationEventAt: string | null; lastActorId: string | null }>();
   const visitorIdentityByVisitor = new Map<string, { displayName: string | null; email: string | null }>();
 
   for await (const e of opts.eventsTable.listEntities<any>({})) {
@@ -292,6 +292,7 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
       stage: (p as any)?.stage ?? null,
       lastFormationEventType: (p as any)?.lastEventType ?? null,
       lastFormationEventAt: (p as any)?.lastEventAt ?? null,
+      lastActorId: (p as any)?.lastActorId ?? null,
     });
 
     if (!stateByVisitor.has(visitorId)) continue;
@@ -430,6 +431,7 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
       stage: formationState.stage,
       lastFormationEventType: formationState.lastFormationEventType,
       lastFormationEventAt: formationState.lastFormationEventAt,
+      lastActorId: profile?.lastActorId ?? null,
       needsFollowup: signals.needsFollowup,
       followupReason: signals.followupReason,
       followupResolved: signals.followupResolved,
@@ -548,4 +550,5 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
     items: pagedItems,
   };
 }
+
 

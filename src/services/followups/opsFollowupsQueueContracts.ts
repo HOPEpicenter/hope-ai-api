@@ -24,6 +24,7 @@ export type OpsFollowupsQueueItem = {
   stage: string | null;
   lastFormationEventType?: string | null;
   lastFormationEventAt?: string | null;
+  lastActorId?: string | null;
   needsFollowup: boolean;
   followupReason?: OpsFollowupReason;
   followupResolved: boolean;

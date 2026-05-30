@@ -106,5 +106,12 @@ $goodV1 = New-FormationEnvelope -visitorId $vid -type "NEXT_STEP_SELECTED" -occu
 PostJson "$ApiBase/formation/events" $headers $goodV1 | Out-Null
 Write-Host "[OK] v1 envelope accepted" -ForegroundColor Green
 
+# 6) Valid v1 with source.actorId should pass
+$goodV1WithActor = New-FormationEnvelope -visitorId $vid -type "NEXT_STEP_SELECTED" -occurredAt $now.AddSeconds(4) -data @{ nextStep = "JoinGroup" } -sourceSystem "assert-formation-envelope-v1-strict"
+$goodV1WithActor.source.actorId = "ops-user-1"
+PostJson "$ApiBase/formation/events" $headers $goodV1WithActor | Out-Null
+Write-Host "[OK] v1 envelope with source.actorId accepted" -ForegroundColor Green
+
 Write-Host "[assert-formation-envelope-v1-strict] OK" -ForegroundColor Green
+
 

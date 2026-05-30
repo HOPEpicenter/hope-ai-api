@@ -31,6 +31,16 @@ export function resolveOperatorDisplayName(ownerId: unknown): string | null {
     ?? normalized;
 }
 
+export function isKnownOperatorId(ownerId: unknown): boolean {
+  const normalized = normalizeOperatorId(ownerId);
+
+  if (!normalized) {
+    return false;
+  }
+
+  return OPERATOR_DISPLAY_NAMES.has(normalized);
+}
+
 export function buildOperatorOwnerRef(ownerId: unknown): OperatorOwnerRef | null {
   const normalized = normalizeOperatorId(ownerId);
 

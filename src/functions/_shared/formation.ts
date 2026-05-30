@@ -34,20 +34,6 @@ function normalizeAssignedTo(input: any): string | null {
   return null;
 }
 
-const OPERATOR_DISPLAY_NAMES = new Map<string, string>([
-  ["ops-user-1", "Operations Team"],
-  ["ops-user-2", "Guest Services"]
-]);
-
-export function resolveOperatorDisplayName(ownerId: unknown): string | null {
-  const normalized = String(ownerId ?? "").trim();
-
-  if (!normalized) {
-    return null;
-  }
-
-  return OPERATOR_DISPLAY_NAMES.get(normalized) ?? normalized;
-}
 
 export type FunctionFormationEventEntity = {
   partitionKey: string;
@@ -1128,6 +1114,7 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
+
 
 
 

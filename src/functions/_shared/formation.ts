@@ -76,6 +76,7 @@ export type FunctionFormationProfileEntity = {
   assignedTo?: string | null;
   lastEventType?: string;
   lastEventAt?: string;
+  lastActorId?: string | null;
   updatedAt?: string;
   lastServiceAttendedAt?: string;
   lastFollowupAssignedAt?: string;
@@ -465,6 +466,8 @@ async function applyFormationEventToProfile(params: {
       typeof source?.system === "string" ? source.system : null;
     (profile as any).lastSourceCategory =
       typeof source?.category === "string" ? source.category : null;
+    (profile as any).lastActorId =
+      typeof source?.actorId === "string" ? source.actorId : null;
   }
 
   if (type === "GROUP_JOINED") {
@@ -1114,4 +1117,5 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
+
 

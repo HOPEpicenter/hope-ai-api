@@ -13,6 +13,7 @@ const profile = {
   lastEventType: "FOLLOWUP_OUTCOME_RECORDED",
   lastEventAt: "2026-01-03T00:00:00Z",
   lastEventId: "evt-3",
+  lastActorId: "ops-user-1",
   lastSourceSystem: "test",
   lastSourceCategory: "regression",
   lastFollowupAssignedAt: "2026-01-01T00:00:00Z",
@@ -38,7 +39,7 @@ assert.equal(
 
 const changed = toComparableFormationProfileState({
   ...profile,
-  lastEventAt: "2026-01-04T00:00:00Z"
+  lastActorId: "ops-user-2"
 });
 
 assert.notEqual(
@@ -48,3 +49,4 @@ assert.notEqual(
 );
 
 console.log("comparableFormationProfile.test.ts passed");
+

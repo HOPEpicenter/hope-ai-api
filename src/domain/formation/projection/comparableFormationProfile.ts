@@ -8,6 +8,7 @@ export type ComparableFormationProfile = {
   lastEventType?: string | null;
   lastEventAt?: string | null;
   lastEventId?: string | null;
+  lastActorId?: string | null;
   lastSourceSystem?: string | null;
   lastSourceCategory?: string | null;
   lastServiceAttendedAt?: string | null;
@@ -39,6 +40,7 @@ export function toComparableFormationProfileState(
     lastEventType: profile.lastEventType ?? null,
     lastEventAt: profile.lastEventAt ?? null,
     lastEventId: profile.lastEventId ?? null,
+    lastActorId: profile.lastActorId ?? null,
     lastSourceSystem: profile.lastSourceSystem ?? null,
     lastSourceCategory: profile.lastSourceCategory ?? null,
     lastServiceAttendedAt: profile.lastServiceAttendedAt ?? null,
@@ -53,3 +55,4 @@ export function toComparableFormationProfileState(
     groups: Array.isArray(profile.groups) ? profile.groups : null
   });
 }
+

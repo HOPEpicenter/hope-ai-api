@@ -1,3 +1,13 @@
+## 2026-06-01 Update — GitHub Actions Node 24 cleanup closed
+
+What landed:
+- removed obsolete Node 20 JavaScript action runtime overrides from staging and production deploy workflows
+- kept deploy workflows aligned with azure/login@v3 for the Node 24-compatible path
+- validated CI and post-merge staging deployment after cleanup
+
+Current rule:
+- treat GitHub Actions Node 24 migration cleanup as closed
+- return to backend-first roadmap work unless a real deployment blocker appears
 ### Ordering governance hardening (2026-05-19)
 
 - centralized timeline ordering semantics across engagements/followups/integration layers

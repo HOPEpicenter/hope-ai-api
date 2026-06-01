@@ -435,7 +435,7 @@ Verification:
 - merge to main successful
 - CI green
 - staging deploy green
-- Node 20 deprecation warning on azure/login remains non-blocking
+- Node 20 deprecation warning on azure/login is resolved; both deploy workflows no longer force the Node 20 action runtime
 
 ## 2026-04-06
 

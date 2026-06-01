@@ -473,7 +473,7 @@ Current rule:
 - [x] Main merged cleanly
 - [x] CI green
 - [x] Staging deploy green
-- [x] Non-blocking azure/login Node 20 deprecation warning acknowledged and deferred
+- [x] azure/login Node 20 deprecation warning fully resolved; obsolete Node 20 action runtime overrides removed from deploy workflows
 
 
 ## 2026-04-06 Session Closeout

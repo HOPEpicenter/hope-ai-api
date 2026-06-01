@@ -1,6 +1,4 @@
 name: Deploy hope-ai-api-staging to Azure Functions
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE20: true
 
 on:
   push:
@@ -129,5 +127,3 @@ jobs:
           if (-not $ok) {
             throw "Post-deploy health check failed after retries."
           }
-
-

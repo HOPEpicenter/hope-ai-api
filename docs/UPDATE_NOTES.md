@@ -1,3 +1,9 @@
+## 2026-06-01 — Teams Registry v1
+
+- Added read-only GET /ops/teams Teams Registry v1 endpoint.
+- Added regression coverage for the Teams Registry v1 endpoint.
+- Kept scope intentionally narrow: no storage, writes, team assignment workflow, membership, RBAC, or dashboard expansion.
+- CI and staging deploy passed after merge.
 
 ## 2026-05-19 — Ordering governance consolidation
 

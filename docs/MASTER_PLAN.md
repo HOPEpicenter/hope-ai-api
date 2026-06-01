@@ -1,3 +1,14 @@
+## 2026-06-02 Update — Orchestration guardrail closeout
+
+What we verified:
+- existing scripts/assert-ops-task-preview-simulation.ps1 already validates read-only simulation mode
+- existing regression coverage confirms orchestration remains inactive, task persistence remains inactive, and replay behavior remains deterministic
+- the simulation assertion is already wired through scripts/assert-pagination-regressions.ps1
+
+Current rule:
+- do not add duplicate orchestration regression frameworks
+- keep orchestration simulation-only/read-side unless a separate activation design is explicitly opened
+- keep production ops-preview latency investigation deferred unless it becomes operationally disruptive
 ## 2026-06-01 Update — Teams registry v1 shipped
 
 What landed:

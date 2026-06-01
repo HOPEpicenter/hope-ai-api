@@ -36,6 +36,7 @@ import {
 import { readCanonicalVisitorIdentity } from "../../services/dashboard/visitorIdentity";
 import { readCanonicalVisitorDashboardCard } from "../../services/dashboard/readCanonicalVisitorDashboardCard";
 import { resolveMutationSource } from "../../services/events/resolveMutationSource";
+import { listKnownTeams } from "../../services/operators/teamRegistry";
 function isAllowedType(v: unknown): v is FormationEventType {
   return typeof v === "string" && (allowedTypes as string[]).includes(v);
 }
@@ -59,6 +60,13 @@ export function createOpsRouter(visitorsRepository: VisitorsRepository, formatio
 
   opsRouter.get("/health", (req, res) => {
     res.json({ ok: true, requestId: getRequestId(req) });
+  });
+
+  opsRouter.get("/teams", (_req, res) => {
+    return res.json({
+      ok: true,
+      teams: listKnownTeams()
+    });
   });
 
   // GET /ops/visitors (list)

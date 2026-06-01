@@ -1,3 +1,14 @@
+## 2026-06-01 Update — Teams registry v1 shipped
+
+What landed:
+- PR #999 added a minimal read-only Teams Registry v1 at GET /ops/teams
+- PR #1000 added regression coverage for the Teams Registry v1 endpoint
+- registry remains ops-only and read-only
+- no team assignment workflow, team membership, RBAC, storage, or dashboard expansion was added
+
+Current rule:
+- treat Teams Registry v1 as complete for now
+- do not widen into team membership, authorization, scheduling, volunteer management, or dashboard consumption unless a real backend blocker appears
 ## 2026-06-01 Update — GitHub Actions Node 24 cleanup closed
 
 What landed:

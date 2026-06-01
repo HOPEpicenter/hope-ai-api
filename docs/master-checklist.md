@@ -495,7 +495,7 @@ Current rule:
 - [x] Follow-up prioritization signals shipped (`followupPriorityScore`, `followupAgingBucket`, `followupEscalated`)
 - [x] `/ops/followups` priority queue shipped — #542
 - [x] `/ops/followups` includeResolved + resolved stats shipped — #543
-- [ ] Teams registry
+- [x] Teams registry v1 — read-only /ops/teams endpoint shipped in #999 and regression-covered in #1000
 - [x] Ops followups owner rollup — #548
 ## 2026-04-08 Session Closeout
 
@@ -516,7 +516,7 @@ Current rule:
 - [x] #550 event-derived read model
 - [x] CI green
 - [x] staging green
-- [ ] Teams registry (parked)
+- [x] Teams registry v1 — read-only /ops/teams endpoint shipped in #999 and regression-covered in #1000 (parked)
 
 
 - [x] Followup ownership model validated (assign/unassign lifecycle + regression + staging)\n

@@ -623,7 +623,7 @@ Current rule:
 - [x] Verified CI green during merged PR wave
 - [x] Verified staging deploy green during merged PR wave
 - [x] Verified local regression gates during implementation
-- [ ] Keep next orchestration-related work simulation-only unless explicitly opening a separate activation design
+- [x] Existing orchestration simulation regression confirms next orchestration-related work remains simulation-only unless a separate activation design is explicitly opened
 
 
 ## 2026-05-16 — Canonical Orchestration Infrastructure Closeout
@@ -652,12 +652,12 @@ Current rule:
 
 Next constraints:
 
-- [ ] Keep orchestration behavior deterministic and read-side only
-- [ ] Do not introduce AI orchestration without explicit activation architecture
-- [ ] Preserve replay-safe operational semantics during future orchestration work
+- [x] Existing orchestration simulation regression confirms orchestration behavior remains deterministic and read-side only
+- [x] Existing orchestration simulation regression preserves no-AI-orchestration/no-activation guardrails
+- [x] Existing orchestration simulation regression preserves replay-safe operational semantics
 
 
-- [ ] Add deterministic replay parity snapshots for future orchestration workflows
+- [x] Existing orchestration simulation regression covers deterministic replay parity/hash snapshot behavior
 
 - [x] Extract deterministic formation projection kernel infrastructure
 

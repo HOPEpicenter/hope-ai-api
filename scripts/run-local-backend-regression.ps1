@@ -183,6 +183,11 @@ $Base = $BaseUrl.Replace("/api", "")
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-ops-followups-owners.ps1 -Base $Base
 if ($LASTEXITCODE -ne 0) { throw "assert-ops-followups-owners.ps1 failed" }
 Write-Host "[OK] Ops followups owner rollup regression"
+
+Write-Host "=== Ops teams registry regression ==="
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-ops-teams-registry.ps1
+if ($LASTEXITCODE -ne 0) { throw "assert-ops-teams-registry.ps1 failed" }
+Write-Host "[OK] Ops teams registry regression"
 Write-Host "[local-backend] All local backend checks passed."
 
 Write-Host "=== Invalid first transition invariant ==="

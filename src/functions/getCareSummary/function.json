@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getCareSummary/index.js",
+  "entryPoint": "getCareSummary",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "care/summary"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

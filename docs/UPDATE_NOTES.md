@@ -1,3 +1,9 @@
+## 2026-06-02 — Derived Insights Closeout
+
+- Reviewed existing derived insight and analytics surfaces.
+- Confirmed derived insights already exist through engagement score, engagement risk, visitor activity insights, journey read models, integration summaries, followup prioritization signals, and related read-only views.
+- Kept the architectural rule: derive from existing event/read-model truth and avoid storing derived state unless necessary.
+- No new insight endpoint, storage table, dashboard expansion, or AI-derived insight layer was added.
 ## 2026-06-02 — Streaming Export Format Discovery
 
 - Reviewed repo references for streaming/export format, CSV, NDJSON, download, and export-job concepts.

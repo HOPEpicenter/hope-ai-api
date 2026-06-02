@@ -37,6 +37,7 @@ assert(needsCare.carePriority === "elevated", "candidate carePriority should be 
 assert(needsCare.careAgeBucket === "aging", "candidate careAgeBucket should be aging");
 assert(needsCare.escalationLevel === "review", "candidate escalationLevel should be review");
 assert(needsCare.recommendedCareAction === "prioritize_review", "candidate recommendedCareAction should prioritize review");
+assert(needsCare.careSortScore === 210, "candidate careSortScore should be 210");
 assert(needsCare.careOpenedBy === "ops-user-1", "candidate careOpenedBy should match assigned owner");
 assert(needsCare.daysOpen === 3, "candidate daysOpen should be deterministic");
 assert(needsCare.source.workflowId === "care", "candidate workflowId should be care");
@@ -56,6 +57,7 @@ assert(staleCare.carePriority === "urgent", "stale candidate carePriority should
 assert(staleCare.careAgeBucket === "stale", "stale candidate careAgeBucket should be stale");
 assert(staleCare.escalationLevel === "escalate", "stale candidate escalationLevel should escalate");
 assert(staleCare.recommendedCareAction === "escalation_review", "stale candidate recommendedCareAction should escalate review");
+assert(staleCare.careSortScore === 310, "stale candidate careSortScore should be 310");
 const connected = deriveCareCandidate({
   visitorId: "visitor-care-2",
   assignedTo: "ops-user-1",

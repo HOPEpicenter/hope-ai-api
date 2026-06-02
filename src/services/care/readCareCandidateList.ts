@@ -31,6 +31,14 @@ export type CareQueueSummary = {
     review: number;
     escalate: number;
   };
+  byAssignmentState: {
+    assigned: number;
+    unassigned: number;
+  };
+  byAssignmentBucket: {
+    owned: number;
+    queue: number;
+  };
 };
 
 export type ReadCareCandidateListResult =
@@ -100,6 +108,14 @@ export function readCareCandidateList(
         none: projected.items.filter((x) => x.escalationLevel === "none").length,
         review: projected.items.filter((x) => x.escalationLevel === "review").length,
         escalate: projected.items.filter((x) => x.escalationLevel === "escalate").length
+      },
+      byAssignmentState: {
+        assigned: projected.items.filter((x) => x.assignmentState === "assigned").length,
+        unassigned: projected.items.filter((x) => x.assignmentState === "unassigned").length
+      },
+      byAssignmentBucket: {
+        owned: projected.items.filter((x) => x.assignmentBucket === "owned").length,
+        queue: projected.items.filter((x) => x.assignmentBucket === "queue").length
       }
     }
   };

@@ -5,6 +5,7 @@ export type DeriveCareCandidateInput = {
   assignedTo?: string | null;
   lastFollowupOutcome?: string | null;
   lastFollowupOutcomeAt?: string | null;
+  now?: Date;
 };
 
 export function deriveCareCandidate(
@@ -24,12 +25,28 @@ export function deriveCareCandidate(
     visitorId,
     status: "candidate",
     reason: "needs_care",
+    careLevel: "standard",
+    careCategory: "followup_needs_care",
     openedAt: outcomeAt,
+    careOpenedBy: assignedTo,
     assignedTo,
+    daysOpen: calculateDaysOpen(outcomeAt, input.now ?? new Date()),
     source: {
       workflowId: "care",
       followupOutcome: "needs_care",
       followupOutcomeAt: outcomeAt
     }
   };
+}
+
+function calculateDaysOpen(openedAt: string, now: Date): number | null {
+  const openedTime = Date.parse(openedAt);
+  const nowTime = now.getTime();
+
+  if (!Number.isFinite(openedTime) || !Number.isFinite(nowTime)) {
+    return null;
+  }
+
+  const diffMs = Math.max(0, nowTime - openedTime);
+  return Math.floor(diffMs / 86400000);
 }

@@ -13,6 +13,7 @@ Backend is ready for a controlled pilot. No additional major backend architectur
 3. Confirm ops health endpoint responds.
 4. Confirm operators know the pilot workflow for the day.
 5. Confirm known incidents or limitations are visible to operators.
+6. Confirm Today cockpit is available and functioning.
 
 ## Health checks
 
@@ -25,8 +26,8 @@ Expected result: ok is true.
 
 ## Operator workflow
 
-1. Start from the agreed operator surface.
-2. Review ready care or follow-up work.
+1. Start from the Today cockpit.
+2. Review Ready Care work.
 3. Open the visitor record.
 4. Record contact, follow-up, or outcome activity.
 5. Confirm the queue/card/timeline state updates as expected.
@@ -46,6 +47,45 @@ Record each incident with:
 - severity: low, medium, high
 - whether pilot work can continue
 
+### Incident Template
+
+Date/Time:
+Operator:
+VisitorId:
+
+Action Attempted:
+
+Expected Result:
+
+Actual Result:
+
+Screenshot / Log:
+
+Can Pilot Continue?
+Y/N
+
+Severity:
+Low / Medium / High
+
+## Pilot Feedback Template
+
+Date:
+Operator:
+
+Workflow:
+
+Expected:
+
+What Happened:
+
+Confusing?
+Y/N
+
+Severity:
+Low / Medium / High
+
+Suggested Improvement:
+
 ## Stop-of-day checklist
 
 1. Confirm no active operator workflow is mid-action.
@@ -53,6 +93,21 @@ Record each incident with:
 3. Record confusing workflow moments.
 4. Confirm staging health still passes.
 5. Decide whether any issue is a blocker or normal follow-up.
+
+## Pilot Decision
+
+GO
+- No blocker incidents
+- Operators can complete workflow safely
+
+CONDITIONAL GO
+- Non-blocking issues exist
+- Workaround documented
+
+NO GO
+- Operator cannot safely determine next action
+- Followup state appears corrupted
+- Health endpoints failing
 
 ## Escalation rules
 

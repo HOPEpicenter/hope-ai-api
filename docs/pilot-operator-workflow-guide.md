@@ -28,6 +28,15 @@ Ready Care
 4. Decide whether contact is appropriate.
 5. Avoid changing state if the visitor record appears incorrect or duplicated.
 
+## Ready Care Completion
+
+A Ready Care item is complete when:
+
+1. A contact attempt has been recorded.
+2. An outcome has been recorded.
+3. Visitor state updates correctly in the Today cockpit.
+4. The operator can confidently determine the next status.
+
 ## Mark Contacted
 
 Use Mark Contacted only after a real contact attempt or meaningful outreach step.

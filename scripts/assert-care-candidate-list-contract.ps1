@@ -55,6 +55,8 @@ assert(result.items.length === 2, "items length should match count");
 assert(result.items[0].visitorId === "visitor-care-old", "higher score candidate should sort first");
 assert(result.items[1].visitorId === "visitor-care-new", "lower score candidate should sort second");
 assert(result.items[0].assignedTo === "ops-user-2", "assigned owner should be preserved");
+assert(result.items[0].assignmentState === "assigned", "assignmentState should be assigned");
+assert(result.items[0].assignmentBucket === "owned", "assignmentBucket should be owned");
 assert(result.items[0].source.workflowId === "care", "workflowId should be care");
 assert(result.items[0].carePriority === "urgent", "carePriority should be urgent");
 assert(result.items[0].careAgeBucket === "stale", "careAgeBucket should be stale");
@@ -83,9 +85,10 @@ const tieResult = buildCareCandidateList({
 
 assert(tieResult.items[0].visitorId === "visitor-a", "visitorId should tie-break ascending");
 assert(tieResult.items[1].visitorId === "visitor-b", "visitorId should tie-break ascending");
+assert(tieResult.items[0].assignmentState === "unassigned", "unassigned candidate should be unassigned");
+assert(tieResult.items[0].assignmentBucket === "queue", "unassigned candidate should be queue");
 
 console.log("OK: care candidate list contract passed.");
 "@
 
 node -e $nodeScript $modulePath
-

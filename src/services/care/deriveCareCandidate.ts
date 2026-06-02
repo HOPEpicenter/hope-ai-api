@@ -31,6 +31,8 @@ export function deriveCareCandidate(
   const escalationLevel = deriveEscalationLevel(careAgeBucket);
   const recommendedCareAction = deriveRecommendedCareAction(careAgeBucket);
   const careSortScore = deriveCareSortScore(careAgeBucket, assignedTo);
+  const assignmentState = deriveAssignmentState(assignedTo);
+  const assignmentBucket = deriveAssignmentBucket(assignedTo);
 
   return {
     visitorId,
@@ -46,6 +48,8 @@ export function deriveCareCandidate(
     openedAt: outcomeAt,
     careOpenedBy: assignedTo,
     assignedTo,
+    assignmentState,
+    assignmentBucket,
     daysOpen,
     source: {
       workflowId: "care",
@@ -136,4 +140,14 @@ function deriveCareSortScore(
 
   return ageScore + assignmentScore;
 }
+function deriveAssignmentState(
+  assignedTo: string | null
+): "assigned" | "unassigned" {
+  return assignedTo ? "assigned" : "unassigned";
+}
 
+function deriveAssignmentBucket(
+  assignedTo: string | null
+): "owned" | "queue" {
+  return assignedTo ? "owned" : "queue";
+}

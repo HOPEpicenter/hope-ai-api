@@ -30,6 +30,8 @@ assert(needsCare.visitorId === "visitor-care-1", "candidate visitorId should mat
 assert(needsCare.status === "candidate", "candidate status should be candidate");
 assert(needsCare.reason === "needs_care", "candidate reason should be needs_care");
 assert(needsCare.assignedTo === "ops-user-1", "candidate assignedTo should match");
+assert(needsCare.assignmentState === "assigned", "candidate assignmentState should be assigned");
+assert(needsCare.assignmentBucket === "owned", "candidate assignmentBucket should be owned");
 assert(needsCare.openedAt === "2026-06-02T16:00:00.000Z", "candidate openedAt should use outcome timestamp");
 assert(needsCare.careLevel === "standard", "candidate careLevel should be standard");
 assert(needsCare.careCategory === "followup_needs_care", "candidate careCategory should match");
@@ -85,8 +87,18 @@ const missingTimestamp = deriveCareCandidate({
 
 assert(missingTimestamp === null, "needs_care without timestamp should not derive a care candidate");
 
+const unassigned = deriveCareCandidate({
+  visitorId: "visitor-unassigned",
+  assignedTo: null,
+  lastFollowupOutcome: "needs_care",
+  lastFollowupOutcomeAt: "2026-06-02T16:00:00.000Z",
+  now: new Date("2026-06-05T16:00:00.000Z")
+});
+
+assert(unassigned !== null, "unassigned candidate should derive a care candidate");
+assert(unassigned.assignmentState === "unassigned", "unassigned candidate should be unassigned");
+assert(unassigned.assignmentBucket === "queue", "unassigned candidate should be queue");
 console.log("OK: care candidate derivation contract passed.");
 "@
 
 node -e $nodeScript $modulePath
-

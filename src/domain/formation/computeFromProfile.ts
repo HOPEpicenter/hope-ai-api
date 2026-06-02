@@ -1,4 +1,5 @@
-﻿export type Urgency = "OVERDUE" | "DUE_SOON" | "WATCH";
+import { isTerminalFollowupOutcome } from "../../services/followups/isTerminalFollowupOutcome";
+export type Urgency = "OVERDUE" | "DUE_SOON" | "WATCH";
 
 export type FollowupComputed = {
   stage: string;
@@ -43,14 +44,16 @@ export function computeFromProfile(profile: any, now: Date = new Date()): Follow
   let reason: string | null = null;
 
   const hasAssigned = !!lastFollowupAssignedAt;
-  const hasOutcome = !!lastFollowupOutcomeAt;
+  const hasTerminalOutcome =
+  !!lastFollowupOutcomeAt &&
+  isTerminalFollowupOutcome(profile?.lastFollowupOutcome);
 
-  if (hasAssigned && !hasOutcome) {
+  if (hasAssigned && !hasTerminalOutcome) {
     const hoursSinceAssigned = Math.floor((now.getTime() - lastFollowupAssignedAt!.getTime()) / (60 * 60 * 1000));
     urgency = hoursSinceAssigned >= 48 ? "OVERDUE" : "DUE_SOON";
     recommendedAction = urgency === "OVERDUE" ? "Immediate follow-up" : "Contact within 48h";
     reason = "Follow-up assigned + no outcome recorded";
-  } else if (hasOutcome) {
+  } else if (hasTerminalOutcome) {
     urgency = "WATCH";
     recommendedAction = "Light touch / confirm next step";
     reason = "Outcome recorded";

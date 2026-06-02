@@ -1,3 +1,4 @@
+import { isTerminalFollowupOutcome } from "../../services/followups/isTerminalFollowupOutcome";
 import {
   getFormationProfilesTableClient,
   listFormationProfiles,
@@ -27,7 +28,7 @@ function parseCursor(val: unknown): string | undefined {
 }
 
 function isOpenAssignedFollowup(profile: FunctionFormationProfileEntity): boolean {
-  return !!profile.assignedTo && !profile.lastFollowupOutcomeAt;
+  return !!profile.assignedTo && !(!!profile.lastFollowupOutcomeAt && isTerminalFollowupOutcome(profile.lastFollowupOutcome));
 }
 
 export async function getDashboardFollowups(context: any, req: any): Promise<void> {

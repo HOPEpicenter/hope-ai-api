@@ -1,3 +1,4 @@
+import { isTerminalFollowupOutcome } from "../../services/followups/isTerminalFollowupOutcome";
 import {
   normalizeOperatorId,
   resolveOperatorDisplayName
@@ -56,8 +57,7 @@ export function projectFollowupState(profile: any): FollowupProjection {
   const contacted =
     !!profile?.lastFollowupContactedAt;
 
-  const resolved =
-    !!profile?.lastFollowupOutcomeAt;
+  const resolved = !!profile?.lastFollowupOutcomeAt && isTerminalFollowupOutcome(profile?.lastFollowupOutcome);
 
   if (!assignedTo) {
     return {

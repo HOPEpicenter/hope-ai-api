@@ -1,3 +1,4 @@
+import { isTerminalFollowupOutcome } from "../../services/followups/isTerminalFollowupOutcome";
 import { buildOperatorOwnerRef } from "../../services/operators/operatorIdentity";
 
 import type {
@@ -21,6 +22,7 @@ export type DeriveIntegrationSummaryInput = {
   lastFollowupAssignedAt?: string | null;
   lastFollowupContactedAt?: string | null;
   lastFollowupOutcomeAt?: string | null;
+  lastFollowupOutcome?: string | null;
   groups?: unknown;
   programs?: unknown;
   workflows?: unknown;
@@ -90,9 +92,8 @@ export function deriveIntegrationSummaryV1(
   const outcomeAt = input.lastFollowupOutcomeAt;
 
   const followupResolved =
-    !!assignedAt &&
     !!outcomeAt &&
-    outcomeAt >= assignedAt;
+    isTerminalFollowupOutcome(input.lastFollowupOutcome);
 
   let followupUrgency: "ON_TRACK" | "AT_RISK" | "OVERDUE" | undefined;
   let followupOverdue = false;

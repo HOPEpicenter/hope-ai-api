@@ -1,3 +1,4 @@
+import { isTerminalFollowupOutcome } from "./isTerminalFollowupOutcome";
 export type DerivedFollowupStatus = "none" | "action_needed" | "contact_made" | "resolved";
 
 export type DerivedFollowupState = {
@@ -9,7 +10,7 @@ export type DerivedFollowupState = {
 export function deriveFollowupState(profile: any): DerivedFollowupState {
   const assigned = !!profile?.assignedTo;
   const contacted = !!profile?.lastFollowupContactedAt;
-  const outcome = !!profile?.lastFollowupOutcomeAt;
+  const outcome = !!profile?.lastFollowupOutcomeAt && isTerminalFollowupOutcome(profile?.lastFollowupOutcome);
 
   if (!assigned) {
     return {

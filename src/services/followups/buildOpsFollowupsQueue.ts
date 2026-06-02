@@ -1,3 +1,4 @@
+import { isTerminalFollowupOutcome } from "./isTerminalFollowupOutcome";
 import { paginateOffsetItems } from "../../shared/timeline/offsetPaginator";
 import {
   compareBooleanDesc,
@@ -29,6 +30,7 @@ type EventState = {
   lastFollowupAssignedAt: string | null;
   lastFollowupContactedAt: string | null;
   lastFollowupOutcomeAt: string | null;
+  lastFollowupOutcome: string | null;
 };
 
 export type BuildOpsFollowupsQueueOptions = {
@@ -105,13 +107,14 @@ function deriveQueueSignals(state: {
   lastFollowupAssignedAt: string | null;
   lastFollowupContactedAt: string | null;
   lastFollowupOutcomeAt: string | null;
+  lastFollowupOutcome: string | null;
 }) {
   const assignedAt = state.lastFollowupAssignedAt;
   const contactedAt = state.lastFollowupContactedAt;
   const outcomeAt = state.lastFollowupOutcomeAt;
   const assignedTo = String(state.assignedTo ?? "").trim();
 
-  const followupResolved = !!assignedAt && !!outcomeAt && String(outcomeAt) >= String(assignedAt);
+  const followupResolved = !!outcomeAt && isTerminalFollowupOutcome(state.lastFollowupOutcome);
 
   if (!assignedAt) {
     return {
@@ -249,6 +252,7 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
         lastFollowupAssignedAt: null,
         lastFollowupContactedAt: null,
         lastFollowupOutcomeAt: null,
+        lastFollowupOutcome: null,
       };
       stateByVisitor.set(visitorId, state);
     }
@@ -279,6 +283,11 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
     if (type === "FOLLOWUP_OUTCOME_RECORDED") {
       if (compareIsoAsc(state.lastFollowupOutcomeAt, occurredAt) <= 0) {
         state.lastFollowupOutcomeAt = occurredAt;
+        state.lastFollowupOutcome = String(
+          ((e as any)?.metadata as any)?.outcome ??
+          ((e as any)?.metadata as any)?.followupOutcome ??
+          ""
+        ).trim() || null;
       }
     }
   }
@@ -302,6 +311,7 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
     const profileAssignedAt = String((p as any)?.lastFollowupAssignedAt ?? "").trim() || null;
     const profileContactedAt = String((p as any)?.lastFollowupContactedAt ?? "").trim() || null;
     const profileOutcomeAt = String((p as any)?.lastFollowupOutcomeAt ?? "").trim() || null;
+    const profileOutcome = String((p as any)?.lastFollowupOutcome ?? "").trim() || null;
 
     if (compareIsoAsc(state.lastFollowupAssignedAt, profileAssignedAt) < 0) {
       state.lastFollowupAssignedAt = profileAssignedAt;
@@ -314,6 +324,9 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
     }
     if (compareIsoAsc(state.lastFollowupOutcomeAt, profileOutcomeAt) < 0) {
       state.lastFollowupOutcomeAt = profileOutcomeAt;
+      state.lastFollowupOutcome = profileOutcome;
+    } else if (!state.lastFollowupOutcome && profileOutcome) {
+      state.lastFollowupOutcome = profileOutcome;
     }
   }
 

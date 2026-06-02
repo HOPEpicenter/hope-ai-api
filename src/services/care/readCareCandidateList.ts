@@ -18,6 +18,10 @@ export type CareQueueSummary = {
   urgentCount: number;
   staleCount: number;
   escalationCount: number;
+  assignedCount: number;
+  unassignedCount: number;
+  ownedCount: number;
+  queueCount: number;
   byPriority: {
     normal: number;
     elevated: number;
@@ -109,6 +113,18 @@ export function readCareCandidateList(
       ).length,
       escalationCount: projected.items.filter(
         (x) => x.escalationLevel === "escalate"
+      ).length,
+      assignedCount: projected.items.filter(
+        (x) => x.assignmentState === "assigned"
+      ).length,
+      unassignedCount: projected.items.filter(
+        (x) => x.assignmentState === "unassigned"
+      ).length,
+      ownedCount: projected.items.filter(
+        (x) => x.assignmentBucket === "owned"
+      ).length,
+      queueCount: projected.items.filter(
+        (x) => x.assignmentBucket === "queue"
       ).length,
       byPriority: {
         normal: projected.items.filter((x) => x.carePriority === "normal").length,

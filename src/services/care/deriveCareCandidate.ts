@@ -30,6 +30,7 @@ export function deriveCareCandidate(
   const carePriority = deriveCarePriority(careAgeBucket);
   const escalationLevel = deriveEscalationLevel(careAgeBucket);
   const recommendedCareAction = deriveRecommendedCareAction(careAgeBucket);
+  const careSortScore = deriveCareSortScore(careAgeBucket, assignedTo);
 
   return {
     visitorId,
@@ -41,6 +42,7 @@ export function deriveCareCandidate(
     careAgeBucket,
     escalationLevel,
     recommendedCareAction,
+    careSortScore,
     openedAt: outcomeAt,
     careOpenedBy: assignedTo,
     assignedTo,
@@ -120,5 +122,18 @@ function deriveRecommendedCareAction(
     default:
       return "review_followup";
   }
+}
+function deriveCareSortScore(
+  ageBucket: "new" | "aging" | "stale",
+  assignedTo: string | null
+): number {
+  const ageScore =
+    ageBucket === "stale" ? 300 :
+    ageBucket === "aging" ? 200 :
+    100;
+
+  const assignmentScore = assignedTo ? 10 : 20;
+
+  return ageScore + assignmentScore;
 }
 

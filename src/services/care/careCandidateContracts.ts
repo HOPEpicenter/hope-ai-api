@@ -36,6 +36,7 @@ export type CareCandidate = {
   careAgeBucket: CareAgeBucket;
   escalationLevel: EscalationLevel;
   recommendedCareAction: RecommendedCareAction;
+  careSortScore: number;
   openedAt: string;
   careOpenedBy: string | null;
   assignedTo: string | null;

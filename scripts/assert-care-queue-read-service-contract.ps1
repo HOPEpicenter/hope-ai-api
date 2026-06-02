@@ -45,6 +45,7 @@ assert(result.items[0].carePriority === "elevated", "carePriority should be elev
 assert(result.items[0].careAgeBucket === "aging", "careAgeBucket should be aging");
 assert(result.items[0].escalationLevel === "review", "escalationLevel should be review");
 assert(result.items[0].recommendedCareAction === "prioritize_review", "recommendedCareAction should prioritize review");
+assert(result.items[0].careSortScore === 210, "careSortScore should be 210");
 
 console.log("OK: care queue read service contract passed.");
 "@

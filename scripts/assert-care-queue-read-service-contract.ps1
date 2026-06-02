@@ -44,7 +44,7 @@ assert(result.items[0].source.workflowId === "care", "workflowId should be care"
 assert(result.items[0].carePriority === "elevated", "carePriority should be elevated");
 assert(result.items[0].careAgeBucket === "aging", "careAgeBucket should be aging");
 assert(result.items[0].escalationLevel === "review", "escalationLevel should be review");
-assert(result.items[0].recommendedCareAction === "review_followup", "recommendedCareAction should match");
+assert(result.items[0].recommendedCareAction === "prioritize_review", "recommendedCareAction should prioritize review");
 
 console.log("OK: care queue read service contract passed.");
 "@

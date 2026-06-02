@@ -29,6 +29,7 @@ export function deriveCareCandidate(
   const careAgeBucket = deriveCareAgeBucket(daysOpen);
   const carePriority = deriveCarePriority(careAgeBucket);
   const escalationLevel = deriveEscalationLevel(careAgeBucket);
+  const recommendedCareAction = deriveRecommendedCareAction(careAgeBucket);
 
   return {
     visitorId,
@@ -39,7 +40,7 @@ export function deriveCareCandidate(
     carePriority,
     careAgeBucket,
     escalationLevel,
-    recommendedCareAction: "review_followup",
+    recommendedCareAction,
     openedAt: outcomeAt,
     careOpenedBy: assignedTo,
     assignedTo,
@@ -104,6 +105,20 @@ function deriveEscalationLevel(
 
     default:
       return "none";
+  }
+}
+function deriveRecommendedCareAction(
+  ageBucket: "new" | "aging" | "stale"
+): "review_followup" | "prioritize_review" | "escalation_review" {
+  switch (ageBucket) {
+    case "aging":
+      return "prioritize_review";
+
+    case "stale":
+      return "escalation_review";
+
+    default:
+      return "review_followup";
   }
 }
 

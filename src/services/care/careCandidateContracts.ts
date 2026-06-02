@@ -22,7 +22,9 @@ export type EscalationLevel =
   | "escalate";
 
 export type RecommendedCareAction =
-  | "review_followup";
+  | "review_followup"
+  | "prioritize_review"
+  | "escalation_review";
 
 export type CareCandidate = {
   visitorId: string;
@@ -44,3 +46,4 @@ export type CareCandidate = {
     followupOutcomeAt: string;
   };
 };
+

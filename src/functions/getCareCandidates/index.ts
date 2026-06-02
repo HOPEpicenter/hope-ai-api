@@ -115,6 +115,7 @@ export async function getCareCandidates(context: any, req: any): Promise<void> {
         cursor: nextCursor,
         nextCursor,
         items: pageItems,
+        summary: projected.summary,
         projectionIntegrity: {
           orphanProfilesExcluded
         }
@@ -138,4 +139,3 @@ export async function getCareCandidates(context: any, req: any): Promise<void> {
     };
   }
 }
-

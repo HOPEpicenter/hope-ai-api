@@ -10,7 +10,18 @@ export type ReadCareCandidateListInput = BuildCareCandidateListInput & {
   escalationLevel?: string | null;
 };
 
-export type ReadCareCandidateListResult = CareCandidateListResult;
+export type CareQueueSummary = {
+  totalCandidates: number;
+  filteredCount: number;
+  urgentCount: number;
+  staleCount: number;
+  escalationCount: number;
+};
+
+export type ReadCareCandidateListResult =
+  CareCandidateListResult & {
+    summary: CareQueueSummary;
+  };
 
 export function readCareCandidateList(
   input: ReadCareCandidateListInput
@@ -47,7 +58,19 @@ export function readCareCandidateList(
   return {
     ok: true,
     count: items.length,
-    items
+    items,
+    summary: {
+      totalCandidates: projected.items.length,
+      filteredCount: items.length,
+      urgentCount: projected.items.filter(
+        (x) => x.carePriority === "urgent"
+      ).length,
+      staleCount: projected.items.filter(
+        (x) => x.careAgeBucket === "stale"
+      ).length,
+      escalationCount: projected.items.filter(
+        (x) => x.escalationLevel === "escalate"
+      ).length
+    }
   };
 }
-

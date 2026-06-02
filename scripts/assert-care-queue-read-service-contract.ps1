@@ -115,8 +115,12 @@ const escalatedOnly = readCareCandidateList({
 
 assert(escalatedOnly.count === 1, "escalation filter should return one candidate");
 assert(escalatedOnly.items[0].visitorId === "stale-care", "escalation filter should return stale candidate");
+assert(result.summary.totalCandidates === 1, "summary totalCandidates should be 1");
+assert(result.summary.filteredCount === 1, "summary filteredCount should be 1");
+assert(result.summary.urgentCount === 0, "summary urgentCount should be 0");
+assert(result.summary.staleCount === 0, "summary staleCount should be 0");
+assert(result.summary.escalationCount === 0, "summary escalationCount should be 0");
 console.log("OK: care queue read service contract passed.");
 "@
 
 node -e $nodeScript $modulePath
-

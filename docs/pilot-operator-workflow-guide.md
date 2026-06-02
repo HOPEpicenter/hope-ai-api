@@ -55,6 +55,23 @@ Use Mark Contacted only after a real contact attempt or meaningful outreach step
 - referred to ministry/team
 - incorrect or duplicate record
 
+## Outcome Guidance
+
+resolved
+- Followup work is complete.
+
+needs another followup
+- Additional operator action is expected.
+
+no response
+- Followup remains unresolved and may require future action.
+
+referred to ministry/team
+- Responsibility has been handed to another ministry or team.
+
+incorrect or duplicate record
+- Do not continue followup activity on the record.
+
 ## End-of-Day Check
 
 1. Confirm no active card was left mid-action.

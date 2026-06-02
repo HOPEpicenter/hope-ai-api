@@ -1,3 +1,9 @@
+## 2026-06-02 — Milestone Regression Coverage Closeout
+
+- Reviewed existing formation milestone and profile invariant regression coverage.
+- Confirmed repeated milestone events and same-timestamp tie-break behavior are already covered by scripts/assert-formation-milestones-v1.ps1.
+- Confirmed profile reconciliation, duplicate replay, out-of-order behavior, and snapshot invariants are already covered by existing formation profile reconciliation and snapshot invariant assertions.
+- No duplicate regression script was added.
 ## 2026-06-02 — Operational Hardening Review Closeout
 
 - Reviewed operational health, replay integrity, audit, repair, diagnostics, observability, telemetry, and simulation surfaces.

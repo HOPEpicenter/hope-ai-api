@@ -411,7 +411,7 @@ Implemented:
 
 Remaining:
 - [ ] Expand milestones v1 beyond the initial two types (if/when needed)
-- [ ] Expand regression coverage: repeated events + profile invariants per milestone type (ordering/tie-break + idempotency now covered)
+- [x] Expand regression coverage: repeated events + profile invariants per milestone type — already covered by formation milestones, profile reconciliation, and snapshot invariant regressions
 - [x] Clarified/documented that `stageUpdatedAt / stageReason / stageUpdatedBy` are guaranteed for explicit stage-change scenarios, not generic profile outputs
 
 Notes:

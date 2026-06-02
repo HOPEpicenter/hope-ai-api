@@ -6,13 +6,23 @@ export type CareCandidateLevel = "standard";
 
 export type CareCandidateCategory = "followup_needs_care";
 
-export type CarePriority = "normal";
+export type CarePriority =
+  | "normal"
+  | "elevated"
+  | "urgent";
 
-export type CareAgeBucket = "new";
+export type CareAgeBucket =
+  | "new"
+  | "aging"
+  | "stale";
 
-export type EscalationLevel = "none";
+export type EscalationLevel =
+  | "none"
+  | "review"
+  | "escalate";
 
-export type RecommendedCareAction = "review_followup";
+export type RecommendedCareAction =
+  | "review_followup";
 
 export type CareCandidate = {
   visitorId: string;

@@ -30,13 +30,15 @@ const result = buildCareCandidateList({
       visitorId: "visitor-care-old",
       assignedTo: "ops-user-2",
       lastFollowupOutcome: "needs_care",
-      lastFollowupOutcomeAt: "2026-06-02T15:00:00.000Z"
+      lastFollowupOutcomeAt: "2026-06-02T15:00:00.000Z",
+      now: new Date("2026-06-05T15:00:00.000Z")
     },
     {
       visitorId: "visitor-care-new",
       assignedTo: "ops-user-1",
       lastFollowupOutcome: "needs_care",
-      lastFollowupOutcomeAt: "2026-06-02T17:00:00.000Z"
+      lastFollowupOutcomeAt: "2026-06-02T17:00:00.000Z",
+      now: new Date("2026-06-05T17:00:00.000Z")
     },
     {
       visitorId: "visitor-left-message",
@@ -54,9 +56,9 @@ assert(result.items[0].visitorId === "visitor-care-new", "newer care candidate s
 assert(result.items[1].visitorId === "visitor-care-old", "older care candidate should sort second");
 assert(result.items[0].assignedTo === "ops-user-1", "assigned owner should be preserved");
 assert(result.items[0].source.workflowId === "care", "workflowId should be care");
-assert(result.items[0].carePriority === "normal", "carePriority should be normal");
-assert(result.items[0].careAgeBucket === "new", "careAgeBucket should be new");
-assert(result.items[0].escalationLevel === "none", "escalationLevel should be none");
+assert(result.items[0].carePriority === "elevated", "carePriority should be elevated");
+assert(result.items[0].careAgeBucket === "aging", "careAgeBucket should be aging");
+assert(result.items[0].escalationLevel === "review", "escalationLevel should be review");
 assert(result.items[0].recommendedCareAction === "review_followup", "recommendedCareAction should match");
 
 const tieResult = buildCareCandidateList({
@@ -65,13 +67,15 @@ const tieResult = buildCareCandidateList({
       visitorId: "visitor-b",
       assignedTo: null,
       lastFollowupOutcome: "needs_care",
-      lastFollowupOutcomeAt: "2026-06-02T17:00:00.000Z"
+      lastFollowupOutcomeAt: "2026-06-02T17:00:00.000Z",
+      now: new Date("2026-06-05T17:00:00.000Z")
     },
     {
       visitorId: "visitor-a",
       assignedTo: null,
       lastFollowupOutcome: "needs_care",
-      lastFollowupOutcomeAt: "2026-06-02T17:00:00.000Z"
+      lastFollowupOutcomeAt: "2026-06-02T17:00:00.000Z",
+      now: new Date("2026-06-05T17:00:00.000Z")
     }
   ]
 });

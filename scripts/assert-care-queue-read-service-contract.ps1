@@ -133,6 +133,12 @@ assert(result.summary.byAgeBucket.stale === 0, "stale bucket count should be 0")
 assert(result.summary.byEscalationLevel.none === 0, "none escalation count should be 0");
 assert(result.summary.byEscalationLevel.review === 1, "review escalation count should be 1");
 assert(result.summary.byEscalationLevel.escalate === 0, "escalate count should be 0");
+
+assert(result.summary.byAssignmentState.assigned === 1, "assigned count should be 1");
+assert(result.summary.byAssignmentState.unassigned === 0, "unassigned count should be 0");
+
+assert(result.summary.byAssignmentBucket.owned === 1, "owned count should be 1");
+assert(result.summary.byAssignmentBucket.queue === 0, "queue count should be 0");
 console.log("OK: care queue read service contract passed.");
 "@
 

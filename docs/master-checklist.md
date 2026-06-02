@@ -317,7 +317,7 @@ Remaining (business logic expansion):
 - [x] Connect people to groups / programs / workflows (docs/groups-programs-workflows-model-v1.md)
 ---
 ## Phase 5 — Legacy (NOT STARTED)
-- [ ] Long-horizon outcomes and history views.
+- [x] Long-horizon outcomes and history views — satisfied by cursor-paged integration/global timelines plus legacy export payload v1.
 - [ ] Derived insights (avoid storing derived state unless necessary).
 
 ---

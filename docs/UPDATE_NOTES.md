@@ -1,3 +1,10 @@
+## 2026-06-02 — Long-Horizon History Closeout
+
+- Reviewed existing history/timeline surfaces.
+- Confirmed long-horizon history is already supported through cursor-paged integration and global timeline surfaces.
+- Legacy export payload v1 now complements those read-side history views.
+- No new endpoint or storage layer was needed.
+- Streaming export format and derived insights remain separate future items.
 ## 2026-06-02 — Legacy Export Payload v1
 
 - Wired Azure Function GET /api/legacy/export to the existing LegacyExportService.

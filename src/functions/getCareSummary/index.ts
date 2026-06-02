@@ -56,8 +56,20 @@ export async function getCareSummary(
       validProfiles.push(profile);
     }
 
+    const priority =
+      String(req?.query?.priority ?? "").trim() || null;
+
+    const ageBucket =
+      String(req?.query?.ageBucket ?? "").trim() || null;
+
+    const escalationLevel =
+      String(req?.query?.escalationLevel ?? "").trim() || null;
+
     const projected = readCareCandidateList({
-      profiles: validProfiles.map(toCareProfileInput)
+      profiles: validProfiles.map(toCareProfileInput),
+      carePriority: priority,
+      careAgeBucket: ageBucket,
+      escalationLevel
     });
 
     context.res = {

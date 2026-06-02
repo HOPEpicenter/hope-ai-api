@@ -975,3 +975,62 @@ The Today cockpit MVP is functionally complete for pilot-readiness purposes. Ope
 - Continue replacing legacy dashboard surfaces incrementally.
 - Avoid frontend-owned orchestration logic.
 - Preserve PowerShell-only implementation workflow and PR-only merge discipline.
+
+## 2026-06-02 — Care Queue Read Model Foundation
+
+Completed a backend care queue read-model wave establishing deterministic care candidate projections and queue intelligence.
+
+Merged slices:
+- #1026 care candidate metadata projection
+- #1027 classification projection metadata
+- #1028 classification contract assertion
+- #1029 days-open derived classification
+- #1030 recommended action projection
+- #1031 care sort score projection
+- #1032 queue ordering by sort score
+- #1033 queue filters
+- #1035 queue summary segments
+
+What landed:
+
+Care candidate projections
+- Added carePriority projection.
+- Added careAgeBucket projection.
+- Added escalationLevel projection.
+- Added recommendedCareAction projection.
+- Added daysOpen projection.
+- Added careSortScore projection.
+
+Deterministic classification
+- New → normal / none / review_followup.
+- Aging → elevated / review / prioritize_review.
+- Stale → urgent / escalate / escalation_review.
+
+Queue behavior
+- Queue ordering now uses careSortScore DESC.
+- Deterministic tie-breaking preserved.
+- Added priority filtering.
+- Added age-bucket filtering.
+- Added escalation filtering.
+
+Queue summary intelligence
+- Added byPriority summary counts.
+- Added byAgeBucket summary counts.
+- Added byEscalationLevel summary counts.
+- Preserved totalCandidates, filteredCount, urgentCount, staleCount, and escalationCount metrics.
+
+Validation
+- Added reusable classification contract assertion.
+- Expanded derivation contract coverage.
+- Expanded queue reader contract coverage.
+- Validated local regression suite.
+- Validated CI green on all merged slices.
+- Validated staging deployment after every merge.
+
+Strategic impact
+- Established the backend foundation for a future care queue operator experience.
+- Preserved read-model-only architecture.
+- No persistence changes.
+- No assignment workflow activation.
+- No care plan implementation.
+- No dashboard coupling.

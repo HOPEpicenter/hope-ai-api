@@ -673,3 +673,25 @@ Next constraints:
 - [x] Lightweight task preview summary endpoint added.
 - [x] Dashboard ops preview proxy switched to summary endpoint.
 - [ ] Production ops-preview latency investigation deferred.
+
+## 2026-06-02 — Care Queue Read Model Foundation
+
+- [x] Care candidate projection contract
+- [x] Care classification projection
+- [x] Days-open derivation
+- [x] Recommended action derivation
+- [x] Care sort score projection
+- [x] Queue ordering by sort score
+- [x] Queue filtering by classification
+- [x] Queue summary metrics
+- [x] Queue summary segmentation
+- [x] Classification regression coverage
+- [x] Queue reader regression coverage
+- [x] Staging validation completed
+
+Next constraints:
+
+- [ ] Assignment workflow remains deferred
+- [ ] Care plan workflow remains deferred
+- [ ] Dashboard implementation remains deferred
+- [ ] Persistence model remains deferred

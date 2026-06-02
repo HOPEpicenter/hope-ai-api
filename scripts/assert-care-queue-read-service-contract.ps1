@@ -46,6 +46,8 @@ assert(result.items[0].careAgeBucket === "aging", "careAgeBucket should be aging
 assert(result.items[0].escalationLevel === "review", "escalationLevel should be review");
 assert(result.items[0].recommendedCareAction === "prioritize_review", "recommendedCareAction should prioritize review");
 assert(result.items[0].careSortScore === 210, "careSortScore should be 210");
+assert(result.items[0].assignmentState === "assigned", "assignmentState should be assigned");
+assert(result.items[0].assignmentBucket === "owned", "assignmentBucket should be owned");
 
 const urgentOnly = readCareCandidateList({
   profiles: [

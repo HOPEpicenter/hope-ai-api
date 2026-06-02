@@ -26,6 +26,14 @@ export type RecommendedCareAction =
   | "prioritize_review"
   | "escalation_review";
 
+export type AssignmentState =
+  | "assigned"
+  | "unassigned";
+
+export type AssignmentBucket =
+  | "owned"
+  | "queue";
+
 export type CareCandidate = {
   visitorId: string;
   status: CareCandidateStatus;
@@ -40,6 +48,8 @@ export type CareCandidate = {
   openedAt: string;
   careOpenedBy: string | null;
   assignedTo: string | null;
+  assignmentState: AssignmentState;
+  assignmentBucket: AssignmentBucket;
   daysOpen: number | null;
   source: {
     workflowId: "care";
@@ -47,4 +57,3 @@ export type CareCandidate = {
     followupOutcomeAt: string;
   };
 };
-

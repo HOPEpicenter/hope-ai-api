@@ -585,7 +585,7 @@ Current rule:
 - [x] Out-of-order stale assigned event did not reopen resolved state
 - [x] Timeline preserved stale events as historical records
 - [x] Resolved projection state remained authoritative
-- [ ] Begin operational hardening review
+- [x] Begin operational hardening review — completed through health, replay, audit, repair, diagnostics, observability, telemetry, and regression review
 
 ---
 

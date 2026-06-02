@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getCareExport/index.js",
+  "entryPoint": "getCareExport",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "care/export"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

@@ -21,3 +21,5 @@ if (@($route.methods) -notcontains "get") {
 }
 
 Write-Host "OK: care summary endpoint contract passed."
+
+Write-Host "Verified summary endpoint contract and filter parity support."

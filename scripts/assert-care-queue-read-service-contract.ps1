@@ -47,6 +47,74 @@ assert(result.items[0].escalationLevel === "review", "escalationLevel should be 
 assert(result.items[0].recommendedCareAction === "prioritize_review", "recommendedCareAction should prioritize review");
 assert(result.items[0].careSortScore === 210, "careSortScore should be 210");
 
+const urgentOnly = readCareCandidateList({
+  profiles: [
+    {
+      visitorId: "aging-care",
+      assignedTo: "ops-user-1",
+      lastFollowupOutcome: "needs_care",
+      lastFollowupOutcomeAt: "2026-06-02T18:00:00.000Z",
+      now: new Date("2026-06-05T18:00:00.000Z")
+    },
+    {
+      visitorId: "stale-care",
+      assignedTo: "ops-user-2",
+      lastFollowupOutcome: "needs_care",
+      lastFollowupOutcomeAt: "2026-06-02T18:00:00.000Z",
+      now: new Date("2026-06-10T18:00:00.000Z")
+    }
+  ],
+  carePriority: "urgent"
+});
+
+assert(urgentOnly.count === 1, "urgent filter should return one candidate");
+assert(urgentOnly.items[0].visitorId === "stale-care", "urgent filter should return stale candidate");
+
+const staleOnly = readCareCandidateList({
+  profiles: [
+    {
+      visitorId: "aging-care",
+      assignedTo: "ops-user-1",
+      lastFollowupOutcome: "needs_care",
+      lastFollowupOutcomeAt: "2026-06-02T18:00:00.000Z",
+      now: new Date("2026-06-05T18:00:00.000Z")
+    },
+    {
+      visitorId: "stale-care",
+      assignedTo: "ops-user-2",
+      lastFollowupOutcome: "needs_care",
+      lastFollowupOutcomeAt: "2026-06-02T18:00:00.000Z",
+      now: new Date("2026-06-10T18:00:00.000Z")
+    }
+  ],
+  careAgeBucket: "stale"
+});
+
+assert(staleOnly.count === 1, "stale filter should return one candidate");
+assert(staleOnly.items[0].visitorId === "stale-care", "stale filter should return stale candidate");
+
+const escalatedOnly = readCareCandidateList({
+  profiles: [
+    {
+      visitorId: "aging-care",
+      assignedTo: "ops-user-1",
+      lastFollowupOutcome: "needs_care",
+      lastFollowupOutcomeAt: "2026-06-02T18:00:00.000Z",
+      now: new Date("2026-06-05T18:00:00.000Z")
+    },
+    {
+      visitorId: "stale-care",
+      assignedTo: "ops-user-2",
+      lastFollowupOutcome: "needs_care",
+      lastFollowupOutcomeAt: "2026-06-02T18:00:00.000Z",
+      now: new Date("2026-06-10T18:00:00.000Z")
+    }
+  ],
+  escalationLevel: "escalate"
+});
+
+assert(escalatedOnly.count === 1, "escalation filter should return one candidate");
+assert(escalatedOnly.items[0].visitorId === "stale-care", "escalation filter should return stale candidate");
 console.log("OK: care queue read service contract passed.");
 "@
 

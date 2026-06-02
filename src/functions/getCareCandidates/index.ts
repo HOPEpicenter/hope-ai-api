@@ -18,6 +18,11 @@ function parseLimit(val: unknown, fallback = 200): number {
   return Math.max(1, Math.min(Math.trunc(n), 500));
 }
 
+function parseFilter(val: unknown): string | undefined {
+  const text = typeof val === "string" ? val.trim() : "";
+  return text.length > 0 ? text : undefined;
+}
+
 function parseCursor(val: unknown): string | undefined {
   const text = typeof val === "string" ? val.trim() : "";
   return text.length > 0 ? text : undefined;
@@ -38,6 +43,10 @@ export async function getCareCandidates(context: any, req: any): Promise<void> {
   try {
     const limit = parseLimit(req?.query?.limit, 200);
     const requestedCursor = parseCursor(req?.query?.cursor);
+
+    const carePriority = parseFilter(req?.query?.priority);
+    const careAgeBucket = parseFilter(req?.query?.ageBucket);
+    const escalationLevel = parseFilter(req?.query?.escalationLevel);
 
     const table = getFormationProfilesTableClient();
     await ensureTable(table);
@@ -83,7 +92,10 @@ export async function getCareCandidates(context: any, req: any): Promise<void> {
     }
 
     const projected = readCareCandidateList({
-      profiles: collected.map(toCareProfileInput)
+      profiles: collected.map(toCareProfileInput),
+      carePriority,
+      careAgeBucket,
+      escalationLevel
     });
 
     const pageItems = projected.items.slice(0, limit);
@@ -126,3 +138,4 @@ export async function getCareCandidates(context: any, req: any): Promise<void> {
     };
   }
 }
+

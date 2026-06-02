@@ -1,3 +1,9 @@
+## 2026-06-02 — Legacy Export Payload v1
+
+- Wired Azure Function GET /api/legacy/export to the existing LegacyExportService.
+- Endpoint now returns the v1 export payload with visitor, engagement, formation, and integration sections.
+- Added local Azure Functions regression coverage using the existing legacy export assertion.
+- Kept scope narrow: no streaming export, long-horizon history views, dashboard changes, or derived insights expansion.
 ## 2026-06-01 — Teams Registry v1
 
 - Added read-only GET /ops/teams Teams Registry v1 endpoint.

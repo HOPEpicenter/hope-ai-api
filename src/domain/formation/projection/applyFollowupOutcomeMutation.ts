@@ -5,6 +5,17 @@ import {
   applyTouchpointTimestamp
 } from "./applyTouchpointTimestamp";
 
+const CONNECTED_FOLLOWUP_OUTCOMES = new Set([
+  "CONNECTED",
+  "WILL_VISIT",
+  "VISITING",
+  "ATTENDING",
+  "NEXT_STEP_TAKEN",
+  "JOINED_GROUP",
+  "MEMBER_CLASS",
+  "BAPTISM_CLASS"
+]);
+
 export function applyFollowupOutcomeMutation(params: {
   profile: Record<string, any>;
   outcome: string;
@@ -25,13 +36,23 @@ export function applyFollowupOutcomeMutation(params: {
   params.profile.lastFollowupOutcomeNotes =
     typeof params.notes === "string" ? params.notes.trim() || undefined : undefined;
 
-  applyStageTransition({
-    profile: params.profile,
-    stage: "Connected",
-    occurredAtIso: params.occurredAtIso,
-    eventType: params.eventType,
-    eventId: params.eventId
-  });
+  if (isConnectedFollowupOutcome(params.outcome)) {
+    applyStageTransition({
+      profile: params.profile,
+      stage: "Connected",
+      occurredAtIso: params.occurredAtIso,
+      eventType: params.eventType,
+      eventId: params.eventId
+    });
+  }
 
   return true;
+}
+
+function isConnectedFollowupOutcome(outcome: string | null | undefined): boolean {
+  const normalized = String(outcome ?? "")
+    .trim()
+    .toUpperCase();
+
+  return CONNECTED_FOLLOWUP_OUTCOMES.has(normalized);
 }

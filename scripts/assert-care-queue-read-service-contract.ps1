@@ -139,6 +139,12 @@ assert(result.summary.byAssignmentState.unassigned === 0, "unassigned count shou
 
 assert(result.summary.byAssignmentBucket.owned === 1, "owned count should be 1");
 assert(result.summary.byAssignmentBucket.queue === 0, "queue count should be 0");
+
+assert(result.summary.assignedCount === 1, "assignedCount should be 1");
+assert(result.summary.unassignedCount === 0, "unassignedCount should be 0");
+
+assert(result.summary.ownedCount === 1, "ownedCount should be 1");
+assert(result.summary.queueCount === 0, "queueCount should be 0");
 const assignedOnly = readCareCandidateList({
   profiles: [
     {

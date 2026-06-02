@@ -50,7 +50,7 @@ function Post-FormationEvent(
     visitorId = $VisitorId
     type = $Type
     occurredAt = $OccurredAt.ToUniversalTime().ToString("o")
-    source = @{ system = "assert-followup-semantic-progression" }
+    source = @{ system = "assert-followup-semantic-progression"; actorId = "ops-user-1" }
     data = $Data
   } | ConvertTo-Json -Depth 10
 
@@ -174,5 +174,31 @@ Assert ($null -ne $profileC) "scenario C expected formation profile"
 Assert ([string]$profileC.lastEventType -eq "FOLLOWUP_OUTCOME_RECORDED") "scenario C expected lastEventType FOLLOWUP_OUTCOME_RECORDED; got '$($profileC.lastEventType)'"
 Assert ([string]$profileC.lastFollowupOutcome -eq "connected") "scenario C expected lastFollowupOutcome connected; got '$($profileC.lastFollowupOutcome)'"
 Assert (-not [string]::IsNullOrWhiteSpace([string]$profileC.lastFollowupOutcomeAt)) "scenario C expected lastFollowupOutcomeAt"
+
+# Scenario D: assigned then contacted then non-terminal outcome should not advance stage to Connected
+$visitorD = Create-TestVisitor "Followup Semantic No Response"
+$baseD = (Get-Date).ToUniversalTime().AddMinutes(-5)
+
+Write-Host "[scenario D] posting assigned then contacted then no_response outcome"
+Post-FormationEvent -VisitorId $visitorD -Type "FOLLOWUP_ASSIGNED" -Data @{ assigneeId = "ops-user-1" } -OccurredAt $baseD
+Start-Sleep -Milliseconds 50
+Post-FormationEvent -VisitorId $visitorD -Type "FOLLOWUP_CONTACTED" -Data @{ method = "phone" } -OccurredAt $baseD.AddSeconds(1)
+Start-Sleep -Milliseconds 50
+Post-FormationEvent -VisitorId $visitorD -Type "FOLLOWUP_OUTCOME_RECORDED" -Data @{ outcome = "no_response" } -OccurredAt $baseD.AddSeconds(2)
+
+$summaryD = Get-VisitorSummary -VisitorId $visitorD
+$journeyD = Get-VisitorJourney -VisitorId $visitorD
+$profileD = Read-FormationProfile $summaryD
+$journeyStepD = Read-JourneyStep $journeyD
+
+Write-Host "[debug] scenario D summary:"
+$summaryD | ConvertTo-Json -Depth 6 | Write-Host
+
+Assert ($journeyStepD -eq "ENGAGED") "scenario D expected journey ENGAGED; got '$journeyStepD'"
+Assert ($null -ne $profileD) "scenario D expected formation profile"
+Assert ([string]$profileD.lastEventType -eq "FOLLOWUP_OUTCOME_RECORDED") "scenario D expected lastEventType FOLLOWUP_OUTCOME_RECORDED; got '$($profileD.lastEventType)'"
+Assert ([string]$profileD.lastFollowupOutcome -eq "no_response") "scenario D expected lastFollowupOutcome no_response; got '$($profileD.lastFollowupOutcome)'"
+Assert (-not [string]::IsNullOrWhiteSpace([string]$profileD.lastFollowupOutcomeAt)) "scenario D expected lastFollowupOutcomeAt"
+Assert ([string]$profileD.stage -ne "Connected") "scenario D expected no_response not to advance stage to Connected"
 
 Write-Host "Follow-up semantic progression invariant passed."

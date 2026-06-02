@@ -30,8 +30,12 @@ export function buildCareCandidateList(
 }
 
 function compareCareCandidates(a: CareCandidate, b: CareCandidate): number {
+  const scoreDiff = b.careSortScore - a.careSortScore;
+  if (scoreDiff !== 0) return scoreDiff;
+
   const openedDiff = b.openedAt.localeCompare(a.openedAt);
   if (openedDiff !== 0) return openedDiff;
 
   return a.visitorId.localeCompare(b.visitorId);
 }
+

@@ -31,7 +31,7 @@ const result = buildCareCandidateList({
       assignedTo: "ops-user-2",
       lastFollowupOutcome: "needs_care",
       lastFollowupOutcomeAt: "2026-06-02T15:00:00.000Z",
-      now: new Date("2026-06-05T15:00:00.000Z")
+      now: new Date("2026-06-10T15:00:00.000Z")
     },
     {
       visitorId: "visitor-care-new",
@@ -52,15 +52,15 @@ const result = buildCareCandidateList({
 assert(result.ok === true, "result ok should be true");
 assert(result.count === 2, "only needs_care profiles should produce candidates");
 assert(result.items.length === 2, "items length should match count");
-assert(result.items[0].visitorId === "visitor-care-new", "newer care candidate should sort first");
-assert(result.items[1].visitorId === "visitor-care-old", "older care candidate should sort second");
-assert(result.items[0].assignedTo === "ops-user-1", "assigned owner should be preserved");
+assert(result.items[0].visitorId === "visitor-care-old", "higher score candidate should sort first");
+assert(result.items[1].visitorId === "visitor-care-new", "lower score candidate should sort second");
+assert(result.items[0].assignedTo === "ops-user-2", "assigned owner should be preserved");
 assert(result.items[0].source.workflowId === "care", "workflowId should be care");
-assert(result.items[0].carePriority === "elevated", "carePriority should be elevated");
-assert(result.items[0].careAgeBucket === "aging", "careAgeBucket should be aging");
-assert(result.items[0].escalationLevel === "review", "escalationLevel should be review");
-assert(result.items[0].recommendedCareAction === "prioritize_review", "recommendedCareAction should prioritize review");
-assert(result.items[0].careSortScore === 210, "careSortScore should be 210");
+assert(result.items[0].carePriority === "urgent", "carePriority should be urgent");
+assert(result.items[0].careAgeBucket === "stale", "careAgeBucket should be stale");
+assert(result.items[0].escalationLevel === "escalate", "escalationLevel should escalate");
+assert(result.items[0].recommendedCareAction === "escalation_review", "recommendedCareAction should escalate review");
+assert(result.items[0].careSortScore === 310, "careSortScore should be 310");
 
 const tieResult = buildCareCandidateList({
   profiles: [

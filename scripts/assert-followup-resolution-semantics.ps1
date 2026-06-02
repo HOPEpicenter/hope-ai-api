@@ -49,7 +49,7 @@ function Post-FormationEvent(
     visitorId = $VisitorId
     type = $Type
     occurredAt = $OccurredAt.ToUniversalTime().ToString("o")
-    source = @{ system = "assert-followup-resolution-semantics" }
+    source = @{ system = "assert-followup-resolution-semantics"; actorId = "ops-user-1" }
     data = $Data
   } | ConvertTo-Json -Depth 10
 
@@ -118,7 +118,7 @@ function Assert-OutcomeResolution(
   $base = (Get-Date).ToUniversalTime().AddMinutes(-5)
 
   Write-Host "[scenario outcome:$Outcome] posting assigned then contacted then outcome"
-  Post-FormationEvent -VisitorId $visitor -Type "FOLLOWUP_ASSIGNED" -Data @{ assigneeId = "ops-user-outcome" } -OccurredAt $base
+  Post-FormationEvent -VisitorId $visitor -Type "FOLLOWUP_ASSIGNED" -Data @{ assigneeId = "ops-user-1" } -OccurredAt $base
   Start-Sleep -Milliseconds 50
   Post-FormationEvent -VisitorId $visitor -Type "FOLLOWUP_CONTACTED" -Data @{ method = "phone" } -OccurredAt $base.AddSeconds(1)
   Start-Sleep -Milliseconds 50

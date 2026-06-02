@@ -65,11 +65,19 @@ export async function getCareExport(
     const escalationLevel =
       String(req?.query?.escalationLevel ?? "").trim() || null;
 
+    const assignmentState =
+      String(req?.query?.assignmentState ?? "").trim() || null;
+
+    const assignmentBucket =
+      String(req?.query?.assignmentBucket ?? "").trim() || null;
+
     const projected = readCareCandidateList({
       profiles: validProfiles.map(toCareProfileInput),
       carePriority,
       careAgeBucket,
-      escalationLevel
+      escalationLevel,
+      assignmentState,
+      assignmentBucket
     });
 
     context.res = {

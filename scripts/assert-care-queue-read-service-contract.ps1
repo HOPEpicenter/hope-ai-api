@@ -139,6 +139,47 @@ assert(result.summary.byAssignmentState.unassigned === 0, "unassigned count shou
 
 assert(result.summary.byAssignmentBucket.owned === 1, "owned count should be 1");
 assert(result.summary.byAssignmentBucket.queue === 0, "queue count should be 0");
+const assignedOnly = readCareCandidateList({
+  profiles: [
+    {
+      visitorId: "assigned-care",
+      assignedTo: "ops-user-1",
+      lastFollowupOutcome: "needs_care",
+      lastFollowupOutcomeAt: "2026-06-02T18:00:00.000Z"
+    },
+    {
+      visitorId: "queue-care",
+      assignedTo: null,
+      lastFollowupOutcome: "needs_care",
+      lastFollowupOutcomeAt: "2026-06-02T18:00:00.000Z"
+    }
+  ],
+  assignmentState: "assigned"
+});
+
+assert(assignedOnly.count === 1, "assignmentState filter should return one candidate");
+assert(assignedOnly.items[0].visitorId === "assigned-care", "assignmentState filter should return assigned candidate");
+
+const queueOnly = readCareCandidateList({
+  profiles: [
+    {
+      visitorId: "assigned-care",
+      assignedTo: "ops-user-1",
+      lastFollowupOutcome: "needs_care",
+      lastFollowupOutcomeAt: "2026-06-02T18:00:00.000Z"
+    },
+    {
+      visitorId: "queue-care",
+      assignedTo: null,
+      lastFollowupOutcome: "needs_care",
+      lastFollowupOutcomeAt: "2026-06-02T18:00:00.000Z"
+    }
+  ],
+  assignmentBucket: "queue"
+});
+
+assert(queueOnly.count === 1, "assignmentBucket filter should return one candidate");
+assert(queueOnly.items[0].visitorId === "queue-care", "assignmentBucket filter should return queue candidate");
 console.log("OK: care queue read service contract passed.");
 "@
 

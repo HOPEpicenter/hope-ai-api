@@ -47,6 +47,8 @@ export async function getCareCandidates(context: any, req: any): Promise<void> {
     const carePriority = parseFilter(req?.query?.priority);
     const careAgeBucket = parseFilter(req?.query?.ageBucket);
     const escalationLevel = parseFilter(req?.query?.escalationLevel);
+    const assignmentState = parseFilter(req?.query?.assignmentState);
+    const assignmentBucket = parseFilter(req?.query?.assignmentBucket);
 
     const table = getFormationProfilesTableClient();
     await ensureTable(table);
@@ -95,7 +97,9 @@ export async function getCareCandidates(context: any, req: any): Promise<void> {
       profiles: collected.map(toCareProfileInput),
       carePriority,
       careAgeBucket,
-      escalationLevel
+      escalationLevel,
+      assignmentState,
+      assignmentBucket
     });
 
     const pageItems = projected.items.slice(0, limit);

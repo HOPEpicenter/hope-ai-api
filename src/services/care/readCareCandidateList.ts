@@ -8,6 +8,8 @@ export type ReadCareCandidateListInput = BuildCareCandidateListInput & {
   carePriority?: string | null;
   careAgeBucket?: string | null;
   escalationLevel?: string | null;
+  assignmentState?: string | null;
+  assignmentBucket?: string | null;
 };
 
 export type CareQueueSummary = {
@@ -71,6 +73,20 @@ export function readCareCandidateList(
     if (
       input.escalationLevel &&
       item.escalationLevel !== input.escalationLevel
+    ) {
+      return false;
+    }
+
+    if (
+      input.assignmentState &&
+      item.assignmentState !== input.assignmentState
+    ) {
+      return false;
+    }
+
+    if (
+      input.assignmentBucket &&
+      item.assignmentBucket !== input.assignmentBucket
     ) {
       return false;
     }

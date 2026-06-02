@@ -6,12 +6,24 @@ export type CareCandidateLevel = "standard";
 
 export type CareCandidateCategory = "followup_needs_care";
 
+export type CarePriority = "normal";
+
+export type CareAgeBucket = "new";
+
+export type EscalationLevel = "none";
+
+export type RecommendedCareAction = "review_followup";
+
 export type CareCandidate = {
   visitorId: string;
   status: CareCandidateStatus;
   reason: CareCandidateReason;
   careLevel: CareCandidateLevel;
   careCategory: CareCandidateCategory;
+  carePriority: CarePriority;
+  careAgeBucket: CareAgeBucket;
+  escalationLevel: EscalationLevel;
+  recommendedCareAction: RecommendedCareAction;
   openedAt: string;
   careOpenedBy: string | null;
   assignedTo: string | null;

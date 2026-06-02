@@ -27,6 +27,10 @@ export function deriveCareCandidate(
     reason: "needs_care",
     careLevel: "standard",
     careCategory: "followup_needs_care",
+    carePriority: "normal",
+    careAgeBucket: "new",
+    escalationLevel: "none",
+    recommendedCareAction: "review_followup",
     openedAt: outcomeAt,
     careOpenedBy: assignedTo,
     assignedTo,
@@ -50,3 +54,4 @@ function calculateDaysOpen(openedAt: string, now: Date): number | null {
   const diffMs = Math.max(0, nowTime - openedTime);
   return Math.floor(diffMs / 86400000);
 }
+

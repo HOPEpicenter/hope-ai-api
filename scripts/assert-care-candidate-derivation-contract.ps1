@@ -33,6 +33,10 @@ assert(needsCare.assignedTo === "ops-user-1", "candidate assignedTo should match
 assert(needsCare.openedAt === "2026-06-02T16:00:00.000Z", "candidate openedAt should use outcome timestamp");
 assert(needsCare.careLevel === "standard", "candidate careLevel should be standard");
 assert(needsCare.careCategory === "followup_needs_care", "candidate careCategory should match");
+assert(needsCare.carePriority === "normal", "candidate carePriority should be normal");
+assert(needsCare.careAgeBucket === "new", "candidate careAgeBucket should be new");
+assert(needsCare.escalationLevel === "none", "candidate escalationLevel should be none");
+assert(needsCare.recommendedCareAction === "review_followup", "candidate recommendedCareAction should match");
 assert(needsCare.careOpenedBy === "ops-user-1", "candidate careOpenedBy should match assigned owner");
 assert(needsCare.daysOpen === 3, "candidate daysOpen should be deterministic");
 assert(needsCare.source.workflowId === "care", "candidate workflowId should be care");
@@ -69,3 +73,4 @@ console.log("OK: care candidate derivation contract passed.");
 "@
 
 node -e $nodeScript $modulePath
+

@@ -40,8 +40,13 @@ assert(result.count === 1, "only one care candidate should be returned");
 assert(result.items.length === 1, "items length should match count");
 assert(result.items[0].visitorId === "care-queue-1", "needs_care visitor should be returned");
 assert(result.items[0].source.workflowId === "care", "workflowId should be care");
+assert(result.items[0].carePriority === "normal", "carePriority should be normal");
+assert(result.items[0].careAgeBucket === "new", "careAgeBucket should be new");
+assert(result.items[0].escalationLevel === "none", "escalationLevel should be none");
+assert(result.items[0].recommendedCareAction === "review_followup", "recommendedCareAction should match");
 
 console.log("OK: care queue read service contract passed.");
 "@
 
 node -e $nodeScript $modulePath
+

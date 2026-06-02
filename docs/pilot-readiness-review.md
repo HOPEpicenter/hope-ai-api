@@ -380,7 +380,7 @@ Recommendation
 
 
 
-Proceed toward a controlled pilot after completing a short pilot operations packet:
+Proceed toward a controlled pilot using docs/pilot-operations-packet.md as the short pilot operations packet:
 
 
 

@@ -965,7 +965,7 @@ Current shipped state:
 **Next**
 - validate duplicate replay/idempotency edge cases
 - validate delayed/out-of-order event behavior
-- continue operational hardening and observability cleanup
+- operational hardening and observability review completed
 
 ## 2026-05-08 Validation Update
 
@@ -1093,3 +1093,10 @@ The Today cockpit is now the primary operator surface for ready care work. It co
 Keep backend semantics authoritative. The dashboard should remain a thin operational cockpit on top of stabilized backend contracts.
 
 Deferred: production ops-preview latency investigation. Do not block the current pilot-readiness lane on this unless it becomes operationally disruptive.
+
+
+Operational hardening review completed:
+- Health endpoints exist and are regression validated.
+- Replay integrity controls, audit tooling, repair tooling, drift detection, and parity validation are in place.
+- Operational simulation, diagnostics, observability, telemetry, and governance surfaces exist and are covered by regression validation.
+- No material operational hardening gaps were identified that justify new backend scope at this time.

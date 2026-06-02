@@ -395,6 +395,7 @@ export class IntegrationService {
       lastFollowupAssignedAt,
       lastFollowupContactedAt,
       lastFollowupOutcomeAt,
+      lastFollowupOutcome: (profile as any)?.lastFollowupOutcome ?? null,
       groups,
       programs,
       workflows

@@ -83,12 +83,20 @@ export async function readIntegrationSummaryByVisitorId(visitorId: string): Prom
   const lastEngagementAt = String(latestEngagement?.occurredAt ?? "").trim() || null;
   const lastFormationAt = String(profile?.lastEventAt ?? "").trim() || null;
   const assigneeId = String(profile?.assignedTo ?? "").trim() || null;
+  const lastFollowupAssignedAt = (profile as any)?.lastFollowupAssignedAt ?? null;
+  const lastFollowupContactedAt = (profile as any)?.lastFollowupContactedAt ?? null;
+  const lastFollowupOutcomeAt = (profile as any)?.lastFollowupOutcomeAt ?? null;
+  const lastFollowupOutcome = (profile as any)?.lastFollowupOutcome ?? null;
 
   return deriveIntegrationSummaryV1({
     visitorId,
     lastEngagementAt,
     lastFormationAt,
     assignedToUserId: assigneeId,
+    lastFollowupAssignedAt,
+    lastFollowupContactedAt,
+    lastFollowupOutcomeAt,
+    lastFollowupOutcome,
     groups: (profile as any)?.groups,
     programs: (profile as any)?.programs,
     workflows: (profile as any)?.workflows,

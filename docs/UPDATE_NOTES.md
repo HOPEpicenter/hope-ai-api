@@ -1,3 +1,10 @@
+## 2026-06-02 — Streaming Export Format Discovery
+
+- Reviewed repo references for streaming/export format, CSV, NDJSON, download, and export-job concepts.
+- Confirmed no explicit streaming export contract or format design currently exists.
+- Kept the existing v1 JSON legacy export as the supported export payload.
+- Deferred streaming/export format until there is an explicit design decision.
+- Avoided adding an ad hoc export format or new public surface.
 ## 2026-06-02 — Long-Horizon History Closeout
 
 - Reviewed existing history/timeline surfaces.

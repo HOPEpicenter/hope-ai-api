@@ -121,8 +121,38 @@ Pause pilot work if:
 
 Do not pause pilot for cosmetic dashboard issues unless they block safe operator action.
 
+
+## Known Pilot Limitation: Followup Outcomes
+
+Current pilot behavior treats all recorded outcomes as terminal for the active followup assignment.
+
+Examples:
+
+- connected
+- no_response
+- referred
+- duplicate
+
+Observed behavior:
+
+- outcome recorded
+- followup marked resolved
+- removed from active care queue
+
+Current limitation:
+
+- operators cannot undo a recorded outcome
+- operators cannot reopen a followup from the dashboard
+
+Operator guidance:
+
+- verify visitor identity before recording an outcome
+- verify the selected outcome before submission
+- escalate mistaken outcomes through incident reporting
+
 ## Scope guardrails
 
 - Do not add backend features during pilot unless a real blocker appears.
 - Do not widen orchestration, dashboard, RBAC, team workflow, or export format scope during pilot.
 - Keep fixes small, PR-based, and validated through CI and staging deploy.
+

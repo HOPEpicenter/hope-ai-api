@@ -55,7 +55,7 @@ Use Mark Contacted only after a real contact attempt or meaningful outreach step
 - referred to ministry/team
 - incorrect or duplicate record
 
-## Outcome Guidance
+### Outcome Guidance
 
 resolved
 - Followup work is complete.
@@ -71,6 +71,21 @@ referred to ministry/team
 
 incorrect or duplicate record
 - Do not continue followup activity on the record.
+
+### Important Outcome Behavior
+
+Recording a followup outcome is currently a terminal action for the active followup assignment.
+
+After an outcome is recorded:
+
+- The visitor leaves the active Ready Care queue.
+- The followup is treated as resolved for the current assignment.
+- The record moves to history and timeline surfaces.
+- There is currently no operator-facing undo or reopen action.
+
+Use extra care before recording an outcome.
+
+If an incorrect outcome is recorded, document the issue in incident notes and escalate through the pilot support process.
 
 ## End-of-Day Check
 

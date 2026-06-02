@@ -318,7 +318,7 @@ Remaining (business logic expansion):
 ---
 ## Phase 5 — Legacy (NOT STARTED)
 - [x] Long-horizon outcomes and history views — satisfied by cursor-paged integration/global timelines plus legacy export payload v1.
-- [ ] Derived insights (avoid storing derived state unless necessary).
+- [x] Derived insights — satisfied by existing read-only derived score, risk, activity, journey, and integration insight surfaces.
 
 ---
 

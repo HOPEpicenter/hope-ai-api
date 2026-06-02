@@ -474,7 +474,7 @@ Notes:
 Status: ⚪ NOT STARTED
 
 Planned:
-- [ ] Implement legacy export payload
+- [x] Implement legacy export payload — Azure Function wired in #1003 and function regression added in #1004
 - [ ] Streaming / export format
 - [ ] Long-horizon history views
 - [ ] Derived insights (avoid storing derived state unless necessary)

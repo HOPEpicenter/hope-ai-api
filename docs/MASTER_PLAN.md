@@ -475,7 +475,7 @@ Status: ⚪ NOT STARTED
 
 Planned:
 - [x] Implement legacy export payload — Azure Function wired in #1003 and function regression added in #1004
-- [ ] Streaming / export format
+- [ ] Streaming / export format — deferred pending explicit format/design decision; do not implement ad hoc
 - [x] Long-horizon history views — satisfied by cursor-paged integration/global timelines plus legacy export payload v1
 - [ ] Derived insights (avoid storing derived state unless necessary)
 

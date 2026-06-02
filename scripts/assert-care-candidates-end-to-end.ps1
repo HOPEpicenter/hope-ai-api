@@ -117,8 +117,13 @@ Assert ($null -ne $needsCareItem) "needs_care visitor should appear in care cand
 Assert ($needsCareItem.reason -eq "needs_care") "needs_care candidate reason should match"
 Assert ($needsCareItem.source.workflowId -eq "care") "needs_care candidate workflowId should be care"
 Assert ($needsCareItem.source.followupOutcome -eq "needs_care") "needs_care candidate source outcome should match"
+Assert ($needsCareItem.carePriority -eq "normal") "carePriority should be normal"
+Assert ($needsCareItem.careAgeBucket -eq "new") "careAgeBucket should be new"
+Assert ($needsCareItem.escalationLevel -eq "none") "escalationLevel should be none"
+Assert ($needsCareItem.recommendedCareAction -eq "review_followup") "recommendedCareAction should match"
 
 Assert ($null -eq $connectedItem) "connected visitor should not appear in care candidates"
 Assert ($null -eq $closedItem) "closed visitor should not appear in care candidates"
 
 Write-Host "OK: care candidates end-to-end assertion passed."
+

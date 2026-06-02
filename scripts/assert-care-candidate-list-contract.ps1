@@ -54,6 +54,10 @@ assert(result.items[0].visitorId === "visitor-care-new", "newer care candidate s
 assert(result.items[1].visitorId === "visitor-care-old", "older care candidate should sort second");
 assert(result.items[0].assignedTo === "ops-user-1", "assigned owner should be preserved");
 assert(result.items[0].source.workflowId === "care", "workflowId should be care");
+assert(result.items[0].carePriority === "normal", "carePriority should be normal");
+assert(result.items[0].careAgeBucket === "new", "careAgeBucket should be new");
+assert(result.items[0].escalationLevel === "none", "escalationLevel should be none");
+assert(result.items[0].recommendedCareAction === "review_followup", "recommendedCareAction should match");
 
 const tieResult = buildCareCandidateList({
   profiles: [
@@ -79,3 +83,4 @@ console.log("OK: care candidate list contract passed.");
 "@
 
 node -e $nodeScript $modulePath
+

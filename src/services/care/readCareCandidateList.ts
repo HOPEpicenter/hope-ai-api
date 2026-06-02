@@ -16,6 +16,21 @@ export type CareQueueSummary = {
   urgentCount: number;
   staleCount: number;
   escalationCount: number;
+  byPriority: {
+    normal: number;
+    elevated: number;
+    urgent: number;
+  };
+  byAgeBucket: {
+    new: number;
+    aging: number;
+    stale: number;
+  };
+  byEscalationLevel: {
+    none: number;
+    review: number;
+    escalate: number;
+  };
 };
 
 export type ReadCareCandidateListResult =
@@ -70,7 +85,22 @@ export function readCareCandidateList(
       ).length,
       escalationCount: projected.items.filter(
         (x) => x.escalationLevel === "escalate"
-      ).length
+      ).length,
+      byPriority: {
+        normal: projected.items.filter((x) => x.carePriority === "normal").length,
+        elevated: projected.items.filter((x) => x.carePriority === "elevated").length,
+        urgent: projected.items.filter((x) => x.carePriority === "urgent").length
+      },
+      byAgeBucket: {
+        new: projected.items.filter((x) => x.careAgeBucket === "new").length,
+        aging: projected.items.filter((x) => x.careAgeBucket === "aging").length,
+        stale: projected.items.filter((x) => x.careAgeBucket === "stale").length
+      },
+      byEscalationLevel: {
+        none: projected.items.filter((x) => x.escalationLevel === "none").length,
+        review: projected.items.filter((x) => x.escalationLevel === "review").length,
+        escalate: projected.items.filter((x) => x.escalationLevel === "escalate").length
+      }
     }
   };
 }

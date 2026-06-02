@@ -120,6 +120,17 @@ assert(result.summary.filteredCount === 1, "summary filteredCount should be 1");
 assert(result.summary.urgentCount === 0, "summary urgentCount should be 0");
 assert(result.summary.staleCount === 0, "summary staleCount should be 0");
 assert(result.summary.escalationCount === 0, "summary escalationCount should be 0");
+assert(result.summary.byPriority.normal === 0, "normal priority count should be 0");
+assert(result.summary.byPriority.elevated === 1, "elevated priority count should be 1");
+assert(result.summary.byPriority.urgent === 0, "urgent priority count should be 0");
+
+assert(result.summary.byAgeBucket.new === 0, "new bucket count should be 0");
+assert(result.summary.byAgeBucket.aging === 1, "aging bucket count should be 1");
+assert(result.summary.byAgeBucket.stale === 0, "stale bucket count should be 0");
+
+assert(result.summary.byEscalationLevel.none === 0, "none escalation count should be 0");
+assert(result.summary.byEscalationLevel.review === 1, "review escalation count should be 1");
+assert(result.summary.byEscalationLevel.escalate === 0, "escalate count should be 0");
 console.log("OK: care queue read service contract passed.");
 "@
 

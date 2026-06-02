@@ -33,15 +33,29 @@ assert(needsCare.assignedTo === "ops-user-1", "candidate assignedTo should match
 assert(needsCare.openedAt === "2026-06-02T16:00:00.000Z", "candidate openedAt should use outcome timestamp");
 assert(needsCare.careLevel === "standard", "candidate careLevel should be standard");
 assert(needsCare.careCategory === "followup_needs_care", "candidate careCategory should match");
-assert(needsCare.carePriority === "normal", "candidate carePriority should be normal");
-assert(needsCare.careAgeBucket === "new", "candidate careAgeBucket should be new");
-assert(needsCare.escalationLevel === "none", "candidate escalationLevel should be none");
+assert(needsCare.carePriority === "elevated", "candidate carePriority should be elevated");
+assert(needsCare.careAgeBucket === "aging", "candidate careAgeBucket should be aging");
+assert(needsCare.escalationLevel === "review", "candidate escalationLevel should be review");
 assert(needsCare.recommendedCareAction === "review_followup", "candidate recommendedCareAction should match");
 assert(needsCare.careOpenedBy === "ops-user-1", "candidate careOpenedBy should match assigned owner");
 assert(needsCare.daysOpen === 3, "candidate daysOpen should be deterministic");
 assert(needsCare.source.workflowId === "care", "candidate workflowId should be care");
 assert(needsCare.source.followupOutcome === "needs_care", "candidate source outcome should be needs_care");
 
+const staleCare = deriveCareCandidate({
+  visitorId: "visitor-care-stale",
+  assignedTo: "ops-user-1",
+  lastFollowupOutcome: "needs_care",
+  lastFollowupOutcomeAt: "2026-06-02T16:00:00.000Z",
+  now: new Date("2026-06-10T16:00:00.000Z")
+});
+
+assert(staleCare !== null, "stale needs_care should derive a care candidate");
+assert(staleCare.daysOpen === 8, "stale candidate daysOpen should be deterministic");
+assert(staleCare.carePriority === "urgent", "stale candidate carePriority should be urgent");
+assert(staleCare.careAgeBucket === "stale", "stale candidate careAgeBucket should be stale");
+assert(staleCare.escalationLevel === "escalate", "stale candidate escalationLevel should escalate");
+assert(staleCare.recommendedCareAction === "review_followup", "stale candidate recommendedCareAction should match");
 const connected = deriveCareCandidate({
   visitorId: "visitor-care-2",
   assignedTo: "ops-user-1",

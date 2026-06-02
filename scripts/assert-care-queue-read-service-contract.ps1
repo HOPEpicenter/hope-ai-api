@@ -24,7 +24,8 @@ const result = readCareCandidateList({
       visitorId: "care-queue-1",
       assignedTo: "ops-user-1",
       lastFollowupOutcome: "needs_care",
-      lastFollowupOutcomeAt: "2026-06-02T18:00:00.000Z"
+      lastFollowupOutcomeAt: "2026-06-02T18:00:00.000Z",
+      now: new Date("2026-06-05T18:00:00.000Z")
     },
     {
       visitorId: "care-queue-2",
@@ -40,9 +41,9 @@ assert(result.count === 1, "only one care candidate should be returned");
 assert(result.items.length === 1, "items length should match count");
 assert(result.items[0].visitorId === "care-queue-1", "needs_care visitor should be returned");
 assert(result.items[0].source.workflowId === "care", "workflowId should be care");
-assert(result.items[0].carePriority === "normal", "carePriority should be normal");
-assert(result.items[0].careAgeBucket === "new", "careAgeBucket should be new");
-assert(result.items[0].escalationLevel === "none", "escalationLevel should be none");
+assert(result.items[0].carePriority === "elevated", "carePriority should be elevated");
+assert(result.items[0].careAgeBucket === "aging", "careAgeBucket should be aging");
+assert(result.items[0].escalationLevel === "review", "escalationLevel should be review");
 assert(result.items[0].recommendedCareAction === "review_followup", "recommendedCareAction should match");
 
 console.log("OK: care queue read service contract passed.");

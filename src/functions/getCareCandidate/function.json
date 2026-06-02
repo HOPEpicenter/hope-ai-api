@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getCareCandidate/index.js",
+  "entryPoint": "getCareCandidate",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "care/candidates/{visitorId}"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

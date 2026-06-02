@@ -110,21 +110,39 @@ $summaryB | ConvertTo-Json -Depth 6 | Write-Host
 Assert ($null -ne $integrationB) "scenario B expected integration summary"
 Assert ($integrationB.followupResolved -eq $false) "scenario B expected followupResolved=false"
 
-# Scenario C: assigned then contacted then outcome => resolved
-$visitorC = Create-TestVisitor "Followup Resolution Outcome"
-$baseC = (Get-Date).ToUniversalTime().AddMinutes(-5)
+function Assert-OutcomeResolution(
+  [string]$Outcome,
+  [bool]$ExpectedResolved
+) {
+  $visitor = Create-TestVisitor "Followup Resolution Outcome $Outcome"
+  $base = (Get-Date).ToUniversalTime().AddMinutes(-5)
 
-Write-Host "[scenario C] posting assigned then contacted then outcome"
-Post-FormationEvent -VisitorId $visitorC -Type "FOLLOWUP_ASSIGNED" -Data @{ assigneeId = "ops-user-3" } -OccurredAt $baseC
-Start-Sleep -Milliseconds 50
-Post-FormationEvent -VisitorId $visitorC -Type "FOLLOWUP_CONTACTED" -Data @{ method = "phone" } -OccurredAt $baseC.AddSeconds(1)
-Start-Sleep -Milliseconds 50
-Post-FormationEvent -VisitorId $visitorC -Type "FOLLOWUP_OUTCOME_RECORDED" -Data @{ outcome = "connected" } -OccurredAt $baseC.AddSeconds(2)
-$summaryC = Get-VisitorSummary -VisitorId $visitorC
-$integrationC = Read-Integration $summaryC
-Write-Host "[debug] scenario C summary:"
-$summaryC | ConvertTo-Json -Depth 6 | Write-Host
-Assert ($null -ne $integrationC) "scenario C expected integration summary"
-Assert ($integrationC.followupResolved -eq $true) "scenario C expected followupResolved=true"
+  Write-Host "[scenario outcome:$Outcome] posting assigned then contacted then outcome"
+  Post-FormationEvent -VisitorId $visitor -Type "FOLLOWUP_ASSIGNED" -Data @{ assigneeId = "ops-user-outcome" } -OccurredAt $base
+  Start-Sleep -Milliseconds 50
+  Post-FormationEvent -VisitorId $visitor -Type "FOLLOWUP_CONTACTED" -Data @{ method = "phone" } -OccurredAt $base.AddSeconds(1)
+  Start-Sleep -Milliseconds 50
+  Post-FormationEvent -VisitorId $visitor -Type "FOLLOWUP_OUTCOME_RECORDED" -Data @{ outcome = $Outcome } -OccurredAt $base.AddSeconds(2)
+
+  $summary = Get-VisitorSummary -VisitorId $visitor
+  $integration = Read-Integration $summary
+
+  Write-Host "[debug] scenario outcome:$Outcome summary:"
+  $summary | ConvertTo-Json -Depth 6 | Write-Host
+
+  Assert ($null -ne $integration) "scenario outcome:$Outcome expected integration summary"
+  Assert ($integration.followupResolved -eq $ExpectedResolved) "scenario outcome:$Outcome expected followupResolved=$ExpectedResolved"
+}
+
+$terminalOutcomes = @("connected", "closed")
+$nonTerminalOutcomes = @("no_response", "left_message", "needs_care")
+
+foreach ($outcome in $terminalOutcomes) {
+  Assert-OutcomeResolution -Outcome $outcome -ExpectedResolved $true
+}
+
+foreach ($outcome in $nonTerminalOutcomes) {
+  Assert-OutcomeResolution -Outcome $outcome -ExpectedResolved $false
+}
 
 Write-Host "Follow-up resolution semantics invariant passed."

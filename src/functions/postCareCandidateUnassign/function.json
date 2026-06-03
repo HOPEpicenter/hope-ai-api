@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/postCareCandidateUnassign/index.js",
+  "entryPoint": "postCareCandidateUnassign",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "post" ],
+      "route": "care/candidates/{visitorId}/unassign"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

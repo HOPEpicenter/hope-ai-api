@@ -183,6 +183,11 @@ $Base = $BaseUrl.Replace("/api", "")
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-ops-followups-owners.ps1 -Base $Base
 if ($LASTEXITCODE -ne 0) { throw "assert-ops-followups-owners.ps1 failed" }
 Write-Host "[OK] Ops followups owner rollup regression"
+Write-Host ""
+Write-Host "=== Ops followups projection consistency regression ==="
+pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\assert-ops-followups-projection-consistency.ps1") -BaseUrl $Base -ApiKey $ApiKey
+if ($LASTEXITCODE -ne 0) { throw "assert-ops-followups-projection-consistency.ps1 failed" }
+Write-Host "[OK] Ops followups projection consistency regression"
 
 Write-Host "=== Ops teams registry regression ==="
 $opsTeamsUrl = ($Base.TrimEnd("/") + "/ops/teams")

@@ -29,7 +29,7 @@ $eventA = @{
   visitorId = $visitorA.visitorId
   type = "FOLLOWUP_ASSIGNED"
   occurredAt = $assignedAtA
-  source = @{ system = "assert-ops-followups-filter-and-stats" }
+  source = @{ system = "assert-ops-followups-filter-and-stats"; actorId = "ops-user-1" }
   data = @{ assigneeId = "ops-user-alpha" }
 } | ConvertTo-Json -Depth 10
 
@@ -37,7 +37,7 @@ $eventB = @{
   visitorId = $visitorB.visitorId
   type = "FOLLOWUP_ASSIGNED"
   occurredAt = $assignedAtB
-  source = @{ system = "assert-ops-followups-filter-and-stats" }
+  source = @{ system = "assert-ops-followups-filter-and-stats"; actorId = "ops-user-1" }
   data = @{ assigneeId = "ops-user-beta" }
 } | ConvertTo-Json -Depth 10
 

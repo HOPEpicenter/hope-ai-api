@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/postCareCandidateAssign/index.js",
+  "entryPoint": "postCareCandidateAssign",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "post" ],
+      "route": "care/candidates/{visitorId}/assign"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

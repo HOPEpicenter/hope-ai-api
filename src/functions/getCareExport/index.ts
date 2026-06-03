@@ -21,6 +21,25 @@ function toCareProfileInput(profile: FunctionFormationProfileEntity) {
   };
 }
 
+async function listAllFormationProfiles(
+  table: any
+): Promise<FunctionFormationProfileEntity[]> {
+  const profiles: FunctionFormationProfileEntity[] = [];
+  let cursor: string | undefined = undefined;
+
+  do {
+    const page = await listFormationProfiles(table, {
+      limit: 200,
+      cursor
+    });
+
+    profiles.push(...page.items);
+    cursor = page.cursor ?? undefined;
+  } while (cursor);
+
+  return profiles;
+}
+
 export async function getCareExport(
   context: any,
   req: any
@@ -31,14 +50,12 @@ export async function getCareExport(
     const table = getFormationProfilesTableClient();
     await ensureTable(table);
 
-    const page = await listFormationProfiles(table, {
-      limit: 500
-    });
+    const profiles = await listAllFormationProfiles(table);
 
     const validProfiles: FunctionFormationProfileEntity[] = [];
     let orphanProfilesExcluded = 0;
 
-    for (const profile of page.items) {
+    for (const profile of profiles) {
       const visitorId = String(profile.visitorId ?? "").trim();
 
       if (!visitorId) {
@@ -56,28 +73,13 @@ export async function getCareExport(
       validProfiles.push(profile);
     }
 
-    const carePriority =
-      String(req?.query?.priority ?? "").trim() || null;
-
-    const careAgeBucket =
-      String(req?.query?.ageBucket ?? "").trim() || null;
-
-    const escalationLevel =
-      String(req?.query?.escalationLevel ?? "").trim() || null;
-
-    const assignmentState =
-      String(req?.query?.assignmentState ?? "").trim() || null;
-
-    const assignmentBucket =
-      String(req?.query?.assignmentBucket ?? "").trim() || null;
-
     const projected = readCareCandidateList({
       profiles: validProfiles.map(toCareProfileInput),
-      carePriority,
-      careAgeBucket,
-      escalationLevel,
-      assignmentState,
-      assignmentBucket
+      carePriority: String(req?.query?.priority ?? "").trim() || null,
+      careAgeBucket: String(req?.query?.ageBucket ?? "").trim() || null,
+      escalationLevel: String(req?.query?.escalationLevel ?? "").trim() || null,
+      assignmentState: String(req?.query?.assignmentState ?? "").trim() || null,
+      assignmentBucket: String(req?.query?.assignmentBucket ?? "").trim() || null
     });
 
     context.res = {
@@ -95,12 +97,7 @@ export async function getCareExport(
       }
     };
   } catch (err: any) {
-    logFunctionError(
-      context,
-      "getCareExport",
-      err,
-      { requestId }
-    );
+    logFunctionError(context, "getCareExport", err, { requestId });
 
     context.res = {
       status: 500,

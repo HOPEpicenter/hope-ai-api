@@ -21,6 +21,25 @@ function toCareProfileInput(profile: FunctionFormationProfileEntity) {
   };
 }
 
+async function listAllFormationProfiles(
+  table: any
+): Promise<FunctionFormationProfileEntity[]> {
+  const profiles: FunctionFormationProfileEntity[] = [];
+  let cursor: string | undefined = undefined;
+
+  do {
+    const page = await listFormationProfiles(table, {
+      limit: 200,
+      cursor
+    });
+
+    profiles.push(...page.items);
+    cursor = page.cursor ?? undefined;
+  } while (cursor);
+
+  return profiles;
+}
+
 export async function getCareCandidate(
   context: any,
   req: any
@@ -28,18 +47,13 @@ export async function getCareCandidate(
   const requestId = getRequestId(req);
 
   try {
-    const visitorId = String(
-      req?.params?.visitorId ?? ""
-    ).trim();
+    const visitorId = String(req?.params?.visitorId ?? "").trim();
 
     if (!visitorId) {
       context.res = {
         status: 400,
         headers: { "content-type": "application/json; charset=utf-8" },
-        body: {
-          ok: false,
-          error: "visitorId is required"
-        }
+        body: { ok: false, error: "visitorId is required" }
       };
       return;
     }
@@ -50,10 +64,7 @@ export async function getCareCandidate(
       context.res = {
         status: 404,
         headers: { "content-type": "application/json; charset=utf-8" },
-        body: {
-          ok: false,
-          error: "not found"
-        }
+        body: { ok: false, error: "not found" }
       };
       return;
     }
@@ -61,13 +72,11 @@ export async function getCareCandidate(
     const table = getFormationProfilesTableClient();
     await ensureTable(table);
 
-    const page = await listFormationProfiles(table, {
-      limit: 500
-    });
+    const profiles = await listAllFormationProfiles(table);
 
     const result = readCareCandidateByVisitorId({
       visitorId,
-      profiles: page.items.map(toCareProfileInput)
+      profiles: profiles.map(toCareProfileInput)
     });
 
     context.res = {
@@ -81,12 +90,7 @@ export async function getCareCandidate(
       }
     };
   } catch (err: any) {
-    logFunctionError(
-      context,
-      "getCareCandidate",
-      err,
-      { requestId }
-    );
+    logFunctionError(context, "getCareCandidate", err, { requestId });
 
     context.res = {
       status: 500,

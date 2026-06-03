@@ -708,3 +708,15 @@ Next constraints:
 - [x] Bulk ownership regression coverage added.
 - [x] Assignment route contracts wired into regression runner.
 - [x] Bulk assignment route contracts wired into regression runner.
+
+## 2026-06-03 Backend Hardening Closeout
+
+- [x] Ops followups projection consistency protection — #1064
+- [x] Ops followups operator contract protection — #1065
+- [x] Cross-surface derivation contract protection — #1066
+- [x] Journey / Formation / Visitor Summary derivation validation
+- [x] Ops Followups derivation validation
+- [x] Task Eligibility derivation validation
+- [ ] Journey / Formation projection drift audit
+- [ ] Task generation derivation audit
+- [ ] Visitor profile invariant expansion

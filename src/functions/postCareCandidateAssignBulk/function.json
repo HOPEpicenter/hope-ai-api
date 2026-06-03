@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/postCareCandidateAssignBulk/index.js",
+  "entryPoint": "postCareCandidateAssignBulk",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "post" ],
+      "route": "care/candidates/assign-bulk"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

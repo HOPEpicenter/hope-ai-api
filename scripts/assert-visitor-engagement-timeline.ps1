@@ -51,7 +51,7 @@ $engagementEvent = @{
   visitorId = $visitorId
   type = "note.add"
   occurredAt = $base.ToString("o")
-  source = @{ system = "assert-visitor-engagement-timeline" }
+  source = @{ system = "assert-visitor-engagement-timeline"; actorId = "ops-user-1" }
   data = @{ text = "engagement event" }
 } | ConvertTo-Json -Depth 20
 
@@ -69,7 +69,7 @@ $formationEvent = @{
   visitorId = $visitorId
   type = "FOLLOWUP_ASSIGNED"
   occurredAt = $base.AddMinutes(1).ToString("o")
-  source = @{ system = "assert-visitor-engagement-timeline" }
+  source = @{ system = "assert-visitor-engagement-timeline"; actorId = "ops-user-1" }
   data = @{ assigneeId = "ops-user-1" }
 } | ConvertTo-Json -Depth 20
 

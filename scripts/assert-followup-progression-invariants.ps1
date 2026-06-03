@@ -50,7 +50,7 @@ function Post-FormationEvent(
     visitorId = $VisitorId
     type = $Type
     occurredAt = $OccurredAt.ToUniversalTime().ToString("o")
-    source = @{ system = "assert-followup-progression-invariants" }
+    source = @{ system = "assert-followup-progression-invariants"; actorId = "ops-user-1" }
     data = $Data
   } | ConvertTo-Json -Depth 10
 

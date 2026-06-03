@@ -65,7 +65,7 @@ function Post-EngagementEvent {
     visitorId  = $VisitorId
     type       = $Type
     occurredAt = $OccurredAt
-    source     = @{ system = "assert-journey-derivation-invariants" }
+    source     = @{ system = "assert-journey-derivation-invariants"; actorId = "ops-user-1" }
     data       = @{
       text    = "journey invariant engagement"
       channel = "api"
@@ -89,7 +89,7 @@ function Post-FormationEvent {
     visitorId  = $VisitorId
     type       = $Type
     occurredAt = $OccurredAt
-    source     = @{ system = "assert-journey-derivation-invariants" }
+    source     = @{ system = "assert-journey-derivation-invariants"; actorId = "ops-user-1" }
     data       = $Data
   }
 

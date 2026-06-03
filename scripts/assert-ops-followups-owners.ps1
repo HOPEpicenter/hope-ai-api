@@ -44,7 +44,7 @@ function Post-FormationEvent([string]$visitorId, [string]$type, [hashtable]$data
     visitorId  = $visitorId
     type       = $type
     occurredAt = $occurredAt.ToUniversalTime().ToString("o")
-    source     = @{ system = "assert-ops-followups-owners" }
+    source     = @{ system = "assert-ops-followups-owners"; actorId = "ops-user-1" }
     data       = $data
   } | ConvertTo-Json -Depth 20
 

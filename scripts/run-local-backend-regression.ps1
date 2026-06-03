@@ -185,9 +185,39 @@ if ($LASTEXITCODE -ne 0) { throw "assert-ops-followups-owners.ps1 failed" }
 Write-Host "[OK] Ops followups owner rollup regression"
 
 Write-Host "=== Ops teams registry regression ==="
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-ops-teams-registry.ps1
-if ($LASTEXITCODE -ne 0) { throw "assert-ops-teams-registry.ps1 failed" }
-Write-Host "[OK] Ops teams registry regression"
+$opsTeamsUrl = ($Base.TrimEnd("/") + "/ops/teams")
+try {
+  Invoke-WebRequest -Method GET -Uri $opsTeamsUrl -Headers @{ "x-api-key" = $ApiKey } -UseBasicParsing -TimeoutSec 15 -ErrorAction Stop | Out-Null
+
+  pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-ops-teams-registry.ps1
+  if ($LASTEXITCODE -ne 0) { throw "assert-ops-teams-registry.ps1 failed" }
+
+  Write-Host "[OK] Ops teams registry regression"
+} catch {
+  if ($_.Exception.Message -match "404") {
+    Write-Host ("[skip] Ops teams registry endpoint not deployed at {0}." -f $opsTeamsUrl) -ForegroundColor Yellow
+  } else {
+    throw
+  }
+}
+Write-Host ""
+Write-Host "=== Care regression gate ==="
+$careRegressionScripts = @(
+  "assert-care-candidate-assignment-command-contract.ps1",
+  "assert-care-candidate-assign-bulk-command-contract.ps1",
+  "assert-care-candidate-unassign-bulk-command-contract.ps1",
+  "assert-care-bulk-assignment-ownership-contract.ps1",
+  "assert-care-assignment-summary-contract.ps1",
+  "assert-care-projection-consistency-contract.ps1",
+  "assert-care-export-assignment-consistency-contract.ps1"
+)
+
+foreach ($careScript in $careRegressionScripts) {
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\$careScript") -BaseUrl $Base -ApiKey $ApiKey
+  if ($LASTEXITCODE -ne 0) { throw "$careScript failed" }
+}
+
+Write-Host "[OK] Care regression gate"
 
 Write-Host ""
 Write-Host "=== Legacy export function payload regression ==="

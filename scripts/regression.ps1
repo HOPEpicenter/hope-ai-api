@@ -520,6 +520,17 @@ if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
 
 
 
+
+# Care assignment endpoint contracts
+Write-Host "[regression] Care assignment endpoint contracts..."
+
+pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-care-candidate-assign-endpoint-contract.ps1")
+if ($LASTEXITCODE -ne 0) { throw "Care candidate assign endpoint contract failed ($LASTEXITCODE)" }
+
+pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-care-candidate-unassign-endpoint-contract.ps1")
+if ($LASTEXITCODE -ne 0) { throw "Care candidate unassign endpoint contract failed ($LASTEXITCODE)" }
+
+Ok "Care assignment endpoint contracts passed."
 # Global unified timeline regression
 if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
   Write-Host "[regression] Global unified timeline contract..."

@@ -541,6 +541,28 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-c
 if ($LASTEXITCODE -ne 0) { throw "Care candidate bulk unassign endpoint contract failed ($LASTEXITCODE)" }
 
 Ok "Care bulk assignment endpoint contracts passed."
+# Care assignment behavioral regressions
+if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+  Write-Host "[regression] Care assignment validation contract..."
+
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-care-assignment-validation-contract.ps1") -BaseUrl ($BaseUrl -replace "/api$","")
+  if ($LASTEXITCODE -ne 0) { throw "Care assignment validation contract failed ($LASTEXITCODE)" }
+
+  Write-Host "[regression] Care assignment summary regression..."
+
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-care-assignment-summary-contract.ps1") -BaseUrl ($BaseUrl -replace "/api$","")
+  if ($LASTEXITCODE -ne 0) { throw "Care assignment summary regression failed ($LASTEXITCODE)" }
+
+  Write-Host "[regression] Care projection consistency regression..."
+
+  pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-care-projection-consistency-contract.ps1") -BaseUrl ($BaseUrl -replace "/api$","")
+  if ($LASTEXITCODE -ne 0) { throw "Care projection consistency regression failed ($LASTEXITCODE)" }
+
+  Ok "Care assignment behavioral regressions passed."
+} else {
+  Write-Host "[regression] Skipping care assignment behavioral regressions (HOPE_API_KEY not set)."
+}
+
 # Global unified timeline regression
 if (-not [string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
   Write-Host "[regression] Global unified timeline contract..."

@@ -46,7 +46,7 @@ function Post-EngagementTransition([string]$VisitorId, [datetime]$OccurredAt) {
     visitorId = $VisitorId
     type = "status.transition"
     occurredAt = $OccurredAt.ToUniversalTime().ToString("o")
-    source = @{ system = "assert-latest-activity-consistency" }
+    source = @{ system = "assert-latest-activity-consistency"; actorId = "ops-user-1" }
     data = @{
       from = "NEW"
       to = "ENGAGED"
@@ -68,7 +68,7 @@ function Post-FormationEvent([string]$VisitorId, [datetime]$OccurredAt) {
     visitorId = $VisitorId
     type = "FOLLOWUP_CONTACTED"
     occurredAt = $OccurredAt.ToUniversalTime().ToString("o")
-    source = @{ system = "assert-latest-activity-consistency" }
+    source = @{ system = "assert-latest-activity-consistency"; actorId = "ops-user-1" }
     data = @{
       summary = "Latest activity consistency formation contact"
     }
@@ -90,7 +90,7 @@ function Post-NextStepCompleted([string]$VisitorId, [datetime]$OccurredAt) {
     visitorId = $VisitorId
     type = "NEXT_STEP_COMPLETED"
     occurredAt = $OccurredAt.ToUniversalTime().ToString("o")
-    source = @{ system = "assert-latest-activity-consistency" }
+    source = @{ system = "assert-latest-activity-consistency"; actorId = "ops-user-1" }
     data = @{
       nextStep = "prayer"
     }

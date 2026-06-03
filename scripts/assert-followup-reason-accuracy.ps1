@@ -49,7 +49,7 @@ function Post-FormationEvent(
     visitorId = $VisitorId
     type = $Type
     occurredAt = $OccurredAt.ToUniversalTime().ToString("o")
-    source = @{ system = "assert-followup-reason-accuracy" }
+    source = @{ system = "assert-followup-reason-accuracy"; actorId = "ops-user-1" }
     data = $Data
   } | ConvertTo-Json -Depth 10
 

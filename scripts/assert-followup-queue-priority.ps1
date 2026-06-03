@@ -43,7 +43,7 @@ function Post-FormationEvent($visitorId, $type, $data) {
       visitorId = $visitorId
       type = $type
       occurredAt = (Get-Date).ToString("o")
-      source = @{ system = "assert-followup-queue-priority.ps1" }
+      source = @{ system = "assert-followup-queue-priority.ps1"; actorId = "ops-user-1" }
       data = $data
     } | ConvertTo-Json -Depth 6) `
     -ContentType "application/json" | Out-Null
@@ -60,7 +60,7 @@ function Post-EngagementEvent($visitorId, $type, $data, $minutesAgo = 0) {
       visitorId = $visitorId
       type = $type
       occurredAt = (Get-Date).AddMinutes(-1 * $minutesAgo).ToString("o")
-      source = @{ system = "assert-followup-queue-priority.ps1" }
+      source = @{ system = "assert-followup-queue-priority.ps1"; actorId = "ops-user-1" }
       data = $data
     } | ConvertTo-Json -Depth 6) `
     -ContentType "application/json" | Out-Null

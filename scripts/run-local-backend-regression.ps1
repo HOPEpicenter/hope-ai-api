@@ -251,6 +251,11 @@ Write-Host "[OK] Summary vs engagement-status consistency invariant"
 Write-Host "=== Journey vs engagement consistency invariant ==="
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-journey-engagement-consistency.ps1
 if ($LASTEXITCODE -ne 0) { throw "assert-journey-engagement-consistency.ps1 failed" }
+Write-Host ""
+Write-Host "=== Cross-surface derivation contracts ==="
+pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\assert-cross-surface-derivation-contracts.ps1") -ApiBase $BaseUrl -ApiKey $ApiKey
+if ($LASTEXITCODE -ne 0) { throw "assert-cross-surface-derivation-contracts.ps1 failed" }
+Write-Host "[OK] Cross-surface derivation contracts"
 Write-Host "[OK] Journey vs engagement consistency invariant"
 
 Write-Host "=== Follow-up progression invariants ==="

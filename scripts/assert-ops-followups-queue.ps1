@@ -26,7 +26,7 @@ $event = @{
   visitorId = $visitorId
   type = "FOLLOWUP_ASSIGNED"
   occurredAt = $assignedAt
-  source = @{ system = "assert-ops-followups-queue" }
+  source = @{ system = "assert-ops-followups-queue"; actorId = "ops-user-1" }
   data = @{ assigneeId = "ops-user-queue" }
 } | ConvertTo-Json -Depth 10
 

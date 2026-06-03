@@ -105,7 +105,7 @@ Json-Post "$api/formation/events" @{
   visitorId = $visitorId
   type = "FOLLOWUP_ASSIGNED"
   occurredAt = $now.ToString("o")
-  source = @{ system = "scripts/assert-ops-followups-include-resolved.ps1" }
+  source = @{ system = "scripts/assert-ops-followups-include-resolved.ps1"; actorId = "ops-user-1" }
   data = @{ assigneeId = "ops-user-include-resolved" }
 } | Out-Null
 
@@ -127,8 +127,8 @@ Json-Post "$api/formation/events" @{
   visitorId = $visitorId
   type = "FOLLOWUP_OUTCOME_RECORDED"
   occurredAt = $now.AddSeconds(1).ToString("o")
-  source = @{ system = "scripts/assert-ops-followups-include-resolved.ps1" }
-  data = @{ outcome = "resolved_by_include_resolved_assert" }
+  source = @{ system = "scripts/assert-ops-followups-include-resolved.ps1"; actorId = "ops-user-1" }
+  data = @{ outcome = "connected" }
 } | Out-Null
 
 Start-Sleep -Milliseconds 250
@@ -157,7 +157,7 @@ $audit = Json-Post "$api/_ops/formation/profile-audit" @{
 }
 
 Assert ($audit.ok -eq $true) "profile audit should succeed"
-Assert ($audit.currentProfile.lastFollowupOutcome -eq "resolved_by_include_resolved_assert") "canonical profile should own lastFollowupOutcome"
+Assert ($audit.currentProfile.lastFollowupOutcome -eq "connected") "canonical profile should own lastFollowupOutcome"
 
 Write-Host "Checking filtered cursor + ownership invariants..."
 

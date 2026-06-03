@@ -178,7 +178,8 @@ function Add-FormationEvent([string]$VisitorId, [string]$Type, [string]$Occurred
     type       = $Type
     occurredAt = $OccurredAt
     source     = @{
-      system = "scripts/assert-ops-followups.ps1"
+      system  = "scripts/assert-ops-followups.ps1"
+      actorId = "ops-user-1"
     }
     data       = $Metadata
   }
@@ -646,7 +647,7 @@ for ($i = 0; $i -lt $cleanupVisitorIds.Count; $i++) {
   $visitorId = $cleanupVisitorIds[$i]
   $cleanupAt = $cleanupBase.AddSeconds($i).ToString("o")
   Write-Host ("[assert-ops-followups] POST /api/formation/events FOLLOWUP_OUTCOME_RECORDED ({0}) ..." -f $visitorId)
-  Add-FormationEvent -VisitorId $visitorId -Type "FOLLOWUP_OUTCOME_RECORDED" -OccurredAt $cleanupAt -Metadata @{ outcome = "resolved_by_regression" }
+  Add-FormationEvent -VisitorId $visitorId -Type "FOLLOWUP_OUTCOME_RECORDED" -OccurredAt $cleanupAt -Metadata @{ outcome = "connected" }
 }
 
 Start-Sleep -Milliseconds 250

@@ -53,48 +53,34 @@ export async function getCareCandidates(context: any, req: any): Promise<void> {
     const table = getFormationProfilesTableClient();
     await ensureTable(table);
 
-    const collected: FunctionFormationProfileEntity[] = [];
+    const page = await listFormationProfiles(table, {
+      limit: 200,
+      cursor: requestedCursor
+    });
+
+    const validProfiles: FunctionFormationProfileEntity[] = [];
     let orphanProfilesExcluded = 0;
-    let sourceCursor = requestedCursor;
-    let sourceHasMore = true;
 
-    while (collected.length < (limit + 1) && sourceHasMore) {
-      const page = await listFormationProfiles(table, {
-        limit: 200,
-        cursor: sourceCursor
-      });
+    for (const profile of page.items) {
+      const visitorId = String(profile.visitorId ?? "").trim();
 
-      for (const profile of page.items) {
-        const visitorId = String(profile.visitorId ?? "").trim();
-
-        if (!visitorId) {
-          orphanProfilesExcluded++;
-          continue;
-        }
-
-        const visitor = await getVisitorById(visitorId);
-
-        if (!visitor) {
-          orphanProfilesExcluded++;
-          continue;
-        }
-
-        collected.push(profile);
+      if (!visitorId) {
+        orphanProfilesExcluded++;
+        continue;
       }
 
-      if (page.cursor) {
-        sourceCursor = page.cursor;
-      } else {
-        sourceHasMore = false;
+      const visitor = await getVisitorById(visitorId);
+
+      if (!visitor) {
+        orphanProfilesExcluded++;
+        continue;
       }
 
-      if (!page.cursor || page.items.length === 0) {
-        break;
-      }
+      validProfiles.push(profile);
     }
 
     const projected = readCareCandidateList({
-      profiles: collected.map(toCareProfileInput),
+      profiles: validProfiles.map(toCareProfileInput),
       carePriority,
       careAgeBucket,
       escalationLevel,
@@ -103,10 +89,7 @@ export async function getCareCandidates(context: any, req: any): Promise<void> {
     });
 
     const pageItems = projected.items.slice(0, limit);
-    const nextCursor =
-      collected.length > limit && collected[limit]
-        ? collected[limit].rowKey
-        : null;
+    const nextCursor = page.cursor;
 
     context.res = {
       status: 200,

@@ -113,7 +113,8 @@ Completed the end-to-end engagement intelligence slice and connected it to opera
 - Added GET /api/engagements/risk
 - Surfaced engagement risk into visitor summary
 - Surfaced risk + priority into dashboard card
-- Added shared - Added shared readEngagementRiskV1 reader
+- Added shared 
+- Added shared readEngagementRiskV1 reader
 - Added shared deriveFollowupPriority helper
 - Enriched /ops/followups queue items with:
   - nengagementRiskLevel
@@ -282,7 +283,8 @@ These post-v1 slices improved the dashboard’s operator workflow without wideni
 ## 2026-02-27
 
 - ✅ OPS: GET /ops/followups now ensures the formation profiles table exists before listing (prevents errors on fresh Azurite).
-- ✅ OPS: followups items now include esolvedForAssignment so queue logic can suppress “already resolved” rows without adding write endpoints under /ops/*.
+- ✅ OPS: followups items now include 
+esolvedForAssignment so queue logic can suppress “already resolved” rows without adding write endpoints under /ops/*.
 ## 2026-02-25
 
 - ✅ Merged **#139**: regression runner now includes integration summary followupReason/assignedTo consistency contract (runs only when HOPE_API_KEY is set).
@@ -1079,3 +1081,34 @@ Merged PRs:
 - #1054 bulk assignment ownership regression
 
 No dashboard work, care plans, workflow orchestration, or task-engine work was included.
+
+## 2026-06-03 — Cross-Surface Derivation Hardening Closeout
+
+What landed
+
+- PR #1064 — Ops Followups Projection Consistency
+  - Added ops followups projection consistency regression coverage.
+  - Wired the assertion into the local backend regression gate.
+  - Aligned followup regression scripts with the current operator actor contract.
+
+- PR #1065 — Ops Followups Operator Contracts
+  - Added required actorId metadata to legacy ops followup mutation assertions.
+  - Replaced legacy synthetic resolution outcomes with canonical terminal outcome semantics.
+  - Preserved production behavior while strengthening regression coverage.
+
+- PR #1066 — Cross-Surface Derivation Contracts
+  - Added cross-surface derivation regression coverage across Journey, Formation Profile, Visitor Summary, Ops Followups, and Task Eligibility.
+  - Wired the new assertion into the local backend regression gate.
+  - Confirmed CI and staging deployment green.
+
+Why this matters
+
+- Moves Ops Followups and cross-surface derivation into Regression Protected status.
+- Reduces projection drift risk across backend read models before dashboard rebuild work.
+- Keeps backend-first pilot readiness moving without widening product scope.
+
+Next
+
+- Journey / Formation projection drift audit.
+- Task generation derivation audit.
+- Visitor profile invariant expansion.

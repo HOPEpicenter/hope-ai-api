@@ -1108,3 +1108,29 @@ The care read-model foundation now includes backend command support for candidat
 The command layer writes only the FormationProfile ownership field and relies on existing care projections to reflect assignmentState, assignmentBucket, candidate detail, summary, and export behavior.
 
 This layer intentionally does not include dashboard changes, care plans, task generation, or workflow orchestration.
+
+## 2026-06-03 Backend Hardening Closeout
+
+Completed
+
+- Ops Followups projection consistency hardening (#1064).
+- Ops Followups operator contract hardening (#1065).
+- Cross-surface derivation contract hardening (#1066).
+
+Current architecture status
+
+- Care assignment layer: Regression Protected (#15803D).
+- Ops Followups layer: Regression Protected (#15803D).
+- Cross-Surface Derivation layer: Regression Protected (#15803D).
+
+Why this matters (master plan alignment)
+
+- Strengthens backend contracts before dashboard rebuild work.
+- Reduces future regression risk across operational read models.
+- Keeps pilot readiness focused on stable backend behavior instead of legacy dashboard churn.
+
+Next
+
+- Journey / Formation projection drift audit.
+- Task generation derivation audit.
+- Visitor profile invariant expansion.

@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/postCareCandidateUnassignBulk/index.js",
+  "entryPoint": "postCareCandidateUnassignBulk",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "post" ],
+      "route": "care/candidates/unassign-bulk"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

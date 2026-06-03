@@ -1100,3 +1100,11 @@ Operational hardening review completed:
 - Replay integrity controls, audit tooling, repair tooling, drift detection, and parity validation are in place.
 - Operational simulation, diagnostics, observability, telemetry, and governance surfaces exist and are covered by regression validation.
 - No material operational hardening gaps were identified that justify new backend scope at this time.
+
+### Care Assignment Command Layer
+
+The care read-model foundation now includes backend command support for candidate ownership. Operators and future admin tooling can assign or unassign individual care candidates, as well as bulk assign or bulk unassign candidate sets.
+
+The command layer writes only the FormationProfile ownership field and relies on existing care projections to reflect assignmentState, assignmentBucket, candidate detail, summary, and export behavior.
+
+This layer intentionally does not include dashboard changes, care plans, task generation, or workflow orchestration.

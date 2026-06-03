@@ -695,3 +695,16 @@ Next constraints:
 - [ ] Care plan workflow remains deferred
 - [ ] Dashboard implementation remains deferred
 - [ ] Persistence model remains deferred
+
+## Care Assignment Command Layer
+
+- [x] Single candidate assignment command deployed.
+- [x] Single candidate unassignment command deployed.
+- [x] Bulk candidate assignment command deployed.
+- [x] Bulk candidate unassignment command deployed.
+- [x] Assignment route contracts added.
+- [x] Bulk assignment route contracts added.
+- [x] Assignment command E2E coverage added.
+- [x] Bulk ownership regression coverage added.
+- [x] Assignment route contracts wired into regression runner.
+- [x] Bulk assignment route contracts wired into regression runner.

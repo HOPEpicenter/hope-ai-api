@@ -1034,3 +1034,48 @@ Strategic impact
 - No assignment workflow activation.
 - No care plan implementation.
 - No dashboard coupling.
+
+## 2026-06-02 Care Assignment Command Layer Closeout
+
+Completed a backend care assignment command wave.
+
+Added and deployed:
+
+- POST /api/care/candidates/{visitorId}/assign
+- POST /api/care/candidates/{visitorId}/unassign
+- POST /api/care/candidates/assign-bulk
+- POST /api/care/candidates/unassign-bulk
+
+Validated behavior:
+
+- single assignment updates FormationProfile.assignedTo
+- single unassignment clears FormationProfile.assignedTo
+- bulk assignment returns per-visitor results
+- bulk unassignment returns per-visitor results
+- missing visitors are reported per item without failing the whole batch
+- assignmentState projects assigned/unassigned
+- assignmentBucket projects owned/queue
+- candidate detail reflects command updates
+- ownership regression validates assigned -> owned and unassigned -> queue
+
+Coverage added:
+
+- endpoint contracts for assign/unassign
+- endpoint contracts for bulk assign/bulk unassign
+- E2E command contracts for assignment flows
+- ownership regression for bulk assign/unassign
+- regression runner coverage for assignment route contracts
+
+Merged PRs:
+
+- #1046 single assignment command
+- #1047 single unassignment command
+- #1048 assignment endpoint contracts
+- #1049 assignment command E2E contract
+- #1050 assignment route contracts in regression runner
+- #1051 bulk assignment command
+- #1052 bulk unassignment command
+- #1053 bulk route contracts in regression runner
+- #1054 bulk assignment ownership regression
+
+No dashboard work, care plans, workflow orchestration, or task-engine work was included.

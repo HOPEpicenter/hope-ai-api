@@ -1134,3 +1134,29 @@ Next
 - Journey / Formation projection drift audit.
 - Task generation derivation audit.
 - Visitor profile invariant expansion.
+
+## 2026-06-04 Backend Hardening Checkpoint
+
+Completed
+
+- Integration summary cross-surface derivation hardening (#1072).
+
+Current architecture status
+
+- Care assignment layer: Regression Protected.
+- Ops Followups layer: Regression Protected.
+- Cross-Surface Derivation layer: Regression Protected.
+- Integration Summary ownership/source derivation: Regression Protected.
+
+Why this matters
+
+- Strengthens backend contract enforcement before dashboard rebuild work.
+- Reduces projection drift risk across backend read models.
+- Keeps pilot readiness focused on stable backend behavior and deterministic derivation.
+
+Next
+
+- Journey / Formation projection drift audit.
+- Task generation derivation audit.
+- Visitor profile invariant expansion.
+

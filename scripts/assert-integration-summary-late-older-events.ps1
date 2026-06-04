@@ -37,7 +37,7 @@ function Post-FollowupAssigned([string]$visitorId, [string]$assigneeId, [datetim
     visitorId  = $visitorId
     type       = "FOLLOWUP_ASSIGNED"
     occurredAt = $OccurredAt.ToUniversalTime().ToString("o")
-    source     = @{ system = "assert-integration-summary-late-older-events" }
+    source     = @{ system = "assert-integration-summary-late-older-events"; actorId = "ops-user-1" }
     data       = @{ assigneeId = $assigneeId }
   } | ConvertTo-Json -Depth 20
 
@@ -55,7 +55,7 @@ function Post-EngagementEvent([string]$visitorId, [datetime]$OccurredAt, [string
     visitorId  = $visitorId
     type       = "dev_engaged"
     occurredAt = $OccurredAt.ToUniversalTime().ToString("o")
-    source     = @{ system = "assert-integration-summary-late-older-events" }
+    source     = @{ system = "assert-integration-summary-late-older-events"; actorId = "ops-user-1" }
     data       = @{ channel = "api"; notes = $Notes }
   } | ConvertTo-Json -Depth 20
 
@@ -203,3 +203,4 @@ if ($afterOlderB.summary.sources.formation -eq $true) {
 }
 
 Write-Host "OK case B: older engagement did not override assignment-driven summary. visitorId=$visitorB ownerId=$assigneeId" -ForegroundColor Green
+

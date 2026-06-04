@@ -37,7 +37,7 @@ function Post-FollowupAssigned([string]$visitorId, [string]$assigneeId) {
     visitorId  = $visitorId
     type       = "FOLLOWUP_ASSIGNED"
     occurredAt = (Get-Date).ToUniversalTime().ToString("o")
-    source     = @{ system = "assert-integration-summary-followup-consistency" }
+    source     = @{ system = "assert-integration-summary-followup-consistency"; actorId = "ops-user-1" }
     data       = @{ assigneeId = $assigneeId }
   } | ConvertTo-Json -Depth 20
 
@@ -100,3 +100,4 @@ Assert ($sumYes.summary.needsFollowup -eq $true) "expected needsFollowup=true wh
 Assert (-not [string]::IsNullOrWhiteSpace([string]$sumYes.summary.followupReason)) "expected followupReason to be present/non-empty when assignedTo is present (visitorYes='${visitorYes}')"
 
 "OK followup consistency (assigned): visitorId=$visitorYes ownerId=$assigneeId followupReason=$($sumYes.summary.followupReason)"
+

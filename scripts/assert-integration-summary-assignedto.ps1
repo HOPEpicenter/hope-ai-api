@@ -37,7 +37,7 @@ function Post-FollowupAssigned([string]$visitorId, [string]$assigneeId) {
     visitorId  = $visitorId
     type       = "FOLLOWUP_ASSIGNED"
     occurredAt = (Get-Date).ToUniversalTime().ToString("o")
-    source     = @{ system = "assert-integration-summary-assignedto" }
+    source     = @{ system = "assert-integration-summary-assignedto"; actorId = "ops-user-1" }
     data       = @{ assigneeId = $assigneeId }
   } | ConvertTo-Json -Depth 20
 
@@ -94,3 +94,4 @@ if ($sumYes.summary.assignedTo.ownerId -ne $assigneeId) {
   throw "assignedTo mismatch for visitorYes='${visitorYes}': expected '$assigneeId' got '$($sumYes.summary.assignedTo.ownerId)'"
 }
 "OK assigned: visitorId=$visitorYes ownerId=$assigneeId"
+

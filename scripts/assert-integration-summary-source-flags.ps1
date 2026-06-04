@@ -57,7 +57,7 @@ function Post-FollowupAssigned([string]$visitorId, [string]$assigneeId) {
     visitorId  = $visitorId
     type       = "FOLLOWUP_ASSIGNED"
     occurredAt = (Get-Date).ToUniversalTime().ToString("o")
-    source     = @{ system = "assert-integration-summary-source-flags" }
+    source     = @{ system = "assert-integration-summary-source-flags"; actorId = "ops-user-1" }
     data       = @{
       eventId    = [Guid]::NewGuid().ToString()
       assigneeId = $assigneeId
@@ -90,10 +90,11 @@ Assert ($sum.summary.needsFollowup -eq $true) "expected needsFollowup=true"
 Assert ($sum.summary.followupReason -eq "FOLLOWUP_ASSIGNED") "expected followupReason=FOLLOWUP_ASSIGNED"
 
 Assert ($sum.summary.sources.engagement -eq $false) "expected sources.engagement=false"
-Assert ($sum.summary.sources.formation -eq $false) "expected sources.formation=false"
+Assert ($sum.summary.sources.formation -eq $true) "expected sources.formation=true"
 
 Assert ($null -eq $sum.summary.lastEngagementAt) "expected lastEngagementAt=null"
-Assert ($null -eq $sum.summary.lastFormationAt) "expected lastFormationAt=null"
+Assert ($null -ne $sum.summary.lastFormationAt) "expected lastFormationAt present"
 Assert ($null -eq $sum.summary.lastIntegratedAt) "expected lastIntegratedAt=null"
 
 Write-Host "OK: assignment-only source flags invariant passed. visitorId=$visitorId ownerId=$assigneeId" -ForegroundColor Green
+

@@ -136,6 +136,24 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "assert-integration-summary-derive.ps1 failed" }
   }
 
+  Write-Host ""
+  Write-Host "=== Integration summary regression gate ==="
+  $integrationSummaryScripts = @(
+    "assert-integration-summary-assignedto.ps1",
+    "assert-integration-summary-followup-consistency.ps1",
+    "assert-integration-summary-source-transition.ps1",
+    "assert-integration-summary-source-flags.ps1",
+    "assert-integration-summary-no-false-followup.ps1",
+    "assert-integration-summary-late-older-events.ps1"
+  )
+
+  foreach ($integrationSummaryScript in $integrationSummaryScripts) {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\$integrationSummaryScript") -Base $Base -ApiKey $ApiKey
+    if ($LASTEXITCODE -ne 0) { throw "$integrationSummaryScript failed" }
+  }
+
+  Write-Host "[OK] Integration summary regression gate"
+
   Run-Step -Name "Visitor summary auth check" -Action {
     $body = @{
       name   = "local-runner-summary-check"

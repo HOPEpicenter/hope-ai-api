@@ -64,7 +64,7 @@ function Post-FollowupAssigned([string]$visitorId, [string]$assigneeId) {
     visitorId  = $visitorId
     type       = "FOLLOWUP_ASSIGNED"
     occurredAt = (Get-Date).ToUniversalTime().ToString("o")
-    source     = @{ system = "assert-integration-summary-source-transition" }
+    source     = @{ system = "assert-integration-summary-source-transition"; actorId = "ops-user-1" }
     data       = @{ assigneeId = $assigneeId }
   } | ConvertTo-Json -Depth 20
 
@@ -81,7 +81,7 @@ function Post-EngagementEvent([string]$visitorId, [string]$OccurredAt, [string]$
     visitorId  = $visitorId
     type       = "note.add"
     occurredAt = $OccurredAt
-    source     = @{ system = "assert-integration-summary-source-transition" }
+    source     = @{ system = "assert-integration-summary-source-transition"; actorId = "ops-user-1" }
     data       = @{ text = $Notes }
   } | ConvertTo-Json -Depth 20
 
@@ -101,35 +101,37 @@ Post-FollowupAssigned -visitorId $visitorId -assigneeId $assigneeId
 $afterAssign = Get-IntegrationSummaryEventually $visitorId {
   param($r)
   (Has-Prop $r.summary "assignedTo") -and
-  ($r.summary.assignedTo.ownerId -eq $assigneeId) -and
-  ($r.summary.followupReason -eq "FOLLOWUP_ASSIGNED") -and
-  ($r.summary.sources.engagement -eq $false) -and
-  ($r.summary.sources.formation -eq $false)
+    ($r.summary.assignedTo.ownerId -eq $assigneeId) -and
+    ($r.summary.followupReason -eq "FOLLOWUP_ASSIGNED") -and
+    ($r.summary.sources.engagement -eq $false) -and
+    ($r.summary.sources.formation -eq $true) -and
+    (Has-NonNullProp $r.summary "lastFormationAt")
 } "after-assign"
 
 Assert ($afterAssign.summary.needsFollowup -eq $true) "expected needsFollowup=true after assignment"
 Assert ($null -eq $afterAssign.summary.lastEngagementAt) "expected lastEngagementAt=null after assignment-only"
-Assert ($null -eq $afterAssign.summary.lastFormationAt) "expected lastFormationAt=null after assignment-only"
+Assert ($afterAssign.summary.sources.formation -eq $true) "expected sources.formation=true after assignment-only"
+Assert (Has-NonNullProp $afterAssign.summary "lastFormationAt") "expected lastFormationAt present after assignment-only"
 Assert ($null -eq $afterAssign.summary.lastIntegratedAt) "expected lastIntegratedAt=null after assignment-only"
-
 $engAt = (Get-Date).ToUniversalTime().ToString("o")
 Post-EngagementEvent -visitorId $visitorId -OccurredAt $engAt -Notes "source transition engagement"
 
 $afterEng = Get-IntegrationSummaryEventually $visitorId {
   param($r)
   (Has-Prop $r.summary "assignedTo") -and
-  ($r.summary.assignedTo.ownerId -eq $assigneeId) -and
-  ($r.summary.followupReason -eq "FOLLOWUP_ASSIGNED") -and
-  ($r.summary.sources.engagement -eq $true) -and
-  ($r.summary.sources.formation -eq $false) -and
-  (Has-NonNullProp $r.summary "lastEngagementAt") -and
-  (Has-NonNullProp $r.summary "lastIntegratedAt")
+    ($r.summary.assignedTo.ownerId -eq $assigneeId) -and
+    ($r.summary.followupReason -eq "FOLLOWUP_ASSIGNED") -and
+    ($r.summary.sources.engagement -eq $true) -and
+    ($r.summary.sources.formation -eq $true) -and
+    (Has-NonNullProp $r.summary "lastEngagementAt") -and
+    (Has-NonNullProp $r.summary "lastFormationAt") -and
+    (Has-NonNullProp $r.summary "lastIntegratedAt")
 } "after-engagement"
-
 Assert ($afterEng.summary.needsFollowup -eq $true) "expected needsFollowup=true after engagement"
 Assert ($afterEng.summary.sources.engagement -eq $true) "expected sources.engagement=true"
-Assert ($afterEng.summary.sources.formation -eq $false) "expected sources.formation=false"
-Assert ($null -eq $afterEng.summary.lastFormationAt) "expected lastFormationAt=null without formation source"
+Assert ($afterEng.summary.sources.formation -eq $true) "expected sources.formation=true"
+Assert (Has-NonNullProp $afterEng.summary "lastFormationAt") "expected lastFormationAt present with formation source"
 Assert ((To-DateTime $afterEng.summary.lastIntegratedAt) -eq (To-DateTime $afterEng.summary.lastEngagementAt)) "expected lastIntegratedAt == lastEngagementAt when only engagement source exists"
 
 Write-Host "OK: source transition invariant passed. visitorId=$visitorId ownerId=$assigneeId" -ForegroundColor Green
+

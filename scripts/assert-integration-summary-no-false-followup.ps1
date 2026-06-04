@@ -44,7 +44,7 @@ function Post-Engagement([string]$visitorId) {
     visitorId  = $visitorId
     type       = "note.add"
     occurredAt = (Get-Date).ToUniversalTime().ToString("o")
-    source     = @{ system = "assert-integration-summary-no-false-followup" }
+    source     = @{ system = "assert-integration-summary-no-false-followup"; actorId = "ops-user-1" }
     data       = @{ text = "engagement should not create followup ownership" }
   } | ConvertTo-Json -Depth 20
 
@@ -61,7 +61,7 @@ function Post-FormationNonAssignment([string]$visitorId) {
     visitorId  = $visitorId
     type       = "FOLLOWUP_CONTACTED"
     occurredAt = (Get-Date).ToUniversalTime().ToString("o")
-    source     = @{ system = "assert-integration-summary-no-false-followup" }
+    source     = @{ system = "assert-integration-summary-no-false-followup"; actorId = "ops-user-1" }
     data       = @{ method = "sms"; result = "reached" }
   } | ConvertTo-Json -Depth 20
 
@@ -95,3 +95,4 @@ Assert (-not (Has-Prop $sum2.summary "assignedTo")) "non-assignment formation ev
 Write-Host "OK: non-assignment formation event did not synthesize assignedTo"
 
 Write-Host "[assert-integration-summary-no-false-followup] OK" -ForegroundColor Green
+

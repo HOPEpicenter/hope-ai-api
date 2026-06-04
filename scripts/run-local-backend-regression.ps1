@@ -215,7 +215,8 @@ $careRegressionScripts = @(
   "assert-care-assignment-summary-contract.ps1",
   "assert-care-projection-consistency-contract.ps1",
   "assert-care-export-assignment-consistency-contract.ps1",
-  "assert-care-cross-surface-derivation-contract.ps1"
+  "assert-care-cross-surface-derivation-contract.ps1",
+  "assert-care-summary-export-list-consistency-contract.ps1"
 )
 
 foreach ($careScript in $careRegressionScripts) {
@@ -306,6 +307,7 @@ Write-Host "[OK] Engagement transition validity invariants"
     Get-Process func -ErrorAction SilentlyContinue | Stop-Process -Force
   }
 }
+
 
 
 

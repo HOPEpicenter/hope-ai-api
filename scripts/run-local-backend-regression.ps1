@@ -10,6 +10,8 @@ if ([string]::IsNullOrWhiteSpace($ApiKey)) {
   throw "HOPE_API_KEY env var is required."
 }
 
+$Base = $BaseUrl -replace "/api$",""
+
 function Wait-HttpOk {
   param(
     [Parameter(Mandatory=$true)][string]$Url,

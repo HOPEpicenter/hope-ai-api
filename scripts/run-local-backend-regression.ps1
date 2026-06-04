@@ -162,6 +162,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "assert-journey-derivation-invariants.ps1 failed" }
   }
 
+  Run-Step -Name "Formation profile projection integrity" -Action {
+    pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\assert-formation-profile-projection-integrity-contract.ps1") -BaseUrl $Base -ApiKey $ApiKey
+    if ($LASTEXITCODE -ne 0) { throw "assert-formation-profile-projection-integrity-contract.ps1 failed" }
+  }
+
   Run-Step -Name "Engagement status invariants" -Action {
     pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $RepoRoot "scripts\assert-engagement-status-invariants.ps1") -ApiBase $BaseUrl -ApiKey $ApiKey
     if ($LASTEXITCODE -ne 0) { throw "assert-engagement-status-invariants.ps1 failed" }
@@ -308,14 +313,4 @@ Write-Host "[OK] Engagement transition validity invariants"
     Get-Process func -ErrorAction SilentlyContinue | Stop-Process -Force
   }
 }
-
-
-
-
-
-
-
-
-
-
 

@@ -1112,3 +1112,39 @@ Next
 - Journey / Formation projection drift audit.
 - Task generation derivation audit.
 - Visitor profile invariant expansion.
+
+## 2026-06-04 — Integration Summary Contract Hardening
+
+What landed
+
+- PR #1072 — Harden integration summary cross-surface derivation.
+- Added the existing integration summary contract family to the local backend regression gate.
+- Updated integration summary assertions for current operator follow-up mutation validation requirements.
+- Updated integration summary source ownership assertions to reflect current formation-source semantics.
+- Added validation coverage for:
+  - assignedTo projection consistency
+  - followupReason consistency
+  - assignment-only source flags
+  - assignment → engagement source transition behavior
+  - no-false-followup ownership synthesis
+  - late / older event stability
+
+Validation
+
+- Local backend regression suite passed.
+- CI build + regression + smoke passed.
+- Staging deployment completed successfully.
+- No production runtime code changes were required.
+
+Why this matters
+
+- Moves integration summary ownership/source derivation coverage into the default local regression path.
+- Reduces drift risk between Formation, Integration Summary, Followups, and related read models.
+- Strengthens backend contract protection before dashboard rebuild work.
+
+Next
+
+- Journey / Formation projection drift audit.
+- Task generation derivation audit.
+- Visitor profile invariant expansion.
+

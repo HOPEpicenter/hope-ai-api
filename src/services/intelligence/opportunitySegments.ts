@@ -13,6 +13,8 @@ export type OpportunitySegmentDefinition = {
   href: string;
   recommendedActionLabel: string;
   recommendedActionReason: string;
+  resolutionField: string;
+  resolutionReason: string;
 };
 
 export const OPPORTUNITY_SEGMENTS: OpportunitySegmentDefinition[] = [
@@ -24,7 +26,9 @@ export const OPPORTUNITY_SEGMENTS: OpportunitySegmentDefinition[] = [
     surface: "formation-profiles",
     href: "/formation-profiles?segment=connected-without-next-step",
     recommendedActionLabel: "Select next step",
-    recommendedActionReason: "Connected profile has engagement activity but no next-step milestone."
+    recommendedActionReason: "Connected profile has engagement activity but no next-step milestone.",
+    resolutionField: "lastNextStepAt",
+    resolutionReason: "Opportunity closes when a next-step milestone is recorded."
   },
   {
     key: "ACTIVE_CARE_WITHOUT_OUTCOME",
@@ -34,7 +38,9 @@ export const OPPORTUNITY_SEGMENTS: OpportunitySegmentDefinition[] = [
     surface: "followups",
     href: "/followups?segment=active-care-without-outcome",
     recommendedActionLabel: "Record care outcome",
-    recommendedActionReason: "Care relationship is active but no outcome has been recorded."
+    recommendedActionReason: "Care relationship is active but no outcome has been recorded.",
+    resolutionField: "lastFollowupOutcomeAt",
+    resolutionReason: "Opportunity closes when a followup outcome is recorded."
   },
   {
     key: "NEXT_STEP_SELECTED_NOT_COMPLETED",
@@ -44,7 +50,9 @@ export const OPPORTUNITY_SEGMENTS: OpportunitySegmentDefinition[] = [
     surface: "formation-profiles",
     href: "/formation-profiles?segment=next-step-selected-not-completed",
     recommendedActionLabel: "Encourage next step completion",
-    recommendedActionReason: "Next step was selected but no completion milestone has been recorded."
+    recommendedActionReason: "Next step was selected but no completion milestone has been recorded.",
+    resolutionField: "lastNextStepCompletedAt",
+    resolutionReason: "Opportunity closes when the selected next step is completed."
   },
   {
     key: "CONNECTED_WITHOUT_CARE_OWNER",
@@ -54,7 +62,9 @@ export const OPPORTUNITY_SEGMENTS: OpportunitySegmentDefinition[] = [
     surface: "care-queue",
     href: "/followups?segment=connected-without-care-owner",
     recommendedActionLabel: "Assign care owner",
-    recommendedActionReason: "Connected profile does not currently have a care owner assigned."
+    recommendedActionReason: "Connected profile does not currently have a care owner assigned.",
+    resolutionField: "assignedTo",
+    resolutionReason: "Opportunity closes when a care owner is assigned."
   }
 ];
 
@@ -98,7 +108,13 @@ export function buildOpportunityWorklistItem(input: {
       label: input.definition.recommendedActionLabel,
       reason: input.definition.recommendedActionReason
     },
+    resolution: {
+      status: "open",
+      resolvedWhen: input.definition.resolutionField,
+      reason: input.definition.resolutionReason
+    },
     href: visitorId ? `/visitors/${encodeURIComponent(visitorId)}` : null
   };
 }
+
 

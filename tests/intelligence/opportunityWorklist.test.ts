@@ -15,6 +15,11 @@ assert.strictEqual(
   connectedWithoutNextStep.recommendedActionReason,
   "Connected profile has engagement activity but no next-step milestone."
 );
+assert.strictEqual(connectedWithoutNextStep.resolutionField, "lastNextStepAt");
+assert.strictEqual(
+  connectedWithoutNextStep.resolutionReason,
+  "Opportunity closes when a next-step milestone is recorded."
+);
 
 const missing = getOpportunitySegmentDefinition("not-a-real-segment");
 assert.strictEqual(missing, null);
@@ -53,8 +58,14 @@ assert.deepStrictEqual(item, {
     label: "Select next step",
     reason: "Connected profile has engagement activity but no next-step milestone."
   },
+  resolution: {
+    status: "open",
+    resolvedWhen: "lastNextStepAt",
+    reason: "Opportunity closes when a next-step milestone is recorded."
+  },
   href: "/visitors/visitor-1"
 });
 
 console.log("opportunityWorklist.test.ts passed");
+
 

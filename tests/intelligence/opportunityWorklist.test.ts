@@ -11,6 +11,10 @@ const connectedWithoutNextStep = getOpportunitySegmentDefinition("connected-with
 assert.ok(connectedWithoutNextStep);
 assert.strictEqual(connectedWithoutNextStep.label, "Connected people without next step");
 assert.strictEqual(connectedWithoutNextStep.recommendedActionLabel, "Select next step");
+assert.strictEqual(
+  connectedWithoutNextStep.recommendedActionReason,
+  "Connected profile has engagement activity but no next-step milestone."
+);
 
 const missing = getOpportunitySegmentDefinition("not-a-real-segment");
 assert.strictEqual(missing, null);
@@ -46,9 +50,11 @@ assert.deepStrictEqual(item, {
   lastNextStepAt: null,
   lastNextStepCompletedAt: null,
   recommendedAction: {
-    label: "Select next step"
+    label: "Select next step",
+    reason: "Connected profile has engagement activity but no next-step milestone."
   },
   href: "/visitors/visitor-1"
 });
 
 console.log("opportunityWorklist.test.ts passed");
+

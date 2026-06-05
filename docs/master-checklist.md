@@ -720,3 +720,16 @@ Next constraints:
 - [ ] Journey / Formation projection drift audit
 - [ ] Task generation derivation audit
 - [ ] Visitor profile invariant expansion
+
+## Dashboard convergence closeout — 2026-06-04
+
+- [x] Ministry OS dashboard foundation merged.
+- [x] Visitor story experience merged.
+- [x] Unified visitor story timeline merged.
+- [x] Today cockpit v2 merged.
+- [x] People-first directory merged.
+- [x] Formation journey experience merged.
+- [x] Care team workbench merged.
+- [x] Executive ministry pulse merged.
+- [x] Production Vercel deployments verified after dashboard slices.
+- [x] Dashboard remains a thin ministry surface over backend-authoritative contracts.

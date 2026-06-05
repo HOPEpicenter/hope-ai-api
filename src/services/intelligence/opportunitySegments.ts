@@ -12,6 +12,7 @@ export type OpportunitySegmentDefinition = {
   surface: "formation-profiles" | "followups" | "care-queue";
   href: string;
   recommendedActionLabel: string;
+  recommendedActionReason: string;
 };
 
 export const OPPORTUNITY_SEGMENTS: OpportunitySegmentDefinition[] = [
@@ -22,7 +23,8 @@ export const OPPORTUNITY_SEGMENTS: OpportunitySegmentDefinition[] = [
     priority: "high",
     surface: "formation-profiles",
     href: "/formation-profiles?segment=connected-without-next-step",
-    recommendedActionLabel: "Select next step"
+    recommendedActionLabel: "Select next step",
+    recommendedActionReason: "Connected profile has engagement activity but no next-step milestone."
   },
   {
     key: "ACTIVE_CARE_WITHOUT_OUTCOME",
@@ -31,7 +33,8 @@ export const OPPORTUNITY_SEGMENTS: OpportunitySegmentDefinition[] = [
     priority: "high",
     surface: "followups",
     href: "/followups?segment=active-care-without-outcome",
-    recommendedActionLabel: "Record care outcome"
+    recommendedActionLabel: "Record care outcome",
+    recommendedActionReason: "Care relationship is active but no outcome has been recorded."
   },
   {
     key: "NEXT_STEP_SELECTED_NOT_COMPLETED",
@@ -40,7 +43,8 @@ export const OPPORTUNITY_SEGMENTS: OpportunitySegmentDefinition[] = [
     priority: "medium",
     surface: "formation-profiles",
     href: "/formation-profiles?segment=next-step-selected-not-completed",
-    recommendedActionLabel: "Encourage next step completion"
+    recommendedActionLabel: "Encourage next step completion",
+    recommendedActionReason: "Next step was selected but no completion milestone has been recorded."
   },
   {
     key: "CONNECTED_WITHOUT_CARE_OWNER",
@@ -49,7 +53,8 @@ export const OPPORTUNITY_SEGMENTS: OpportunitySegmentDefinition[] = [
     priority: "medium",
     surface: "care-queue",
     href: "/followups?segment=connected-without-care-owner",
-    recommendedActionLabel: "Assign care owner"
+    recommendedActionLabel: "Assign care owner",
+    recommendedActionReason: "Connected profile does not currently have a care owner assigned."
   }
 ];
 
@@ -90,8 +95,10 @@ export function buildOpportunityWorklistItem(input: {
     lastNextStepAt: profile.lastNextStepAt ?? null,
     lastNextStepCompletedAt: profile.lastNextStepCompletedAt ?? null,
     recommendedAction: {
-      label: input.definition.recommendedActionLabel
+      label: input.definition.recommendedActionLabel,
+      reason: input.definition.recommendedActionReason
     },
     href: visitorId ? `/visitors/${encodeURIComponent(visitorId)}` : null
   };
 }
+

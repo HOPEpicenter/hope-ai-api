@@ -88,24 +88,29 @@ $segments = @(
   @{
     segment = "connected-without-next-step"
     recommendedAction = "Select next step"
+    recommendedReason = "Connected profile has engagement activity but no next-step milestone."
   },
   @{
     segment = "next-step-selected-not-completed"
     recommendedAction = "Encourage next step completion"
+    recommendedReason = "Next step was selected but no completion milestone has been recorded."
   },
   @{
     segment = "active-care-without-outcome"
     recommendedAction = "Record care outcome"
+    recommendedReason = "Care relationship is active but no outcome has been recorded."
   },
   @{
     segment = "connected-without-care-owner"
     recommendedAction = "Assign care owner"
+    recommendedReason = "Connected profile does not currently have a care owner assigned."
   }
 )
 
 foreach ($entry in $segments) {
   $segment = [string]$entry.segment
   $expectedAction = [string]$entry.recommendedAction
+  $expectedReason = [string]$entry.recommendedReason
 
   Write-Host ("[assert-opportunity-worklists] GET segment={0}" -f $segment)
 
@@ -128,6 +133,9 @@ foreach ($entry in $segments) {
     Assert-True ($item.href.StartsWith("/visitors/")) "Expected item href to target visitor surface."
     Assert-True ($null -ne $item.recommendedAction) "Expected recommendedAction."
     Assert-Equal $item.recommendedAction.label $expectedAction "Expected recommendedAction label to match segment."
+    if ($item.recommendedAction.PSObject.Properties.Name -contains "reason") {
+      Assert-Equal $item.recommendedAction.reason $expectedReason "Expected recommendedAction reason to match segment."
+    }
   }
 
   $limitOneUrl = "$ApiBase/activity-intelligence/opportunities/${segment}?limit=1"
@@ -161,3 +169,5 @@ Write-Host "[assert-opportunity-worklists] GET invalid segment returns 400"
 ExpectHttpStatus "$ApiBase/activity-intelligence/opportunities/not-a-real-segment" 400
 
 Write-Host "[assert-opportunity-worklists] OK: opportunity worklists regression passed." -ForegroundColor Green
+
+

@@ -747,3 +747,26 @@ Next constraints:
 - [x] Add backend-authoritative formation profile segment filters.
 - [x] Update dashboard formation segment drilldowns to pass through backend segment contracts.
 - [x] Add lightweight formation segment intelligence coverage.
+
+## 2026-06-05 Opportunity Intelligence Worklist Closeout
+
+- [x] Opportunity worklist endpoint deployed.
+- [x] Opportunity worklist regression script added.
+- [x] Opportunity worklist staging validation completed.
+- [x] Opportunity drilldown landing pages completed.
+- [x] Opportunity context banner added to visitor detail.
+- [x] Backend-authored recommended action reasons added.
+- [x] Visitor detail displays backend action context.
+- [x] Visitor detail displays backend reason context.
+- [x] Opportunity visitor-context smoke coverage added.
+- [x] Production dashboard deployment verified.
+- [x] Staging backend deployment verified.
+- [x] Opportunity intelligence remains backend-authoritative.
+
+Next constraints
+
+- [ ] Journey / Formation projection drift audit.
+- [ ] Task generation derivation audit.
+- [ ] Visitor profile invariant expansion.
+- [ ] Canonical opportunity narrative layer.
+

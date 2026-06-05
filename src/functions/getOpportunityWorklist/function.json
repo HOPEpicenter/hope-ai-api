@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getOpportunityWorklist/index.js",
+  "entryPoint": "getOpportunityWorklist",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "activity-intelligence/opportunities/{segment}"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

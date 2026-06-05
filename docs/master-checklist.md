@@ -733,3 +733,17 @@ Next constraints:
 - [x] Executive ministry pulse merged.
 - [x] Production Vercel deployments verified after dashboard slices.
 - [x] Dashboard remains a thin ministry surface over backend-authoritative contracts.
+
+## 2026-06-05 Activity Intelligence / Ministry Opportunity Drilldown Checkpoint
+
+- [x] Add activity intelligence formation journey signals.
+- [x] Add activity intelligence formation milestone signals.
+- [x] Add activity intelligence formation cohort signals.
+- [x] Add ranked ministry opportunity intelligence.
+- [x] Add backend-authoritative opportunity drilldown metadata.
+- [x] Surface formation intelligence and opportunities in Executive Ministry Pulse.
+- [x] Make Ministry Opportunity cards clickable.
+- [x] Add v1 dashboard segment landing behavior.
+- [x] Add backend-authoritative formation profile segment filters.
+- [x] Update dashboard formation segment drilldowns to pass through backend segment contracts.
+- [x] Add lightweight formation segment intelligence coverage.

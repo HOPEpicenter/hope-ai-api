@@ -1179,3 +1179,19 @@ Architecture position:
 - No orchestration, AI actioning, real task persistence, care plans, RBAC, or schema expansion was introduced.
 - Backend-first discipline remains the default.
 - Future dashboard work should stay narrow, product-driven, and tied to concrete pilot/customer workflow needs.
+
+### 2026-06-05 Activity Intelligence / Ministry Opportunity Drilldown Checkpoint
+
+The dashboard convergence milestone now extends beyond Executive Ministry Pulse display into actionable, backend-authoritative ministry opportunity drilldowns.
+
+Completed:
+- Activity intelligence now produces formation journey, milestone, cohort, opportunity, and drilldown metadata.
+- Executive Ministry Pulse surfaces backend-derived formation intelligence and ranked Ministry Opportunity signals.
+- Opportunity drilldowns now use backend-authoritative destinations and formation segment filters.
+- Formation profile segments now support backend contract filtering for connected-without-next-step, next-step-selected-not-completed, active-care-without-outcome, and connected-without-care-owner.
+- Dashboard behavior was adjusted to pass formation segment filters through to the backend rather than deriving approximations locally.
+
+Direction:
+- Continue moving business logic into backend contracts.
+- Keep dashboard work thin and transitional while moving toward the new Ministry OS.
+- Avoid legacy dashboard polish unless it directly supports pilot readiness or backend contract validation.

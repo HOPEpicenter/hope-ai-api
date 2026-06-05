@@ -47,11 +47,19 @@ export type ActivityFormationMilestoneSummary = {
   groupParticipation: number;
 };
 
+export type ActivityFormationCohortSummary = {
+  connectedWithoutNextStep: number;
+  connectedWithoutCareOwner: number;
+  nextStepSelectedNotCompleted: number;
+  activeCareWithoutOutcome: number;
+};
+
 export type ActivityFormationSummary = {
   totalProfiles: number;
   byStage: Record<string, number>;
   projectedJourney: ActivityFormationJourneySummary;
   milestoneSignals: ActivityFormationMilestoneSummary;
+  cohorts: ActivityFormationCohortSummary;
 };
 
 export type ActivityIntelligenceInput = {
@@ -133,6 +141,13 @@ function buildFormationSummary(
     groupParticipation: 0
   };
 
+  const cohorts: ActivityFormationCohortSummary = {
+    connectedWithoutNextStep: 0,
+    connectedWithoutCareOwner: 0,
+    nextStepSelectedNotCompleted: 0,
+    activeCareWithoutOutcome: 0
+  };
+
   for (const profile of profiles) {
     addStage(byStage, profile.stage);
 
@@ -145,6 +160,22 @@ function buildFormationSummary(
       CONNECTED_OUTCOMES.has(outcome);
     const hasCareOwner = hasText(profile.assignedTo);
     const hasGroups = hasGroupParticipation(profile);
+
+    if (stage === "Connected" && !hasNextStep) {
+      cohorts.connectedWithoutNextStep++;
+    }
+
+    if (stage === "Connected" && !hasCareOwner) {
+      cohorts.connectedWithoutCareOwner++;
+    }
+
+    if (hasNextStep && !hasCompletedNextStep) {
+      cohorts.nextStepSelectedNotCompleted++;
+    }
+
+    if (hasCareOwner && !hasText(profile.lastFollowupOutcomeAt)) {
+      cohorts.activeCareWithoutOutcome++;
+    }
 
     if (hasNextStep) {
       milestoneSignals.nextStepSelected++;
@@ -191,7 +222,8 @@ function buildFormationSummary(
     totalProfiles: profiles.length,
     byStage,
     projectedJourney,
-    milestoneSignals
+    milestoneSignals,
+    cohorts
   };
 }
 
@@ -240,3 +272,4 @@ export function buildActivityIntelligence(
     formation: buildFormationSummary(input.formationProfiles)
   };
 }
+

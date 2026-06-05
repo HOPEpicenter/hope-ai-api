@@ -1174,3 +1174,30 @@ Next direction:
 - Keep backend semantics authoritative.
 - Continue dashboard work only in tightly scoped slices.
 - Do not widen into orchestration, AI guidance, real task persistence, RBAC, or care plans without a concrete product/backend blocker.
+
+## 2026-06-05 - Activity Intelligence / Ministry Opportunity Drilldown Closeout
+
+Completed backend and dashboard convergence for activity intelligence into actionable ministry opportunities.
+
+Shipped:
+- Backend activity intelligence now includes formation journey, milestone, cohort, opportunity, and drilldown metadata.
+- Executive Ministry Pulse now surfaces formation intelligence, cohort gaps, and ranked Ministry Opportunity.
+- Ministry Opportunity cards now link to backend-authoritative drilldown destinations.
+- Dashboard segment landing pages now support opportunity drilldowns.
+- Formation profile segment filters are now backend-authoritative for:
+  - connected-without-next-step
+  - next-step-selected-not-completed
+  - active-care-without-outcome
+  - connected-without-care-owner
+- Added lightweight intelligence coverage for formation cohort and opportunity drilldown behavior.
+
+Validation:
+- Backend PRs #1078, #1079, #1080, #1081, #1082, #1083 passed CI and deployed to staging.
+- Dashboard PRs #144, #145, #147, #148, #149 passed Vercel and deployed to production.
+- Live staging validation confirmed `/api/activity-intelligence` and `/api/formation/profiles?segment=connected-without-next-step`.
+- Both `hope-ai-api` and `hope-dashboard` ended clean on `main`.
+
+Next:
+- Continue moving logic into backend-authoritative contracts.
+- Avoid investing in legacy dashboard polish except where needed to bridge toward the new Ministry OS.
+- Next high-value slice: richer person-level opportunity worklists and segment-specific UX in the new dashboard path.

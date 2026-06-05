@@ -1195,3 +1195,46 @@ Direction:
 - Continue moving business logic into backend contracts.
 - Keep dashboard work thin and transitional while moving toward the new Ministry OS.
 - Avoid legacy dashboard polish unless it directly supports pilot readiness or backend contract validation.
+
+## 2026-06-05 Opportunity Intelligence Worklist & Visitor Context Closeout
+
+Completed
+
+- Added backend-authoritative opportunity worklist regression coverage (#1087).
+- Added dedicated opportunity worklist endpoint validation against staging.
+- Added backend-authored recommended action reasons for all opportunity segments (#1088).
+- Opportunity worklists now return:
+  - recommendedAction.label
+  - recommendedAction.reason
+- Dashboard opportunity drilldowns now support:
+  - backend worklist consumption
+  - visitor-detail context handoff
+  - backend-authored action display
+  - backend-authored reason display
+- Added dashboard smoke coverage validating:
+  - segment handoff
+  - visitor URL generation
+  - action propagation
+  - reason propagation
+
+Current architecture status
+
+- Activity Intelligence layer: Regression Protected.
+- Opportunity Ranking layer: Regression Protected.
+- Opportunity Worklist layer: Regression Protected.
+- Visitor Opportunity Context layer: Regression Protected.
+
+Why this matters
+
+- Keeps ministry opportunity logic backend-authoritative.
+- Prevents dashboard-specific opportunity derivation.
+- Establishes a complete path from ministry signal -> worklist -> person record -> recommended action.
+- Improves pilot readiness while preserving backend-first architecture.
+
+Next
+
+- Journey / Formation projection drift audit.
+- Task generation derivation audit.
+- Visitor profile invariant expansion.
+- Canonical person-level opportunity narratives.
+

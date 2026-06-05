@@ -1201,3 +1201,52 @@ Next:
 - Continue moving logic into backend-authoritative contracts.
 - Avoid investing in legacy dashboard polish except where needed to bridge toward the new Ministry OS.
 - Next high-value slice: richer person-level opportunity worklists and segment-specific UX in the new dashboard path.
+
+## 2026-06-05 - Opportunity Worklists & Visitor Context Closeout
+
+Completed backend and dashboard convergence for person-level ministry opportunity workflows.
+
+Backend
+
+- Added opportunity worklist regression script (#1087).
+- Added staging validation coverage for all supported opportunity segments.
+- Added backend-authored recommended action reasons (#1088).
+- Extended opportunity worklist contracts with:
+  - recommendedAction.label
+  - recommendedAction.reason
+- Preserved backward compatibility during rollout.
+
+Dashboard
+
+- Completed opportunity segment descriptions (#150).
+- Added opportunity context banners on visitor detail (#152).
+- Added backend action + reason display on visitor detail (#153).
+- Added opportunity visitor-context smoke validation (#154).
+
+Validation
+
+- PR #1087 passed CI and deployed successfully.
+- PR #1088 passed CI and deployed successfully.
+- Staging deployment completed successfully.
+- Opportunity worklist regression passed against staging.
+- Opportunity-to-visitor-detail context handoff validated.
+- Dashboard production deployments verified through Vercel.
+- Both repositories ended clean on main.
+
+Outcome
+
+Executive Ministry Pulse now supports:
+
+- Backend Opportunity Ranking
+- Opportunity Worklists
+- Visitor Detail Handoff
+- Backend Recommended Actions
+- Backend Recommended Reasons
+- Smoke Coverage
+
+Next
+
+- Continue backend-authoritative ministry intelligence.
+- Expand person-level opportunity narratives.
+- Avoid adding dashboard-owned business logic.
+

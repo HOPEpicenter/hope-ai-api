@@ -1160,3 +1160,22 @@ Next
 - Task generation derivation audit.
 - Visitor profile invariant expansion.
 
+
+## Dashboard convergence milestone — 2026-06-04
+
+The dashboard convergence milestone is complete through Executive Ministry Pulse.
+
+The dashboard now has the core pilot-ready ministry surfaces:
+- Today cockpit
+- Visitor story
+- Unified visitor story timeline
+- People-first directory
+- Formation journey
+- Care team workbench
+- Executive ministry pulse
+
+Architecture position:
+- Dashboard remains a thin consumer of backend-authoritative contracts.
+- No orchestration, AI actioning, real task persistence, care plans, RBAC, or schema expansion was introduced.
+- Backend-first discipline remains the default.
+- Future dashboard work should stay narrow, product-driven, and tied to concrete pilot/customer workflow needs.

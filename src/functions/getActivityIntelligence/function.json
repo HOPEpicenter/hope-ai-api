@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getActivityIntelligence/index.js",
+  "entryPoint": "getActivityIntelligence",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "activity-intelligence"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

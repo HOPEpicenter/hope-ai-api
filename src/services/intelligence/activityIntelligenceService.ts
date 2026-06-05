@@ -63,6 +63,11 @@ export type ActivityFormationOpportunity = {
   label: string;
   count: number;
   priority: "high" | "medium" | "low";
+  drilldown: {
+    surface: "formation-profiles" | "followups" | "care-queue";
+    segment: string;
+    href: string;
+  };
 };
 
 export type ActivityFormationOpportunitySummary = {
@@ -147,25 +152,45 @@ function buildFormationOpportunities(
       key: "CONNECTED_WITHOUT_NEXT_STEP",
       label: "Connected people without next step",
       count: cohorts.connectedWithoutNextStep,
-      priority: "high"
+      priority: "high",
+      drilldown: {
+        surface: "formation-profiles",
+        segment: "connected-without-next-step",
+        href: "/formation-profiles?segment=connected-without-next-step"
+      }
     },
     {
       key: "ACTIVE_CARE_WITHOUT_OUTCOME",
       label: "Active care relationships without outcome",
       count: cohorts.activeCareWithoutOutcome,
-      priority: "high"
+      priority: "high",
+      drilldown: {
+        surface: "followups",
+        segment: "active-care-without-outcome",
+        href: "/followups?segment=active-care-without-outcome"
+      }
     },
     {
       key: "NEXT_STEP_SELECTED_NOT_COMPLETED",
       label: "Next steps selected but not completed",
       count: cohorts.nextStepSelectedNotCompleted,
-      priority: "medium"
+      priority: "medium",
+      drilldown: {
+        surface: "formation-profiles",
+        segment: "next-step-selected-not-completed",
+        href: "/formation-profiles?segment=next-step-selected-not-completed"
+      }
     },
     {
       key: "CONNECTED_WITHOUT_CARE_OWNER",
       label: "Connected people without care owner",
       count: cohorts.connectedWithoutCareOwner,
-      priority: "medium"
+      priority: "medium",
+      drilldown: {
+        surface: "care-queue",
+        segment: "connected-without-care-owner",
+        href: "/followups?segment=connected-without-care-owner"
+      }
     }
   ] satisfies ActivityFormationOpportunity[];
 

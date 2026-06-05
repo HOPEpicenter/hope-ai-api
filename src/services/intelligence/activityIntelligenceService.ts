@@ -54,12 +54,29 @@ export type ActivityFormationCohortSummary = {
   activeCareWithoutOutcome: number;
 };
 
+export type ActivityFormationOpportunity = {
+  key:
+    | "CONNECTED_WITHOUT_NEXT_STEP"
+    | "ACTIVE_CARE_WITHOUT_OUTCOME"
+    | "NEXT_STEP_SELECTED_NOT_COMPLETED"
+    | "CONNECTED_WITHOUT_CARE_OWNER";
+  label: string;
+  count: number;
+  priority: "high" | "medium" | "low";
+};
+
+export type ActivityFormationOpportunitySummary = {
+  highestPriority: ActivityFormationOpportunity | null;
+  items: ActivityFormationOpportunity[];
+};
+
 export type ActivityFormationSummary = {
   totalProfiles: number;
   byStage: Record<string, number>;
   projectedJourney: ActivityFormationJourneySummary;
   milestoneSignals: ActivityFormationMilestoneSummary;
   cohorts: ActivityFormationCohortSummary;
+  opportunities: ActivityFormationOpportunitySummary;
 };
 
 export type ActivityIntelligenceInput = {
@@ -120,6 +137,44 @@ function hasGroupParticipation(profile: ActivityFormationProjectionInput): boole
   } catch {
     return false;
   }
+}
+
+function buildFormationOpportunities(
+  cohorts: ActivityFormationCohortSummary
+): ActivityFormationOpportunitySummary {
+  const items = [
+    {
+      key: "CONNECTED_WITHOUT_NEXT_STEP",
+      label: "Connected people without next step",
+      count: cohorts.connectedWithoutNextStep,
+      priority: "high"
+    },
+    {
+      key: "ACTIVE_CARE_WITHOUT_OUTCOME",
+      label: "Active care relationships without outcome",
+      count: cohorts.activeCareWithoutOutcome,
+      priority: "high"
+    },
+    {
+      key: "NEXT_STEP_SELECTED_NOT_COMPLETED",
+      label: "Next steps selected but not completed",
+      count: cohorts.nextStepSelectedNotCompleted,
+      priority: "medium"
+    },
+    {
+      key: "CONNECTED_WITHOUT_CARE_OWNER",
+      label: "Connected people without care owner",
+      count: cohorts.connectedWithoutCareOwner,
+      priority: "medium"
+    }
+  ] satisfies ActivityFormationOpportunity[];
+
+  const filtered = items.filter((item) => item.count > 0);
+
+  return {
+    highestPriority: filtered[0] ?? null,
+    items: filtered
+  };
 }
 
 function buildFormationSummary(
@@ -223,7 +278,8 @@ function buildFormationSummary(
     byStage,
     projectedJourney,
     milestoneSignals,
-    cohorts
+    cohorts,
+    opportunities: buildFormationOpportunities(cohorts)
   };
 }
 

@@ -25,6 +25,7 @@ function mapProfile(entity: any) {
     lastFollowupOutcomeNotes: entity.lastFollowupOutcomeNotes ?? null,
 
     lastNextStepAt: entity.lastNextStepAt ?? null,
+    lastNextStepCompletedAt: entity.lastNextStepCompletedAt ?? null,
 
     updatedAt: entity.updatedAt ?? null
   };
@@ -61,6 +62,7 @@ export async function getFormationProfiles(context: any, req: any): Promise<any>
     const assignedTo = req?.query?.assignedTo ? String(req.query.assignedTo).trim() : undefined;
     const q = req?.query?.q ? String(req.query.q).trim() : undefined;
     const visitorIdQ = req?.query?.visitorId ? String(req.query.visitorId).trim() : undefined;
+    const segment = req?.query?.segment ? String(req.query.segment).trim() : undefined;
 
     const table = getFormationProfilesTableClient();
     await ensureTable(table);
@@ -80,7 +82,8 @@ export async function getFormationProfiles(context: any, req: any): Promise<any>
         cursor,
         stage,
         assignedTo,
-        q
+        q,
+        segment
       });
 
       const validatedItems: any[] = [];

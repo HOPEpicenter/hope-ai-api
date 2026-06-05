@@ -991,6 +991,7 @@ function matchesProfileFilters(
     stage?: string;
     assignedTo?: string;
     q?: string;
+    segment?: string;
   }
 ): boolean {
   const stage = String(filters?.stage ?? "").trim();
@@ -1033,6 +1034,7 @@ export async function listFormationProfiles(
     stage?: string;
     assignedTo?: string;
     q?: string;
+    segment?: string;
   }
 ): Promise<{
   items: FunctionFormationProfileEntity[];
@@ -1065,6 +1067,7 @@ export async function listFormationProfiles(
     "lastFollowupOutcome",
     "lastFollowupOutcomeNotes",
     "lastNextStepAt",
+    "lastNextStepCompletedAt",
     "lastPrayerRequestedAt",
     "displayName",
     "groupsJson"
@@ -1096,12 +1099,47 @@ export async function listFormationProfiles(
       lastFollowupOutcome: entity.lastFollowupOutcome,
       lastFollowupOutcomeNotes: entity.lastFollowupOutcomeNotes,
       lastNextStepAt: entity.lastNextStepAt,
+      lastNextStepCompletedAt: entity.lastNextStepCompletedAt,
       lastPrayerRequestedAt: entity.lastPrayerRequestedAt,
       displayName: entity.displayName,
       groupsJson: entity.groupsJson
     }) as FunctionFormationProfileEntity;
 
     if (!matchesProfileFilters(profile, input)) {
+      continue;
+    }
+
+    const segment = String(input?.segment ?? "").trim();
+
+    if (
+      segment === "connected-without-next-step" &&
+      (String(profile.stage ?? "").trim() !== "Connected" ||
+        String(profile.lastNextStepAt ?? "").trim().length > 0)
+    ) {
+      continue;
+    }
+
+    if (
+      segment === "next-step-selected-not-completed" &&
+      (String(profile.lastNextStepAt ?? "").trim().length === 0 ||
+        String(profile.lastNextStepCompletedAt ?? "").trim().length > 0)
+    ) {
+      continue;
+    }
+
+    if (
+      segment === "active-care-without-outcome" &&
+      (String(profile.assignedTo ?? "").trim().length === 0 ||
+        String(profile.lastFollowupOutcomeAt ?? "").trim().length > 0)
+    ) {
+      continue;
+    }
+
+    if (
+      segment === "connected-without-care-owner" &&
+      (String(profile.stage ?? "").trim() !== "Connected" ||
+        String(profile.assignedTo ?? "").trim().length > 0)
+    ) {
       continue;
     }
 
@@ -1121,8 +1159,4 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
-
-
-
-
 

@@ -3,22 +3,22 @@ export function getTimelineSummary(type: string | null | undefined): string {
 
   switch (normalized) {
     case "FOLLOWUP_ASSIGNED":
-      return "Followup assigned";
+      return "Care ownership assigned";
 
     case "FOLLOWUP_CONTACTED":
-      return "Contact made";
+      return "Pastoral contact made";
 
     case "FOLLOWUP_OUTCOME_RECORDED":
-      return "Outcome recorded";
+      return "Care outcome recorded";
 
     case "FOLLOWUP_UNASSIGNED":
-      return "Followup unassigned";
+      return "Care ownership removed";
 
     case "NEXT_STEP_SELECTED":
-      return "Next step selected";
+      return "Visitor selected a next step";
 
     case "NEXT_STEP_COMPLETED":
-      return "Next step completed";
+      return "Visitor completed a next step";
 
     default:
       return normalized || "Activity recorded";

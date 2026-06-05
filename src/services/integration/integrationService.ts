@@ -118,20 +118,20 @@ function formatGroupedSummary(summary: string, count: number): string {
   if (count <= 1) return summary;
 
   const normalized = summary.trim();
-  if (normalized.toLowerCase() === "followup outcome recorded") {
-    return `Followups completed (${count})`;
+  if (normalized.toLowerCase() === "care outcome recorded") {
+    return `Care outcomes recorded (${count})`;
   }
 
-  if (normalized.toLowerCase() === "followup contacted") {
-    return `Contacts made (${count})`;
+  if (normalized.toLowerCase() === "pastoral contact made") {
+    return `Pastoral contacts made (${count})`;
   }
 
-  if (normalized.toLowerCase() === "followup assigned") {
-    return `Followups assigned (${count})`;
+  if (normalized.toLowerCase() === "care ownership assigned") {
+    return `Care ownership assignments (${count})`;
   }
 
-  if (normalized.toLowerCase() === "followup unassigned") {
-    return `Followups unassigned (${count})`;
+  if (normalized.toLowerCase() === "care ownership removed") {
+    return `Care ownership removals (${count})`;
   }
 
   return `${normalized} (${count})`;
@@ -178,10 +178,10 @@ function normalizeActivityFamily(item: any): string {
 
   if (type.startsWith("FOLLOWUP_")) return type.toLowerCase();
 
-  if (summary.includes("followup assigned")) return "followup_assigned";
-  if (summary.includes("followup contacted")) return "followup_contacted";
-  if (summary.includes("followup outcome")) return "followup_outcome_recorded";
-  if (summary.includes("followup unassigned")) return "followup_unassigned";
+  if (summary.includes("care ownership assigned")) return "followup_assigned";
+  if (summary.includes("pastoral contact made")) return "followup_contacted";
+  if (summary.includes("care outcome recorded")) return "followup_outcome_recorded";
+  if (summary.includes("care ownership removed")) return "followup_unassigned";
 
   return type.toLowerCase() || "unknown";
 }
@@ -402,27 +402,4 @@ export class IntegrationService {
     });
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

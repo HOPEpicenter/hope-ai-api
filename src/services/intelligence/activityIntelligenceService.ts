@@ -1,3 +1,7 @@
+import {
+  OPPORTUNITY_SEGMENTS,
+  toOpportunityDrilldown
+} from "./opportunitySegments";
 export type ActivityOperationalHealthStatus = "healthy" | "watch" | "attention";
 
 export type ActivityCareLoadSummary = {
@@ -147,52 +151,20 @@ function hasGroupParticipation(profile: ActivityFormationProjectionInput): boole
 function buildFormationOpportunities(
   cohorts: ActivityFormationCohortSummary
 ): ActivityFormationOpportunitySummary {
-  const items = [
-    {
-      key: "CONNECTED_WITHOUT_NEXT_STEP",
-      label: "Connected people without next step",
-      count: cohorts.connectedWithoutNextStep,
-      priority: "high",
-      drilldown: {
-        surface: "formation-profiles",
-        segment: "connected-without-next-step",
-        href: "/formation-profiles?segment=connected-without-next-step"
-      }
-    },
-    {
-      key: "ACTIVE_CARE_WITHOUT_OUTCOME",
-      label: "Active care relationships without outcome",
-      count: cohorts.activeCareWithoutOutcome,
-      priority: "high",
-      drilldown: {
-        surface: "followups",
-        segment: "active-care-without-outcome",
-        href: "/followups?segment=active-care-without-outcome"
-      }
-    },
-    {
-      key: "NEXT_STEP_SELECTED_NOT_COMPLETED",
-      label: "Next steps selected but not completed",
-      count: cohorts.nextStepSelectedNotCompleted,
-      priority: "medium",
-      drilldown: {
-        surface: "formation-profiles",
-        segment: "next-step-selected-not-completed",
-        href: "/formation-profiles?segment=next-step-selected-not-completed"
-      }
-    },
-    {
-      key: "CONNECTED_WITHOUT_CARE_OWNER",
-      label: "Connected people without care owner",
-      count: cohorts.connectedWithoutCareOwner,
-      priority: "medium",
-      drilldown: {
-        surface: "care-queue",
-        segment: "connected-without-care-owner",
-        href: "/followups?segment=connected-without-care-owner"
-      }
-    }
-  ] satisfies ActivityFormationOpportunity[];
+  const countBySegment: Record<string, number> = {
+    "connected-without-next-step": cohorts.connectedWithoutNextStep,
+    "active-care-without-outcome": cohorts.activeCareWithoutOutcome,
+    "next-step-selected-not-completed": cohorts.nextStepSelectedNotCompleted,
+    "connected-without-care-owner": cohorts.connectedWithoutCareOwner
+  };
+
+  const items = OPPORTUNITY_SEGMENTS.map((definition) => ({
+    key: definition.key,
+    label: definition.label,
+    count: countBySegment[definition.segment] ?? 0,
+    priority: definition.priority,
+    drilldown: toOpportunityDrilldown(definition)
+  })) satisfies ActivityFormationOpportunity[];
 
   const filtered = items.filter((item) => item.count > 0);
 
@@ -353,4 +325,5 @@ export function buildActivityIntelligence(
     formation: buildFormationSummary(input.formationProfiles)
   };
 }
+
 

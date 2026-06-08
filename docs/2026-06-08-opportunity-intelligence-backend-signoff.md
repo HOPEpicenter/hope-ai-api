@@ -43,6 +43,26 @@ Each segment now carries backend-authored:
 
 The worklist item shape also keeps the dashboard thin by returning person-level opportunity context with display name, visitorId, stage, owner, recent activity, recommended action, resolution metadata, and visitor detail href.
 
+## Validation
+
+Staging opportunity worklists regression passed on 2026-06-08 using:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-opportunity-worklists.ps1 -BaseUrl "https://hope-ai-api-staging.azurewebsites.net" -ApiKey $env:HOPE_API_KEY
+```
+
+Validated:
+
+- connected-without-next-step
+- next-step-selected-not-completed
+- active-care-without-outcome
+- connected-without-care-owner
+- invalid segment returns HTTP 400
+- limit handling
+- pagination replay stability
+- visitor detail href shape
+- backend-authored recommended action labels/reasons
+
 ## Dashboard repo decision
 
 Do not create the new dashboard repository yet from inside this backend closeout branch. The repo should be created or selected only after backend signoff confirms:
@@ -58,7 +78,7 @@ This preserves the decision from the dashboard master plan: build a new dashboar
 ## Backend signoff checklist before dashboard repo creation
 
 - [ ] Confirm the full dashboard-facing endpoint inventory.
-- [ ] Confirm opportunity worklists and segment filters are regression-covered.
+- [x] Confirm opportunity worklists and segment filters are regression-covered.
 - [ ] Confirm no unresolved backend blockers remain for Today cockpit, visitor snapshot, story/timeline, journey, care queue, and intelligence preview.
 - [ ] Confirm OPS-only surfaces remain internal and preview/readiness-only where persistence or orchestration is inactive.
 - [ ] Confirm local backend verification command remains current.

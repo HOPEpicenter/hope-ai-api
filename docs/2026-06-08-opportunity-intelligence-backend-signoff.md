@@ -63,6 +63,20 @@ Validated:
 - visitor detail href shape
 - backend-authored recommended action labels/reasons
 
+Full local backend regression passed on 2026-06-08 using:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-backend-all.ps1
+```
+
+The run completed with `ALL BACKEND ASSERTS PASSED` and covered build, local Functions host health, integration summary derivation, visitor summary auth, visitor journey, journey derivation invariants, formation projection integrity, engagement status invariants, visitor engagement timeline, group joined signal, OPS followups rollups/projection consistency, care assignment/export/projection consistency, legacy export payloads, engagement transition invariants, cross-surface derivation contracts, follow-up progression/resolution semantics, latest activity consistency, dashboard card consistency, formation profile consistency, and activity insights consistency.
+
+The docs/readiness blocker scan also returned no markers:
+
+```powershell
+git grep "TODO\|FIXME\|BLOCKER" src docs
+```
+
 ## Dashboard-facing endpoint inventory
 
 Route inventory was reviewed from `src/functions/*/function.json` on 2026-06-08.
@@ -134,12 +148,12 @@ This preserves the decision from the dashboard master plan: build a new dashboar
 
 - [x] Confirm the full dashboard-facing endpoint inventory.
 - [x] Confirm opportunity worklists and segment filters are regression-covered.
-- [ ] Confirm no unresolved backend blockers remain for Today cockpit, visitor snapshot, story/timeline, journey, care queue, and intelligence preview.
+- [x] Confirm no unresolved backend blockers remain for Today cockpit, visitor snapshot, story/timeline, journey, care queue, and intelligence preview.
 - [x] Confirm OPS-only surfaces remain internal and preview/readiness-only where persistence or orchestration is inactive.
-- [ ] Confirm local backend verification command remains current.
+- [x] Confirm local backend verification command remains current.
 - [ ] Confirm CI is green on the backend signoff/docs PR.
 - [ ] Confirm staging deploy remains green after merge.
 
-## Next move
+## Signoff posture
 
-Complete one focused backend readiness/signoff pass. If it confirms no blocking gaps, the next project lane should be new dashboard repository creation and PR 1: foundation shell, route, layout, design tokens, navigation, and empty states.
+Backend is ready for dashboard initialization once PR CI is green and the docs-only signoff PR is merged. After merge, create/select the dedicated new dashboard repository and start PR 1: foundation shell, route, layout, design tokens, navigation, empty states, environment variable contract, and typed API client over the finalized backend endpoint inventory.

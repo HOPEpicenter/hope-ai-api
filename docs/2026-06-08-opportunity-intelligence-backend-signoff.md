@@ -63,6 +63,61 @@ Validated:
 - visitor detail href shape
 - backend-authored recommended action labels/reasons
 
+## Dashboard-facing endpoint inventory
+
+Route inventory was reviewed from `src/functions/*/function.json` on 2026-06-08.
+
+Canonical `/api/*` surfaces available for the future dashboard:
+
+- `GET/POST /api/visitors`
+- `GET /api/visitors/{visitorId}`
+- `GET /api/visitors/{id}/summary`
+- `GET /api/visitors/{id}/dashboard-card`
+- `GET /api/visitors/{id}/activity-insights`
+- `GET /api/visitors/{id}/formation/profile`
+- `GET /api/visitors/{id}/formation/events`
+- `GET /api/visitors/{visitorId}/journey`
+- `GET /api/dashboard/followups`
+- `GET /api/formation/profiles`
+- `GET /api/formation/timeline`
+- `POST /api/formation/events`
+- `GET /api/engagements/score`
+- `GET /api/engagements/status`
+- `GET /api/engagements/timeline`
+- `POST /api/engagements/events`
+- `GET /api/engagements/{visitorId}/timeline`
+- `GET /api/integration/summary`
+- `GET /api/integration/timeline`
+- `GET /api/integration/timeline/global`
+- `GET /api/activity-intelligence`
+- `GET /api/activity-intelligence/opportunities/{segment}`
+- `GET /api/care/candidates`
+- `GET /api/care/candidates/{visitorId}`
+- `POST /api/care/candidates/{visitorId}/assign`
+- `POST /api/care/candidates/{visitorId}/unassign`
+- `POST /api/care/candidates/assign-bulk`
+- `POST /api/care/candidates/unassign-bulk`
+- `GET /api/care/summary`
+- `GET /api/care/export`
+- `GET /api/legacy/export`
+- `GET /api/health`
+- `GET /api/version`
+
+Internal/OPS surfaces confirmed as not product-dashboard dependencies unless explicitly labeled preview/readiness:
+
+- `GET /api/ops/followups`
+- `GET /api/ops/task-preview-summary`
+- `GET /api/ops/task-preview-simulation`
+- `GET /api/_ops/formation/recent-events`
+- `POST /api/_ops/formation/profile-audit`
+- `GET /api/_protected/ping`
+
+Backend signoff interpretation:
+
+- The future dashboard has enough canonical read surfaces for Today cockpit, visitor snapshot, visitor story/timeline, journey, care queue, intelligence preview, and opportunity worklists.
+- OPS/task-preview endpoints should remain preview/readiness-only until persistence/orchestration is explicitly activated.
+- The old dashboard can be used as a reference for env/API binding conventions, but the new dashboard should not inherit legacy frontend state derivation or route-handler bridges that mask backend drift.
+
 ## Dashboard repo decision
 
 Do not create the new dashboard repository yet from inside this backend closeout branch. The repo should be created or selected only after backend signoff confirms:
@@ -77,14 +132,14 @@ This preserves the decision from the dashboard master plan: build a new dashboar
 
 ## Backend signoff checklist before dashboard repo creation
 
-- [ ] Confirm the full dashboard-facing endpoint inventory.
+- [x] Confirm the full dashboard-facing endpoint inventory.
 - [x] Confirm opportunity worklists and segment filters are regression-covered.
 - [ ] Confirm no unresolved backend blockers remain for Today cockpit, visitor snapshot, story/timeline, journey, care queue, and intelligence preview.
-- [ ] Confirm OPS-only surfaces remain internal and preview/readiness-only where persistence or orchestration is inactive.
+- [x] Confirm OPS-only surfaces remain internal and preview/readiness-only where persistence or orchestration is inactive.
 - [ ] Confirm local backend verification command remains current.
 - [ ] Confirm CI is green on the backend signoff/docs PR.
 - [ ] Confirm staging deploy remains green after merge.
 
 ## Next move
 
-Open one focused backend readiness/signoff pass. If it confirms no blocking gaps, the next project lane should be new dashboard repository creation and PR 1: foundation shell, route, layout, design tokens, navigation, and empty states.
+Complete one focused backend readiness/signoff pass. If it confirms no blocking gaps, the next project lane should be new dashboard repository creation and PR 1: foundation shell, route, layout, design tokens, navigation, and empty states.

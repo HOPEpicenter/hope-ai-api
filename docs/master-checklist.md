@@ -770,3 +770,19 @@ Next constraints
 - [ ] Visitor profile invariant expansion.
 - [ ] Canonical opportunity narrative layer.
 
+
+## 2026-06-09 People Workflow Pilot Readiness
+
+- [x] Visitor creation from People page
+- [x] Visitor notes from People profile
+- [x] Full Story timeline from backend timeline contract
+- [x] Care ownership actions from People profile
+- [x] Journey next-step actions from People profile
+- [x] CI validation passed
+- [x] Vercel preview validation passed
+- [x] Production deployment validation passed
+
+Current rule:
+- onboard real ministry data before widening dashboard scope
+- use People as the primary pastor workflow surface
+- continue backend-first governance discipline

@@ -7,14 +7,10 @@ import { createListVisitorsAdapter } from "./listVisitorsAdapter";
 import { createGetVisitorSummaryAdapter } from "./createGetVisitorSummaryAdapter";
 import { createGetVisitorDashboardCardAdapter } from "./createGetVisitorDashboardCardAdapter";
 import { createGetVisitorJourneyAdapter } from "./createGetVisitorJourneyAdapter";
-import { IntegrationService } from "../../services/integration/integrationService";
-import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
-import { AzureTableFormationEventsRepository } from "../../repositories/formationEventsRepository";
 
 export default function visitorsRouter(visitorsRepository: VisitorsRepository) {
   const router = Router();
 
-  const integrationService = new IntegrationService(new EngagementEventsRepository());
 
   router.post("/", createCreateVisitorAdapter(visitorsRepository));
   router.get("/:id", createGetVisitorAdapter(visitorsRepository));
@@ -27,6 +23,4 @@ export default function visitorsRouter(visitorsRepository: VisitorsRepository) {
 
   return router;
 }
-
-
 

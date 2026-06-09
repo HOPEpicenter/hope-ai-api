@@ -1,13 +1,34 @@
 import { validateEngagementEventEnvelopeV1Strict } from "../../contracts/engagementEvent.v1";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { EngagementsService } from "../../services/engagements/engagementsService";
-import { recordFormationEventV1 } from "../_shared/formation";
 import { resolveMutationSource } from "../../services/events/resolveMutationSource";
+import {
+  apiErrorBody,
+  getRequestId,
+  logFunctionError
+} from "../../shared/observability/functionObservability";
+import { requireApiKeyForFunction } from "../_shared/apiKey";
+import { recordFormationEventV1 } from "../_shared/formation";
 
 const service = new EngagementsService(new EngagementEventsRepository());
 
 export async function postEngagementEvent(context: any, req: any): Promise<void> {
+  const requestId = getRequestId(req);
+
   try {
+    const auth = requireApiKeyForFunction(req);
+    if (!auth.ok) {
+      context.log.warn("postEngagementEvent auth rejected");
+      context.res = {
+        status: auth.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: {
+          ...auth.body,
+          authRejectedBy: "postEngagementEvent"
+        }
+      };
+      return;
+    }
 
     const body = req?.body ?? {};
     const parsed = validateEngagementEventEnvelopeV1Strict(body);
@@ -18,6 +39,7 @@ export async function postEngagementEvent(context: any, req: any): Promise<void>
         headers: { "content-type": "application/json; charset=utf-8" },
         body: {
           ok: false,
+          requestId,
           error: {
             code: "VALIDATION_ERROR",
             message: "Body validation failed",
@@ -30,7 +52,6 @@ export async function postEngagementEvent(context: any, req: any): Promise<void>
 
     const evt = parsed.value;
 
-    // --- DOMAIN SAFETY GUARDS ---
     if (!evt.visitorId || typeof evt.visitorId !== "string" || evt.visitorId.trim() === "") {
       throw new Error("visitorId must be a non-empty string");
     }
@@ -51,7 +72,6 @@ export async function postEngagementEvent(context: any, req: any): Promise<void>
 
     await service.appendEvent(evt);
 
-    // Bridge: engagement → formation
     const type = String(evt.type ?? "").trim();
 
     const formationTypes = [
@@ -81,16 +101,27 @@ export async function postEngagementEvent(context: any, req: any): Promise<void>
       headers: { "content-type": "application/json; charset=utf-8" },
       body: {
         ok: true,
+        requestId,
         accepted: true,
         v: 1
       }
     };
   } catch (err: any) {
-    context.log.error(err?.message ?? err);
+    logFunctionError(context, "postEngagementEvent", err, {
+      requestId,
+      visitorId: req?.body?.visitorId ?? null,
+      eventId: req?.body?.eventId ?? null,
+      type: req?.body?.type ?? null
+    });
+
     context.res = {
       status: 400,
       headers: { "content-type": "application/json; charset=utf-8" },
-      body: { ok: false, error: err?.message ?? "Bad Request" }
+      body: apiErrorBody(
+        "ENGAGEMENT_EVENT_BAD_REQUEST",
+        err?.message ?? "Bad Request",
+        requestId
+      )
     };
   }
 }

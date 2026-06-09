@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/updateVisitor/index.js",
+  "entryPoint": "updateVisitor",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "patch" ],
+      "route": "visitors/{visitorId}"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

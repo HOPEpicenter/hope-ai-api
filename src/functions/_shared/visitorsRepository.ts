@@ -6,6 +6,7 @@ export type FunctionVisitor = {
   visitorId: string;
   name: string;
   email?: string;
+  phone?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -21,6 +22,7 @@ type VisitorEntity = {
   name: string;
   email?: string;
   emailLower?: string;
+  phone?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -44,6 +46,7 @@ function toVisitor(entity: VisitorEntity): FunctionVisitor {
     visitorId: entity.rowKey,
     name: entity.name,
     email: entity.email,
+    phone: entity.phone,
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt
   };
@@ -99,7 +102,7 @@ export async function listVisitorsRecords(input: { limit: number }): Promise<{ i
   return { items, count: all.length };
 }
 
-export async function createVisitorRecord(input: { name: string; email?: string }): Promise<FunctionCreateVisitorResult> {
+export async function createVisitorRecord(input: { name: string; email?: string; phone?: string }): Promise<FunctionCreateVisitorResult> {
   const table = getTableClient(TABLE);
   await ensureTableExists(table);
   const id = randomUUID();
@@ -107,6 +110,7 @@ export async function createVisitorRecord(input: { name: string; email?: string 
 
   const emailTrim = typeof input.email === "string" ? input.email.trim() : undefined;
   const emailLower = emailTrim ? emailTrim.toLowerCase() : undefined;
+  const phoneTrim = typeof input.phone === "string" ? input.phone.trim() : undefined;
 
   if (emailLower) {
     const emailKey = encodeURIComponent(emailLower);
@@ -194,6 +198,7 @@ export async function createVisitorRecord(input: { name: string; email?: string 
     name: input.name,
     email: emailTrim,
     emailLower,
+    phone: phoneTrim,
     createdAt: now,
     updatedAt: now
   };
@@ -218,5 +223,39 @@ export async function createVisitorRecord(input: { name: string; email?: string 
     visitor: toVisitor(entity),
     created: true
   };
+}
+export async function updateVisitorRecord(
+  visitorId: string,
+  input: { name?: string; email?: string; phone?: string }
+): Promise<FunctionVisitor | null> {
+  const table = getTableClient(TABLE);
+  await ensureTableExists(table);
+
+  const visitor = await getVisitorById(visitorId);
+  if (!visitor) return null;
+
+  const entity = await table.getEntity<VisitorEntity>(VISITOR_PK, visitorId);
+  const now = nowIso();
+
+  const nextName = typeof input.name === "string" ? input.name.trim() : entity.name;
+  const nextEmail = typeof input.email === "string" ? input.email.trim() : entity.email;
+  const nextPhone = typeof input.phone === "string" ? input.phone.trim() : entity.phone;
+
+  if (!nextName) {
+    throw new Error("name is required");
+  }
+
+  const updated: VisitorEntity = {
+    ...entity,
+    name: nextName,
+    email: nextEmail || undefined,
+    emailLower: nextEmail ? nextEmail.toLowerCase() : undefined,
+    phone: nextPhone || undefined,
+    updatedAt: now
+  };
+
+  await table.upsertEntity(updated as any, "Replace");
+
+  return toVisitor(updated);
 }
 

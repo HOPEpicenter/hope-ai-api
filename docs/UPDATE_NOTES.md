@@ -1250,3 +1250,57 @@ Next
 - Expand person-level opportunity narratives.
 - Avoid adding dashboard-owned business logic.
 
+
+## 2026-06-09 — Pilot Command Surface Validation
+
+### Completed
+
+- Care ownership commands verified end-to-end.
+  - Assign candidate
+  - Unassign candidate
+
+- Care outcome commands verified end-to-end.
+  - FOLLOWUP_OUTCOME_RECORDED
+
+- Journey next-step commands verified end-to-end.
+  - NEXT_STEP_SELECTED
+  - NEXT_STEP_COMPLETED
+
+- Dashboard mutations now use server-side API proxy routes.
+
+- Engagement event ingestion now requires x-api-key.
+
+### Validation
+
+- Dashboard build passed.
+- Backend build passed.
+- Dashboard PR #13 merged.
+- Dashboard PR #14 merged.
+- Dashboard PR #15 merged.
+- Dashboard PR #16 merged.
+- Backend PR #1092 merged.
+
+### Manual Smoke Results
+
+- Care assignment updates projections.
+- Care unassignment updates projections.
+- Care outcome updates formation profile.
+- Next-step selection updates formation profile.
+- Next-step completion updates formation profile.
+- Journey evidence updates correctly.
+- Engagement ingestion rejects missing API key.
+- Engagement ingestion accepts valid API key.
+
+### Pilot Readiness
+
+Verified command workflow chain:
+
+Care Assign
+→ Care Unassign
+→ Care Outcome
+→ Next Step Selected
+→ Next Step Completed
+
+All validated against backend projections.
+
+

@@ -1304,3 +1304,24 @@ Care Assign
 All validated against backend projections.
 
 
+
+## 2026-06-09 — People Workflow Pilot Readiness
+
+Dashboard work completed against existing signed-off backend contracts.
+
+What landed:
+- People profile note creation using POST /visitors/{visitorId}/notes
+- People profile visitor creation using POST /visitors
+- Full Story timeline view using integration timeline data with summary fallback
+- Care ownership assignment/unassignment directly from the People profile
+- Journey next-step selection/completion directly from the People profile
+
+Validation:
+- All changes merged through PR workflow
+- CI passed on all merged PRs
+- Vercel preview deployments passed
+- Production deployments verified after merge
+- Manual workflow validation completed
+
+Result:
+- The People page now acts as the primary pastor-facing workflow surface for person-level care and journey actions.

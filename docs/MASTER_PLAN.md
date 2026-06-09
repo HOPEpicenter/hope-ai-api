@@ -1238,3 +1238,26 @@ Next
 - Visitor profile invariant expansion.
 - Canonical person-level opportunity narratives.
 
+
+## 2026-06-09 Update — People Workflow Pilot Surface
+
+What landed:
+- People profile note actions
+- People profile visitor creation
+- Full Story timeline integration
+- Care ownership controls
+- Journey next-step controls
+
+Why this matters:
+
+- consolidates person-level workflows into a single pastor-facing experience
+- exercises existing backend contracts rather than introducing new backend scope
+- improves pilot readiness without creating duplicate projections or storage
+- keeps dashboard aligned with backend-first architecture
+
+Current rule:
+
+- continue using signed-off backend contracts
+- avoid speculative dashboard features
+- prioritize real ministry data onboarding over additional dashboard expansion
+- keep backend correctness as the primary source of truth

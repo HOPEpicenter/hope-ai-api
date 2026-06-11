@@ -48,11 +48,20 @@ export async function readCanonicalVisitorDashboardCard(
   const assignedTo = projection.assignedTo;
   const assignedToName = projection.assignedToName;
 
+  const lastNextStepAt =
+    typeof profile?.lastNextStepAt === "string" && profile.lastNextStepAt.trim().length > 0
+      ? profile.lastNextStepAt.trim()
+      : null;
+
+  const lastNextStepCompletedAt =
+    typeof profile?.lastNextStepCompletedAt === "string" && profile.lastNextStepCompletedAt.trim().length > 0
+      ? profile.lastNextStepCompletedAt.trim()
+      : null;
+
   const lastFollowupAssignedAt =
     typeof profile?.lastFollowupAssignedAt === "string" && profile.lastFollowupAssignedAt.trim().length > 0
       ? profile.lastFollowupAssignedAt.trim()
       : null;
-
   const lastFollowupContactedAt =
     typeof profile?.lastFollowupContactedAt === "string" && profile.lastFollowupContactedAt.trim().length > 0
       ? profile.lastFollowupContactedAt.trim()
@@ -69,6 +78,8 @@ export async function readCanonicalVisitorDashboardCard(
     visitorId,
     lastActivityAt: latest?.occurredAt ?? null,
     lastActivitySummary: latest?.summary ?? null,
+    lastNextStepAt,
+    lastNextStepCompletedAt,
     followupStatus,
     assignedTo,
     assignedToName,

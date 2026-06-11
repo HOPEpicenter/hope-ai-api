@@ -1325,3 +1325,80 @@ Validation:
 
 Result:
 - The People page now acts as the primary pastor-facing workflow surface for person-level care and journey actions.
+
+## 2026-06-11 — Dashboard Contract Alignment + Care Guardrails
+
+### Completed
+
+Backend PR #1097 dashboard adoption completed.
+
+Dashboard support added for:
+
+- address1
+- address2
+- city
+- state
+- postalCode
+- birthday
+
+People workflow enhancements:
+
+- Create Person supports address and birthday
+- Edit Person supports address and birthday
+- Person Profile displays address and birthday
+- Dashboard API proxy routes pass new visitor identity fields through existing backend contracts
+
+Care workflow enhancements:
+
+- Care workspace now surfaces latest follow-up outcome
+- Care workspace now surfaces outcome timestamp
+- Care workspace now surfaces workflow source metadata from care candidate projections
+
+Backend contract hardening:
+
+- Added care candidate end-to-end assertion for source.followupOutcomeAt
+- Extended care candidate projection guardrails without changing runtime behavior
+
+### Validation
+
+Dashboard:
+
+- npm run build passed
+- Dashboard PR #27 merged
+- Dashboard PR #28 merged
+- Vercel preview deployments passed
+- Production deployment verified
+
+Backend:
+
+- assert-care-candidates-end-to-end.ps1 passed
+- run-local-backend-regression.ps1 passed
+- Backend PR #1098 merged
+- CI passed
+- Staging Azure Functions deployment succeeded
+
+### Result
+
+People, Care, and backend care-candidate projections remain aligned around signed-off backend contracts.
+
+Additional guardrails now verify:
+
+- source.workflowId
+- source.followupOutcome
+- source.followupOutcomeAt
+
+for needs_care care candidate projections.
+
+### Pilot Readiness
+
+Current pilot workflow coverage includes:
+
+Visitor Creation
+→ Person Profile
+→ Care Assignment
+→ Care Outcome
+→ Journey Next Step Selection
+→ Journey Next Step Completion
+
+All validated against backend projections and dashboard contract surfaces.
+

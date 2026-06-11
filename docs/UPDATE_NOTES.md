@@ -1402,3 +1402,39 @@ Visitor Creation
 
 All validated against backend projections and dashboard contract surfaces.
 
+
+## 2026-06-11 — Next-Step Visibility Contract Loop
+
+### Completed
+
+Backend PR #1101 added next-step timestamp visibility to the canonical visitor dashboard card.
+
+Dashboard PR #29 consumed the new backend fields.
+
+### Backend
+
+- Added lastNextStepAt to CanonicalVisitorDashboardCard
+- Added lastNextStepCompletedAt to CanonicalVisitorDashboardCard
+- Mapped both fields from FormationProfile
+- Extended latest activity consistency assertion
+
+### Dashboard
+
+- Added next-step timestamp fields to dashboard card contracts
+- Showed next-step timestamps in Today selected visitor panel
+- Showed next-step timestamps in Visitor Snapshot rail
+
+### Validation
+
+- Backend npm run build passed
+- Backend latest activity consistency assertion passed
+- Backend CI passed
+- Backend staging Azure Functions deploy succeeded
+- Dashboard npm run build passed
+- Dashboard PR checks passed
+- Vercel deployment ready
+
+### Result
+
+Next-step activity is now visible from backend canonical formation profile through dashboard card surfaces without adding new event types or dashboard-owned derivation.
+

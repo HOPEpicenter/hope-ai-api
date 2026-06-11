@@ -5,6 +5,12 @@ type UpdateVisitorBody = {
   name?: string;
   email?: string;
   phone?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  birthday?: string;
 };
 
 function isValidEmail(email: string): boolean {
@@ -67,6 +73,30 @@ export async function updateVisitor(context: any, req: any): Promise<void> {
       patch.phone = body.phone.trim();
     }
 
+    if (typeof body.address1 === "string") {
+      patch.address1 = body.address1.trim();
+    }
+
+    if (typeof body.address2 === "string") {
+      patch.address2 = body.address2.trim();
+    }
+
+    if (typeof body.city === "string") {
+      patch.city = body.city.trim();
+    }
+
+    if (typeof body.state === "string") {
+      patch.state = body.state.trim();
+    }
+
+    if (typeof body.postalCode === "string") {
+      patch.postalCode = body.postalCode.trim();
+    }
+
+    if (typeof body.birthday === "string") {
+      patch.birthday = body.birthday.trim();
+    }
+
     const visitor = await updateVisitorRecord(visitorId, patch);
 
     if (!visitor) {
@@ -95,3 +125,4 @@ export async function updateVisitor(context: any, req: any): Promise<void> {
     };
   }
 }
+

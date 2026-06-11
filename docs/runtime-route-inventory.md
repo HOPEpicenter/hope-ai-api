@@ -44,7 +44,7 @@ Azure Functions are configured with `authLevel: anonymous`, but protected routes
 | GET | `/api/engagements/status` | Engagement status | `HOPE_API_KEY` |
 | GET | `/api/integration/timeline` | Integration timeline | `HOPE_API_KEY` |
 | GET | `/api/integration/summary` | Integration summary | `HOPE_API_KEY` |
-| GET | `/api/integration/global-timeline` | Global integration timeline | `HOPE_API_KEY` |
+| GET | `/api/integration/timeline/global` | Global integration timeline | `HOPE_API_KEY` |
 | GET | `/api/legacy/export` | Legacy export | `HOPE_API_KEY` |
 | GET | `/api/dashboard/followups` | Dashboard followups/read model | `HOPE_API_KEY` |
 | GET | `/api/_protected/ping` | Protected auth probe | `HOPE_API_KEY` |

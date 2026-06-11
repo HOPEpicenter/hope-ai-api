@@ -126,7 +126,7 @@ Expected surfaces:
 - /api/formation/profiles
 - /api/visitors/:id/dashboard-card
 - /api/visitors/:id/summary
-- /api/dashboard/timeline/unified
+- /api/integration/timeline/global
 
 Do not use:
 

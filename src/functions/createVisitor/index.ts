@@ -7,6 +7,12 @@ type CreateVisitorBody = {
   lastName?: string;
   email?: string;
   phone?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  birthday?: string;
 };
 
 function isValidEmail(email: string): boolean {
@@ -29,6 +35,12 @@ export async function createVisitor(context: any, req: any): Promise<void> {
     const name = typeof nameRaw === "string" ? nameRaw.trim() : "";
     const emailRaw = typeof body.email === "string" ? body.email.trim() : "";
     const phoneRaw = typeof body.phone === "string" ? body.phone.trim() : "";
+    const address1Raw = typeof body.address1 === "string" ? body.address1.trim() : "";
+    const address2Raw = typeof body.address2 === "string" ? body.address2.trim() : "";
+    const cityRaw = typeof body.city === "string" ? body.city.trim() : "";
+    const stateRaw = typeof body.state === "string" ? body.state.trim() : "";
+    const postalCodeRaw = typeof body.postalCode === "string" ? body.postalCode.trim() : "";
+    const birthdayRaw = typeof body.birthday === "string" ? body.birthday.trim() : "";
 
     if (!name) {
       context.res = {
@@ -57,7 +69,17 @@ export async function createVisitor(context: any, req: any): Promise<void> {
       return;
     }
 
-    const result = await createVisitorRecord({ name, email: emailRaw, phone: phoneRaw });
+    const result = await createVisitorRecord({
+      name,
+      email: emailRaw,
+      phone: phoneRaw,
+      address1: address1Raw,
+      address2: address2Raw,
+      city: cityRaw,
+      state: stateRaw,
+      postalCode: postalCodeRaw,
+      birthday: birthdayRaw
+    });
 
     context.res = {
       status: result.created ? 201 : 200,

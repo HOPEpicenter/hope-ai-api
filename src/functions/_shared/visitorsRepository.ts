@@ -7,6 +7,12 @@ export type FunctionVisitor = {
   name: string;
   email?: string;
   phone?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  birthday?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -23,6 +29,12 @@ type VisitorEntity = {
   email?: string;
   emailLower?: string;
   phone?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  birthday?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -47,6 +59,12 @@ function toVisitor(entity: VisitorEntity): FunctionVisitor {
     name: entity.name,
     email: entity.email,
     phone: entity.phone,
+    address1: entity.address1,
+    address2: entity.address2,
+    city: entity.city,
+    state: entity.state,
+    postalCode: entity.postalCode,
+    birthday: entity.birthday,
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt
   };
@@ -102,7 +120,17 @@ export async function listVisitorsRecords(input: { limit: number }): Promise<{ i
   return { items, count: all.length };
 }
 
-export async function createVisitorRecord(input: { name: string; email?: string; phone?: string }): Promise<FunctionCreateVisitorResult> {
+export async function createVisitorRecord(input: {
+  name: string;
+  email?: string;
+  phone?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  birthday?: string;
+}): Promise<FunctionCreateVisitorResult> {
   const table = getTableClient(TABLE);
   await ensureTableExists(table);
   const id = randomUUID();
@@ -111,6 +139,12 @@ export async function createVisitorRecord(input: { name: string; email?: string;
   const emailTrim = typeof input.email === "string" ? input.email.trim() : undefined;
   const emailLower = emailTrim ? emailTrim.toLowerCase() : undefined;
   const phoneTrim = typeof input.phone === "string" ? input.phone.trim() : undefined;
+  const address1Trim = typeof input.address1 === "string" ? input.address1.trim() : undefined;
+  const address2Trim = typeof input.address2 === "string" ? input.address2.trim() : undefined;
+  const cityTrim = typeof input.city === "string" ? input.city.trim() : undefined;
+  const stateTrim = typeof input.state === "string" ? input.state.trim() : undefined;
+  const postalCodeTrim = typeof input.postalCode === "string" ? input.postalCode.trim() : undefined;
+  const birthdayTrim = typeof input.birthday === "string" ? input.birthday.trim() : undefined;
 
   if (emailLower) {
     const emailKey = encodeURIComponent(emailLower);
@@ -199,6 +233,12 @@ export async function createVisitorRecord(input: { name: string; email?: string;
     email: emailTrim,
     emailLower,
     phone: phoneTrim,
+    address1: address1Trim,
+    address2: address2Trim,
+    city: cityTrim,
+    state: stateTrim,
+    postalCode: postalCodeTrim,
+    birthday: birthdayTrim,
     createdAt: now,
     updatedAt: now
   };
@@ -226,7 +266,17 @@ export async function createVisitorRecord(input: { name: string; email?: string;
 }
 export async function updateVisitorRecord(
   visitorId: string,
-  input: { name?: string; email?: string; phone?: string }
+  input: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    address1?: string;
+    address2?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    birthday?: string;
+  }
 ): Promise<FunctionVisitor | null> {
   const table = getTableClient(TABLE);
   await ensureTableExists(table);
@@ -240,6 +290,12 @@ export async function updateVisitorRecord(
   const nextName = typeof input.name === "string" ? input.name.trim() : entity.name;
   const nextEmail = typeof input.email === "string" ? input.email.trim() : entity.email;
   const nextPhone = typeof input.phone === "string" ? input.phone.trim() : entity.phone;
+  const nextAddress1 = typeof input.address1 === "string" ? input.address1.trim() : entity.address1;
+  const nextAddress2 = typeof input.address2 === "string" ? input.address2.trim() : entity.address2;
+  const nextCity = typeof input.city === "string" ? input.city.trim() : entity.city;
+  const nextState = typeof input.state === "string" ? input.state.trim() : entity.state;
+  const nextPostalCode = typeof input.postalCode === "string" ? input.postalCode.trim() : entity.postalCode;
+  const nextBirthday = typeof input.birthday === "string" ? input.birthday.trim() : entity.birthday;
 
   if (!nextName) {
     throw new Error("name is required");
@@ -251,6 +307,12 @@ export async function updateVisitorRecord(
     email: nextEmail || undefined,
     emailLower: nextEmail ? nextEmail.toLowerCase() : undefined,
     phone: nextPhone || undefined,
+    address1: nextAddress1 || undefined,
+    address2: nextAddress2 || undefined,
+    city: nextCity || undefined,
+    state: nextState || undefined,
+    postalCode: nextPostalCode || undefined,
+    birthday: nextBirthday || undefined,
     updatedAt: now
   };
 

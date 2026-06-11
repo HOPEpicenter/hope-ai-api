@@ -117,6 +117,7 @@ Assert ($null -ne $needsCareItem) "needs_care visitor should appear in care cand
 Assert ($needsCareItem.reason -eq "needs_care") "needs_care candidate reason should match"
 Assert ($needsCareItem.source.workflowId -eq "care") "needs_care candidate workflowId should be care"
 Assert ($needsCareItem.source.followupOutcome -eq "needs_care") "needs_care candidate source outcome should match"
+Assert (-not [string]::IsNullOrWhiteSpace([string]$needsCareItem.source.followupOutcomeAt)) "needs_care candidate source outcome timestamp should be present"
 Assert ($needsCareItem.carePriority -eq "normal") "carePriority should be normal"
 Assert ($needsCareItem.careAgeBucket -eq "new") "careAgeBucket should be new"
 Assert ($needsCareItem.escalationLevel -eq "none") "escalationLevel should be none"

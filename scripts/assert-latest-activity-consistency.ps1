@@ -146,6 +146,27 @@ Start-Sleep -Milliseconds 100
 Post-FormationEvent -VisitorId $visitorId -OccurredAt $base.AddSeconds(30)
 Start-Sleep -Milliseconds 100
 Post-NextStepCompleted -VisitorId $visitorId -OccurredAt $base.AddSeconds(60)
+Start-Sleep -Milliseconds 100
+
+$followupOutcomeAt = $base.AddSeconds(90)
+$body = @{
+  v = 1
+  eventId = "evt-$([guid]::NewGuid().ToString("N"))"
+  visitorId = $visitorId
+  type = "FOLLOWUP_OUTCOME_RECORDED"
+  occurredAt = $followupOutcomeAt.ToUniversalTime().ToString("o")
+  source = @{ system = "assert-latest-activity-consistency"; actorId = "ops-user-1" }
+  data = @{
+    outcome = "needs_care"
+  }
+} | ConvertTo-Json -Depth 10
+
+Invoke-RestMethod `
+  -Method POST `
+  -Uri "$BaseUrl/api/formation/events" `
+  -Headers (Get-Headers) `
+  -ContentType "application/json" `
+  -Body $body | Out-Null
 
 $timeline = Get-IntegrationTimeline -VisitorId $visitorId
 $summary = Get-VisitorSummary -VisitorId $visitorId
@@ -183,14 +204,16 @@ Assert ([string]$summaryLatest.eventId -eq [string]$latest.eventId) "summary lat
 
 Assert ([string]$card.card.lastActivityAt -eq [string]$latest.occurredAt) "dashboard card lastActivityAt does not match integration latest"
 Assert ([string]$card.card.lastActivitySummary -eq [string]$latest.summary) "dashboard card lastActivitySummary does not match integration latest summary"
-Assert ([string]$card.card.lastNextStepAt -eq [string]$latest.occurredAt) "dashboard card lastNextStepAt does not match integration latest"
-Assert ([string]$card.card.lastNextStepCompletedAt -eq [string]$latest.occurredAt) "dashboard card lastNextStepCompletedAt does not match integration latest"
+Assert ([string]$card.card.lastNextStepAt -eq [string]$profile.profile.lastNextStepAt) "dashboard card lastNextStepAt does not match formation profile"
+Assert ([string]$card.card.lastNextStepCompletedAt -eq [string]$profile.profile.lastNextStepCompletedAt) "dashboard card lastNextStepCompletedAt does not match formation profile"
+Assert ([string]$card.card.lastFollowupOutcome -eq [string]$profile.profile.lastFollowupOutcome) "dashboard card lastFollowupOutcome does not match formation profile"
+Assert ([string]$card.card.lastFollowupOutcomeAt -eq [string]$profile.profile.lastFollowupOutcomeAt) "dashboard card lastFollowupOutcomeAt does not match formation profile"
 
 Assert ($null -ne $profile.profile) "formation profile missing"
 Assert ([string]$profile.profile.lastEventAt -eq [string]$latest.occurredAt) "formation profile lastEventAt does not match integration latest"
 Assert ([string]$profile.profile.lastEventType -eq [string]$latest.type) "formation profile lastEventType does not match integration latest type"
-Assert ([string]$profile.profile.lastEventType -eq "NEXT_STEP_COMPLETED") "formation profile latest event should be NEXT_STEP_COMPLETED"
-Assert ([string]$profile.profile.lastNextStepCompletedAt -eq [string]$latest.occurredAt) "formation profile lastNextStepCompletedAt does not match integration latest"
+Assert ([string]$profile.profile.lastEventType -eq "FOLLOWUP_OUTCOME_RECORDED") "formation profile latest event should be FOLLOWUP_OUTCOME_RECORDED"
+Assert ([string]$profile.profile.lastNextStepCompletedAt -eq [string]$card.card.lastNextStepCompletedAt) "formation profile lastNextStepCompletedAt does not match dashboard card"
 
 Assert ($null -ne $insights.insights) "activity insights missing"
 Assert ($null -ne $insights.insights.lastMeaningfulActivity) "activity insights lastMeaningfulActivity missing"

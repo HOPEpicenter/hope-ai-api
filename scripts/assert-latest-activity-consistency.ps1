@@ -183,6 +183,8 @@ Assert ([string]$summaryLatest.eventId -eq [string]$latest.eventId) "summary lat
 
 Assert ([string]$card.card.lastActivityAt -eq [string]$latest.occurredAt) "dashboard card lastActivityAt does not match integration latest"
 Assert ([string]$card.card.lastActivitySummary -eq [string]$latest.summary) "dashboard card lastActivitySummary does not match integration latest summary"
+Assert ([string]$card.card.lastNextStepAt -eq [string]$latest.occurredAt) "dashboard card lastNextStepAt does not match integration latest"
+Assert ([string]$card.card.lastNextStepCompletedAt -eq [string]$latest.occurredAt) "dashboard card lastNextStepCompletedAt does not match integration latest"
 
 Assert ($null -ne $profile.profile) "formation profile missing"
 Assert ([string]$profile.profile.lastEventAt -eq [string]$latest.occurredAt) "formation profile lastEventAt does not match integration latest"

@@ -1438,3 +1438,55 @@ Dashboard PR #29 consumed the new backend fields.
 
 Next-step activity is now visible from backend canonical formation profile through dashboard card surfaces without adding new event types or dashboard-owned derivation.
 
+
+## 2026-06-11 — Prayer Request Runtime + Dashboard Visibility
+
+### Completed
+
+Backend prayer request runtime alignment completed.
+
+Backend PR #1104:
+- Allowed PRAYER_REQUESTED through active formation runtime validation
+- Projected lastPrayerRequestedAt into formation profile state
+- Preserved lastPrayerRequestedAt in formation profile storage projection
+- Exposed lastPrayerRequestedAt through formation profile responses
+- Extended latest activity consistency coverage
+
+Backend PR #1105:
+- Added lastPrayerRequestedAt to CanonicalVisitorDashboardCard
+- Mapped lastPrayerRequestedAt from formation profile into dashboard card
+- Asserted dashboard card prayer timestamp matches formation profile
+
+Dashboard PR #31:
+- Added lastPrayerRequestedAt to dashboard card contracts
+- Displayed Last prayer request in Today selected visitor panel
+- Displayed Last prayer request in Visitor Snapshot rail
+
+### Validation
+
+Backend:
+- npm run build passed
+- scripts/assert-latest-activity-consistency.ps1 passed
+- CI passed for PR #1104
+- CI passed for PR #1105
+- Staging Azure Functions deployment succeeded for PR #1104
+- Staging Azure Functions deployment succeeded for PR #1105
+
+Dashboard:
+- npm run build passed
+- Vercel PR checks passed
+- Dashboard PR #31 merged
+- Vercel deployment ready
+
+### Result
+
+Prayer request activity now flows through the active backend runtime path into canonical formation profile state, the visitor dashboard card, and dashboard-visible pastor surfaces.
+
+This completed the backend-first contract loop:
+
+PRAYER_REQUESTED
+→ lastPrayerRequestedAt
+→ CanonicalVisitorDashboardCard
+→ Today selected visitor panel
+→ Visitor Snapshot rail
+

@@ -62,6 +62,7 @@ function Post-EngagementEvent([string]$VisitorId, [string]$Type, [datetime]$Occu
     occurredAt = New-IsoUtc $OccurredAt
     source = @{
       system = "scripts/assert-cross-surface-consistency.ps1"
+      actorId = "ops-user-1"
     }
     data = $Data
   }
@@ -76,6 +77,7 @@ function Post-FormationEvent([string]$VisitorId, [string]$Type, [datetime]$Occur
     occurredAt = New-IsoUtc $OccurredAt
     source = @{
       system = "scripts/assert-cross-surface-consistency.ps1"
+      actorId = "ops-user-1"
     }
     data = $Data
   }

@@ -141,6 +141,29 @@ function Get-ActivityInsights([string]$VisitorId) {
 $visitorId = New-TestVisitor
 $base = (Get-Date).ToUniversalTime().AddMinutes(-10)
 
+$prayerRequestedAt = $base.AddSeconds(-30)
+$body = @{
+  v = 1
+  eventId = "evt-$([guid]::NewGuid().ToString("N"))"
+  visitorId = $visitorId
+  type = "PRAYER_REQUESTED"
+  occurredAt = $prayerRequestedAt.ToUniversalTime().ToString("o")
+  source = @{ system = "assert-latest-activity-consistency"; actorId = "ops-user-1" }
+  data = @{
+    topic = "guidance"
+    shareWith = "pastoral_only"
+  }
+} | ConvertTo-Json -Depth 10
+
+Invoke-RestMethod `
+  -Method POST `
+  -Uri "$BaseUrl/api/formation/events" `
+  -Headers (Get-Headers) `
+  -ContentType "application/json" `
+  -Body $body | Out-Null
+
+Start-Sleep -Milliseconds 100
+
 Post-EngagementTransition -VisitorId $visitorId -OccurredAt $base
 Start-Sleep -Milliseconds 100
 Post-FormationEvent -VisitorId $visitorId -OccurredAt $base.AddSeconds(30)
@@ -214,6 +237,7 @@ Assert ([string]$profile.profile.lastEventAt -eq [string]$latest.occurredAt) "fo
 Assert ([string]$profile.profile.lastEventType -eq [string]$latest.type) "formation profile lastEventType does not match integration latest type"
 Assert ([string]$profile.profile.lastEventType -eq "FOLLOWUP_OUTCOME_RECORDED") "formation profile latest event should be FOLLOWUP_OUTCOME_RECORDED"
 Assert ([string]$profile.profile.lastNextStepCompletedAt -eq [string]$card.card.lastNextStepCompletedAt) "formation profile lastNextStepCompletedAt does not match dashboard card"
+Assert (-not [string]::IsNullOrWhiteSpace([string]$profile.profile.lastPrayerRequestedAt)) "formation profile lastPrayerRequestedAt should be present"
 
 Assert ($null -ne $insights.insights) "activity insights missing"
 Assert ($null -ne $insights.insights.lastMeaningfulActivity) "activity insights lastMeaningfulActivity missing"

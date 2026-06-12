@@ -26,7 +26,7 @@ function mapProfile(entity: any) {
 
     lastNextStepAt: entity.lastNextStepAt ?? null,
     lastNextStepCompletedAt: entity.lastNextStepCompletedAt ?? null,
-
+    lastPrayerRequestedAt: entity.lastPrayerRequestedAt ?? null,
     updatedAt: entity.updatedAt ?? null
   };
 }

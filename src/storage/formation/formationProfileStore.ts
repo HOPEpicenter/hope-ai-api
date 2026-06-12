@@ -17,7 +17,7 @@ export type FormationProfileEntity = {
   lastEventAt?: string | null;
 
   lastFollowupAssignedAt?: string | null;
-
+  lastPrayerRequestedAt?: string | null;
   updatedAt?: string | null;
 };
 

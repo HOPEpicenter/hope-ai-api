@@ -9,6 +9,7 @@ export type CanonicalVisitorDashboardCard = {
   lastNextStepCompletedAt: string | null;
   lastFollowupOutcome: string | null;
   lastFollowupOutcomeAt: string | null;
+  lastPrayerRequestedAt: string | null;
   followupStatus: "action_needed" | "contact_made" | "resolved" | "unassigned";
   assignedTo: string | null;
   assignedToName: string | null;

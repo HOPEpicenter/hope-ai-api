@@ -24,6 +24,25 @@ export async function readCanonicalVisitorDashboardCard(
   const profile = summary.formation.profile ?? null;
   const projection = projectFollowupState(profile);
 
+  const stage =
+    typeof profile?.stage === "string" && profile.stage.trim().length > 0
+      ? profile.stage.trim()
+      : null;
+
+  const stageReason =
+    typeof profile?.stageReason === "string" && profile.stageReason.trim().length > 0
+      ? profile.stageReason.trim()
+      : null;
+
+  const stageUpdatedAt =
+    typeof profile?.stageUpdatedAt === "string" && profile.stageUpdatedAt.trim().length > 0
+      ? profile.stageUpdatedAt.trim()
+      : null;
+
+  const stageUpdatedBy =
+    typeof profile?.stageUpdatedBy === "string" && profile.stageUpdatedBy.trim().length > 0
+      ? profile.stageUpdatedBy.trim()
+      : null;
   const followupStatus =
     projection.followupState === "Assigned"
       ? "action_needed"
@@ -93,6 +112,10 @@ export async function readCanonicalVisitorDashboardCard(
     visitorId,
     lastActivityAt: latest?.occurredAt ?? null,
     lastActivitySummary: latest?.summary ?? null,
+    stage,
+    stageReason,
+    stageUpdatedAt,
+    stageUpdatedBy,
     lastNextStepAt,
     lastNextStepCompletedAt,
     lastFollowupOutcome,

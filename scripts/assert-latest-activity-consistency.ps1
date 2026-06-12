@@ -239,6 +239,10 @@ Assert ([string]$profile.profile.lastEventType -eq "FOLLOWUP_OUTCOME_RECORDED") 
 Assert ([string]$profile.profile.lastNextStepCompletedAt -eq [string]$card.card.lastNextStepCompletedAt) "formation profile lastNextStepCompletedAt does not match dashboard card"
 Assert (-not [string]::IsNullOrWhiteSpace([string]$profile.profile.lastPrayerRequestedAt)) "formation profile lastPrayerRequestedAt should be present"
 Assert ([string]$card.card.lastPrayerRequestedAt -eq [string]$profile.profile.lastPrayerRequestedAt) "dashboard card lastPrayerRequestedAt does not match formation profile"
+Assert ([string]$card.card.stage -eq [string]$profile.profile.stage) "dashboard card stage does not match formation profile"
+Assert ([string]$card.card.stageReason -eq [string]$profile.profile.stageReason) "dashboard card stageReason does not match formation profile"
+Assert ([string]$card.card.stageUpdatedAt -eq [string]$profile.profile.stageUpdatedAt) "dashboard card stageUpdatedAt does not match formation profile"
+Assert ([string]$card.card.stageUpdatedBy -eq [string]$profile.profile.stageUpdatedBy) "dashboard card stageUpdatedBy does not match formation profile"
 
 Assert ($null -ne $insights.insights) "activity insights missing"
 Assert ($null -ne $insights.insights.lastMeaningfulActivity) "activity insights lastMeaningfulActivity missing"

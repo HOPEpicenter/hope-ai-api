@@ -67,6 +67,12 @@ export async function readCanonicalVisitorDashboardCard(
     typeof profile?.lastFollowupOutcomeAt === "string" && profile.lastFollowupOutcomeAt.trim().length > 0
       ? profile.lastFollowupOutcomeAt.trim()
       : null;
+
+  const lastPrayerRequestedAt =
+    typeof profile?.lastPrayerRequestedAt === "string" && profile.lastPrayerRequestedAt.trim().length > 0
+      ? profile.lastPrayerRequestedAt.trim()
+      : null;
+
   const lastFollowupAssignedAt =
     typeof profile?.lastFollowupAssignedAt === "string" && profile.lastFollowupAssignedAt.trim().length > 0
       ? profile.lastFollowupAssignedAt.trim()
@@ -91,6 +97,7 @@ export async function readCanonicalVisitorDashboardCard(
     lastNextStepCompletedAt,
     lastFollowupOutcome,
     lastFollowupOutcomeAt,
+    lastPrayerRequestedAt,
     followupStatus,
     assignedTo,
     assignedToName,

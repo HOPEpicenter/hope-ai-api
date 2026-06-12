@@ -173,6 +173,7 @@ const SUPPORTED_FORMATION_EVENT_TYPES = new Set([
   "FOLLOWUP_OUTCOME_RECORDED",
   "NEXT_STEP_SELECTED",
   "NEXT_STEP_COMPLETED",
+  "PRAYER_REQUESTED",
   "SALVATION_RECORDED",
   "BAPTISM_RECORDED",
   "MEMBERSHIP_RECORDED",
@@ -587,6 +588,14 @@ async function applyFormationEventToProfile(params: {
       data,
       occurredAtIso: occurredAt,
       eventId
+    });
+  }
+
+  if (type === "PRAYER_REQUESTED") {
+    applyTouchpointTimestamp({
+      profile: profile as any,
+      field: "lastPrayerRequestedAt",
+      occurredAtIso: occurredAt
     });
   }
 }

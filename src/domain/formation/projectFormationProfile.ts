@@ -53,7 +53,7 @@ export async function projectFormationProfileFromEvent(input: FormationEventInpu
 
   let assignedTo: string | null | undefined = existing?.assignedTo ?? null;
   let lastFollowupAssignedAt: string | null | undefined = existing?.lastFollowupAssignedAt ?? null;
-
+  let lastPrayerRequestedAt: string | null | undefined = existing?.lastPrayerRequestedAt ?? null;
   // Type-specific projection (Phase 3.2 scope)
   if (input.type === "FOLLOWUP_ASSIGNED") {
     const md: any = input.metadata ?? {};
@@ -67,6 +67,9 @@ export async function projectFormationProfileFromEvent(input: FormationEventInpu
     assignedTo = null;
   }
 
+  if (input.type === "PRAYER_REQUESTED") {
+    lastPrayerRequestedAt = occurredAt;
+  }
   const entity: FormationProfileEntity = {
     partitionKey: FORMATION_PROFILES_PARTITION_KEY,
     rowKey: visitorId,
@@ -79,6 +82,7 @@ export async function projectFormationProfileFromEvent(input: FormationEventInpu
     lastEventAt: occurredAt,
 
     lastFollowupAssignedAt: lastFollowupAssignedAt ?? null,
+    lastPrayerRequestedAt: lastPrayerRequestedAt ?? null,
     updatedAt: nowIso(),
   };
 

@@ -244,6 +244,20 @@ Assert ([string]$card.card.stageReason -eq [string]$profile.profile.stageReason)
 Assert ([string]$card.card.stageUpdatedAt -eq [string]$profile.profile.stageUpdatedAt) "dashboard card stageUpdatedAt does not match formation profile"
 Assert ([string]$card.card.stageUpdatedBy -eq [string]$profile.profile.stageUpdatedBy) "dashboard card stageUpdatedBy does not match formation profile"
 
+$risk = $summary.summary.engagement.risk
+Assert ($null -ne $risk) "summary engagement risk missing"
+Assert ([string]$card.card.riskLevel -eq [string]$risk.riskLevel) "dashboard card riskLevel does not match summary risk"
+Assert ([int]$card.card.riskScore -eq [int]$risk.riskScore) "dashboard card riskScore does not match summary risk"
+Assert ([string]$card.card.recommendedAction -eq [string]$risk.recommendedAction) "dashboard card recommendedAction does not match summary risk"
+Assert ([bool]$card.card.needsFollowup -eq [bool]$risk.engagement.needsFollowup) "dashboard card needsFollowup does not match summary risk"
+
+Assert ([string]$card.card.priorityBand -eq "low") "dashboard card priorityBand should be low for resolved low-risk scenario"
+Assert ([int]$card.card.priorityScore -eq 10) "dashboard card priorityScore should be 10 for resolved low-risk scenario"
+Assert ([string]$card.card.priorityReason -eq "low_risk") "dashboard card priorityReason should be low_risk for resolved low-risk scenario"
+
+Assert ($null -eq $card.card.followupUrgency) "dashboard card followupUrgency should be null for unassigned resolved scenario"
+Assert ([bool]$card.card.followupOverdue -eq $false) "dashboard card followupOverdue should be false for unassigned resolved scenario"
+
 Assert ($null -ne $insights.insights) "activity insights missing"
 Assert ($null -ne $insights.insights.lastMeaningfulActivity) "activity insights lastMeaningfulActivity missing"
 Assert ([string]$insights.insights.lastMeaningfulActivity.occurredAt -eq [string]$latest.occurredAt) "activity insights lastMeaningfulActivity occurredAt does not match integration latest"

@@ -5,6 +5,10 @@ export type CanonicalVisitorDashboardCard = {
   visitorId: string;
   lastActivityAt: string | null;
   lastActivitySummary: string | null;
+  stage: string | null;
+  stageReason: string | null;
+  stageUpdatedAt: string | null;
+  stageUpdatedBy: string | null;
   lastNextStepAt: string | null;
   lastNextStepCompletedAt: string | null;
   lastFollowupOutcome: string | null;

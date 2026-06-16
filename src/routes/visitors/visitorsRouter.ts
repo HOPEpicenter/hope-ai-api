@@ -7,12 +7,24 @@ import { createListVisitorsAdapter } from "./listVisitorsAdapter";
 import { createGetVisitorSummaryAdapter } from "./createGetVisitorSummaryAdapter";
 import { createGetVisitorDashboardCardAdapter } from "./createGetVisitorDashboardCardAdapter";
 import { createGetVisitorJourneyAdapter } from "./createGetVisitorJourneyAdapter";
+import { postVisitorNote } from "../../functions/postVisitorNote";
+import { updateVisitor } from "../../functions/updateVisitor";
+import { invokeFunction } from "./invokeFunction";
 
 export default function visitorsRouter(visitorsRepository: VisitorsRepository) {
   const router = Router();
 
 
   router.post("/", createCreateVisitorAdapter(visitorsRepository));
+  router.patch("/:visitorId", (req, res, next) => {
+    invokeFunction(updateVisitor, req, res).catch(next);
+  });
+  router.put("/:visitorId", (req, res, next) => {
+    invokeFunction(updateVisitor, req, res).catch(next);
+  });
+  router.post("/:visitorId/notes", (req, res, next) => {
+    invokeFunction(postVisitorNote, req, res).catch(next);
+  });
   router.get("/:id", createGetVisitorAdapter(visitorsRepository));
   router.get("/:id/summary", requireApiKey, createGetVisitorSummaryAdapter());
   router.get("/:id/dashboard-card", requireApiKey, createGetVisitorDashboardCardAdapter());

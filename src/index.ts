@@ -15,6 +15,7 @@ import { AzureTableVisitorsRepository, AzureTableFormationEventsRepository } fro
 import { opsFollowupsRouter } from "./routes/opsFollowups";
 import dashboardRouter from "./routes/dashboard";
 import opsParityRouter from "./routes/opsParity";
+import protectedRouter from "./routes/protected";
 import { careRouter } from "./routes/care";
 import { activityIntelligenceRouter } from "./routes/activityIntelligence";
 
@@ -86,6 +87,7 @@ app.use("/api", careRouter);
 app.use("/api", activityIntelligenceRouter);
 app.use("/api", dashboardRouter);
 app.use("/api", opsParityRouter);
+app.use("/api", protectedRouter);
 app.use("/api", legacyRouter);
 
 /**

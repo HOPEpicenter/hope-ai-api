@@ -5,7 +5,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$ApiBase = ($BaseUrl.TrimEnd("/") + "/api")
+$RootBase = $BaseUrl.TrimEnd("/")
+if ($RootBase -match "/api$") {
+  $ApiBase = $RootBase
+} else {
+  $ApiBase = "$RootBase/api"
+}
 
 $headers = @{
   "content-type" = "application/json"
@@ -78,6 +83,7 @@ function Seed-CareCandidate {
 
   Post-FormationEvent -VisitorId $visitorId -Type "FOLLOWUP_CONTACTED" -OccurredAt $base.AddSeconds(1) -Data @{
     method = "phone"
+    result = "connected"
   }
 
   Post-FormationEvent -VisitorId $visitorId -Type "FOLLOWUP_OUTCOME_RECORDED" -OccurredAt $base.AddSeconds(2) -Data @{

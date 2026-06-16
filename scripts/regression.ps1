@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$env:HOPE_RUN_PHASE3_ASSERTS = "1"
 Write-Host "=== HOPE AI REGRESSION CHECKS ==="
 Write-Host "RepoRoot: $RepoRoot"
 Write-Host "BaseUrl:  $BaseUrl"

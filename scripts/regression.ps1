@@ -478,6 +478,10 @@ Formation idempotency..."
   Write-Host "[regression] Skipping formation milestones v1 contract (HOPE_API_KEY not set)."
   Write-Host "[regression] Skipping formation snapshot invariants (HOPE_API_KEY not set)."
 }
+Write-Host "[regression] Final route parity contract..."
+pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-final-route-parity-contract.ps1") -BaseUrl $BaseUrl -ApiKey $env:HOPE_API_KEY
+if ($LASTEXITCODE -ne 0) { throw "Final route parity contract failed ($LASTEXITCODE)" }
+
 Write-Host "[4] Auth scoping assertions (401/400 expectations)"
 $env:HOPE_RUN_PHASE3_ASSERTS = "1"
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\assert-auth-scoping.ps1 -BaseUrl $BaseUrl

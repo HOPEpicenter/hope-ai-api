@@ -14,6 +14,7 @@ import { requestLogMiddleware } from "./http/requestLog";
 import { AzureTableVisitorsRepository, AzureTableFormationEventsRepository } from "./repositories";
 import { opsFollowupsRouter } from "./routes/opsFollowups";
 import dashboardRouter from "./routes/dashboard";
+import opsParityRouter from "./routes/opsParity";
 import { careRouter } from "./routes/care";
 import { activityIntelligenceRouter } from "./routes/activityIntelligence";
 
@@ -84,6 +85,7 @@ app.use("/api", integrationRouter);
 app.use("/api", careRouter);
 app.use("/api", activityIntelligenceRouter);
 app.use("/api", dashboardRouter);
+app.use("/api", opsParityRouter);
 app.use("/api", legacyRouter);
 
 /**

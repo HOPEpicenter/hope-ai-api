@@ -1490,3 +1490,12 @@ PRAYER_REQUESTED
 → Today selected visitor panel
 → Visitor Snapshot rail
 
+
+## 2026-06-16 — Backend Express parity hardening
+
+- Merged **#1110**: added Express care route parity for Azure Functions care endpoints.
+- Merged **#1111**: added Express activity intelligence and opportunity worklist route parity.
+- Merged **#1112**: added Express visitor mutation route parity for visitor notes and visitor updates.
+- CI and staging deploys passed for all three PRs.
+- Local backend regression passed after parity fixes.
+- This reduces drift between local Express validation and deployed Azure Functions behavior before dashboard work resumes.

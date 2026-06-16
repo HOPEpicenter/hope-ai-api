@@ -14,6 +14,7 @@ import { requestLogMiddleware } from "./http/requestLog";
 import { AzureTableVisitorsRepository, AzureTableFormationEventsRepository } from "./repositories";
 import { opsFollowupsRouter } from "./routes/opsFollowups";
 import { careRouter } from "./routes/care";
+import { activityIntelligenceRouter } from "./routes/activityIntelligence";
 
 import { AzureTableEngagementsRepository } from "./repositories/engagementsRepository";
 process.on("unhandledRejection", (reason) => {
@@ -80,6 +81,7 @@ app.use("/api", followupQueueRouter);
 app.use("/api", engagementsRouter);
 app.use("/api", integrationRouter);
 app.use("/api", careRouter);
+app.use("/api", activityIntelligenceRouter);
 app.use("/api", legacyRouter);
 
 /**

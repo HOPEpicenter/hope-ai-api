@@ -5,7 +5,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$ApiBase = ($BaseUrl.TrimEnd("/") + "/api")
+$RootBase = $BaseUrl.TrimEnd("/")
+if ($RootBase -match "/api$") {
+  $ApiBase = $RootBase
+} else {
+  $ApiBase = "$RootBase/api"
+}
 
 $headers = @{
   "content-type" = "application/json"

@@ -1499,3 +1499,13 @@ PRAYER_REQUESTED
 - CI and staging deploys passed for all three PRs.
 - Local backend regression passed after parity fixes.
 - This reduces drift between local Express validation and deployed Azure Functions behavior before dashboard work resumes.
+
+## 2026-06-16 — Final Express route parity milestone
+
+- Merged **#1114**: added Express parity for dashboard followups.
+- Merged **#1115**: added Express parity for OPS task preview and formation profile audit routes.
+- Merged **#1116**: added final Express parity for visitor activity insights and protected ping.
+- Merged **#1117**: added regression coverage for final route parity.
+- Full local regression passed after the parity sweep.
+- CI and staging deploys passed after each merge.
+- Express local validation is now effectively aligned with the Azure Functions HTTP route surface.

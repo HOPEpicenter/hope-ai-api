@@ -14,7 +14,7 @@ Status: Express route parity is considered effectively aligned with Azure Functi
 | `/api/visitors/{visitorId}` | `getVisitor`, `updateVisitor` | Yes | Yes | Visitor mutation parity added. |
 | `/api/visitors/{visitorId}/notes` | `postVisitorNote` | Yes | Yes | Visitor mutation parity added. |
 | `/api/visitors/{id}/summary` | `getVisitorSummary` | Yes | Yes | Summary/Journey regression coverage. |
-| `/api/visitors/{id}/dashboard-card` | `getVisitorDashboardCard` | Yes | Partial | Covered through dashboard/visitor surface smoke; candidate for dedicated contract if dashboard card becomes pilot-critical. |
+| `/api/visitors/{id}/dashboard-card` | `getVisitorDashboardCard` | Yes | Yes | Dedicated dashboard card contract added in PR #1120. |
 | `/api/visitors/{visitorId}/journey` | `getVisitorJourney` | Yes | Yes | Journey smoke/regression coverage. |
 | `/api/visitors/{id}/activity-insights` | `getVisitorActivityInsights` | Yes | Yes | Final route parity contract. |
 | `/api/visitors/{id}/formation/events` | `getVisitorFormationEvents` | Yes | Yes | Formation pagination/idempotency/reconciliation coverage. |
@@ -39,7 +39,7 @@ Status: Express route parity is considered effectively aligned with Azure Functi
 | `/api/care/candidates/{visitorId}/unassign` | `postCareCandidateUnassign` | Yes | Yes | Care unassignment contracts. |
 | `/api/care/candidates/assign-bulk` | `postCareCandidateAssignBulk` | Yes | Yes | Bulk assignment contracts. |
 | `/api/care/candidates/unassign-bulk` | `postCareCandidateUnassignBulk` | Yes | Yes | Bulk unassignment contracts. |
-| `/api/activity-intelligence` | `getActivityIntelligence` | Yes | Partial | Route parity added; opportunity/worklist tests cover adjacent surface. Candidate for dedicated response-shape contract if pilot-critical. |
+| `/api/activity-intelligence` | `getActivityIntelligence` | Yes | Yes | Dedicated activity intelligence response-shape contract added in PR #1121. |
 | `/api/activity-intelligence/opportunities/{segment}` | `getOpportunityWorklist` | Yes | Yes | Opportunity worklist regression. |
 | `/api/dashboard/followups` | `getDashboardFollowups` | Yes | Yes | Dashboard followups parity and OPS projection contracts. |
 | `/api/ops/followups` | `getOpsFollowups` | Yes | Yes | OPS followups lifecycle/order coverage. |

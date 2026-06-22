@@ -768,7 +768,7 @@ Next constraints
 - [x] Journey / Formation projection drift audit — COMPLETE (#1124).
 - [x] Task generation derivation audit — COMPLETE (#1125).
 - [x] Visitor profile invariant expansion — COMPLETE (#1126).
-- [ ] Canonical opportunity narrative layer.
+- [x] Canonical opportunity narrative layer — COMPLETE (#1128).
 
 
 ## 2026-06-09 People Workflow Pilot Readiness

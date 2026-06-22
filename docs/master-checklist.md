@@ -717,9 +717,9 @@ Next constraints:
 - [x] Journey / Formation / Visitor Summary derivation validation
 - [x] Ops Followups derivation validation
 - [x] Task Eligibility derivation validation
-- [ ] Journey / Formation projection drift audit
-- [ ] Task generation derivation audit
-- [ ] Visitor profile invariant expansion
+- [x] Journey / Formation projection drift audit — COMPLETE (#1124)
+- [x] Task generation derivation audit — COMPLETE (#1125)
+- [x] Visitor profile invariant expansion — COMPLETE (#1126)
 
 ## Dashboard convergence closeout — 2026-06-04
 
@@ -765,9 +765,9 @@ Next constraints:
 
 Next constraints
 
-- [ ] Journey / Formation projection drift audit.
-- [ ] Task generation derivation audit.
-- [ ] Visitor profile invariant expansion.
+- [x] Journey / Formation projection drift audit — COMPLETE (#1124).
+- [x] Task generation derivation audit — COMPLETE (#1125).
+- [x] Visitor profile invariant expansion — COMPLETE (#1126).
 - [ ] Canonical opportunity narrative layer.
 
 

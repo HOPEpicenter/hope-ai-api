@@ -138,6 +138,22 @@ function Get-ActivityInsights([string]$VisitorId) {
     -Headers (Get-Headers)
 }
 
+function Assert-SummaryProfileMatchesFormationProfile(
+  [object]$SummaryProfile,
+  [object]$FormationProfile,
+  [string[]]$Fields
+) {
+  Assert ($null -ne $SummaryProfile) "visitor summary formation profile missing"
+  Assert ($null -ne $FormationProfile) "canonical formation profile missing"
+
+  foreach ($field in $Fields) {
+    $summaryValue = [string]$SummaryProfile.$field
+    $profileValue = [string]$FormationProfile.$field
+
+    Assert ($summaryValue -eq $profileValue) "visitor summary formation profile $field does not match canonical formation profile"
+  }
+}
+
 $visitorId = New-TestVisitor
 $base = (Get-Date).ToUniversalTime().AddMinutes(-10)
 
@@ -243,6 +259,25 @@ Assert ([string]$card.card.stage -eq [string]$profile.profile.stage) "dashboard 
 Assert ([string]$card.card.stageReason -eq [string]$profile.profile.stageReason) "dashboard card stageReason does not match formation profile"
 Assert ([string]$card.card.stageUpdatedAt -eq [string]$profile.profile.stageUpdatedAt) "dashboard card stageUpdatedAt does not match formation profile"
 Assert ([string]$card.card.stageUpdatedBy -eq [string]$profile.profile.stageUpdatedBy) "dashboard card stageUpdatedBy does not match formation profile"
+
+$summaryProfile = $summary.summary.formation.profile
+Assert-SummaryProfileMatchesFormationProfile `
+  -SummaryProfile $summaryProfile `
+  -FormationProfile $profile.profile `
+  -Fields @(
+    "visitorId",
+    "lastEventAt",
+    "lastEventType",
+    "lastNextStepAt",
+    "lastNextStepCompletedAt",
+    "lastFollowupOutcome",
+    "lastFollowupOutcomeAt",
+    "lastPrayerRequestedAt",
+    "stage",
+    "stageReason",
+    "stageUpdatedAt",
+    "stageUpdatedBy"
+  )
 
 $risk = $summary.summary.engagement.risk
 Assert ($null -ne $risk) "summary engagement risk missing"

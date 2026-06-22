@@ -89,21 +89,29 @@ $segments = @(
     segment = "connected-without-next-step"
     recommendedAction = "Select next step"
     recommendedReason = "Connected profile has engagement activity but no next-step milestone."
+    resolutionField = "lastNextStepAt"
+    resolutionReason = "Opportunity closes when a next-step milestone is recorded."
   },
   @{
     segment = "next-step-selected-not-completed"
     recommendedAction = "Encourage next step completion"
     recommendedReason = "Next step was selected but no completion milestone has been recorded."
+    resolutionField = "lastNextStepCompletedAt"
+    resolutionReason = "Opportunity closes when the selected next step is completed."
   },
   @{
     segment = "active-care-without-outcome"
     recommendedAction = "Record care outcome"
     recommendedReason = "Care relationship is active but no outcome has been recorded."
+    resolutionField = "lastFollowupOutcomeAt"
+    resolutionReason = "Opportunity closes when a followup outcome is recorded."
   },
   @{
     segment = "connected-without-care-owner"
     recommendedAction = "Assign care owner"
     recommendedReason = "Connected profile does not currently have a care owner assigned."
+    resolutionField = "assignedTo"
+    resolutionReason = "Opportunity closes when a care owner is assigned."
   }
 )
 
@@ -111,6 +119,8 @@ foreach ($entry in $segments) {
   $segment = [string]$entry.segment
   $expectedAction = [string]$entry.recommendedAction
   $expectedReason = [string]$entry.recommendedReason
+  $expectedResolutionField = [string]$entry.resolutionField
+  $expectedResolutionReason = [string]$entry.resolutionReason
 
   Write-Host ("[assert-opportunity-worklists] GET segment={0}" -f $segment)
 
@@ -136,6 +146,31 @@ foreach ($entry in $segments) {
     if ($item.recommendedAction.PSObject.Properties.Name -contains "reason") {
       Assert-Equal $item.recommendedAction.reason $expectedReason "Expected recommendedAction reason to match segment."
     }
+
+    Assert-True ($null -ne $item.resolution) "Expected resolution."
+    Assert-Equal $item.resolution.status "open" "Expected opportunity resolution status to remain open."
+    Assert-Equal $item.resolution.resolvedWhen $expectedResolutionField "Expected resolution field to match segment."
+    Assert-Equal $item.resolution.reason $expectedResolutionReason "Expected resolution reason to match segment."
+
+    Assert-True ($null -ne $item.narrative) "Expected canonical opportunity narrative."
+    Assert-Equal $item.narrative.segment $segment "Expected narrative segment to match response segment."
+    Assert-Equal $item.narrative.label $res.label "Expected narrative label to match response label."
+    Assert-Equal $item.narrative.summary $expectedReason "Expected narrative summary to match recommended reason."
+    Assert-Equal $item.narrative.visitor.visitorId $item.visitorId "Expected narrative visitorId to match item visitorId."
+    Assert-Equal $item.narrative.visitor.displayName $item.displayName "Expected narrative displayName to match item displayName."
+    Assert-Equal $item.narrative.recommendedAction.label $item.recommendedAction.label "Expected narrative recommendedAction label to match item."
+    Assert-Equal $item.narrative.recommendedAction.reason $item.recommendedAction.reason "Expected narrative recommendedAction reason to match item."
+    Assert-Equal $item.narrative.resolution.status $item.resolution.status "Expected narrative resolution status to match item."
+    Assert-Equal $item.narrative.resolution.resolvedWhen $item.resolution.resolvedWhen "Expected narrative resolution field to match item."
+    Assert-Equal $item.narrative.resolution.reason $item.resolution.reason "Expected narrative resolution reason to match item."
+    Assert-Equal $item.narrative.evidence.stage $item.stage "Expected narrative evidence stage to match item."
+    Assert-Equal $item.narrative.evidence.assignedTo $item.assignedTo "Expected narrative evidence assignedTo to match item."
+    Assert-Equal $item.narrative.evidence.lastEventType $item.lastEventType "Expected narrative evidence lastEventType to match item."
+    Assert-Equal $item.narrative.evidence.lastEventAt $item.lastEventAt "Expected narrative evidence lastEventAt to match item."
+    Assert-Equal $item.narrative.evidence.lastFollowupOutcome $item.lastFollowupOutcome "Expected narrative evidence lastFollowupOutcome to match item."
+    Assert-Equal $item.narrative.evidence.lastFollowupOutcomeAt $item.lastFollowupOutcomeAt "Expected narrative evidence lastFollowupOutcomeAt to match item."
+    Assert-Equal $item.narrative.evidence.lastNextStepAt $item.lastNextStepAt "Expected narrative evidence lastNextStepAt to match item."
+    Assert-Equal $item.narrative.evidence.lastNextStepCompletedAt $item.lastNextStepCompletedAt "Expected narrative evidence lastNextStepCompletedAt to match item."
   }
 
   $limitOneUrl = "$ApiBase/activity-intelligence/opportunities/${segment}?limit=1"
@@ -169,5 +204,3 @@ Write-Host "[assert-opportunity-worklists] GET invalid segment returns 400"
 ExpectHttpStatus "$ApiBase/activity-intelligence/opportunities/not-a-real-segment" 400
 
 Write-Host "[assert-opportunity-worklists] OK: opportunity worklists regression passed." -ForegroundColor Green
-
-

@@ -17,6 +17,38 @@ export type OpportunitySegmentDefinition = {
   resolutionReason: string;
 };
 
+export type CanonicalOpportunityNarrative = {
+  segment: string;
+  label: string;
+  priority: OpportunitySegmentDefinition["priority"];
+  surface: OpportunitySegmentDefinition["surface"];
+  headline: string;
+  summary: string;
+  visitor: {
+    visitorId: string;
+    displayName: string | null;
+  };
+  recommendedAction: {
+    label: string;
+    reason: string;
+  };
+  resolution: {
+    status: "open";
+    resolvedWhen: string;
+    reason: string;
+  };
+  evidence: {
+    stage: unknown;
+    assignedTo: unknown;
+    lastEventType: unknown;
+    lastEventAt: unknown;
+    lastFollowupOutcome: unknown;
+    lastFollowupOutcomeAt: unknown;
+    lastNextStepAt: unknown;
+    lastNextStepCompletedAt: unknown;
+  };
+};
+
 export const OPPORTUNITY_SEGMENTS: OpportunitySegmentDefinition[] = [
   {
     key: "CONNECTED_WITHOUT_NEXT_STEP",
@@ -81,6 +113,64 @@ export function toOpportunityDrilldown(definition: OpportunitySegmentDefinition)
   };
 }
 
+function readVisitorId(profile: any, visitor: any): string {
+  return String(profile?.visitorId ?? profile?.rowKey ?? visitor?.id ?? "").trim();
+}
+
+function readDisplayName(profile: any, visitor: any, visitorId: string): string | null {
+  const profileDisplayName = String(profile?.displayName ?? "").trim();
+  const visitorName = String(visitor?.displayName ?? visitor?.name ?? "").trim();
+
+  return profileDisplayName || visitorName || visitorId || null;
+}
+
+export function buildOpportunityNarrative(input: {
+  profile: any;
+  visitor: any;
+  definition: OpportunitySegmentDefinition;
+}): CanonicalOpportunityNarrative {
+  const profile = input.profile ?? {};
+  const visitor = input.visitor ?? {};
+  const visitorId = readVisitorId(profile, visitor);
+  const displayName = readDisplayName(profile, visitor, visitorId);
+
+  const headline = displayName
+    ? `${displayName}: ${input.definition.label}`
+    : input.definition.label;
+
+  return {
+    segment: input.definition.segment,
+    label: input.definition.label,
+    priority: input.definition.priority,
+    surface: input.definition.surface,
+    headline,
+    summary: input.definition.recommendedActionReason,
+    visitor: {
+      visitorId,
+      displayName
+    },
+    recommendedAction: {
+      label: input.definition.recommendedActionLabel,
+      reason: input.definition.recommendedActionReason
+    },
+    resolution: {
+      status: "open",
+      resolvedWhen: input.definition.resolutionField,
+      reason: input.definition.resolutionReason
+    },
+    evidence: {
+      stage: profile.stage ?? null,
+      assignedTo: profile.assignedTo ?? null,
+      lastEventType: profile.lastEventType ?? null,
+      lastEventAt: profile.lastEventAt ?? null,
+      lastFollowupOutcome: profile.lastFollowupOutcome ?? null,
+      lastFollowupOutcomeAt: profile.lastFollowupOutcomeAt ?? null,
+      lastNextStepAt: profile.lastNextStepAt ?? null,
+      lastNextStepCompletedAt: profile.lastNextStepCompletedAt ?? null
+    }
+  };
+}
+
 export function buildOpportunityWorklistItem(input: {
   profile: any;
   visitor: any;
@@ -88,10 +178,14 @@ export function buildOpportunityWorklistItem(input: {
 }) {
   const profile = input.profile ?? {};
   const visitor = input.visitor ?? {};
-  const visitorId = String(profile.visitorId ?? profile.rowKey ?? visitor.id ?? "").trim();
-  const profileDisplayName = String(profile.displayName ?? "").trim();
-  const visitorName = String(visitor.displayName ?? visitor.name ?? "").trim();
-  const displayName = profileDisplayName || visitorName || visitorId || null;
+  const narrative = buildOpportunityNarrative({
+    profile,
+    visitor,
+    definition: input.definition
+  });
+
+  const visitorId = narrative.visitor.visitorId;
+  const displayName = narrative.visitor.displayName;
 
   return {
     visitorId,
@@ -104,17 +198,9 @@ export function buildOpportunityWorklistItem(input: {
     lastFollowupOutcomeAt: profile.lastFollowupOutcomeAt ?? null,
     lastNextStepAt: profile.lastNextStepAt ?? null,
     lastNextStepCompletedAt: profile.lastNextStepCompletedAt ?? null,
-    recommendedAction: {
-      label: input.definition.recommendedActionLabel,
-      reason: input.definition.recommendedActionReason
-    },
-    resolution: {
-      status: "open",
-      resolvedWhen: input.definition.resolutionField,
-      reason: input.definition.resolutionReason
-    },
+    recommendedAction: narrative.recommendedAction,
+    resolution: narrative.resolution,
+    narrative,
     href: visitorId ? `/visitors/${encodeURIComponent(visitorId)}` : null
   };
 }
-
-

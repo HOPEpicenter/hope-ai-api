@@ -114,6 +114,41 @@ assert(
   "plans should expose schemaVersion"
 );
 
+assert(
+  plan1.candidateIdentityKey === preview1.candidateIdentityKey,
+  "plan candidateIdentityKey should derive from preview candidateIdentityKey"
+);
+
+assert(
+  plan1.visitorId === preview1.visitorId,
+  "plan visitorId should derive from preview visitorId"
+);
+
+assert(
+  plan1.ownerId === preview1.ownerId,
+  "plan ownerId should derive from preview ownerId"
+);
+
+assert(
+  plan1.candidateTaskType === preview1.candidateTaskType,
+  "plan candidateTaskType should derive from preview candidateTaskType"
+);
+
+assert(
+  plan1.previewEscalationLevel === preview1.previewEscalationLevel,
+  "plan escalation level should derive from preview escalation level"
+);
+
+assert(
+  plan1.previewFreshnessSeverity === preview1.previewFreshnessSeverity,
+  "plan freshness severity should derive from preview freshness severity"
+);
+
+assert(
+  JSON.stringify(plan1.suppressionReasons) === JSON.stringify(preview1.suppressionReasons),
+  "plan suppression reasons should derive from preview suppression reasons"
+);
+
 const duplicateCandidates = [
   deriveTaskPreview({
     followup: baseFollowup,
@@ -238,6 +273,28 @@ assert(
   "plan readiness counts should reconcile"
 );
 
+const manualPlanSummary = {
+  totalPlans: allPlans.length,
+  readyPlans: allPlans.filter(x => x.planReadiness === "READY").length,
+  suppressedPlans: allPlans.filter(x => x.planReadiness === "SUPPRESSED").length,
+  stalePlans: allPlans.filter(x => x.planReadiness === "STALE").length
+};
+
+assert(
+  JSON.stringify(planSummary) === JSON.stringify(manualPlanSummary),
+  "plan summary should be derived exactly from plan readiness counts"
+);
+
+assert(
+  planSummary.readyPlans === allPreviews.filter(x => x.candidateTaskEligible).length,
+  "READY plan count should match eligible preview count"
+);
+
+assert(
+  planSummary.stalePlans === allPreviews.filter(x => x.previewFreshnessSeverity === "STALE").length,
+  "STALE plan count should match stale preview count"
+);
+
 const eligibleOnly =
   filterTaskPreviews(allPreviews, {
     eligibleOnly: true
@@ -254,6 +311,24 @@ const summary =
 assert(
   summary.total === allPreviews.length,
   "summary total should match preview count"
+);
+
+const manualPreviewSummary = {
+  total: allPreviews.length,
+  eligible: allPreviews.filter(x => x.candidateTaskEligible).length,
+  suppressed: allPreviews.filter(x => !x.candidateTaskEligible).length,
+  escalationHigh: allPreviews.filter(x => x.previewEscalationLevel === "HIGH").length,
+  escalationElevated: allPreviews.filter(x => x.previewEscalationLevel === "ELEVATED").length,
+  escalationNone: allPreviews.filter(x => x.previewEscalationLevel === "NONE").length,
+  freshnessHealthy: allPreviews.filter(x => x.previewFreshnessSeverity === "HEALTHY").length,
+  freshnessDrifted: allPreviews.filter(x => x.previewFreshnessSeverity === "DRIFTED").length,
+  freshnessProfileBehind: allPreviews.filter(x => x.previewFreshnessSeverity === "PROFILE_BEHIND").length,
+  freshnessStale: allPreviews.filter(x => x.previewFreshnessSeverity === "STALE").length
+};
+
+assert(
+  JSON.stringify(summary) === JSON.stringify(manualPreviewSummary),
+  "preview summary should be derived exactly from preview classifications"
 );
 
 const sorted = sortTaskPreviews([
@@ -298,3 +373,4 @@ console.log(
 "@
 
 node -e $script $modulePath
+

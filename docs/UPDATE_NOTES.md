@@ -1,3 +1,22 @@
+## 2026-06-23 — Ops preview latency diagnostic baseline
+
+Completed a diagnostic-only latency measurement slice for OPS task-preview surfaces.
+
+Shipped:
+- #1130: added `scripts/measure-ops-preview-latency.ps1`
+- #1131: fixed diagnostic output so failed probes show `FAIL` and BaseUrl values ending in `/api` do not produce double `/api/api`
+
+Validation:
+- CI build + regression + smoke passed for both PRs
+- staging deploy passed for both PRs
+- staging diagnostic baseline captured after #1130/#1131:
+  - task-preview-summary: avgMs ~16314, maxMs ~17557
+  - task-preview-simulation: avgMs ~15734, maxMs ~15989
+
+Decision:
+- This confirms the known staging ops-preview latency remains real and measurable.
+- No backend behavior, orchestration, persistence, assignment workflow, care-plan workflow, or dashboard scope was changed.
+- The production ops-preview latency checklist item remains open/deferred until a real latency investigation or remediation is intentionally opened.
 ## 2026-06-02 — Milestone Regression Coverage Closeout
 
 - Reviewed existing formation milestone and profile invariant regression coverage.

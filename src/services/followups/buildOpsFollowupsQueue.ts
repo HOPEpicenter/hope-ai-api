@@ -45,6 +45,7 @@ export type BuildOpsFollowupsQueueOptions = {
   includeSynthetic?: boolean;
   sortBy?: string;
   sortDir?: "asc" | "desc";
+  enrichmentMode?: "full" | "task-preview";
 };
 
 function hoursBetween(a: string, b: string): number {
@@ -220,6 +221,8 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
   const sortDir = opts.sortDir === "asc" ? "asc" : "desc";
   const includeResolved = opts.includeResolved === true;
   const includeSynthetic = opts.includeSynthetic === true;
+  const enrichmentMode = opts.enrichmentMode === "task-preview" ? "task-preview" : "full";
+  const shouldRunHeavyEnrichment = enrichmentMode === "full";
   const limit = Math.max(1, Math.min(500, Math.trunc(opts.limit || 25)));
   const cursor = Math.max(0, Math.trunc(opts.cursor || 0));
 
@@ -375,57 +378,59 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
     let priorityBand: string | null = null;
     let priorityReason: string | null = null;
 
-    try {
-      const MAX_EVENTS = 500;
-      const PAGE_SIZE = 100;
-      const all: any[] = [];
-      let engagementCursor: string | undefined = undefined;
+    if (shouldRunHeavyEnrichment) {
+      try {
+        const MAX_EVENTS = 500;
+        const PAGE_SIZE = 100;
+        const all: any[] = [];
+        let engagementCursor: string | undefined = undefined;
 
-      while (all.length < MAX_EVENTS) {
-        const page = await opts.engagementService.readTimeline(state.visitorId, PAGE_SIZE, engagementCursor);
-        all.push(...(page.items ?? []));
-        if (!page.nextCursor) break;
-        engagementCursor = page.nextCursor;
+        while (all.length < MAX_EVENTS) {
+          const page = await opts.engagementService.readTimeline(state.visitorId, PAGE_SIZE, engagementCursor);
+          all.push(...(page.items ?? []));
+          if (!page.nextCursor) break;
+          engagementCursor = page.nextCursor;
+        }
+
+        const score = computeEngagementScoreV1({
+          events: all,
+          windowDays: 14
+        });
+
+        const risk = deriveEngagementRiskV1({
+          visitorId: state.visitorId,
+          windowDays: 14,
+          engaged: score.engaged,
+          lastEngagedAt: score.lastEngagedAt,
+          daysSinceLastEngagement: score.daysSinceLastEngagement,
+          engagementCount: score.engagementCount,
+          score: score.score,
+          scoreReasons: score.scoreReasons,
+          needsFollowup: score.needsFollowup
+        });
+
+        const priority = deriveFollowupPriority({
+          needsFollowup: signals.needsFollowup,
+          riskLevel: risk.riskLevel,
+          riskScore: risk.riskScore
+        });
+
+        riskLevel = risk.riskLevel;
+        riskScore = risk.riskScore;
+        priorityBand = priority.priorityBand;
+        priorityReason = priority.priorityReason;
+
+        const formationState = deriveFormationState({
+          profile: formationProfileByVisitor.get(state.visitorId),
+          signals,
+          priorityBand,
+          priorityReason
+        });
+
+        priorityReason = formationState.priorityReason ?? null;
+      } catch {
+        // fail safe: queue still returns even if enrichment fails
       }
-
-      const score = computeEngagementScoreV1({
-        events: all,
-        windowDays: 14
-      });
-
-      const risk = deriveEngagementRiskV1({
-        visitorId: state.visitorId,
-        windowDays: 14,
-        engaged: score.engaged,
-        lastEngagedAt: score.lastEngagedAt,
-        daysSinceLastEngagement: score.daysSinceLastEngagement,
-        engagementCount: score.engagementCount,
-        score: score.score,
-        scoreReasons: score.scoreReasons,
-        needsFollowup: score.needsFollowup
-      });
-
-      const priority = deriveFollowupPriority({
-        needsFollowup: signals.needsFollowup,
-        riskLevel: risk.riskLevel,
-        riskScore: risk.riskScore
-      });
-
-      riskLevel = risk.riskLevel;
-      riskScore = risk.riskScore;
-      priorityBand = priority.priorityBand;
-      priorityReason = priority.priorityReason;
-
-      const formationState = deriveFormationState({
-        profile: formationProfileByVisitor.get(state.visitorId),
-        signals,
-        priorityBand,
-        priorityReason
-      });
-
-      priorityReason = formationState.priorityReason ?? null;
-    } catch {
-      // fail safe: queue still returns even if enrichment fails
     }
 
     const formationState = deriveFormationState({
@@ -563,5 +568,3 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
     items: pagedItems,
   };
 }
-
-

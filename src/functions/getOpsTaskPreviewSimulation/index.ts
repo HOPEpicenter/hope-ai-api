@@ -182,6 +182,7 @@ export default async function (context: any, req: any): Promise<void> {
             .toLowerCase() === "asc"
             ? "asc"
             : "desc",
+        enrichmentMode: "task-preview",
       });
 
     const previews =
@@ -624,19 +625,3 @@ async function ensureTableExists(
     throw e;
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

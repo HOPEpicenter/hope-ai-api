@@ -801,33 +801,30 @@ Assert (
   $response.complianceSummary.complianceMode -eq "OPS_READ_ONLY_COMPLIANT"
 ) "complianceMode should be OPS_READ_ONLY_COMPLIANT"
 
-Assert (
-  $response.complianceSummary.governanceCompliant -eq $true
-) "governanceCompliant should be true"
 
 Assert (
-  $response.complianceSummary.policyCompliant -eq $true
-) "policyCompliant should be true"
+  $response.complianceSummary.governanceComplianceAligned -eq $true
+) "governanceComplianceAligned should be true"
 
 Assert (
-  $response.complianceSummary.replayCompliant -eq $true
-) "replayCompliant should be true"
+  $response.complianceSummary.replayComplianceAligned -eq $true
+) "replayComplianceAligned should be true"
 
 Assert (
-  $response.complianceSummary.snapshotCompliant -eq $true
-) "snapshotCompliant should be true"
+  $response.complianceSummary.snapshotComplianceAligned -eq $true
+) "snapshotComplianceAligned should be true"
 
 Assert (
-  $response.complianceSummary.exportCompliant -eq $true
-) "exportCompliant should be true"
+  $response.complianceSummary.exportComplianceAligned -eq $true
+) "exportComplianceAligned should be true"
 
 Assert (
-  $response.complianceSummary.consistencyCompliant -eq $true
-) "consistencyCompliant should be true"
+  $response.complianceSummary.consistencyComplianceAligned -eq $true
+) "consistencyComplianceAligned should be true"
 
 Assert (
-  $response.complianceSummary.opsOnlyCompliant -eq $true
-) "opsOnlyCompliant should be true"
+  $response.complianceSummary.opsOnlyCompliance -eq $true
+) "opsOnlyCompliance should be true"
 
 Assert (
   $response.complianceProofs.deterministic -eq $true
@@ -1182,14 +1179,3 @@ foreach ($plan in $response.plans) {
 }
 
 Write-Host "OK: OPS task preview simulation assertion passed."
-
-
-
-
-
-
-
-
-
-
-

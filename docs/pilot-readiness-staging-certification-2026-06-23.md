@@ -35,6 +35,6 @@ Latest measured baseline:
 
 ## Status
 
-Pilot readiness certification: PASS  
-Latency risk: MONITOR / DEFERRED  
+Pilot readiness certification: PASS
+Latency risk: MONITOR / DEFERRED
 Deferred scopes remain closed: assignment workflow, care-plan workflow, persistence, orchestration activation, dashboard rebuild.

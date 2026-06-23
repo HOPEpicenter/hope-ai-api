@@ -1528,3 +1528,22 @@ PRAYER_REQUESTED
 - Full local regression passed after the parity sweep.
 - CI and staging deploys passed after each merge.
 - Express local validation is now effectively aligned with the Azure Functions HTTP route surface.
+## 2026-06-23 — OPS task-preview latency improvement
+
+Merged and deployed **#1136** to reduce OPS task-preview latency by skipping per-visitor engagement timeline enrichment for task-preview summary/simulation reads while preserving visitor identity lookup for synthetic filtering.
+
+Post-deploy staging validation:
+
+- `scripts/assert-ops-task-preview-simulation.ps1` passed against staging.
+- `scripts/measure-ops-preview-latency.ps1` completed with no failed probes.
+
+Post-deploy latency baseline:
+
+| Surface | Count | Min ms | Avg ms | Max ms | Failed | Warned |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| task-preview-summary | 3 | 9808 | 10340 | 10612 | 0 | 2 |
+| task-preview-simulation | 3 | 9647 | 9935 | 10327 | 0 | 1 |
+
+Previous staging baseline was approximately 21–23 seconds for these endpoints, so #1136 reduced observed OPS preview latency by roughly half.
+
+Remaining latency is likely related to shared queue table scans and should stay monitor/deferred unless it blocks pilot usage.

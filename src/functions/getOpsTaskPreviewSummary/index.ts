@@ -91,7 +91,8 @@ export default async function (context: any, req: any): Promise<void> {
       sortDir:
         String(readQuery(req, "sortDir") ?? "").trim().toLowerCase() === "asc"
           ? "asc"
-          : "desc"
+          : "desc",
+      enrichmentMode: "task-preview"
     });
 
     const previews = (queue.items ?? []).map((item: any) =>

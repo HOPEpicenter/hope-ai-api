@@ -109,7 +109,11 @@ if (-not $ApiBase) {
     throw "Provide -BaseUrl or -ApiBase."
   }
 
-  $ApiBase = "$BaseUrl/api"
+  if ($BaseUrl.ToLowerInvariant().EndsWith("/api")) {
+    $ApiBase = $BaseUrl
+  } else {
+    $ApiBase = "$BaseUrl/api"
+  }
 }
 
 if ([string]::IsNullOrWhiteSpace($ApiKey)) {
@@ -156,7 +160,7 @@ for ($i = 1; $i -le $Repetitions; $i++) {
 
     $results.Add($result)
 
-    $status = if ($result.warned) { "WARN" } else { "OK" }
+    $status = if ($result.ok -ne $true) { "FAIL" } elseif ($result.warned) { "WARN" } else { "OK" }
     Write-Host ("[{0}] {1} repetition={2} statusCode={3} ok={4} elapsedMs={5}" -f $status, $result.name, $i, $result.statusCode, $result.ok, $result.elapsedMs)
   }
 }

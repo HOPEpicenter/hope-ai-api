@@ -53,34 +53,12 @@ export async function getCareCandidates(context: any, req: any): Promise<void> {
     const table = getFormationProfilesTableClient();
     await ensureTable(table);
 
-    const page = await listFormationProfiles(table, {
-      limit: 200,
-      cursor: requestedCursor
-    });
-
     const validProfiles: FunctionFormationProfileEntity[] = [];
     let orphanProfilesExcluded = 0;
-
-    for (const profile of page.items) {
-      const visitorId = String(profile.visitorId ?? "").trim();
-
-      if (!visitorId) {
-        orphanProfilesExcluded++;
-        continue;
-      }
-
-      const visitor = await getVisitorById(visitorId);
-
-      if (!visitor) {
-        orphanProfilesExcluded++;
-        continue;
-      }
-
-      validProfiles.push(profile);
-    }
-
-    const projected = readCareCandidateList({
-      profiles: validProfiles.map(toCareProfileInput),
+    let cursor: string | undefined = requestedCursor;
+    let nextCursor: string | undefined = undefined;
+    let projected = readCareCandidateList({
+      profiles: [],
       carePriority,
       careAgeBucket,
       escalationLevel,
@@ -88,8 +66,44 @@ export async function getCareCandidates(context: any, req: any): Promise<void> {
       assignmentBucket
     });
 
+    do {
+      const page = await listFormationProfiles(table, {
+        limit: 200,
+        cursor
+      });
+
+      cursor = page.cursor ?? undefined;
+      nextCursor = cursor;
+
+      for (const profile of page.items) {
+        const visitorId = String(profile.visitorId ?? "").trim();
+
+        if (!visitorId) {
+          orphanProfilesExcluded++;
+          continue;
+        }
+
+        const visitor = await getVisitorById(visitorId);
+
+        if (!visitor) {
+          orphanProfilesExcluded++;
+          continue;
+        }
+
+        validProfiles.push(profile);
+      }
+
+      projected = readCareCandidateList({
+        profiles: validProfiles.map(toCareProfileInput),
+        carePriority,
+        careAgeBucket,
+        escalationLevel,
+        assignmentState,
+        assignmentBucket
+      });
+    } while (projected.items.length < limit && cursor);
+
     const pageItems = projected.items.slice(0, limit);
-    const nextCursor = page.cursor;
 
     context.res = {
       status: 200,

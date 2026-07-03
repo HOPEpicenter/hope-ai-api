@@ -1,101 +1,139 @@
-# HOPE Pilot Readiness v2
+# HOPE Pilot Readiness v2 — Revision 3
 
-**Status:** Living engineering operating system  
-**Generated from:** merged API PR history and Dashboard Next PR history  
-**Purpose:** Keep every engineering recommendation grounded in evidence before the pilot.
+Date: 2026-07-03
 
-## Mission
+Status: Pilot Hardening Phase
 
-Build the first production-ready Ministry Operating System that helps pastors answer:
+## Executive Summary
 
-- Who needs me today?
-- Why do they need me?
-- What is the next faithful step?
-- What is this person's complete ministry story?
+The HOPE Ministry OS dashboard has transitioned from feature construction to pilot hardening.
 
-## Readiness Snapshot
+Core ministry workflows are implemented over verified backend contracts. Recent work focused on pastor-facing language, shared presentation services, test-record filtering, staff-directory foundation, and verified admin readiness.
 
-| Area | Status | Readiness | Evidence |
-|---|---|---:|---|
-| Backend platform | Green | 96% | API PRs cover route parity, canonical projections, contract coverage, staging certification, care, activity intelligence, and governance. |
-| Dashboard Next | Green | 92% | Dashboard PRs #1-#62 establish shell, Today, Person 360, Journey, Care, Insights, Admin, resilience, and pastor-first language. |
-| Canonical contracts | Green | 95% | Dashboard-card, activity intelligence, care, timeline, and opportunity contracts are covered and hardened. |
-| Pastor workflow | Yellow | 86% | Core workspaces exist; remaining work is workflow continuity/audit, not foundational architecture. |
-| Documentation | Yellow | 70% | Documentation exists but needs reconciliation against the merged PR ledger. |
-| Pilot operations | Green/Yellow | 88% | Pilot operations packet, route inventory, staging certification, and known limitations are documented. |
-| Accessibility/usability audit | Yellow | 75% | Needs deliberate final pilot pass across all workspaces. |
+## Current Pilot Readiness
 
-## Current System Map
+| Area | Status | Notes |
+| --- | --- | --- |
+| Backend contracts | Complete | Verified dashboard contracts in use |
+| Today Dashboard | Complete | Pastor-focused ministry command center |
+| People 360 | Complete | Unified ministry profile and timeline |
+| Journey Workspace | Complete | Ministry story and next-step presentation |
+| Care Workspace | Complete | Assignment and outcome workflow |
+| Insights | Complete | Ministry readiness worklists |
+| Admin Readiness Center | Complete | Contract registry and readiness dashboard |
+| Identity Presentation Layer | Complete | Human-friendly person and owner names |
+| Ministry Event Language | Complete | Backend event codes translated for pastors |
+| Display Language Layer | Complete | Status, risk, and reason labels centralized |
+| Shared Staff Directory | Complete | Central staff display abstraction |
+| Test Record Filtering | Complete | Engineering/test data hidden from key ministry views |
+| Visitor CRUD | Complete | Person create/edit workflow in dashboard |
+| Editable Notes | Planned | Backend-first audited editing |
+| Staff Administration | Planned | Backend-first dynamic staff management |
+| Authentication Hardening | Planned | Pilot wave |
+| Production Readiness | In progress | Final hardening and validation |
 
-```text
-Visitor Identity
-    -> Formation Events
-    -> Formation Profile
-    -> Canonical Readers
-    -> Care / Journey / Opportunity / Timeline / Dashboard Card
-    -> Azure Functions + Express Parity
-    -> Dashboard Next Server Loaders
-    -> Pastor Workspaces
-```
+## Architectural Decisions
 
-## What is Done
+### Display Layer
 
-### Backend
+Backend contracts remain canonical. The dashboard translates backend implementation language into ministry language.
 
-- Global timeline and integration foundations.
-- Formation event and profile projection hardening.
-- Care candidate projections, queue, summary, export, assignment, and integrity contracts.
-- Followup terminal/non-terminal outcome semantics.
-- Activity intelligence and opportunity worklists.
-- Opportunity narratives, action reasons, and resolution metadata.
-- Visitor notes, phone, address, birthday, and identity update contracts.
-- Dashboard-card enrichment for next steps, outcomes, prayer, assignments, and stage metadata.
-- Express/Azure Functions route parity and contract coverage.
-- Pilot readiness review, route inventory, staging certification, and operations packet.
+No backend enum, internal code, or technical ID should be displayed directly to pastors when a ministry-facing display helper exists.
 
-### Dashboard Next
+### Staff Directory
 
-- App shell and server-side backend API helper.
-- Today Command Center.
-- Person 360 / People directory and profile.
-- Journey story workspace.
-- Care workspace with ownership and outcome actions.
-- Insights / Opportunity Intelligence workspace.
-- Persistent visitor snapshot rail.
-- Global visitor context.
-- PersonMinistryHeader and selected person identity fallback.
-- Nonfatal backend loading and DataHealthBanner.
-- Backend smoke helper.
-- Pastor-first language across Today, People, Journey, Care, Insights, and Admin.
-- Ministry OS v2 blueprint.
+Technical owner IDs are presentation implementation details.
 
-## Remaining Pilot Work
+The dashboard now resolves owners through a centralized staff directory abstraction. Future work will replace the static staff directory with user-managed staff records.
 
-| Priority | Item | Status | Notes |
-|---:|---|---|---|
-| 1 | Documentation reconciliation | Active | Update MASTER_PLAN, checklist, inventories, and flow chart from PR ledger. |
-| 2 | Pastor workflow continuity audit | Ready | Verify Today -> Person 360 -> Journey -> Care -> Insights behaves as one ministry workflow. |
-| 3 | Accessibility and empty-state audit | Ready | Keyboard, focus, labels, warnings, loading, and empty-state language. |
-| 4 | Morning briefing decision | Investigate | Build only if no existing canonical read model already satisfies the need. |
-| 5 | Pilot validation run | Ready after audits | Validate deployed dashboard + staging/production API with pastor workflow scenarios. |
+### Test Records
 
-## Recommendation Gate
+Pastor-facing workflows should default to real ministry records.
 
-Before any implementation recommendation:
+Engineering and regression records remain available for development but are hidden from key ministry workflows by default.
 
-1. Check the PR ledger.
-2. Check canonical services/inventories.
-3. Confirm it is not already merged.
-4. Confirm it is pilot-relevant.
-5. Confirm it is the highest-value unfinished milestone.
+### Pastoral Notes
 
-## Next PR Recommendation
+Current state:
 
-**Docs PR:** `docs: add Hope Pilot Readiness v2 reconciliation`
+- Team-visible pastoral notes can be created.
+- Notes appear in the unified ministry timeline.
+- Dashboard note creation posts to the backend note creation endpoint.
 
-Scope:
+Planned state:
 
-- Add this Pilot Readiness v2 package.
-- Do not change runtime behavior.
-- Do not create backend/dashboard features.
-- Use this as the source for future MASTER_PLAN and checklist updates.
+- Stable note ID.
+- Note read endpoint.
+- Note update endpoint.
+- Edited timestamp.
+- Edited by.
+- Audit/version history.
+- Dashboard editing after backend contracts exist.
+
+Architectural decision:
+
+Pastoral notes are not permanently append-only. Staff must be able to correct factual mistakes, spelling errors, and accidental entries while preserving an audit trail.
+
+## Remaining Engineering Work
+
+### Wave 1 — Backend Completion
+
+- Editable pastoral notes API
+- Stable note ID
+- Note read endpoint
+- Note update endpoint
+- Note audit metadata
+- Note version history
+- Staff directory API
+- Staff management API
+- Authorization rules for note editing and staff administration
+
+### Wave 2 — Dashboard Completion
+
+- Edit pastoral note UI
+- Save/cancel note editing flow
+- Edited badge or audit indicator
+- Staff management UI
+- Staff assignment administration
+- Final workflow polish
+
+### Wave 3 — Pilot Validation
+
+- End-to-end ministry walkthrough
+- Ministry acceptance testing
+- Documentation freeze
+- Deployment validation
+- Pilot launch
+
+## Engineering Governance
+
+The following rules remain mandatory:
+
+- Backend-first architecture
+- PR-only workflow
+- PowerShell-only implementation workflow
+- Contract-first development
+- Documentation synchronized with implementation
+- No placeholder ministry data
+- Pastor-first presentation language
+- Shared display helpers for presentation logic
+- Shared abstractions over hard-coded values
+- Production behavior must remain deterministic
+
+## Documentation Synchronization Rule
+
+Before starting a new engineering wave, verify the implementation and update pilot documentation so it accurately reflects the current system.
+
+This document should be treated as a planning source of truth for remaining pilot work and should evolve alongside the code rather than lagging behind it.
+
+## Success Criteria
+
+The system will be considered pilot-ready when:
+
+- Required backend contracts are verified.
+- Dashboard presentation uses ministry-facing language.
+- Engineering/test records are hidden from ministry workflows by default.
+- Staff assignment is abstracted from technical IDs.
+- Pastoral notes have a backend-backed audited editing path.
+- End-to-end ministry workflows pass validation.
+- Pilot documentation matches verified implementation.

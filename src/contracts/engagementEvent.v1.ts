@@ -61,10 +61,16 @@ function normalizeEnvelopeValue(v: {
 
   const data: Record<string, unknown> = isRecord(v.data) ? { ...v.data } : {};
 
-  if (t === "note.add" && typeof data.text === "string") {
+  if ((t === "note.add" || t === "note.updated") && typeof data.text === "string") {
     data.text = data.text.trim();
+    if (typeof data.noteId === "string") {
+      data.noteId = data.noteId.trim();
+    }
     if (typeof data.visibility === "string") {
       data.visibility = data.visibility.trim().toLowerCase();
+    }
+    if (typeof data.reason === "string") {
+      data.reason = data.reason.trim();
     }
   }
 
@@ -228,6 +234,54 @@ function validateEngagementEventEnvelopeV1Internal(
     }
   }
 
+  if (type === "note.updated") {
+    if (!isRecord(data)) {
+      issues.push({ path: "data", message: "note.updated requires data object" });
+    } else {
+      const noteId = (data as any).noteId;
+      const text = (data as any).text;
+      const version = (data as any).version;
+      const visibility = (data as any).visibility;
+      const reason = (data as any).reason;
+
+      if (typeof noteId !== "string") {
+        issues.push({ path: "data.noteId", message: "must be a string" });
+      } else {
+        const n = noteId.trim();
+        if (n.length < 1 || n.length > 128) {
+          issues.push({ path: "data.noteId", message: "must be a string (1-128 chars)" });
+        }
+      }
+
+      if (typeof text !== "string") {
+        issues.push({ path: "data.text", message: "must be a string" });
+      } else {
+        const t = text.trim();
+        if (t.length < 1 || t.length > 2000) {
+          issues.push({ path: "data.text", message: "must be a string (1-2000 chars)" });
+        }
+      }
+
+      if (!Number.isInteger(version) || version < 2) {
+        issues.push({ path: "data.version", message: "must be an integer >= 2" });
+      }
+
+      if (visibility !== undefined) {
+        if (typeof visibility !== "string") {
+          issues.push({ path: "data.visibility", message: "must be a string if provided" });
+        } else {
+          const v = visibility.trim().toLowerCase();
+          if (v !== "team" && v !== "private") {
+            issues.push({ path: "data.visibility", message: "must be 'team' or 'private' if provided" });
+          }
+        }
+      }
+
+      if (reason !== undefined && (typeof reason !== "string" || reason.trim().length > 256)) {
+        issues.push({ path: "data.reason", message: "must be a string (<=256 chars) if provided" });
+      }
+    }
+  }
   if (type === "tag.add" || type === "tag.remove") {
     if (!isRecord(data)) {
       issues.push({ path: "data", message: `${type} requires data object` });

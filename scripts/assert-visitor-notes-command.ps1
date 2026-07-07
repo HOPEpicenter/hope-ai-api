@@ -51,6 +51,8 @@ $note = Json-Post "$ApiBase/visitors/$([Uri]::EscapeDataString($visitorId))/note
 Assert ([bool]$note.ok) "note command should return ok=true"
 Assert ([bool]$note.accepted) "note command should return accepted=true"
 Assert ([string]$note.type -eq "note.add") "note command should return type=note.add"
+Assert (-not [string]::IsNullOrWhiteSpace([string]$note.noteId)) "note command should return stable noteId"
+Assert ([string]$note.noteId -like "note-*") "noteId should use note-* prefix"
 Assert ([string]$note.visitorId -eq $visitorId) "note command visitorId should match"
 
 Start-Sleep -Milliseconds 750
@@ -59,7 +61,7 @@ $engagementTimeline = Json-Get "$ApiBase/engagements/timeline?visitorId=$([Uri]:
 $integrationTimeline = Json-Get "$ApiBase/integration/timeline?visitorId=$([Uri]::EscapeDataString($visitorId))&limit=20"
 
 $engNote = @($engagementTimeline.items | Where-Object {
-  [string]$_.type -eq "note.add" -and [string]$_.data.text -eq $noteText
+  [string]$_.type -eq "note.add" -and [string]$_.data.text -eq $noteText -and [string]$_.data.noteId -eq [string]$note.noteId
 }) | Select-Object -First 1
 
 $integrationNote = @($integrationTimeline.items | Where-Object {

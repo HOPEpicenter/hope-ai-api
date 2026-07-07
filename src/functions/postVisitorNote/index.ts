@@ -15,6 +15,10 @@ function newEventId(): string {
   return "evt-" + randomUUID().replace(/-/g, "");
 }
 
+function newNoteId(): string {
+  return "note-" + randomUUID().replace(/-/g, "");
+}
+
 export async function postVisitorNote(context: any, req: any): Promise<void> {
   const requestId = getRequestId(req);
 
@@ -32,7 +36,10 @@ export async function postVisitorNote(context: any, req: any): Promise<void> {
     const visitorId = String(req?.params?.visitorId ?? "").trim();
     const body = req?.body ?? {};
 
+    const noteId = newNoteId();
+
     const data: Record<string, unknown> = {
+      noteId,
       text: body.text
     };
 
@@ -82,6 +89,7 @@ export async function postVisitorNote(context: any, req: any): Promise<void> {
         accepted: true,
         v: 1,
         eventId: parsed.value.eventId,
+        noteId,
         visitorId: parsed.value.visitorId,
         type: parsed.value.type
       }

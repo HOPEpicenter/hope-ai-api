@@ -20,26 +20,7 @@ export class EngagementsService {
     const normalized = normalizeEngagementEventEnvelopeV1(evt as EngagementEventEnvelopeV1);
     await this.repo.appendEvent(normalized, opts);
 
-// --- Global Timeline Write (engagement) ---
-try {
-  const { GlobalTimelineRepository } = await import("../../repositories/globalTimelineRepository");
-  const repo = new GlobalTimelineRepository();
 
-  await repo.append({
-    eventId: normalized.eventId,
-    visitorId: normalized.visitorId,
-    stream: "engagement",
-    type: normalized.type,
-    occurredAt: normalized.occurredAt,
-    summary: null,
-    source: normalized?.source?.system ?? null,
-    raw: normalized
-  });
-} catch (err: any) {
-  console.error("globalTimeline append failed (engagement)", err);
-  throw new Error(`globalTimeline append failed (engagement): ${String(err?.message ?? err)}`);
-}
-// --- End Global Timeline Write ---
   }
   async getAnalytics(visitorId: string): Promise<import("../../contracts/engagementAnalytics.v1").EngagementAnalyticsV1> {
     const MAX_EVENTS = 2000;

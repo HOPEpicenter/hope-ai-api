@@ -59,6 +59,7 @@ Start-Sleep -Milliseconds 750
 
 $engagementTimeline = Json-Get "$ApiBase/engagements/timeline?visitorId=$([Uri]::EscapeDataString($visitorId))&limit=20"
 $integrationTimeline = Json-Get "$ApiBase/integration/timeline?visitorId=$([Uri]::EscapeDataString($visitorId))&limit=20"
+$notesRead = Json-Get "$ApiBase/visitors/$([Uri]::EscapeDataString($visitorId))/notes"
 
 $engNote = @($engagementTimeline.items | Where-Object {
   [string]$_.type -eq "note.add" -and [string]$_.data.text -eq $noteText -and [string]$_.data.noteId -eq [string]$note.noteId
@@ -71,6 +72,15 @@ $integrationNote = @($integrationTimeline.items | Where-Object {
 }) | Select-Object -First 1
 
 Assert ($null -ne $engNote) "engagement timeline should include created note.add"
+$readNote = @($notesRead.items | Where-Object {
+  [string]$_.noteId -eq [string]$note.noteId -and [string]$_.text -eq $noteText
+}) | Select-Object -First 1
+
 Assert ($null -ne $integrationNote) "integration timeline should include created note.add"
+Assert ([bool]$notesRead.ok) "notes read endpoint should return ok=true"
+Assert ([string]$notesRead.visitorId -eq $visitorId) "notes read endpoint visitorId should match"
+Assert ($null -ne $readNote) "notes read endpoint should include projected created note"
+Assert ([int]$readNote.version -eq 1) "projected created note should have version=1"
+Assert (-not [bool]$readNote.edited) "projected created note should not be edited"
 
 Write-Host "OK: visitor notes command assertion passed." -ForegroundColor Green

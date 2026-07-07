@@ -8,6 +8,7 @@ import { createGetVisitorSummaryAdapter } from "./createGetVisitorSummaryAdapter
 import { createGetVisitorDashboardCardAdapter } from "./createGetVisitorDashboardCardAdapter";
 import { createGetVisitorJourneyAdapter } from "./createGetVisitorJourneyAdapter";
 import { postVisitorNote } from "../../functions/postVisitorNote";
+import { getVisitorNotes } from "../../functions/getVisitorNotes";
 import { updateVisitor } from "../../functions/updateVisitor";
 import { getVisitorActivityInsights } from "../../functions/getVisitorActivityInsights";
 import { invokeFunction } from "./invokeFunction";
@@ -22,6 +23,9 @@ export default function visitorsRouter(visitorsRepository: VisitorsRepository) {
   });
   router.put("/:visitorId", (req, res, next) => {
     invokeFunction(updateVisitor, req, res).catch(next);
+  });
+  router.get("/:visitorId/notes", (req, res, next) => {
+    invokeFunction(getVisitorNotes, req, res).catch(next);
   });
   router.post("/:visitorId/notes", (req, res, next) => {
     invokeFunction(postVisitorNote, req, res).catch(next);

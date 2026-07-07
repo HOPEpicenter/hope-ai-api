@@ -1,6 +1,6 @@
-# HOPE Pilot Readiness v2 — Revision 3
+# HOPE Pilot Readiness v2 — Revision 4
 
-Date: 2026-07-03
+Date: 2026-07-07
 
 Status: Pilot Hardening Phase
 
@@ -27,7 +27,7 @@ Core ministry workflows are implemented over verified backend contracts. Recent 
 | Shared Staff Directory | Complete | Central staff display abstraction |
 | Test Record Filtering | Complete | Engineering/test data hidden from key ministry views |
 | Visitor CRUD | Complete | Person create/edit workflow in dashboard |
-| Editable Notes | Planned | Backend-first audited editing |
+| Editable Notes | Complete | Backend event-sourced audited editing implemented |
 | Staff Administration | Planned | Backend-first dynamic staff management |
 | Authentication Hardening | Planned | Pilot wave |
 | Production Readiness | In progress | Final hardening and validation |
@@ -59,16 +59,17 @@ Current state:
 - Team-visible pastoral notes can be created.
 - Notes appear in the unified ministry timeline.
 - Dashboard note creation posts to the backend note creation endpoint.
+- Stable note IDs are generated for pastoral notes.
+- Canonical pastoral notes projection derives current note state from immutable engagement events.
+- GET /visitors/{visitorId}/notes returns projected notes.
+- PATCH /visitors/{visitorId}/notes/{noteId} emits immutable note.updated events.
+- Edited metadata, version history, and audit history are preserved through replay.
+- Full lifecycle regression covers POST -> GET -> PATCH -> GET.
 
-Planned state:
+Remaining dashboard state:
 
-- Stable note ID.
-- Note read endpoint.
-- Note update endpoint.
-- Edited timestamp.
-- Edited by.
-- Audit/version history.
-- Dashboard editing after backend contracts exist.
+- Dashboard editing should consume the verified backend contracts.
+- Dashboard should show save/cancel editing, edited indicators, and audit/history display.
 
 Architectural decision:
 
@@ -78,12 +79,6 @@ Pastoral notes are not permanently append-only. Staff must be able to correct fa
 
 ### Wave 1 — Backend Completion
 
-- Editable pastoral notes API
-- Stable note ID
-- Note read endpoint
-- Note update endpoint
-- Note audit metadata
-- Note version history
 - Staff directory API
 - Staff management API
 - Authorization rules for note editing and staff administration

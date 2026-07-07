@@ -1,3 +1,19 @@
+## 2026-07-07 — Editable Pastoral Notes Backend
+
+- [x] Stable pastoral note IDs added.
+- [x] `note.updated` engagement event contract added.
+- [x] Canonical pastoral notes projection added.
+- [x] Single-note canonical lookup added.
+- [x] `GET /api/visitors/{visitorId}/notes` added.
+- [x] `PATCH /api/visitors/{visitorId}/notes/{noteId}` added.
+- [x] Version history and edited metadata preserved through replay.
+- [x] Full lifecycle regression covers POST -> GET -> PATCH -> GET.
+- [x] Duplicate engagement Global Timeline append removed.
+
+Current rule:
+- dashboard note editing must consume the backend notes contracts.
+- pastoral notes remain event-sourced and audited, not destructive row updates.
+- staff administration remains the next backend-managed directory gap.
 ## 2026-05-19 Ordering governance consolidation
 
 - [x] Centralized followups queue comparison helpers

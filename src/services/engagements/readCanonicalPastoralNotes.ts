@@ -38,3 +38,18 @@ export async function readCanonicalPastoralNotes(
     items: projectPastoralNotes(visitorId, all)
   };
 }
+
+export async function readCanonicalPastoralNote(
+  visitorId: string,
+  noteId: string,
+  repo = new EngagementEventsRepository()
+): Promise<PastoralNoteProjection | null> {
+  const normalizedNoteId = typeof noteId === "string" ? noteId.trim() : "";
+
+  if (!visitorId || !normalizedNoteId) {
+    return null;
+  }
+
+  const result = await readCanonicalPastoralNotes(visitorId, repo);
+  return result.items.find((note) => note.noteId === normalizedNoteId) ?? null;
+}

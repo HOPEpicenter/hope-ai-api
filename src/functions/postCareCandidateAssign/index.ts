@@ -17,6 +17,7 @@ import {
   getRequestId,
   logFunctionError
 } from "../../shared/observability/functionObservability";
+import { isKnownStaffId } from "../../services/operators/operatorIdentity";
 
 function toCareProfileInput(profile: FunctionFormationProfileEntity) {
   return {
@@ -65,6 +66,15 @@ export async function postCareCandidateAssign(
         status: 400,
         headers: { "content-type": "application/json; charset=utf-8" },
         body: { ok: false, error: "assignedTo is required" }
+      };
+      return;
+    }
+
+    if (!isKnownStaffId(assignedTo)) {
+      context.res = {
+        status: 400,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: { ok: false, error: "assignedTo must reference a known staff identity" }
       };
       return;
     }

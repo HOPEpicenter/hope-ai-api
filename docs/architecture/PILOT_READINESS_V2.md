@@ -28,7 +28,8 @@ Core ministry workflows are implemented over verified backend contracts. Recent 
 | Test Record Filtering | Complete | Engineering/test data hidden from key ministry views |
 | Visitor CRUD | Complete | Person create/edit workflow in dashboard |
 | Editable Notes | Complete | Backend event-sourced audited editing implemented |
-| Staff Administration | Planned | Backend-first dynamic staff management |
+| Staff Identity v1 | Complete | Canonical staff identity abstraction and assignment validation |
+| Staff Administration | Planned | Dynamic staff create/edit/deactivate workflow built on Staff Identity v1 |
 | Authentication Hardening | Planned | Pilot wave |
 | Production Readiness | In progress | Final hardening and validation |
 
@@ -40,11 +41,13 @@ Backend contracts remain canonical. The dashboard translates backend implementat
 
 No backend enum, internal code, or technical ID should be displayed directly to pastors when a ministry-facing display helper exists.
 
-### Staff Directory
+### Staff Identity and Staff Directory
 
 Technical owner IDs are presentation implementation details.
 
-The dashboard now resolves owners through a centralized staff directory abstraction. Future work will replace the static staff directory with user-managed staff records.
+Staff Identity v1 is now the backend identity boundary for care/followup ownership. Existing operator IDs remain backward-compatible, but assignment must resolve through known staff identities before future dashboard or staff administration expansion.
+
+The dashboard now resolves owners through a centralized staff directory abstraction. Future work will replace the static staff directory with user-managed staff records built on Staff Identity v1.
 
 ### Test Records
 
@@ -79,7 +82,7 @@ Pastoral notes are not permanently append-only. Staff must be able to correct fa
 
 ### Wave 1 — Backend Completion
 
-- Staff directory API
+- Dynamic staff directory API built on Staff Identity v1
 - Staff management API
 - Authorization rules for note editing and staff administration
 

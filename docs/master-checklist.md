@@ -802,3 +802,13 @@ Current rule:
 - onboard real ministry data before widening dashboard scope
 - use People as the primary pastor workflow surface
 - continue backend-first governance discipline
+
+## 2026-07-07 — Staff Identity v1
+
+- Added canonical Staff Identity v1 abstraction over existing operator assignment IDs.
+- Preserved backward-compatible operator exports for existing care/followup code.
+- Care assignment now rejects unknown `assignedTo` values instead of accepting arbitrary strings.
+- Staff Directory API remains future work; this PR only locks the identity boundary needed before dynamic staff administration.
+
+Current rule:
+- assignment ownership must resolve through canonical staff identity before future dashboard/staff-admin expansion.

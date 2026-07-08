@@ -1547,3 +1547,13 @@ Post-deploy latency baseline:
 Previous staging baseline was approximately 21–23 seconds for these endpoints, so #1136 reduced observed OPS preview latency by roughly half.
 
 Remaining latency is likely related to shared queue table scans and should stay monitor/deferred unless it blocks pilot usage.
+
+## 2026-07-07 — Staff Identity v1
+
+- Added canonical Staff Identity v1 abstraction over existing operator assignment IDs.
+- Preserved backward-compatible operator exports for existing care/followup code.
+- Care assignment now rejects unknown `assignedTo` values instead of accepting arbitrary strings.
+- Staff Directory API remains future work; this PR only locks the identity boundary needed before dynamic staff administration.
+
+Current rule:
+- assignment ownership must resolve through canonical staff identity before future dashboard/staff-admin expansion.

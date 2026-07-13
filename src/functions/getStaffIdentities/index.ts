@@ -1,5 +1,5 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
-import { listKnownStaffIdentities } from "../../services/operators/operatorIdentity";
+import { readCanonicalStaffDirectory } from "../../services/staff/readCanonicalStaffDirectory";
 import {
   apiErrorBody,
   getRequestId,
@@ -32,7 +32,7 @@ export async function getStaffIdentities(
       return;
     }
 
-    const items = listKnownStaffIdentities();
+    const items = await readCanonicalStaffDirectory();
 
     context.res = {
       status: 200,

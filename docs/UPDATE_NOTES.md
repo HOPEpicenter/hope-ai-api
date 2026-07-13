@@ -1,3 +1,28 @@
+## 2026-07-13 — Dynamic Staff Administration v1 fully validated
+
+Follow-up validation completed after merge.
+
+Verified:
+
+- GitHub Actions passed.
+- Azure staging deployment succeeded.
+- HOPE_ADMIN_API_KEY configured in staging.
+- Azure Functions restarted successfully.
+- Complete staging lifecycle assertion passed:
+  - unauthorized mutation rejected
+  - invalid administrative key rejected
+  - create projected correctly
+  - update projected correctly
+  - deactivate projected correctly
+
+Dynamic Staff Administration v1 is now considered backend complete.
+
+Remaining future work:
+
+- Dashboard Staff Management UI
+- Assignment administration UX
+- Broader authentication/authorization evolution beyond the interim administrative API-key boundary.
+
 ## 2026-07-13 — Dynamic Staff Administration v1 local completion
 
 Implemented the backend Dynamic Staff Administration capability over Staff Identity v1.

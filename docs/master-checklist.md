@@ -825,7 +825,7 @@ Current rule:
 - [x] Administrative API-key boundary
 - [x] Deterministic projector and command regression coverage
 - [x] Local Azure Functions end-to-end lifecycle assertion
-- [ ] CI verification
-- [ ] Staging administrative-key configuration
-- [ ] Staging lifecycle assertion
+- [x] CI verification
+- [x] Staging administrative-key configuration
+- [x] Staging lifecycle assertion
 - [ ] Dashboard staff-management UI

@@ -29,7 +29,7 @@ Core ministry workflows are implemented over verified backend contracts. Recent 
 | Visitor CRUD | Complete | Person create/edit workflow in dashboard |
 | Editable Notes | Complete | Backend event-sourced audited editing implemented |
 | Staff Identity v1 | Complete | Canonical staff identity abstraction and assignment validation |
-| Staff Administration | In progress | Backend create/edit/deactivate contracts implemented and locally validated; CI, staging, and dashboard administration remain |
+| Staff Administration | Backend Complete | Event-sourced Staff Administration validated locally, through CI, deployed successfully, and verified in staging. Remaining work is dashboard administration UX. |
 | Authentication Hardening | Planned | Pilot wave |
 | Production Readiness | In progress | Final hardening and validation |
 
@@ -86,8 +86,8 @@ Pastoral notes are not permanently append-only. Staff must be able to correct fa
 - [x] Staff create, update, and deactivate command API
 - [x] Interim administrative API-key boundary for staff mutations
 - [x] Local Azure Functions lifecycle validation
-- [ ] CI verification
-- [ ] Staging administrative-key configuration and lifecycle validation
+- [x] CI verification
+- [x] Staging administrative-key configuration and lifecycle validation
 - [ ] Broader authentication and authorization hardening
 
 ### Wave 2 — Dashboard Completion

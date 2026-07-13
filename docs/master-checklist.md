@@ -13,7 +13,7 @@
 Current rule:
 - dashboard note editing must consume the backend notes contracts.
 - pastoral notes remain event-sourced and audited, not destructive row updates.
-- staff administration remains the next backend-managed directory gap.
+- staff administration backend contracts are implemented and locally validated; CI, staging, and dashboard administration remain.
 ## 2026-05-19 Ordering governance consolidation
 
 - [x] Centralized followups queue comparison helpers
@@ -808,7 +808,7 @@ Current rule:
 - Added canonical Staff Identity v1 abstraction over existing operator assignment IDs.
 - Preserved backward-compatible operator exports for existing care/followup code.
 - Care assignment now rejects unknown `assignedTo` values instead of accepting arbitrary strings.
-- Staff Directory API remains future work; this PR only locks the identity boundary needed before dynamic staff administration.
+- Staff Identity v1 established the identity boundary that now supports the dynamic, event-sourced Staff directory and administrative commands.
 
 Current rule:
 - assignment ownership must resolve through canonical staff identity before future dashboard/staff-admin expansion.
@@ -817,5 +817,15 @@ Current rule:
 - [x] Protected read endpoint
 - [x] Canonical Staff Identity registry
 - [x] Regression coverage
-- [ ] Dynamic staff persistence
-- [ ] Staff administration commands
+- [x] Dynamic staff event persistence
+- [x] Canonical projected Staff directory
+- [x] Staff create command
+- [x] Staff update command
+- [x] Staff deactivate command
+- [x] Administrative API-key boundary
+- [x] Deterministic projector and command regression coverage
+- [x] Local Azure Functions end-to-end lifecycle assertion
+- [ ] CI verification
+- [ ] Staging administrative-key configuration
+- [ ] Staging lifecycle assertion
+- [ ] Dashboard staff-management UI

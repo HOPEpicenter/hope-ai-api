@@ -20,6 +20,9 @@ This is a high-level inventory derived from PR history. Use code inspection for 
 | `/care/candidates/assign-bulk` | Complete | Bulk care assignment. |
 | `/care/candidates/unassign-bulk` | Complete | Bulk care unassignment. |
 | `/activity-intelligence` | Complete | Ministry intelligence composition endpoint. |
+| `GET /staff-identities` | Complete | Canonical Staff Identity directory projected from seeded identities and immutable Staff events. |
+| `POST /staff-identities` | Locally verified | Creates dynamic Staff identities through `staff.created`; protected by the administrative API-key boundary. |
+| `PATCH /staff-identities/{staffId}` | Locally verified | Updates or deactivates Staff identities through immutable `staff.updated` and `staff.deactivated` events. |
 | Opportunity worklists | Complete | Segment worklists, action reasons, resolution metadata, narrative. |
 | Protected ping / route parity | Complete | Express/Azure parity hardened. |
 

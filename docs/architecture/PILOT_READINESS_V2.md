@@ -29,7 +29,7 @@ Core ministry workflows are implemented over verified backend contracts. Recent 
 | Visitor CRUD | Complete | Person create/edit workflow in dashboard |
 | Editable Notes | Complete | Backend event-sourced audited editing implemented |
 | Staff Identity v1 | Complete | Canonical staff identity abstraction and assignment validation |
-| Staff Administration | Planned | Dynamic staff create/edit/deactivate workflow built on Staff Identity v1 |
+| Staff Administration | In progress | Backend create/edit/deactivate contracts implemented and locally validated; CI, staging, and dashboard administration remain |
 | Authentication Hardening | Planned | Pilot wave |
 | Production Readiness | In progress | Final hardening and validation |
 
@@ -47,7 +47,7 @@ Technical owner IDs are presentation implementation details.
 
 Staff Identity v1 is now the backend identity boundary for care/followup ownership. Existing operator IDs remain backward-compatible, but assignment must resolve through known staff identities before future dashboard or staff administration expansion.
 
-The dashboard now resolves owners through a centralized staff directory abstraction. Future work will replace the static staff directory with user-managed staff records built on Staff Identity v1.
+The dashboard resolves owners through a centralized staff directory abstraction. The backend now supports a projected, event-sourced Staff directory with administrative create, update, and deactivate commands. Dashboard staff management and assignment administration remain future presentation work.
 
 ### Test Records
 
@@ -82,9 +82,13 @@ Pastoral notes are not permanently append-only. Staff must be able to correct fa
 
 ### Wave 1 — Backend Completion
 
-- Dynamic staff directory API built on Staff Identity v1
-- Staff management API
-- Authorization rules for note editing and staff administration
+- [x] Dynamic projected Staff directory API built on Staff Identity v1
+- [x] Staff create, update, and deactivate command API
+- [x] Interim administrative API-key boundary for staff mutations
+- [x] Local Azure Functions lifecycle validation
+- [ ] CI verification
+- [ ] Staging administrative-key configuration and lifecycle validation
+- [ ] Broader authentication and authorization hardening
 
 ### Wave 2 — Dashboard Completion
 

@@ -1,3 +1,37 @@
+## 2026-07-13 — Dynamic Staff Administration v1 local completion
+
+Implemented the backend Dynamic Staff Administration capability over Staff Identity v1.
+
+Shipped in the working branch:
+- immutable `staff.created`, `staff.updated`, and `staff.deactivated` event model
+- Azure Table-backed Staff event repository
+- deterministic canonical Staff directory projector
+- canonical Staff directory read service
+- `GET /api/staff-identities` projected read contract
+- `POST /api/staff-identities` create command
+- `PATCH /api/staff-identities/{staffId}` update and deactivate command
+- dedicated `HOPE_ADMIN_API_KEY` / `x-admin-api-key` mutation boundary
+- deterministic projector and command-service tests
+- PowerShell Azure Functions lifecycle assertion
+
+Validation completed:
+- focused Staff tests passed
+- full regression suite passed
+- TypeScript build passed
+- Functions layout verification passed
+- local Azure Functions lifecycle passed:
+  - missing administrative key rejected
+  - invalid administrative key rejected
+  - create projected correctly
+  - update projected correctly
+  - deactivate projected correctly
+
+Remaining before completion:
+- CI verification
+- staging `HOPE_ADMIN_API_KEY` configuration
+- staging lifecycle assertion
+- dashboard staff-management and assignment-administration UI
+- broader pilot authentication and authorization hardening
 ## 2026-06-23 — Ops preview latency diagnostic baseline
 
 Completed a diagnostic-only latency measurement slice for OPS task-preview surfaces.

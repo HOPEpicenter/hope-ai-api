@@ -1,3 +1,5 @@
+export type StaffStatus = "active" | "inactive";
+
 export const STAFF_IDENTITY_REGISTRY = [
   {
     staffId: "ops-user-1",

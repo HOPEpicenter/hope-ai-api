@@ -35,6 +35,7 @@ Azure Functions are configured with `authLevel: anonymous`, but protected routes
 | POST | `/api/formation/events` | Append Formation event | `HOPE_API_KEY` |
 | GET | `/api/formation/timeline` | Formation timeline | `HOPE_API_KEY` |
 | GET | `/api/formation/profiles` | Formation profiles list | `HOPE_API_KEY` |
+| GET | `/api/staff-identities` | Canonical Staff Identity registry | `HOPE_API_KEY` |
 | GET | `/api/visitors/{id}/formation/events` | Visitor Formation events | `HOPE_API_KEY` |
 | GET | `/api/visitors/{id}/formation/profile` | Visitor Formation profile | `HOPE_API_KEY` |
 | POST | `/api/formation/profiles/{id}/rebuild` | Rebuild Formation profile projection | `HOPE_API_KEY` |

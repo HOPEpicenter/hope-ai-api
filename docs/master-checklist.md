@@ -812,3 +812,10 @@ Current rule:
 
 Current rule:
 - assignment ownership must resolve through canonical staff identity before future dashboard/staff-admin expansion.
+
+### Staff Directory Read Contract v1
+- [x] Protected read endpoint
+- [x] Canonical Staff Identity registry
+- [x] Regression coverage
+- [ ] Dynamic staff persistence
+- [ ] Staff administration commands

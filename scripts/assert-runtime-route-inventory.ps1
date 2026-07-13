@@ -20,6 +20,7 @@ $requiredText = @(
   "/api/version",
   "/api/formation/events",
   "/api/formation/profiles",
+  "/api/staff-identities",
   "/api/engagements/events",
   "/api/integration/timeline",
   "/ops/followups",

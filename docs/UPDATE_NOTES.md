@@ -1557,3 +1557,11 @@ Remaining latency is likely related to shared queue table scans and should stay 
 
 Current rule:
 - assignment ownership must resolve through canonical staff identity before future dashboard/staff-admin expansion.
+
+## 2026-07-13 — Staff Directory Read Contract v1
+
+- Added protected GET /api/staff-identities.
+- Endpoint exposes the canonical Staff Identity registry.
+- Read-only contract; no persistence or management commands.
+- Regression coverage added for Staff Directory Read Contract v1.
+- Forms the backend read surface for future Staff Administration.

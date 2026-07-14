@@ -1641,3 +1641,23 @@ Current rule:
 - Read-only contract; no persistence or management commands.
 - Regression coverage added for Staff Directory Read Contract v1.
 - Forms the backend read surface for future Staff Administration.
+
+## 2026-07-14 — Dashboard Pilot Readiness Convergence
+
+Completed dashboard convergence after Dynamic Staff Administration.
+
+Dashboard:
+
+- Removed the duplicate frontend Staff directory.
+- Care, Journey, Insights, Visitor Snapshot, and shared ministry surfaces now resolve ownership through the backend-projected Staff Identity directory.
+- Eliminated duplicated owner-name lookup logic across dashboard surfaces.
+
+Infrastructure:
+
+- Resolved the Visitor Snapshot React effect lint violation.
+- Preserved runtime behavior while aligning with current React guidance.
+- Verified production build and successful Vercel deployment.
+
+Result:
+
+The dashboard now presents ownership information entirely through backend-authored Staff identities while preserving the backend as the single source of ministry truth.

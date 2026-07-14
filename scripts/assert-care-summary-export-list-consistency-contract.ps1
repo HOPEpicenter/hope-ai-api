@@ -181,9 +181,10 @@ Start-Sleep -Milliseconds 750
 
 Json-Post "$ApiBase/care/candidates/$assignedVisitorId/assign" @{
   assignedTo = "ops-user-2"
+  actorId = "ops-user-1"
 } | Out-Null
 
-Json-Post "$ApiBase/care/candidates/$queueVisitorId/unassign" @{} | Out-Null
+Json-Post "$ApiBase/care/candidates/$queueVisitorId/unassign" @{ actorId = "ops-user-1" } | Out-Null
 
 Start-Sleep -Milliseconds 500
 

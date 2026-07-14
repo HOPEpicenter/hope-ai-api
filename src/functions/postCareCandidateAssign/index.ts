@@ -1,17 +1,13 @@
+import { randomUUID } from "node:crypto";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
-  ensureTable,
-  getFormationProfileByVisitorId,
-  getFormationProfilesTableClient,
-  listFormationProfiles,
+  ensureFormationTables,
+  recordFormationEventV1,
   type FunctionFormationProfileEntity
 } from "../_shared/formation";
 import { getVisitorById } from "../_shared/visitorsRepository";
 import { readCareCandidateByVisitorId } from "../../services/care/readCareCandidateByVisitorId";
-import {
-  createDefaultFormationProfile,
-  upsertFormationProfile
-} from "../../storage/formation/formationProfilesRepo";
+import { resolveMutationSource } from "../../services/events/resolveMutationSource";
 import {
   apiErrorBody,
   getRequestId,
@@ -51,6 +47,8 @@ export async function postCareCandidateAssign(
 
     const visitorId = String(req?.params?.visitorId ?? "").trim();
     const assignedTo = String(req?.body?.assignedTo ?? "").trim();
+    const actorId = String(req?.body?.actorId ?? "").trim();
+    const eventId = String(req?.body?.eventId ?? "").trim() || randomUUID();
 
     if (!visitorId) {
       context.res = {
@@ -66,6 +64,24 @@ export async function postCareCandidateAssign(
         status: 400,
         headers: { "content-type": "application/json; charset=utf-8" },
         body: { ok: false, error: "assignedTo is required" }
+      };
+      return;
+    }
+
+    if (!actorId) {
+      context.res = {
+        status: 400,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: { ok: false, error: "actorId is required" }
+      };
+      return;
+    }
+
+    if (!isKnownStaffId(actorId)) {
+      context.res = {
+        status: 400,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: { ok: false, error: "actorId must reference a known staff identity" }
       };
       return;
     }
@@ -90,30 +106,26 @@ export async function postCareCandidateAssign(
       return;
     }
 
-    const table = getFormationProfilesTableClient();
-    await ensureTable(table);
+    await ensureFormationTables();
 
-    const existingProfile = await getFormationProfileByVisitorId(
-      table,
-      visitorId
-    );
-
-    const profile = {
-      ...(existingProfile ?? createDefaultFormationProfile(visitorId)),
-      partitionKey: "VISITOR" as const,
-      rowKey: visitorId,
+    const eventResult = await recordFormationEventV1({
+      v: 1,
+      eventId,
       visitorId,
-      assignedTo,
-      updatedAt: new Date().toISOString()
-    };
-
-    await upsertFormationProfile(table, profile as any);
-
-    const page = await listFormationProfiles(table, { limit: 500 });
+      type: "FOLLOWUP_ASSIGNED",
+      occurredAt: new Date().toISOString(),
+      source: resolveMutationSource({
+        system: "hope-dashboard-next",
+        actorId
+      }),
+      data: {
+        assigneeId: assignedTo
+      }
+    });
 
     const result = readCareCandidateByVisitorId({
       visitorId,
-      profiles: page.items.map(toCareProfileInput)
+      profiles: [toCareProfileInput(eventResult.profile)]
     });
 
     context.res = {

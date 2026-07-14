@@ -172,6 +172,7 @@ Assert ([string]$opsItem.assignedTo.ownerId -eq "ops-user-1") "ops followup owne
 
 Json-Post "$ApiBase/care/candidates/$(Enc $visitorId)/assign" @{
   assignedTo = "ops-user-2"
+  actorId = "ops-user-1"
 } | Out-Null
 
 Start-Sleep -Milliseconds 500
@@ -188,7 +189,7 @@ Assert-CareCandidate $assignedListItem $visitorId "ops-user-2" "assigned" "owned
 $assignedExportItem = Get-CareExportItem $visitorId "assigned" "owned"
 Assert-CareCandidate $assignedExportItem $visitorId "ops-user-2" "assigned" "owned" "assigned care export"
 
-Json-Post "$ApiBase/care/candidates/$(Enc $visitorId)/unassign" @{} | Out-Null
+Json-Post "$ApiBase/care/candidates/$(Enc $visitorId)/unassign" @{ actorId = "ops-user-1" } | Out-Null
 
 Start-Sleep -Milliseconds 500
 

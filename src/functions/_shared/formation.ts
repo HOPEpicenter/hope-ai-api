@@ -791,7 +791,16 @@ try {
 
   if (projectionChanged) {
     profile.updatedAt = new Date().toISOString();
-    await profilesTable.upsertEntity(serializeGroups(profile) as any, "Merge");
+
+    const updateMode =
+      type === "FOLLOWUP_UNASSIGNED"
+        ? "Replace"
+        : "Merge";
+
+    await profilesTable.upsertEntity(
+      serializeGroups(profile) as any,
+      updateMode
+    );
   }
 
   logFormationEventDecision({

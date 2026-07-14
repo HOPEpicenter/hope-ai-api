@@ -1,3 +1,15 @@
+# Historical Engineering Completion Log
+
+> This document preserves completed engineering work and historical implementation checklists.
+>
+> It is not the active pilot-readiness checklist.
+>
+> Current pilot readiness is owned by `docs/architecture/PILOT_READINESS_V2.md`.
+> Active pilot execution is owned by `docs/architecture/PILOT_READINESS_BOARD.md`.
+>
+> Do not add current roadmap, readiness status, or duplicated pilot gates to this file.
+
+---
 ## 2026-07-07 — Editable Pastoral Notes Backend
 
 - [x] Stable pastoral note IDs added.

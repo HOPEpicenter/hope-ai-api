@@ -1,3 +1,20 @@
+# Historical Release History
+
+> This document preserves historical release notes and engineering milestones.
+>
+> Each entry reflects the project state at the time it was written.
+>
+> Historical references to remaining work are preserved for context and should not be interpreted as the current roadmap.
+>
+> Current strategic direction is owned by `docs/MASTER_PLAN.md`.
+>
+> Current pilot readiness is owned by `docs/architecture/PILOT_READINESS_V2.md`.
+>
+> Current architectural decisions are owned by `docs/architecture/DECISIONS.md`.
+>
+> Do not duplicate current roadmap, pilot status, or architectural guidance in this document.
+
+---
 ## 2026-07-13 — Dynamic Staff Administration v1 fully validated
 
 Follow-up validation completed after merge.

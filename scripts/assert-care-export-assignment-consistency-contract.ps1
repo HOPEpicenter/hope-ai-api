@@ -112,6 +112,7 @@ Start-Sleep -Milliseconds 750
 
 Json-Post "$ApiBase/care/candidates/$visitorId/assign" @{
   assignedTo = "ops-user-2"
+  actorId = "ops-user-1"
 } | Out-Null
 
 Start-Sleep -Milliseconds 500
@@ -143,7 +144,7 @@ Assert ([int]$summary.ownedCount -ge [int]$summary.filteredCount) "summary owned
 Assert ([int]$summary.byAssignmentState.assigned -eq [int]$summary.assignedCount) "summary byAssignmentState.assigned should match assignedCount"
 Assert ([int]$summary.byAssignmentBucket.owned -eq [int]$summary.ownedCount) "summary byAssignmentBucket.owned should match ownedCount"
 
-Json-Post "$ApiBase/care/candidates/$visitorId/unassign" @{} | Out-Null
+Json-Post "$ApiBase/care/candidates/$visitorId/unassign" @{ actorId = "ops-user-1" } | Out-Null
 
 Start-Sleep -Milliseconds 500
 

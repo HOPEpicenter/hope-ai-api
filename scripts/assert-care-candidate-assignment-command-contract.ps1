@@ -87,6 +87,7 @@ Start-Sleep -Milliseconds 500
 
 $assigned = Json-Post "$ApiBase/care/candidates/$visitorId/assign" @{
   assignedTo = "ops-user-2"
+  actorId = "ops-user-1"
 }
 
 Assert ($assigned.ok -eq $true) "assign response should be ok"
@@ -100,7 +101,7 @@ Assert ($detailAfterAssign.item.assignedTo -eq "ops-user-2") "detail should refl
 Assert ($detailAfterAssign.item.assignmentState -eq "assigned") "detail assignmentState should be assigned"
 Assert ($detailAfterAssign.item.assignmentBucket -eq "owned") "detail assignmentBucket should be owned"
 
-$unassigned = Json-Post "$ApiBase/care/candidates/$visitorId/unassign" @{}
+$unassigned = Json-Post "$ApiBase/care/candidates/$visitorId/unassign" @{ actorId = "ops-user-1" }
 
 Assert ($unassigned.ok -eq $true) "unassign response should be ok"
 Assert ($unassigned.found -eq $true) "unassigned candidate should be found"

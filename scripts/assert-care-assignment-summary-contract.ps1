@@ -124,6 +124,7 @@ Assert-SummaryReadable $initialSummary
 
 $assign = Json-Post "$ApiBase/care/candidates/$visitorId/assign" @{
   assignedTo = "ops-user-2"
+  actorId = "ops-user-1"
 }
 
 Assert ($assign.ok -eq $true) "assign response should be ok"
@@ -138,7 +139,7 @@ Assert ([int]$assignedSummary.filteredCount -ge 1) "assigned/owned filtered summ
 Assert ([int]$assignedSummary.assignedCount -ge 1) "assigned/owned summary assignedCount should be at least 1"
 Assert ([int]$assignedSummary.ownedCount -ge 1) "assigned/owned summary ownedCount should be at least 1"
 
-$unassign = Json-Post "$ApiBase/care/candidates/$visitorId/unassign" @{}
+$unassign = Json-Post "$ApiBase/care/candidates/$visitorId/unassign" @{ actorId = "ops-user-1" }
 
 Assert ($unassign.ok -eq $true) "unassign response should be ok"
 

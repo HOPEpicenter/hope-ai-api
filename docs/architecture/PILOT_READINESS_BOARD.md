@@ -45,16 +45,18 @@ Phase 2 intelligence and communication systems remain frozen until pilot complet
 
 ## Wave 1 — Architecture Baseline
 
-Status: In progress
+Status: Documentation synchronization in progress
 
 - [x] Create Pilot Readiness documentation branch.
-- [ ] Update `docs/architecture/PILOT_READINESS_V2.md`.
-- [ ] Update `docs/MASTER_PLAN.md`.
-- [ ] Update `docs/master-checklist.md`.
+- [x] Update `docs/architecture/PILOT_READINESS_V2.md`.
+- [x] Synchronize `docs/MASTER_PLAN.md` with the active pilot architecture.
+- [x] Reclassify `docs/master-checklist.md` as the historical engineering completion log.
 - [ ] Update `docs/UPDATE_NOTES.md`.
-- [ ] Add Ministry State Matrix.
-- [ ] Add Morning Ministry Workflow.
-- [ ] Add Pilot Readiness Board.
+- [x] Add Ministry State Matrix.
+- [x] Add Morning Ministry Workflow.
+- [x] Add Pilot Readiness Board.
+- [x] Record canonical projected Staff directory adoption after dashboard PR #80.
+- [x] Record visitor snapshot React effect hardening after dashboard PR #81.
 - [ ] Validate documentation links and formatting.
 - [ ] Commit and open documentation PR.
 - [ ] CI passes.

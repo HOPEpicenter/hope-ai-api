@@ -24,7 +24,7 @@ Core ministry workflows are implemented over verified backend contracts. Staff A
 | Identity Presentation Layer | Complete | Human-friendly person and owner names |
 | Ministry Event Language | Complete | Backend event codes translated for pastors |
 | Display Language Layer | Complete | Status, risk, and reason labels centralized |
-| Shared Staff Directory | Complete | Central staff display abstraction |
+| Canonical Projected Staff Directory | Complete | Dashboard assignment and display consume backend-projected Staff identities |
 | Test Record Filtering | Complete | Engineering/test data hidden from key ministry views |
 | Visitor CRUD | Complete | Person create/edit workflow in dashboard |
 | Editable Notes | Complete | Backend event-sourced audited editing and dashboard correction workflow implemented |
@@ -97,8 +97,10 @@ Pastoral notes are not permanently append-only. Staff must be able to correct fa
 - [x] Ministry State Matrix created
 - [x] Morning Ministry Workflow created
 - [x] Pilot Readiness Board created
-- [ ] Synchronize master planning and checklist documents
-- [ ] Merge architecture baseline through PR
+- [x] Synchronize master planning and checklist documents
+- [x] Merge architecture baseline through PR
+- [x] Remove the duplicate dashboard staff directory and consume canonical backend Staff identities
+- [x] Resolve the visitor snapshot React effect lint blocker
 
 ### Wave 2 — Cross-Page Architecture Validation
 

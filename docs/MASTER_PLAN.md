@@ -358,148 +358,126 @@ This document tracks the *public-ish* API surface under /api/* and dev/admin too
 
 ---
 
-## Phase 1 — IDENTITY (COMPLETED)
+# HOPE Ministry OS — Current Master Plan
 
-Status: ✅ COMPLETE
+## Current Architecture Status
 
-Checklist:
-- [x] Create Visitor endpoint exists and returns `visitorId`
-- [x] Storage-backed visitor persistence wired (Azure Tables via repo)
-- [x] API key middleware exists (`x-api-key`) and is used for protected surfaces (scoped)
-- [x] Basic health endpoint for CI smoke (`/api/health`)
+Status: Pilot Hardening
 
-Notes:
-- Phase 1 is locked unless a change prevents major problems later.
-- Idempotent visitor creation and stale EMAIL index repair are covered by smoke.
+The backend and dashboard now operate as a unified Ministry Operating System built on deterministic event sourcing.
 
----
+Completed architectural foundations include:
 
-## Phase 2 — ENGAGEMENT (COMPLETED / LOCKED)
+- Identity
+- Engagement
+- Formation
+- Journey
+- Care
+- Person 360
+- Today Workspace
+- Insights
+- Staff Administration
+- Canonical Staff Identity
+- Canonical Care Ownership
+- Ownership Actor Provenance
+- Editable Pastoral Notes
+- Ministry Timeline
+- Replay-safe deterministic projections
 
-Status: ✅ COMPLETE
+Commands create canonical events.
 
-Checklist:
-- [x] Engagement Event Envelope v1 (validation + strict contract)
-- [x] POST `/api/engagements/events` accepts engagement events (envelope)
-- [x] GET `/api/engagements/timeline` supports cursor paging (`nextCursor`) and stable ordering
-- [x] Timeline contract hardened:
-  - limit=1 no skip / no overlap regression
-  - cross-stream cursor boundary regression
-  - cursor is URL-safe and round-trips via URL escaping
-- [x] GET `/api/engagements/status` returns current status derived from events
-- [x] Notes + tags supported as first-class engagement event types
-- [x] GET `/api/engagements/score` exists and returns `{ ok: true, ... }`
-- [x] Oversized metadata returns 400
-- [x] 404 JSON includes `requestId`
+Events build projections.
 
-Locked:
-- Phase 2 is production-ready and should not be reworked unless it prevents major problems later.
-- Paging + cursor logic is hardened and should not be revisited without a major contract change.
+Projections drive pastor-facing experiences.
 
----
+The dashboard is a presentation layer over verified backend projections. All ministry state originates from canonical events and derived projections. The dashboard must never invent, derive independently, or mutate ministry state.
 
-## Phase 3 — FORMATION (ACTIVE / PARTIALLY COMPLETE)
+## Current Pilot Work
 
-Status: 🟡 ACTIVE
+The remaining work before pilot launch is architectural validation rather than feature construction.
 
-Implemented:
-- [x] Formation stage model exists in contract (FormationStage + stage fields on profile snapshot)
-- [x] POST `/api/formation/events` (protected via API key)
-- [x] GET `/api/visitors/:id/formation/events` (paging supported)
-- [x] GET `/api/visitors/:id/formation/profile` (derived snapshot)
-- [x] CI asserts formation pagination + idempotency + profile snapshot behavior
+Current priorities:
 
-Remaining:
-- [ ] Expand milestones v1 beyond the initial two types (if/when needed)
-- [x] Expand regression coverage: repeated events + profile invariants per milestone type — already covered by formation milestones, profile reconciliation, and snapshot invariant regressions
-- [x] Clarified/documented that `stageUpdatedAt / stageReason / stageUpdatedBy` are guaranteed for explicit stage-change scenarios, not generic profile outputs
+1. Synchronize pilot planning and verification documents.
+2. Validate the Ministry State Matrix across all pastor-facing workspaces.
+3. Complete the Morning Ministry Workflow walkthrough.
+4. Verify ownership, notes, journey, timeline, and worklist consistency.
+5. Define and approve pilot authentication and access boundaries.
+6. Complete ministry acceptance testing.
+7. Verify staging and production deployment readiness.
+8. Produce the Pilot Acceptance Report.
 
-Notes:
-- Formation should follow the same event-driven derivation discipline as Engagement.
-- Prefer deriving state from events rather than storing derived fields.
+## Pilot Acceptance Criteria
 
----
+The system will be considered pilot-ready when:
 
-## Cross-cutting — AUTH SCOPING (COMPLETED, STUB SURFACES ONLY)
+- Today clearly identifies who needs attention and why.
+- Person 360 presents a coherent ministry story.
+- Journey and Person 360 agree on formation stage and next-step state.
+- Care ownership remains canonical across every workspace.
+- Assignment and unassignment are represented by canonical formation events.
+- Pastoral note corrections preserve immutable audit history.
+- Completed ministry actions update dependent worklists consistently.
+- Backend failure is never presented as an all-clear ministry state.
+- Pilot users can complete the morning ministry workflow without developer interpretation.
+- Pilot access and sensitive-action boundaries are explicitly approved.
+- Backend CI, Azure staging deployment, and dashboard production deployment are verified.
+- Pilot documentation matches the verified implementation.
 
-Status: ✅ COMPLETE (stub behavior only)
+## Pilot Readiness Architecture
 
-Goal:
-- Public endpoints remain unaffected.
-- Protected endpoints enforce API key and required query validation.
-- No real business logic required yet.
+The following documents define the pilot-readiness operating model:
 
-Implemented:
-- [x] GET `/api/formation/timeline` requires API key
-- [x] GET `/api/integration/timeline` requires API key
-- [x] GET `/api/legacy/export` requires API key
-- [x] POST `/api/formation/events` requires API key
-- [x] Without API key => 401
-- [x] With API key but missing required query/invalid body => 400
-- [x] Auth scoping verified: public endpoints remain unaffected
-- [x] CI/local auth scoping assertions cover 401/400 expectations for scoped endpoints
+- `docs/architecture/PILOT_READINESS_V2.md`
+- `docs/architecture/MINISTRY_STATE_MATRIX.md`
+- `docs/architecture/MORNING_MINISTRY_WORKFLOW.md`
+- `docs/architecture/PILOT_READINESS_BOARD.md`
 
-Remaining:
-- [ ] Expand scoped endpoint coverage only when new protected surfaces are added
+A final `PILOT_ACCEPTANCE_REPORT.md` will record verification evidence, known limitations, deferred scope, and the launch recommendation after validation is complete.
 
----
+## Phase 2 — Frozen Until Pilot Completion
 
-## Phase 4 — INTEGRATION (ACTIVE / PARTIALLY COMPLETE)
+The following initiatives remain intentionally outside pilot scope:
 
-Status: 🟡 ACTIVE (timeline + cursor contract implemented; more business logic pending)
+- Community Intelligence Engine
+- Email Engine
+- SMS Engine
+- Volunteer Ministry
+- Giving Intelligence
+- Attendance Intelligence
+- Neighborhood Intelligence
+- Prayer Intelligence
+- Outreach Intelligence
+- Family Intelligence
+- Community Mapping
 
-Implemented:
-- [x] GET `/api/integration/timeline` v1 aggregation + cursor paging (protected)
-- [x] Cursor contract exists (`integrationTimelineCursor.v1` base64url JSON round-trip)
-- [x] Deep paging + cursor translation hardened at integration layer
-- [x] Cross-stream cursor boundary regression coverage exists
-- [x] GET `/api/integration/summary` v1 (read-only derived view)
-- [x] Gated assert script exists (`scripts/assert-integration-summary.ps1`)
-- [x] Consistency hardening: integration timeline reads formation via storage repo (cursor decode + perStream+1 tail slice paging)
-- [x] Regression covers integration summary ownership/source invariants (follow-up consistency, assignment-only source flags, assignment→engagement transition, no-false-followup, late/older-event stability)
+These initiatives must not be opened until pilot findings are reviewed and Phase 2 is explicitly authorized.
 
-Remaining:
-- [x] Define cross-stream ordering contract (explicitly documented) (docs/integration-ordering-contract-v1.md)
-- [x] Define aggregation model (engagement + formation merge rules) (docs/integration-aggregation-model-v1.md)
-- [x] Model ownership / follow-up assignments (docs/ownership-followup-model-v1.md)
-- [x] Connect people to groups / programs / workflows (docs/groups-programs-workflows-model-v1.md)
-Notes:
-- Integration must preserve stable ordering guarantees from Phase 2.
-- Aggregation must not break cursor contract.
+## Current Governance Rules
 
----
+- Backend remains the source of truth.
+- Commands create events.
+- Events build projections.
+- Projections drive UI.
+- Projections are never mutated directly.
+- All state-changing ministry actions must remain replayable and deterministic.
+- The dashboard must remain thin over verified backend contracts.
+- No orchestration activation, scheduler, background mutation loop, or task persistence may be introduced during pilot hardening.
+- PR-only and PowerShell-only workflows remain mandatory.
+- CI and Azure staging deployment must pass before backend work is complete.
+- Every pre-pilot change must increase ministry trust or reduce pilot risk.
 
-## Phase 5 — LEGACY (NOT STARTED)
+## Current Priority Order
 
-Status: ⚪ NOT STARTED
-
-Planned:
-- [x] Implement legacy export payload — Azure Function wired in #1003 and function regression added in #1004
-- [ ] Streaming / export format — deferred pending explicit format/design decision; do not implement ad hoc
-- [x] Long-horizon history views — satisfied by cursor-paged integration/global timelines plus legacy export payload v1
-- [x] Derived insights — satisfied by engagement score, engagement risk, activity insights, journey read models, integration summaries, and other read-only derived views
-
----
-
-## Guardrails (Always)
-
-- Keep smoke green and CI green.
-- No direct pushes to `main`; PRs only.
-- Only ship changes that:
-  - Prevent major future problems, or
-  - Advance the master plan deliberately.
-- Keep `/ops/*` as dev/admin tooling only.
-- Treat `/api/*` as the product surface and contract.
-
----
-
-## Next Focus (Priority Order)
-
-1. Close docs and staging verification for the current Phase 3/4 surface.
-2. Only add another Formation slice if a real repeated-event/profile-invariant gap is found.
-3. Implement additional Integration business logic only if a real producer or blocker requires it.
-
-
+1. Complete documentation synchronization.
+2. Validate cross-page ministry-state consistency.
+3. Execute the morning ministry workflow scenarios.
+4. Resolve any architecture defects discovered during validation.
+5. Approve pilot access and authorization boundaries.
+6. Complete pastoral acceptance review.
+7. Verify deployment and operational readiness.
+8. Produce the Pilot Acceptance Report.
+9. Approve the controlled ministry pilot.
 ## Deployment notes
 - Staging deploy packaging: Oryx/build is disabled; the staged .deploy zip must be self-contained and include production dependencies (npm ci --omit=dev inside .deploy). (PR #197)
 ## 2026-03-10 closeout

@@ -1,6 +1,6 @@
-# HOPE Pilot Readiness v2 — Revision 4
+# HOPE Pilot Readiness v2 — Revision 5
 
-Date: 2026-07-07
+Date: 2026-07-14
 
 Status: Pilot Hardening Phase
 
@@ -8,7 +8,7 @@ Status: Pilot Hardening Phase
 
 The HOPE Ministry OS dashboard has transitioned from feature construction to pilot hardening.
 
-Core ministry workflows are implemented over verified backend contracts. Recent work focused on pastor-facing language, shared presentation services, test-record filtering, staff-directory foundation, and verified admin readiness.
+Core ministry workflows are implemented over verified backend contracts. Staff Administration, editable pastoral notes, canonical care ownership, actor provenance, and the pastor-facing ministry workspaces are now implemented. The remaining pilot work is architecture validation, cross-page consistency, ministry acceptance, access-boundary approval, and final deployment verification.
 
 ## Current Pilot Readiness
 
@@ -27,10 +27,13 @@ Core ministry workflows are implemented over verified backend contracts. Recent 
 | Shared Staff Directory | Complete | Central staff display abstraction |
 | Test Record Filtering | Complete | Engineering/test data hidden from key ministry views |
 | Visitor CRUD | Complete | Person create/edit workflow in dashboard |
-| Editable Notes | Complete | Backend event-sourced audited editing implemented |
+| Editable Notes | Complete | Backend event-sourced audited editing and dashboard correction workflow implemented |
 | Staff Identity v1 | Complete | Canonical staff identity abstraction and assignment validation |
-| Staff Administration | Backend Complete | Event-sourced Staff Administration validated locally, through CI, deployed successfully, and verified in staging. Remaining work is dashboard administration UX. |
-| Authentication Hardening | Planned | Pilot wave |
+| Staff Administration | Complete | Event-sourced Staff Administration is implemented across the backend and dashboard. Canonical Staff Identity powers administration, assignment, and display throughout Ministry OS. |
+| Canonical Care Ownership | Complete | Assignment and unassignment now write canonical formation events and update derived ministry projections. |
+| Ownership Actor Provenance | Complete | Dashboard care ownership commands send actor identity through the verified backend contract. |
+| Cross-Page Consistency | In validation | Ministry State Matrix and morning workflow validation remain before pilot launch. |
+| Authentication Hardening | Open pilot gate | Pilot access and sensitive-action boundaries require explicit approval |
 | Production Readiness | In progress | Final hardening and validation |
 
 ## Architectural Decisions
@@ -47,7 +50,9 @@ Technical owner IDs are presentation implementation details.
 
 Staff Identity v1 is now the backend identity boundary for care/followup ownership. Existing operator IDs remain backward-compatible, but assignment must resolve through known staff identities before future dashboard or staff administration expansion.
 
-The dashboard resolves owners through a centralized staff directory abstraction. The backend now supports a projected, event-sourced Staff directory with administrative create, update, and deactivate commands. Dashboard staff management and assignment administration remain future presentation work.
+The dashboard resolves owners through a centralized staff directory abstraction. The backend supports a projected, event-sourced Staff directory with administrative create, update, and deactivate commands. Dashboard Staff Administration and assignment workflows now consume the canonical projected Staff directory.
+
+Care assignment and unassignment write canonical `FOLLOWUP_ASSIGNED` and `FOLLOWUP_UNASSIGNED` formation events. Current ownership is derived through projections, and actor provenance is preserved through the command contract.
 
 ### Test Records
 
@@ -69,10 +74,12 @@ Current state:
 - Edited metadata, version history, and audit history are preserved through replay.
 - Full lifecycle regression covers POST -> GET -> PATCH -> GET.
 
-Remaining dashboard state:
+Dashboard state:
 
-- Dashboard editing should consume the verified backend contracts.
-- Dashboard should show save/cancel editing, edited indicators, and audit/history display.
+- Dashboard editing consumes the verified backend contracts.
+- Dashboard editing supports save and cancel behavior.
+- Corrected notes display edited indicators.
+- Audit and version history remain preserved through the canonical notes contract.
 
 Architectural decision:
 
@@ -80,29 +87,35 @@ Pastoral notes are not permanently append-only. Staff must be able to correct fa
 
 ## Remaining Engineering Work
 
-### Wave 1 — Backend Completion
+### Wave 1 — Architecture Baseline
 
-- [x] Dynamic projected Staff directory API built on Staff Identity v1
-- [x] Staff create, update, and deactivate command API
-- [x] Interim administrative API-key boundary for staff mutations
-- [x] Local Azure Functions lifecycle validation
-- [x] CI verification
-- [x] Staging administrative-key configuration and lifecycle validation
-- [ ] Broader authentication and authorization hardening
+- [x] Dynamic projected Staff directory and administrative commands
+- [x] Dashboard Staff Administration workflow
+- [x] Editable pastoral-note dashboard workflow
+- [x] Canonical event-sourced care assignment and unassignment
+- [x] Ownership actor provenance
+- [x] Ministry State Matrix created
+- [x] Morning Ministry Workflow created
+- [x] Pilot Readiness Board created
+- [ ] Synchronize master planning and checklist documents
+- [ ] Merge architecture baseline through PR
 
-### Wave 2 — Dashboard Completion
+### Wave 2 — Cross-Page Architecture Validation
 
-- Edit pastoral note UI
-- Save/cancel note editing flow
-- Edited badge or audit indicator
-- Staff management UI
-- Staff assignment administration
-- Final workflow polish
+- Verify person identity consistency.
+- Verify care-owner consistency.
+- Verify formation-stage and next-step consistency.
+- Verify pastoral-note and timeline consistency.
+- Verify needs-attention and recommended-action consistency.
+- Confirm no dashboard workspace invents ministry state.
 
 ### Wave 3 — Pilot Validation
 
 - End-to-end ministry walkthrough
 - Ministry acceptance testing
+- Ownership and inactive-staff edge-case validation
+- Pastoral-note correction validation
+- Pilot authentication and authorization decision
 - Documentation freeze
 - Deployment validation
 - Pilot launch

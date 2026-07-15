@@ -23,8 +23,8 @@ import {
   formationMutationDispatchers
 } from "../../domain/formation/projection/formationMutationDispatchers";
 import {
-  isKnownOperatorId
-} from "../../services/operators/operatorIdentity";
+  readCanonicalStaffIdentity
+} from "../../services/staff/readCanonicalStaffDirectory";
 
 function normalizeAssignedTo(input: any): string | null {
   if (input === null || input === undefined) return null;
@@ -222,9 +222,6 @@ function validateFormationEventEnvelopeV1Strict(body: unknown): {
     throw new Error("source.actorId is required for operator followup mutations");
   }
 
-  if (OPERATOR_MUTATION_EVENT_TYPES.has(type) && !isKnownOperatorId(actorId)) {
-    throw new Error("source.actorId must reference a known operator for followup mutations");
-  }
 
   if (type === "FOLLOWUP_ASSIGNED") {
     requireNonEmptyString(data.assigneeId, "data.assigneeId");
@@ -615,6 +612,19 @@ export async function recordFormationEventV1(body: unknown): Promise<{
   const occurredAt = normalizeIso(envelope.occurredAt, "occurredAt");
   const source = asObject(envelope.source);
   const data = asObject(envelope.data);
+
+  if (OPERATOR_MUTATION_EVENT_TYPES.has(type)) {
+    const actorId = normalizeOptionalActorId(source.actorId);
+    const staffIdentity = actorId
+      ? await readCanonicalStaffIdentity(actorId)
+      : null;
+
+    if (!staffIdentity || staffIdentity.status !== "active") {
+      throw new Error(
+        "source.actorId must reference an active staff identity for followup mutations"
+      );
+    }
+  }
 
   const eventsTable = getFormationEventsTableClient();
   const profilesTable = getFormationProfilesTableClient();

@@ -30,21 +30,28 @@ if ($result.count -ne @($result.items).Count) {
   throw "Expected count to equal items length."
 }
 
-$opsUser1 = @(
+$compatibilityIdentities = @(
   $result.items |
-  Where-Object { $_.staffId -eq "ops-user-1" }
+  Where-Object {
+    $_.staffId -eq "ops-user-1" -or
+    $_.staffId -eq "ops-user-2"
+  }
 )
 
-if ($opsUser1.Count -ne 1) {
-  throw "Expected canonical ops-user-1 identity."
+if ($compatibilityIdentities.Count -ne 0) {
+  throw "Compatibility operator identities must not appear in the canonical Staff directory."
 }
 
-if ($opsUser1[0].displayName -ne "Operations Team") {
-  throw "Expected Operations Team display name."
+$nonEventBackedIdentities = @(
+  $result.items |
+  Where-Object {
+    [string]::IsNullOrWhiteSpace([string]$_.createdAt) -or
+    [string]::IsNullOrWhiteSpace([string]$_.lastEventId)
+  }
+)
+
+if ($nonEventBackedIdentities.Count -ne 0) {
+  throw "Every canonical Staff identity must be backed by Staff events."
 }
 
-if ([string]::IsNullOrWhiteSpace($opsUser1[0].roleLabel)) {
-  throw "Expected roleLabel."
-}
-
-Write-Host "OK: staff directory read contract v1 works." -ForegroundColor Green
+Write-Host "OK: canonical Staff directory contains only event-backed identities." -ForegroundColor Green

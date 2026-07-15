@@ -23,7 +23,7 @@ import {
   formationMutationDispatchers
 } from "../../domain/formation/projection/formationMutationDispatchers";
 import {
-  readCanonicalStaffIdentity
+  readMutationActorStaffIdentity
 } from "../../services/staff/readCanonicalStaffDirectory";
 
 function normalizeAssignedTo(input: any): string | null {
@@ -616,7 +616,7 @@ export async function recordFormationEventV1(body: unknown): Promise<{
   if (OPERATOR_MUTATION_EVENT_TYPES.has(type)) {
     const actorId = normalizeOptionalActorId(source.actorId);
     const staffIdentity = actorId
-      ? await readCanonicalStaffIdentity(actorId)
+      ? await readMutationActorStaffIdentity(actorId)
       : null;
 
     if (!staffIdentity || staffIdentity.status !== "active") {

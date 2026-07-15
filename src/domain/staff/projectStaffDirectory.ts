@@ -1,6 +1,5 @@
-import {
-  STAFF_IDENTITY_REGISTRY,
-  type StaffStatus
+import type {
+  StaffStatus
 } from "../../services/operators/operatorIdentity";
 
 export type StaffEventType =
@@ -43,17 +42,6 @@ export function projectStaffDirectory(
 ): CanonicalStaffIdentity[] {
   const records = new Map<string, CanonicalStaffIdentity>();
 
-  for (const seed of STAFF_IDENTITY_REGISTRY) {
-    records.set(seed.staffId, {
-      staffId: seed.staffId,
-      displayName: seed.displayName,
-      roleLabel: seed.roleLabel,
-      status: "active",
-      createdAt: null,
-      updatedAt: null,
-      lastEventId: null
-    });
-  }
 
   const ordered = [...events].sort((a, b) =>
     a.occurredAt.localeCompare(b.occurredAt) ||

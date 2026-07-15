@@ -3,6 +3,21 @@ const SOURCE_SYSTEM = "hope-pilot-seed";
 const LOCAL_BASE_URL = "http://127.0.0.1:7071/api";
 const PILOT_NOTE_MARKER = "[HOPE-PILOT-MELISSA-CARTER]";
 
+const SUPPORTED_FORMATION_EVENT_TYPES = new Set([
+  "FOLLOWUP_ASSIGNED",
+  "FOLLOWUP_UNASSIGNED",
+  "FOLLOWUP_CONTACTED",
+  "FOLLOWUP_OUTCOME_RECORDED",
+  "NEXT_STEP_SELECTED",
+  "NEXT_STEP_COMPLETED",
+  "PRAYER_REQUESTED",
+  "SALVATION_RECORDED",
+  "BAPTISM_RECORDED",
+  "MEMBERSHIP_RECORDED",
+  "GROUP_JOINED",
+  "GROUP_LEFT",
+]);
+
 function readEnvironment(name, fallback = "") {
   const value = process.env[name];
 
@@ -83,6 +98,22 @@ function normalizeBaseUrl(value) {
   return normalized.endsWith("/api")
     ? normalized
     : `${normalized}/api`;
+}
+
+function validateScenarioEventTypes(scenarios) {
+  for (const scenario of scenarios) {
+    for (const event of scenario.events) {
+      if (!SUPPORTED_FORMATION_EVENT_TYPES.has(event.type)) {
+        throw new Error(
+          `Unsupported formation event type "${event.type}" ` +
+          `in scenario "${scenario.key}", event "${event.eventKey}". ` +
+          `Supported types: ${
+            Array.from(SUPPORTED_FORMATION_EVENT_TYPES).join(", ")
+          }`,
+        );
+      }
+    }
+  }
 }
 
 function makeEventId(scenarioKey, eventKey) {
@@ -323,10 +354,12 @@ function buildScenarios(staff = null) {
       description: "Connected person without a selected next step",
       events: [
         {
-          eventKey: "service-attended",
-          type: "SERVICE_ATTENDED",
+          eventKey: "connected-outcome",
+          type: "FOLLOWUP_OUTCOME_RECORDED",
+          actorId: douglasStaffId,
           data: {
-            service: "Sunday Worship",
+            outcome: "connected",
+            notes: "Connected through the HOPE welcome process",
           },
         },
       ],
@@ -529,6 +562,7 @@ async function main() {
 
   if (mode === "preview") {
     const scenarios = buildScenarios();
+    validateScenarioEventTypes(scenarios);
 
     console.log(
       JSON.stringify(
@@ -579,6 +613,7 @@ async function main() {
   };
 
   const scenarios = buildScenarios(staff);
+  validateScenarioEventTypes(scenarios);
 
   console.log(
     JSON.stringify(

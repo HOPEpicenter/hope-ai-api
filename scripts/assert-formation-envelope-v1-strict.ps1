@@ -10,6 +10,10 @@ function PostJson([string]$url, [hashtable]$headers, [object]$body) {
   Invoke-RestMethod -Method Post -Uri $url -Headers $headers -ContentType "application/json" -Body ($body | ConvertTo-Json -Depth 20)
 }
 
+function GetJson([string]$url, [hashtable]$headers) {
+  Invoke-RestMethod -Method Get -Uri $url -Headers $headers
+}
+
 function New-FormationEnvelope {
   param(
     [string]$visitorId,
@@ -56,7 +60,30 @@ function Expect-HttpFailure([scriptblock]$fn, [string]$label) {
 
 $headers = @{ "x-api-key" = $ApiKey }
 
+$staffDirectoryResponse = GetJson "$ApiBase/staff-identities" $headers
+$staffItems = @($staffDirectoryResponse.items)
+
+$activeStaff = $staffItems |
+  Where-Object {
+    [string]$_.status -eq "active" -and
+    [string]$_.staffId -like "staff-*"
+  } |
+  Select-Object -First 1
+
+if (-not $activeStaff) {
+  $activeStaff = $staffItems |
+    Where-Object { [string]$_.status -eq "active" } |
+    Select-Object -First 1
+}
+
+$activeStaffId = [string]$activeStaff.staffId
+
+if ([string]::IsNullOrWhiteSpace($activeStaffId)) {
+  throw "No active canonical Staff identity was available for Formation assertions."
+}
+
 Write-Host "[assert-formation-envelope-v1-strict] ApiBase=$ApiBase"
+Write-Host "[assert-formation-envelope-v1-strict] activeStaffId=$activeStaffId"
 
 # 1) Create visitor
 $email = "formation-envelope+" + (Get-Date -Format "yyyyMMddHHmmss") + "@example.com"
@@ -74,7 +101,7 @@ Write-Host "[assert-formation-envelope-v1-strict] visitorId=$vid"
 
 $now = (Get-Date).ToUniversalTime()
 
-# 2) Legacy payload should still work (back-compat)
+# 2) Legacy payload without the v1 envelope must fail
 $legacy = @{
   id         = [Guid]::NewGuid().ToString()
   visitorId  = $vid
@@ -82,8 +109,9 @@ $legacy = @{
   occurredAt = $now.ToString("o")
   metadata   = @{ assigneeId = "ops-user-1" }
 }
-PostJson "$ApiBase/formation/events" $headers $legacy | Out-Null
-Write-Host "[OK] legacy payload accepted" -ForegroundColor Green
+Expect-HttpFailure {
+  PostJson "$ApiBase/formation/events" $headers $legacy
+} "legacy payload without v1 envelope"
 
 # 3) Looks-like-v1 but missing source.system => must fail (strict-for-v1)
 $badV1_noSourceSystem = @{
@@ -113,13 +141,13 @@ Expect-HttpFailure { PostJson "$ApiBase/formation/events" $headers $badV1_missin
 # 7) Operator followup mutation v1 requires a known source.actorId
 $badV1_unknownActor = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_CONTACTED" -occurredAt $now.AddSeconds(5) -data @{} -sourceSystem "assert-formation-envelope-v1-strict"
 $badV1_unknownActor.source.actorId = "unknown-operator"
-Expect-HttpFailure { PostJson "$ApiBase/formation/events" $headers $badV1_unknownActor } "v1 FOLLOWUP_CONTACTED unknown source.actorId"
+Expect-HttpFailure { PostJson "$ApiBase/formation/events" $headers $badV1_unknownActor } "v1 FOLLOWUP_CONTACTED unknown Staff source.actorId"
 
 # 8) Operator followup mutation v1 with known source.actorId should pass
 $goodV1WithActor = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_CONTACTED" -occurredAt $now.AddSeconds(6) -data @{} -sourceSystem "assert-formation-envelope-v1-strict"
-$goodV1WithActor.source.actorId = "ops-user-1"
+$goodV1WithActor.source.actorId = $activeStaffId
 PostJson "$ApiBase/formation/events" $headers $goodV1WithActor | Out-Null
-Write-Host "[OK] v1 operator followup mutation with known source.actorId accepted" -ForegroundColor Green
+Write-Host "[OK] v1 followup mutation with active canonical Staff source.actorId accepted" -ForegroundColor Green
 
 Write-Host "[assert-formation-envelope-v1-strict] OK" -ForegroundColor Green
 

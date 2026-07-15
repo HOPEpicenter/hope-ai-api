@@ -86,16 +86,20 @@ assert(
   "Expected deactivation event as lastEventId."
 );
 
-const seeded = first.find(item => item.staffId === "ops-user-1");
+const emptyProjection = projectStaffDirectory([]);
 
-assert(seeded, "Expected seeded Staff Identity v1 record.");
 assert(
-  seeded.displayName === "Operations Team",
-  "Expected seeded display name."
+  emptyProjection.length === 0,
+  "An empty Staff event stream must produce an empty canonical directory."
 );
+
+const compatibilityIdentity = first.find(
+  item => item.staffId === "ops-user-1"
+);
+
 assert(
-  seeded.status === "active",
-  "Expected seeded staff identity to remain active."
+  !compatibilityIdentity,
+  "Compatibility operator IDs must not appear without Staff events."
 );
 
 const duplicateCreate: StaffEvent[] = [

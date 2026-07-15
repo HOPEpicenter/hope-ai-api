@@ -5,11 +5,39 @@ import { deriveFollowupPriority } from "../followups/deriveFollowupPriority";
 import { deriveFollowupUrgency } from "../followups/deriveFollowupUrgency";
 import { projectFollowupState } from "../../functions/_shared/followupProjection";
 import { TIMELINE_DERIVATION_LIMIT } from "../integration/timelineConstants";
+import { readCanonicalStaffIdentity } from "../staff/readCanonicalStaffDirectory";
 import type { CanonicalVisitorDashboardCard } from "./canonicalDashboardContracts";
 
 const integrationService = new IntegrationService(new EngagementEventsRepository());
 
+type ReadStaffIdentity = (
+  staffId: string
+) => Promise<{ displayName?: string | null } | null>;
 
+export async function resolveCanonicalAssignedStaffName(
+  assignedTo: string | null | undefined,
+  fallbackName: string | null | undefined,
+  readStaffIdentity: ReadStaffIdentity = readCanonicalStaffIdentity
+): Promise<string | null> {
+  const staffId = String(assignedTo ?? "").trim();
+
+  if (!staffId) {
+    return null;
+  }
+
+  const staffIdentity = await readStaffIdentity(staffId);
+  const displayName = String(
+    staffIdentity?.displayName ?? ""
+  ).trim();
+
+  if (displayName) {
+    return displayName;
+  }
+
+  const fallback = String(fallbackName ?? "").trim();
+
+  return fallback || staffId;
+}
 
 export async function readCanonicalVisitorDashboardCard(
   visitorId: string
@@ -65,7 +93,11 @@ export async function readCanonicalVisitorDashboardCard(
   });
 
   const assignedTo = projection.assignedTo;
-  const assignedToName = projection.assignedToName;
+  const assignedToName =
+    await resolveCanonicalAssignedStaffName(
+      assignedTo,
+      projection.assignedToName
+    );
 
   const lastNextStepAt =
     typeof profile?.lastNextStepAt === "string" && profile.lastNextStepAt.trim().length > 0
@@ -118,6 +150,7 @@ export async function readCanonicalVisitorDashboardCard(
     stageUpdatedBy,
     lastNextStepAt,
     lastNextStepCompletedAt,
+    lastFollowupAssignedAt,
     lastFollowupOutcome,
     lastFollowupOutcomeAt,
     lastPrayerRequestedAt,

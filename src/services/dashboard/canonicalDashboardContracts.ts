@@ -11,6 +11,7 @@ export type CanonicalVisitorDashboardCard = {
   stageUpdatedBy: string | null;
   lastNextStepAt: string | null;
   lastNextStepCompletedAt: string | null;
+  lastFollowupAssignedAt: string | null;
   lastFollowupOutcome: string | null;
   lastFollowupOutcomeAt: string | null;
   lastPrayerRequestedAt: string | null;

@@ -15,6 +15,7 @@ import {
 import { readCanonicalVisitorIdentity, type CanonicalVisitorIdentity } from "../../services/dashboard/visitorIdentity";
 import { resolveCanonicalDisplayName } from "../../services/dashboard/resolveCanonicalDisplayName";
 import { buildProjectionIntegrityEnvelope } from "../../shared/integration/projectionIntegrityEnvelope";
+import { readCanonicalVisitorDashboardCard } from "../../services/dashboard/readCanonicalVisitorDashboardCard";
 
 function parseLimit(val: unknown, fallback = 200): number {
   const n = typeof val === "string" ? Number(val) : fallback;
@@ -110,6 +111,26 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
       })
     );
 
+    const dashboardCardByVisitorId = new Map<
+      string,
+      Awaited<ReturnType<typeof readCanonicalVisitorDashboardCard>>
+    >();
+
+    await Promise.all(
+      pageItems.map(async (p) => {
+        const visitorId = String(p.visitorId ?? "").trim();
+
+        if (!visitorId || dashboardCardByVisitorId.has(visitorId)) {
+          return;
+        }
+
+        dashboardCardByVisitorId.set(
+          visitorId,
+          await readCanonicalVisitorDashboardCard(visitorId)
+        );
+      })
+    );
+
     const items = pageItems.map((p) => {
       const projection = projectFollowupState(p);
 
@@ -125,18 +146,45 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
           visitorIdentity.displayName
         );
 
+      const card =
+        dashboardCardByVisitorId.get(visitorId);
+
+      if (!card) {
+        throw new Error(
+          `Canonical dashboard card unavailable for visitor ${visitorId}`
+        );
+      }
+
       return {
-        visitorId: p.visitorId,
+        visitorId,
         displayName,
         name: displayName,
         email: visitorIdentity.email,
-        assignedTo: projection.assignedTo,
-        assignedToName: projection.assignedToName,
+        assignedTo: card.assignedTo ?? projection.assignedTo,
+        assignedToName: card.assignedToName ?? projection.assignedToName,
         projectionMetadata: projection.projectionMetadata,
         followupState: projection.followupState,
         attentionState: projection.attentionState,
-        lastFollowupAssignedAt: p.lastFollowupAssignedAt ?? null,
-        lastFollowupContactedAt: p.lastFollowupContactedAt ?? null
+        stage: card.stage,
+        followupStatus: card.followupStatus,
+        followupUrgency: card.followupUrgency,
+        followupOverdue: card.followupOverdue,
+        riskLevel: card.riskLevel,
+        riskScore: card.riskScore,
+        needsFollowup: card.needsFollowup,
+        recommendedAction: card.recommendedAction,
+        priorityBand: card.priorityBand,
+        priorityScore: card.priorityScore,
+        priorityReason: card.priorityReason,
+        lastFollowupAssignedAt:
+          card.lastFollowupAssignedAt ??
+          p.lastFollowupAssignedAt ??
+          null,
+        lastFollowupContactedAt: p.lastFollowupContactedAt ?? null,
+        lastFollowupOutcomeAt:
+          card.lastFollowupOutcomeAt ??
+          p.lastFollowupOutcomeAt ??
+          null
       };
     });
 

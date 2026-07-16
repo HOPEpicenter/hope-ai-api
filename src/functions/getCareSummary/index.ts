@@ -6,6 +6,7 @@ import {
 } from "../_shared/formation";
 import { getVisitorById } from "../_shared/visitorsRepository";
 import { readCareCandidateList } from "../../services/care/readCareCandidateList";
+import { isTerminalFollowupOutcome } from "../../services/followups/isTerminalFollowupOutcome";
 import { readCanonicalVisitorDashboardCard } from "../../services/dashboard/readCanonicalVisitorDashboardCard";
 import type { CanonicalVisitorDashboardCard } from "../../services/dashboard/canonicalDashboardContracts";
 import {
@@ -21,6 +22,18 @@ function toCareProfileInput(profile: FunctionFormationProfileEntity) {
     lastFollowupOutcome: profile.lastFollowupOutcome ?? null,
     lastFollowupOutcomeAt: profile.lastFollowupOutcomeAt ?? null
   };
+}
+
+function isOpenAssignedFollowup(
+  profile: FunctionFormationProfileEntity
+): boolean {
+  return (
+    !!profile.assignedTo &&
+    !(
+      !!profile.lastFollowupOutcomeAt &&
+      isTerminalFollowupOutcome(profile.lastFollowupOutcome)
+    )
+  );
 }
 
 async function listAllFormationProfiles(
@@ -95,8 +108,31 @@ export async function getCareSummary(
       })
     );
 
+    const summaryProfiles = validProfiles
+      .filter(isOpenAssignedFollowup)
+      .map((profile) => {
+        const visitorId = String(profile.visitorId ?? "").trim();
+        const card = canonicalCardsByVisitorId.get(visitorId);
+
+        return {
+          visitorId,
+          assignedTo:
+            card?.assignedTo ??
+            profile.assignedTo ??
+            null,
+          lastFollowupOutcome: "needs_care",
+          lastFollowupOutcomeAt:
+            card?.lastFollowupAssignedAt ??
+            profile.lastFollowupAssignedAt ??
+            card?.lastFollowupOutcomeAt ??
+            profile.lastFollowupOutcomeAt ??
+            card?.lastActivityAt ??
+            new Date(0).toISOString()
+        };
+      });
+
     const projected = readCareCandidateList({
-      profiles: validProfiles.map(toCareProfileInput),
+      profiles: summaryProfiles,
       canonicalCardsByVisitorId,
       carePriority: String(req?.query?.priority ?? "").trim() || null,
       careAgeBucket: String(req?.query?.ageBucket ?? "").trim() || null,

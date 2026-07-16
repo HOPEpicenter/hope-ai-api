@@ -7,7 +7,7 @@ This is a high-level inventory derived from PR history. Use code inspection for 
 | Family | Status | Notes |
 |---|---|---|
 | `/visitors` | Complete | Create/read/list/update identity. Phone/address/birthday supported. |
-| `/visitors/{id}/notes` | Complete | Emits existing `note.add` engagement event. |
+| `/visitors/{id}/notes` | Complete | POST creates `note.add`; GET returns the canonical projected note state; PATCH `/visitors/{id}/notes/{noteId}` emits immutable `note.updated` events with version and audit history. |
 | `/visitors/{id}/dashboard-card` | Complete | Enriched canonical dashboard card. |
 | `/formation/events` | Complete | Formation V1 event ingestion with actor attribution guardrails. |
 | `/formation/profile` | Complete | Canonical formation profile projection. |
@@ -20,9 +20,9 @@ This is a high-level inventory derived from PR history. Use code inspection for 
 | `/care/candidates/assign-bulk` | Complete | Bulk care assignment. |
 | `/care/candidates/unassign-bulk` | Complete | Bulk care unassignment. |
 | `/activity-intelligence` | Complete | Ministry intelligence composition endpoint. |
-| `GET /staff-identities` | Complete | Canonical Staff Identity directory projected from seeded identities and immutable Staff events. |
-| `POST /staff-identities` | Locally verified | Creates dynamic Staff identities through `staff.created`; protected by the administrative API-key boundary. |
-| `PATCH /staff-identities/{staffId}` | Locally verified | Updates or deactivates Staff identities through immutable `staff.updated` and `staff.deactivated` events. |
+| `GET /staff-identities` | Complete | Canonical Staff Identity directory projected only from immutable Staff events; compatibility-only legacy IDs are excluded from canonical projections. |
+| `POST /staff-identities` | Complete | Creates dynamic Staff identities through `staff.created`; protected by the administrative API-key boundary and verified through CI and staging lifecycle assertions. |
+| `PATCH /staff-identities/{staffId}` | Complete | Updates or deactivates Staff identities through immutable `staff.updated` and `staff.deactivated` events; verified through CI and staging lifecycle assertions. |
 | Opportunity worklists | Complete | Segment worklists, action reasons, resolution metadata, narrative. |
 | Protected ping / route parity | Complete | Express/Azure parity hardened. |
 

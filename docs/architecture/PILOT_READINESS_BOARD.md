@@ -1,6 +1,6 @@
 # HOPE Ministry OS — Pilot Readiness Board
 
-Date: 2026-07-14
+Date: 2026-07-16
 
 Status: Pilot Hardening
 
@@ -29,18 +29,18 @@ Phase 2 intelligence and communication systems remain frozen until pilot complet
 | Today | Feature complete | Morning-loop acceptance remains |
 | Person 360 | Feature complete | Cross-page acceptance remains |
 | Journey | Feature complete | Cross-page next-step validation remains |
-| Care | Feature complete | Ownership edge-case validation remains |
+| Care | Canonically aligned | Dashboard Followups and Care Summary staging parity verified through PRs #1156 and #1157; ownership edge-case acceptance remains |
 | Insights | Feature complete | Worklist resolution validation remains |
-| Staff directory | Complete | Canonical projected directory in use |
+| Staff directory | Complete | Event-backed canonical projected directory verified after PR #1155 |
 | Staff administration | Complete | Dashboard create, edit, and deactivate workflow merged |
 | Editable pastoral notes | Complete | Dashboard edit and audit experience merged |
 | Canonical care ownership | Complete | Assignment and unassignment now use formation events |
 | Actor provenance | Complete | Dashboard ownership commands send actor identity |
 | Admin readiness | Feature complete | Final launch-readiness review remains |
 | Authentication and authorization | Open pilot gate | Pilot access policy and sensitive-action boundaries require explicit approval |
-| Cross-page consistency | In validation | Ministry State Matrix must be proven |
+| Cross-page consistency | In validation | Canonical Followups, Care Summary, Staff identity, priority, urgency, risk, recommendation, and assignment alignment are proven; full pastor-facing matrix walkthrough remains |
 | Ministry acceptance | Not complete | Pastor walkthrough required |
-| Documentation freeze | Not complete | Current documentation must match July implementation |
+| Documentation freeze | In progress | July 16 implementation evidence is being reconciled with the active readiness documents |
 | Controlled pilot decision | Pending | Depends on completion of launch gates |
 
 ## Wave 1 — Architecture Baseline
@@ -64,7 +64,7 @@ Status: Documentation synchronization in progress
 
 ## Wave 2 — Cross-Page Architecture Validation
 
-Status: Not started
+Status: In progress
 
 - [ ] Verify person identity consistency.
 - [ ] Verify care-owner consistency.
@@ -128,9 +128,9 @@ Status: Not started
 
 Status: Not started
 
-- [ ] Backend CI is green.
+- [x] Backend CI is green.
 - [ ] Dashboard CI is green.
-- [ ] Azure staging deploy is successful.
+- [x] Azure staging deploy is successful.
 - [ ] Dashboard production deploy is verified.
 - [ ] Production environment configuration is verified.
 - [ ] End-to-end ministry walkthrough passes.
@@ -139,6 +139,28 @@ Status: Not started
 - [ ] Rollback and issue-triage procedures are documented.
 - [ ] Documentation freeze is complete.
 - [ ] Controlled pilot is approved.
+
+## July 16 Verified Canonical Alignment
+
+The following implementation and staging evidence is complete:
+
+- PR #1155 removed compatibility-only Staff identities from the canonical Staff Directory.
+- PR #1156 aligned `GET /dashboard/followups` with canonical visitor dashboard cards.
+- PR #1157 aligned `GET /care/summary` with the canonical open-assigned follow-up population.
+- Backend CI passed after the Care Summary alignment.
+- Azure staging deployment passed after merge.
+- Staging `GET /dashboard/followups` returned Samuel King, Naomi Clarke, and Daniel Brooks.
+- Staging `GET /care/summary` returned:
+  - `totalCandidates = 3`
+  - `filteredCount = 3`
+  - `urgentCount = 3`
+  - `assignedCount = 3`
+  - `unassignedCount = 0`
+  - `ownedCount = 3`
+  - `queueCount = 0`
+- Canonical assigned Staff names, urgency, risk, recommendation, priority, and journey stage are aligned across the verified backend contracts.
+
+This evidence closes the known Care Summary and Dashboard Followups backend inconsistency. It does not replace the remaining pastor-facing cross-page acceptance walkthrough.
 
 ## Frozen Phase 2 Work
 

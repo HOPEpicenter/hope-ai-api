@@ -1,6 +1,6 @@
 # HOPE Pilot Readiness v2 — Revision 5
 
-Date: 2026-07-14
+Date: 2026-07-16
 
 Status: Pilot Hardening Phase
 
@@ -18,13 +18,13 @@ Core ministry workflows are implemented over verified backend contracts. Staff A
 | Today Dashboard | Complete | Pastor-focused ministry command center |
 | People 360 | Complete | Unified ministry profile and timeline |
 | Journey Workspace | Complete | Ministry story and next-step presentation |
-| Care Workspace | Complete | Assignment and outcome workflow |
+| Care Workspace | Complete | Assignment and outcome workflow; Dashboard Followups and Care Summary canonical staging parity verified through PRs #1156 and #1157 |
 | Insights | Complete | Ministry readiness worklists |
 | Admin Readiness Center | Complete | Contract registry and readiness dashboard |
 | Identity Presentation Layer | Complete | Human-friendly person and owner names |
 | Ministry Event Language | Complete | Backend event codes translated for pastors |
 | Display Language Layer | Complete | Status, risk, and reason labels centralized |
-| Canonical Projected Staff Directory | Complete | Dashboard assignment and display consume backend-projected Staff identities |
+| Canonical Projected Staff Directory | Complete | Dashboard assignment and display consume event-backed backend-projected Staff identities; compatibility-only IDs are excluded from canonical projections after PR #1155 |
 | Test Record Filtering | Complete | Engineering/test data hidden from key ministry views |
 | Visitor CRUD | Complete | Person create/edit workflow in dashboard |
 | Editable Notes | Complete | Backend event-sourced audited editing and dashboard correction workflow implemented |
@@ -32,7 +32,7 @@ Core ministry workflows are implemented over verified backend contracts. Staff A
 | Staff Administration | Complete | Event-sourced Staff Administration is implemented across the backend and dashboard. Canonical Staff Identity powers administration, assignment, and display throughout Ministry OS. |
 | Canonical Care Ownership | Complete | Assignment and unassignment now write canonical formation events and update derived ministry projections. |
 | Ownership Actor Provenance | Complete | Dashboard care ownership commands send actor identity through the verified backend contract. |
-| Cross-Page Consistency | In validation | Ministry State Matrix and morning workflow validation remain before pilot launch. |
+| Cross-Page Consistency | In validation | Canonical Staff identity, assignment, stage, urgency, risk, recommendation, priority, Dashboard Followups, and Care Summary alignment are proven; the full pastor-facing Ministry State Matrix and morning workflow walkthrough remain. |
 | Authentication Hardening | Open pilot gate | Pilot access and sensitive-action boundaries require explicit approval |
 | Production Readiness | In progress | Final hardening and validation |
 
@@ -84,6 +84,27 @@ Dashboard state:
 Architectural decision:
 
 Pastoral notes are not permanently append-only. Staff must be able to correct factual mistakes, spelling errors, and accidental entries while preserving an audit trail.
+
+## July 16 Verified Implementation Evidence
+
+The following pilot-hardening evidence is complete:
+
+- PR #1155 removed compatibility-only Staff identities from the canonical Staff Directory.
+- PR #1156 aligned `GET /dashboard/followups` with canonical visitor dashboard cards.
+- PR #1157 aligned `GET /care/summary` with the canonical open-assigned follow-up population.
+- Backend CI passed after the Care Summary alignment.
+- Azure staging deployment passed after merge.
+- Staging `GET /dashboard/followups` returned Samuel King, Naomi Clarke, and Daniel Brooks.
+- Staging `GET /care/summary` returned matching canonical workload metrics:
+  - `totalCandidates = 3`
+  - `filteredCount = 3`
+  - `urgentCount = 3`
+  - `assignedCount = 3`
+  - `unassignedCount = 0`
+  - `ownedCount = 3`
+  - `queueCount = 0`
+
+This closes the known backend inconsistency between Dashboard Followups and Care Summary. The remaining work is pastor-facing acceptance, cross-page scenario validation, access-boundary approval, deployment verification, and pilot authorization.
 
 ## Remaining Engineering Work
 

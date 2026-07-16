@@ -3,6 +3,12 @@ import {
   type BuildCareCandidateListInput,
   type CareCandidateListResult
 } from "./buildCareCandidateList";
+import {
+  applyCanonicalCareProjection
+} from "./applyCanonicalCareProjection";
+import type {
+  CanonicalVisitorDashboardCard
+} from "../dashboard/canonicalDashboardContracts";
 
 export type ReadCareCandidateListInput = BuildCareCandidateListInput & {
   carePriority?: string | null;
@@ -10,6 +16,10 @@ export type ReadCareCandidateListInput = BuildCareCandidateListInput & {
   escalationLevel?: string | null;
   assignmentState?: string | null;
   assignmentBucket?: string | null;
+  canonicalCardsByVisitorId?: ReadonlyMap<
+    string,
+    CanonicalVisitorDashboardCard
+  >;
 };
 
 export type CareQueueSummary = {
@@ -59,7 +69,16 @@ export function readCareCandidateList(
     profiles: input.profiles
   });
 
-  const items = projected.items.filter((item) => {
+  const allItems = projected.items.map((item) => {
+    const card =
+      input.canonicalCardsByVisitorId?.get(item.visitorId);
+
+    return card
+      ? applyCanonicalCareProjection(item, card)
+      : item;
+  });
+
+  const items = allItems.filter((item) => {
     if (
       input.carePriority &&
       item.carePriority !== input.carePriority
@@ -103,51 +122,51 @@ export function readCareCandidateList(
     count: items.length,
     items,
     summary: {
-      totalCandidates: projected.items.length,
+      totalCandidates: allItems.length,
       filteredCount: items.length,
-      urgentCount: projected.items.filter(
+      urgentCount: allItems.filter(
         (x) => x.carePriority === "urgent"
       ).length,
-      staleCount: projected.items.filter(
+      staleCount: allItems.filter(
         (x) => x.careAgeBucket === "stale"
       ).length,
-      escalationCount: projected.items.filter(
+      escalationCount: allItems.filter(
         (x) => x.escalationLevel === "escalate"
       ).length,
-      assignedCount: projected.items.filter(
+      assignedCount: allItems.filter(
         (x) => x.assignmentState === "assigned"
       ).length,
-      unassignedCount: projected.items.filter(
+      unassignedCount: allItems.filter(
         (x) => x.assignmentState === "unassigned"
       ).length,
-      ownedCount: projected.items.filter(
+      ownedCount: allItems.filter(
         (x) => x.assignmentBucket === "owned"
       ).length,
-      queueCount: projected.items.filter(
+      queueCount: allItems.filter(
         (x) => x.assignmentBucket === "queue"
       ).length,
       byPriority: {
-        normal: projected.items.filter((x) => x.carePriority === "normal").length,
-        elevated: projected.items.filter((x) => x.carePriority === "elevated").length,
-        urgent: projected.items.filter((x) => x.carePriority === "urgent").length
+        normal: allItems.filter((x) => x.carePriority === "normal").length,
+        elevated: allItems.filter((x) => x.carePriority === "elevated").length,
+        urgent: allItems.filter((x) => x.carePriority === "urgent").length
       },
       byAgeBucket: {
-        new: projected.items.filter((x) => x.careAgeBucket === "new").length,
-        aging: projected.items.filter((x) => x.careAgeBucket === "aging").length,
-        stale: projected.items.filter((x) => x.careAgeBucket === "stale").length
+        new: allItems.filter((x) => x.careAgeBucket === "new").length,
+        aging: allItems.filter((x) => x.careAgeBucket === "aging").length,
+        stale: allItems.filter((x) => x.careAgeBucket === "stale").length
       },
       byEscalationLevel: {
-        none: projected.items.filter((x) => x.escalationLevel === "none").length,
-        review: projected.items.filter((x) => x.escalationLevel === "review").length,
-        escalate: projected.items.filter((x) => x.escalationLevel === "escalate").length
+        none: allItems.filter((x) => x.escalationLevel === "none").length,
+        review: allItems.filter((x) => x.escalationLevel === "review").length,
+        escalate: allItems.filter((x) => x.escalationLevel === "escalate").length
       },
       byAssignmentState: {
-        assigned: projected.items.filter((x) => x.assignmentState === "assigned").length,
-        unassigned: projected.items.filter((x) => x.assignmentState === "unassigned").length
+        assigned: allItems.filter((x) => x.assignmentState === "assigned").length,
+        unassigned: allItems.filter((x) => x.assignmentState === "unassigned").length
       },
       byAssignmentBucket: {
-        owned: projected.items.filter((x) => x.assignmentBucket === "owned").length,
-        queue: projected.items.filter((x) => x.assignmentBucket === "queue").length
+        owned: allItems.filter((x) => x.assignmentBucket === "owned").length,
+        queue: allItems.filter((x) => x.assignmentBucket === "queue").length
       }
     }
   };

@@ -13,7 +13,9 @@ import {
   getRequestId,
   logFunctionError
 } from "../../shared/observability/functionObservability";
-import { isKnownStaffId } from "../../services/operators/operatorIdentity";
+import {
+  readMutationActorStaffIdentity
+} from "../../services/staff/readCanonicalStaffDirectory";
 
 function toCareProfileInput(profile: FunctionFormationProfileEntity) {
   return {
@@ -68,11 +70,17 @@ export async function postCareCandidateUnassign(
       return;
     }
 
-    if (!isKnownStaffId(actorId)) {
+    const actorIdentity =
+      await readMutationActorStaffIdentity(actorId);
+
+    if (!actorIdentity || actorIdentity.status !== "active") {
       context.res = {
         status: 400,
         headers: { "content-type": "application/json; charset=utf-8" },
-        body: { ok: false, error: "actorId must reference a known staff identity" }
+        body: {
+          ok: false,
+          error: "actorId must reference an active staff identity"
+        }
       };
       return;
     }

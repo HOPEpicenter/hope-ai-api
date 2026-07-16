@@ -13,7 +13,10 @@ import {
   getRequestId,
   logFunctionError
 } from "../../shared/observability/functionObservability";
-import { isKnownStaffId } from "../../services/operators/operatorIdentity";
+import {
+  readCanonicalStaffIdentity,
+  readMutationActorStaffIdentity
+} from "../../services/staff/readCanonicalStaffDirectory";
 
 function toCareProfileInput(profile: FunctionFormationProfileEntity) {
   return {
@@ -77,20 +80,32 @@ export async function postCareCandidateAssign(
       return;
     }
 
-    if (!isKnownStaffId(actorId)) {
+    const actorIdentity =
+      await readMutationActorStaffIdentity(actorId);
+
+    if (!actorIdentity || actorIdentity.status !== "active") {
       context.res = {
         status: 400,
         headers: { "content-type": "application/json; charset=utf-8" },
-        body: { ok: false, error: "actorId must reference a known staff identity" }
+        body: {
+          ok: false,
+          error: "actorId must reference an active staff identity"
+        }
       };
       return;
     }
 
-    if (!isKnownStaffId(assignedTo)) {
+    const assigneeIdentity =
+      await readCanonicalStaffIdentity(assignedTo);
+
+    if (!assigneeIdentity || assigneeIdentity.status !== "active") {
       context.res = {
         status: 400,
         headers: { "content-type": "application/json; charset=utf-8" },
-        body: { ok: false, error: "assignedTo must reference a known staff identity" }
+        body: {
+          ok: false,
+          error: "assignedTo must reference an active canonical staff identity"
+        }
       };
       return;
     }

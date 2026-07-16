@@ -6,6 +6,8 @@ import {
 } from "../_shared/formation";
 import { getVisitorById } from "../_shared/visitorsRepository";
 import { readCareCandidateList } from "../../services/care/readCareCandidateList";
+import { readCanonicalVisitorDashboardCard } from "../../services/dashboard/readCanonicalVisitorDashboardCard";
+import type { CanonicalVisitorDashboardCard } from "../../services/dashboard/canonicalDashboardContracts";
 import {
   apiErrorBody,
   getRequestId,
@@ -73,8 +75,29 @@ export async function getCareSummary(
       validProfiles.push(profile);
     }
 
+    const canonicalCardsByVisitorId = new Map<
+      string,
+      CanonicalVisitorDashboardCard
+    >();
+
+    await Promise.all(
+      validProfiles.map(async (profile) => {
+        const visitorId = String(profile.visitorId ?? "").trim();
+
+        if (!visitorId || canonicalCardsByVisitorId.has(visitorId)) {
+          return;
+        }
+
+        canonicalCardsByVisitorId.set(
+          visitorId,
+          await readCanonicalVisitorDashboardCard(visitorId)
+        );
+      })
+    );
+
     const projected = readCareCandidateList({
       profiles: validProfiles.map(toCareProfileInput),
+      canonicalCardsByVisitorId,
       carePriority: String(req?.query?.priority ?? "").trim() || null,
       careAgeBucket: String(req?.query?.ageBucket ?? "").trim() || null,
       escalationLevel: String(req?.query?.escalationLevel ?? "").trim() || null,

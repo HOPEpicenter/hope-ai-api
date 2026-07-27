@@ -244,6 +244,10 @@ if (-not $vid) {
 }
 
 Ok "Created visitorId=$vid"
+Write-Host "[regression] Canonical visitor creation contract..."
+pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "assert-visitor-create-idempotency-contract.ps1") -BaseUrl $BaseUrl -ApiKey $env:HOPE_API_KEY
+if ($LASTEXITCODE -ne 0) { Fail "Canonical visitor creation contract failed (exit=$LASTEXITCODE)" }
+Ok "Canonical visitor creation contract passed."
 
 # Create a couple engagements to ensure paging has data
 $e1 = @{

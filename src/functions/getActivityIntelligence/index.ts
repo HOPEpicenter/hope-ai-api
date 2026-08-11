@@ -6,6 +6,7 @@ import {
   type FunctionFormationProfileEntity
 } from "../_shared/formation";
 import { getVisitorById } from "../_shared/visitorsRepository";
+import { isSyntheticVisitorRecord } from "../../services/visitors/isSyntheticVisitorRecord";
 import { readCareCandidateList } from "../../services/care/readCareCandidateList";
 import { readCanonicalOpsFollowupsNarrative } from "../../services/followups/readCanonicalOpsFollowupsNarrative";
 import { buildActivityIntelligence } from "../../services/intelligence/activityIntelligenceService";
@@ -83,6 +84,10 @@ export async function getActivityIntelligence(
       const visitor = await getVisitorById(visitorId);
       if (!visitor) {
         orphanProfilesExcluded++;
+        continue;
+      }
+
+      if (isSyntheticVisitorRecord(visitor)) {
         continue;
       }
 

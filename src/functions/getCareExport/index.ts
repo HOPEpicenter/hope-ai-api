@@ -5,6 +5,7 @@ import {
   type FunctionFormationProfileEntity
 } from "../_shared/formation";
 import { getVisitorById } from "../_shared/visitorsRepository";
+import { isSyntheticVisitorRecord } from "../../services/visitors/isSyntheticVisitorRecord";
 import { readCareCandidateList } from "../../services/care/readCareCandidateList";
 import {
   apiErrorBody,
@@ -67,6 +68,10 @@ export async function getCareExport(
 
       if (!visitor) {
         orphanProfilesExcluded++;
+        continue;
+      }
+
+      if (isSyntheticVisitorRecord(visitor)) {
         continue;
       }
 

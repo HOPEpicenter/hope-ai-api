@@ -5,6 +5,7 @@ import {
   type FunctionFormationProfileEntity
 } from "../_shared/formation";
 import { getVisitorById } from "../_shared/visitorsRepository";
+import { isSyntheticVisitorRecord } from "../../services/visitors/isSyntheticVisitorRecord";
 import { readCareCandidateList } from "../../services/care/readCareCandidateList";
 import { isTerminalFollowupOutcome } from "../../services/followups/isTerminalFollowupOutcome";
 import { readCanonicalVisitorDashboardCard } from "../../services/dashboard/readCanonicalVisitorDashboardCard";
@@ -82,6 +83,10 @@ export async function getCareSummary(
 
       if (!visitor) {
         orphanProfilesExcluded++;
+        continue;
+      }
+
+      if (isSyntheticVisitorRecord(visitor)) {
         continue;
       }
 

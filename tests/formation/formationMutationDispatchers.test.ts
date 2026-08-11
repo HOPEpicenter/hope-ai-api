@@ -37,6 +37,11 @@ assert.equal(
 );
 
 assert.equal(
+  profile.lastNextStep,
+  "Attend Group"
+);
+
+assert.equal(
   profile.stage,
   "Connected"
 );

@@ -54,6 +54,7 @@ export interface FormationProfileSnapshot {
   lastFollowupOutcomeAt?: string;
   lastFollowupOutcome?: string;
   lastFollowupOutcomeNotes?: string;
+  lastNextStep?: string;
   lastNextStepAt?: string;
   lastNextStepCompletedAt?: string;
   lastPrayerRequestedAt?: string;

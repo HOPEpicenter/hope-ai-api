@@ -9,6 +9,7 @@ export type CanonicalVisitorDashboardCard = {
   stageReason: string | null;
   stageUpdatedAt: string | null;
   stageUpdatedBy: string | null;
+  lastNextStep: string | null;
   lastNextStepAt: string | null;
   lastNextStepCompletedAt: string | null;
   lastFollowupAssignedAt: string | null;

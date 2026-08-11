@@ -48,5 +48,16 @@ assert.notEqual(
   "profile state changes should be visible to audit comparison"
 );
 
+const changedNextStep = toComparableFormationProfileState({
+  ...profile,
+  lastNextStep: "Discover HOPE"
+});
+
+assert.notEqual(
+  comparable,
+  changedNextStep,
+  "canonical next-step value changes should be visible to audit comparison"
+);
+
 console.log("comparableFormationProfile.test.ts passed");
 

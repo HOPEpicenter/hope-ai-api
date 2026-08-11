@@ -17,6 +17,7 @@ export type ComparableFormationProfile = {
   lastFollowupOutcomeAt?: string | null;
   lastFollowupOutcome?: string | null;
   lastFollowupOutcomeNotes?: string | null;
+  lastNextStep?: string | null;
   lastNextStepAt?: string | null;
   lastPrayerRequestedAt?: string | null;
   displayName?: string | null;
@@ -49,6 +50,7 @@ export function toComparableFormationProfileState(
     lastFollowupOutcomeAt: profile.lastFollowupOutcomeAt ?? null,
     lastFollowupOutcome: profile.lastFollowupOutcome ?? null,
     lastFollowupOutcomeNotes: profile.lastFollowupOutcomeNotes ?? null,
+    lastNextStep: profile.lastNextStep ?? null,
     lastNextStepAt: profile.lastNextStepAt ?? null,
     lastPrayerRequestedAt: profile.lastPrayerRequestedAt ?? null,
     displayName: profile.displayName ?? null,

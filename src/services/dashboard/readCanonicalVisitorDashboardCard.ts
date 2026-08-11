@@ -99,6 +99,11 @@ export async function readCanonicalVisitorDashboardCard(
       projection.assignedToName
     );
 
+  const lastNextStep =
+    typeof profile?.lastNextStep === "string" && profile.lastNextStep.trim().length > 0
+      ? profile.lastNextStep.trim()
+      : null;
+
   const lastNextStepAt =
     typeof profile?.lastNextStepAt === "string" && profile.lastNextStepAt.trim().length > 0
       ? profile.lastNextStepAt.trim()
@@ -148,6 +153,7 @@ export async function readCanonicalVisitorDashboardCard(
     stageReason,
     stageUpdatedAt,
     stageUpdatedBy,
+    lastNextStep,
     lastNextStepAt,
     lastNextStepCompletedAt,
     lastFollowupAssignedAt,

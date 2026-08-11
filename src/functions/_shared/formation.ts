@@ -73,6 +73,7 @@ export type FunctionFormationProfileEntity = {
   lastFollowupOutcomeAt?: string;
   lastFollowupOutcome?: string;
   lastFollowupOutcomeNotes?: string;
+  lastNextStep?: string;
   lastNextStepAt?: string;
   lastNextStepCompletedAt?: string;
   lastPrayerRequestedAt?: string;
@@ -1094,6 +1095,7 @@ export async function listFormationProfiles(
     "lastFollowupOutcomeAt",
     "lastFollowupOutcome",
     "lastFollowupOutcomeNotes",
+    "lastNextStep",
     "lastNextStepAt",
     "lastNextStepCompletedAt",
     "lastPrayerRequestedAt",
@@ -1126,6 +1128,7 @@ export async function listFormationProfiles(
       lastFollowupOutcomeAt: entity.lastFollowupOutcomeAt,
       lastFollowupOutcome: entity.lastFollowupOutcome,
       lastFollowupOutcomeNotes: entity.lastFollowupOutcomeNotes,
+      lastNextStep: entity.lastNextStep,
       lastNextStepAt: entity.lastNextStepAt,
       lastNextStepCompletedAt: entity.lastNextStepCompletedAt,
       lastPrayerRequestedAt: entity.lastPrayerRequestedAt,

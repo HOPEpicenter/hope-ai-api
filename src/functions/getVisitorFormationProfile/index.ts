@@ -24,6 +24,7 @@ function mapProfile(entity: any) {
     lastFollowupOutcomeAt: entity.lastFollowupOutcomeAt ?? null,
     lastFollowupOutcomeNotes: entity.lastFollowupOutcomeNotes ?? null,
 
+    lastNextStep: entity.lastNextStep ?? null,
     lastNextStepAt: entity.lastNextStepAt ?? null,
     lastNextStepCompletedAt: entity.lastNextStepCompletedAt ?? null,
     lastPrayerRequestedAt: entity.lastPrayerRequestedAt ?? null,

@@ -8,6 +8,7 @@ import {
 export function applyNextStepMutation(params: {
   profile: Record<string, any>;
   completed: boolean;
+  nextStep: string;
   occurredAtIso: string;
   eventType: string;
   eventId: string;
@@ -22,6 +23,8 @@ export function applyNextStepMutation(params: {
   });
 
   if (selectedAdvanced) {
+    params.profile.lastNextStep = params.nextStep;
+
     applyStageTransition({
       profile: params.profile,
       stage: "Connected",

@@ -72,6 +72,7 @@ export const formationMutationDispatchers:
     applyNextStepMutation({
       profile: args.profile,
       completed: false,
+      nextStep,
       occurredAtIso: args.occurredAtIso,
       eventType: args.type,
       eventId: args.eventId
@@ -91,6 +92,7 @@ export const formationMutationDispatchers:
     applyNextStepMutation({
       profile: args.profile,
       completed: true,
+      nextStep,
       occurredAtIso: args.occurredAtIso,
       eventType: args.type,
       eventId: args.eventId

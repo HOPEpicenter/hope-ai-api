@@ -6,6 +6,7 @@ import {
   type FunctionFormationProfileEntity
 } from "../_shared/formation";
 import { getVisitorById } from "../_shared/visitorsRepository";
+import { isSyntheticVisitorRecord } from "../../services/visitors/isSyntheticVisitorRecord";
 import {
   buildOpportunityWorklistItem,
   getOpportunitySegmentDefinition
@@ -85,6 +86,10 @@ export async function getOpportunityWorklist(context: any, req: any): Promise<vo
 
       if (!visitor) {
         orphanProfilesExcluded++;
+        continue;
+      }
+
+      if (isSyntheticVisitorRecord(visitor)) {
         continue;
       }
 

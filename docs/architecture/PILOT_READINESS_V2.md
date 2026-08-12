@@ -2,13 +2,13 @@
 
 Date: 2026-07-14
 
-Status: Pilot Hardening Phase
+Status: Final Pilot Launch Decision
 
 ## Executive Summary
 
 The HOPE Ministry OS dashboard has transitioned from feature construction to pilot hardening.
 
-Core ministry workflows are implemented over verified backend contracts. Staff Administration, editable pastoral notes, canonical care ownership, actor provenance, cross-page workflow continuity, accessibility and empty-state validation, and pastor-facing ministry acceptance are complete. Remaining launch work is limited to the explicit pilot access-boundary decision, final documentation/deployment closeout, and the pilot launch decision.
+Core ministry workflows are implemented over verified backend contracts. Staff Administration, editable pastoral notes, canonical care ownership, actor provenance, cross-page workflow continuity, accessibility and empty-state validation, pastor-facing ministry acceptance, pilot access-boundary hardening, and deployment validation are complete. Remaining launch work is limited to final documentation reconciliation and the pilot launch decision.
 
 ## Current Pilot Readiness
 
@@ -33,8 +33,8 @@ Core ministry workflows are implemented over verified backend contracts. Staff A
 | Canonical Care Ownership | Complete | Assignment and unassignment now write canonical formation events and update derived ministry projections. |
 | Ownership Actor Provenance | Complete | Dashboard care ownership commands send actor identity through the verified backend contract. |
 | Cross-Page Consistency | Complete | Today -> Person 360 -> Journey -> Care -> Insights workflow continuity and pastor acceptance are verified. |
-| Authentication Hardening | Open pilot gate | Pilot access and sensitive-action boundaries require explicit approval |
-| Production Readiness | Final gate | Dashboard production deployment and ministry acceptance are verified; pilot access-boundary approval and final launch decision remain. |
+| Authentication Hardening | Complete | Pilot-sensitive ministry reads and visitor-list access are protected by the application API key and validated in staging. |
+| Production Readiness | Final gate | Dashboard deployment, ministry acceptance, pilot access-boundary hardening, and staging validation are complete; the final pilot launch decision remains. |
 
 ## Architectural Decisions
 
@@ -115,12 +115,12 @@ Pastoral notes are not permanently append-only. Staff must be able to correct fa
 
 - [x] End-to-end ministry walkthrough
 - [x] Ministry acceptance testing
-- Ownership and inactive-staff edge-case validation
-- Pastoral-note correction validation
-- Pilot authentication and authorization decision
-- Documentation freeze
-- Deployment validation
-- Pilot launch
+- [x] Ownership and inactive-staff edge-case validation
+- [x] Pastoral-note correction validation
+- [x] Pilot authentication and authorization decision
+- [x] Documentation freeze
+- [x] Deployment validation
+- [ ] Pilot launch
 
 ## Engineering Governance
 

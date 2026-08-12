@@ -257,4 +257,4 @@ Merged PR count: 13
 | #1133 | 2026-06-23 | Align task preview simulation compliance assertions |
 | #1134 | 2026-06-23 | Record pilot readiness staging certification |
 | #1136 | 2026-06-23 | Reduce task preview queue enrichment latency |
-
+| #1167 | 2026-08-11 | docs: reconcile final pilot readiness |

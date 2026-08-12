@@ -43,7 +43,7 @@ Legend:
 
 ## Current Focus
 
-🟡 Final pilot access-boundary decision, documentation/deployment closeout, and launch decision.
+🟡 Final pilot documentation reconciliation and launch decision. Access-boundary hardening and deployment validation are complete.
 
 ## Do Not Rebuild
 

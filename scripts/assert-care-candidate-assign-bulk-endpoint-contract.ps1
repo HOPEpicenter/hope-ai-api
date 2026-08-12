@@ -28,4 +28,24 @@ if (@($route.methods) -notcontains "post") {
   throw "Expected POST method"
 }
 
+$implementationFile = Join-Path $PSScriptRoot "..\src\functions\postCareCandidateAssignBulk\index.ts"
+
+if (-not (Test-Path $implementationFile)) {
+  throw "Missing postCareCandidateAssignBulk implementation"
+}
+
+$implementation = Get-Content -LiteralPath $implementationFile -Raw
+
+if ($implementation -notmatch 'readCanonicalStaffIdentity') {
+  throw "Bulk care assignment must resolve assignedTo through the canonical staff directory"
+}
+
+if ($implementation -notmatch 'assigneeIdentity\.status\s*!==\s*"active"') {
+  throw "Bulk care assignment must reject inactive canonical staff identities"
+}
+
+if ($implementation -notmatch 'assignedTo must reference an active canonical staff identity') {
+  throw "Bulk care assignment must preserve the canonical active-assignee validation error"
+}
+
 Write-Host "OK: care candidate bulk assign endpoint contract passed."

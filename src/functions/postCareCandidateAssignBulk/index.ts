@@ -14,6 +14,7 @@ import {
   getRequestId,
   logFunctionError
 } from "../../shared/observability/functionObservability";
+import { readCanonicalStaffIdentity } from "../../services/staff/readCanonicalStaffDirectory";
 
 export async function postCareCandidateAssignBulk(
   context: any,
@@ -61,6 +62,21 @@ export async function postCareCandidateAssignBulk(
         status: 400,
         headers: { "content-type": "application/json; charset=utf-8" },
         body: { ok: false, error: "visitorIds is required" }
+      };
+      return;
+    }
+
+    const assigneeIdentity =
+      await readCanonicalStaffIdentity(assignedTo);
+
+    if (!assigneeIdentity || assigneeIdentity.status !== "active") {
+      context.res = {
+        status: 400,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: {
+          ok: false,
+          error: "assignedTo must reference an active canonical staff identity"
+        }
       };
       return;
     }

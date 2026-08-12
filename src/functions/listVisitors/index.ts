@@ -1,3 +1,4 @@
+import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { listVisitorsRecords } from "../_shared/visitorsRepository";
 
 function parseLimit(val: unknown, fallback = 25): number {
@@ -7,6 +8,17 @@ function parseLimit(val: unknown, fallback = 25): number {
 }
 
 export async function listVisitors(context: any, req: any): Promise<void> {
+  const auth = requireApiKeyForFunction(req);
+
+  if (!auth.ok) {
+    context.res = {
+      status: auth.status,
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: auth.body
+    };
+    return;
+  }
+
   try {
     const limit = parseLimit(req?.query?.limit, 25);
     const result = await listVisitorsRecords({ limit });

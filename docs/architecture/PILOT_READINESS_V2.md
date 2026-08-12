@@ -2,13 +2,13 @@
 
 Date: 2026-07-14
 
-Status: Final Pilot Launch Decision
+Status: Controlled Pilot Authorized
 
 ## Executive Summary
 
 The HOPE Ministry OS dashboard has transitioned from feature construction to pilot hardening.
 
-Core ministry workflows are implemented over verified backend contracts. Staff Administration, editable pastoral notes, canonical care ownership, actor provenance, cross-page workflow continuity, accessibility and empty-state validation, pastor-facing ministry acceptance, pilot access-boundary hardening, and deployment validation are complete. Remaining launch work is limited to final documentation reconciliation and the pilot launch decision.
+Core ministry workflows are implemented over verified backend contracts. Staff Administration, editable pastoral notes, canonical care ownership, actor provenance, cross-page workflow continuity, accessibility and empty-state validation, pastor-facing ministry acceptance, pilot access-boundary hardening, and deployment validation are complete. Controlled pilot launch is authorized. Engineering remains frozen unless pilot evidence identifies a material blocker or a required launch-safety correction.
 
 ## Current Pilot Readiness
 
@@ -34,7 +34,7 @@ Core ministry workflows are implemented over verified backend contracts. Staff A
 | Ownership Actor Provenance | Complete | Dashboard care ownership commands send actor identity through the verified backend contract. |
 | Cross-Page Consistency | Complete | Today -> Person 360 -> Journey -> Care -> Insights workflow continuity and pastor acceptance are verified. |
 | Authentication Hardening | Complete | Pilot-sensitive ministry reads and visitor-list access are protected by the application API key and validated in staging. |
-| Production Readiness | Final gate | Dashboard deployment, ministry acceptance, pilot access-boundary hardening, and staging validation are complete; the final pilot launch decision remains. |
+| Production Readiness | Controlled pilot authorized | Dashboard deployment, ministry acceptance, pilot access-boundary hardening, staging validation, and launch authorization are complete. |
 
 ## Architectural Decisions
 
@@ -120,7 +120,7 @@ Pastoral notes are not permanently append-only. Staff must be able to correct fa
 - [x] Pilot authentication and authorization decision
 - [x] Documentation freeze
 - [x] Deployment validation
-- [ ] Pilot launch
+- [x] Pilot launch
 
 ## Engineering Governance
 

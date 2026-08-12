@@ -43,7 +43,7 @@ Legend:
 
 ## Current Focus
 
-🟡 Final pilot documentation reconciliation and launch decision. Access-boundary hardening and deployment validation are complete.
+🟢 Controlled pilot authorized. Architecture remains frozen unless pilot evidence identifies a material blocker or required launch-safety correction.
 
 ## Do Not Rebuild
 

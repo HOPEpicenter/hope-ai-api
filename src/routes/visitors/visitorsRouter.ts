@@ -43,7 +43,7 @@ export default function visitorsRouter(visitorsRepository: VisitorsRepository) {
   router.get("/:id/journey", requireApiKey, createGetVisitorJourneyAdapter());
 
   // LIST /api/visitors?limit=5
-  router.get("/", createListVisitorsAdapter(visitorsRepository));
+  router.get("/", requireApiKey, createListVisitorsAdapter(visitorsRepository));
 
   return router;
 }

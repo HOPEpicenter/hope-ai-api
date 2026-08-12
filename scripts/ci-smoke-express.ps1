@@ -26,10 +26,19 @@ function Invoke-HttpJson {
     [string]$Uri,
 
     [Parameter(Mandatory = $false)]
-    [object]$Body
+    [object]$Body,
+
+    [Parameter(Mandatory = $false)]
+    [hashtable]$Headers = $null
   )
 
   $headers = @{ "Accept" = "application/json" }
+
+  if ($null -ne $Headers) {
+    foreach ($headerName in @($Headers.Keys)) {
+      $headers[$headerName] = $Headers[$headerName]
+    }
+  }
   $bodyJson = $null
   if ($null -ne $Body) {
     $bodyJson = ($Body | ConvertTo-Json -Depth 10)
@@ -251,7 +260,19 @@ if (-not $get.Ok) {
 $listUrl = ("{0}/visitors?limit=5" -f $workingBase)
 Write-Host ("LIST {0}" -f $listUrl)
 
-$list = Invoke-HttpJson -Method GET -Uri $listUrl
+if ([string]::IsNullOrWhiteSpace($env:HOPE_API_KEY)) {
+  Write-Host "FAIL: HOPE_API_KEY not set; cannot call protected visitor list."
+  exit 1
+}
+
+$listHeaders = @{
+  "x-api-key" = $env:HOPE_API_KEY
+}
+
+$list = Invoke-HttpJson `
+  -Method GET `
+  -Uri $listUrl `
+  -Headers $listHeaders
 if (-not $list.Ok) {
   Write-Host ("FAIL: LIST /visitors failed. Status={0} Body={1}" -f $list.StatusCode, ($list.BodyText | ForEach-Object { $_ }))
   exit 1

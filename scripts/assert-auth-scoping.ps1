@@ -76,6 +76,7 @@ foreach ($u in $protected) {
 # Parameterized routes use deliberately nonexistent visitor IDs so the auth
 # assertion does not depend on seeded pilot data.
 $protectedMinistryReads = @(
+  "$BaseUrl/visitors",
   "$BaseUrl/care/candidates",
   "$BaseUrl/care/candidates/auth-scope-missing-visitor",
   "$BaseUrl/care/export",

@@ -55,5 +55,5 @@ Decision rule:
 
 ## P4 - Pilot Validation
 
-Status: Dashboard acceptance complete; launch gates remain
+Status: Dashboard acceptance and technical pilot gates complete; final pilot launch decision remains
 Run full pastor workflow against deployed dashboard and API.

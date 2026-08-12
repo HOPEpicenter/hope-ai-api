@@ -26,10 +26,10 @@
 [Dashboard Next Server Loaders] 🟢
         |
         v
-[Pastor Workflow Experience] 🟡
+[Pastor Workflow Experience] 🟢
         |
         v
-[Pilot Validation] 🟡
+[Dashboard Ministry Acceptance] 🟢
 ```
 
 Legend:
@@ -43,7 +43,7 @@ Legend:
 
 ## Current Focus
 
-🟡 Documentation reconciliation and pilot workflow audit.
+🟡 Final pilot access-boundary decision, documentation/deployment closeout, and launch decision.
 
 ## Do Not Rebuild
 

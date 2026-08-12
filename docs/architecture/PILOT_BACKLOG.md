@@ -4,7 +4,7 @@ Only verified remaining work belongs here.
 
 ## P0 - Documentation Reconciliation
 
-Status: Active  
+Status: Complete
 Purpose: Make Pilot Readiness v2 the authoritative engineering operating system.
 
 Tasks:
@@ -17,7 +17,7 @@ Tasks:
 
 ## P1 - Pastor Workflow Continuity Audit
 
-Status: Ready  
+Status: Complete
 Purpose: Verify the workspaces feel like one continuous ministry workflow.
 
 Audit path:
@@ -39,7 +39,7 @@ Check:
 
 ## P2 - Accessibility and Empty-State Audit
 
-Status: Ready  
+Status: Complete
 Check keyboard navigation, focus order, labels, contrast, empty/error states, warning banners, and form actions.
 
 ## P3 - Morning Briefing Decision
@@ -55,5 +55,5 @@ Decision rule:
 
 ## P4 - Pilot Validation
 
-Status: Ready after P0-P2  
+Status: Dashboard acceptance complete; launch gates remain
 Run full pastor workflow against deployed dashboard and API.

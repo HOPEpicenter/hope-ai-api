@@ -114,11 +114,11 @@ Merged PR count: 16
 
 | Page | Status | Backend Source | Remaining Pilot Work |
 |---|---|---|---|
-| Today | Green | dashboard followups, care summary, opportunity worklists, visitor dashboard card | Workflow audit and morning-briefing decision. |
-| People / Person 360 | Green | visitors, visitor summary, dashboard card, journey, timeline | Accessibility and long-story usability pass. |
-| Journey | Green | formation events/profile/journey endpoints | Empty/error-state audit and workflow continuity. |
-| Care | Green | care candidates, care summary, care commands | Action flow usability check. |
-| Insights | Green | activity intelligence / opportunity worklists | Segment failure handling is in place; verify pilot wording. |
+| Today | Green | dashboard followups, care summary, opportunity worklists, visitor dashboard card | Pastor workflow acceptance complete; morning-briefing decision remains a separate investigation. |
+| People / Person 360 | Green | visitors, visitor summary, dashboard card, journey, timeline | Pastor workflow and accessibility acceptance complete. |
+| Journey | Green | formation events/profile/journey endpoints | Empty/error-state and workflow-continuity acceptance complete. |
+| Care | Green | care candidates, care summary, care commands | Pastor action-flow acceptance complete. |
+| Insights | Green | activity intelligence / opportunity worklists | Segment failure handling and pilot wording acceptance complete. |
 | Admin | Yellow/Green | readiness/system surfaces | Avoid fake health; add verified health only when contract exists. |
 
 ## Component/UX Readiness

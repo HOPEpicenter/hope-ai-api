@@ -8,7 +8,7 @@ Status: Pilot Hardening Phase
 
 The HOPE Ministry OS dashboard has transitioned from feature construction to pilot hardening.
 
-Core ministry workflows are implemented over verified backend contracts. Staff Administration, editable pastoral notes, canonical care ownership, actor provenance, and the pastor-facing ministry workspaces are now implemented. The remaining pilot work is architecture validation, cross-page consistency, ministry acceptance, access-boundary approval, and final deployment verification.
+Core ministry workflows are implemented over verified backend contracts. Staff Administration, editable pastoral notes, canonical care ownership, actor provenance, cross-page workflow continuity, accessibility and empty-state validation, and pastor-facing ministry acceptance are complete. Remaining launch work is limited to the explicit pilot access-boundary decision, final documentation/deployment closeout, and the pilot launch decision.
 
 ## Current Pilot Readiness
 
@@ -32,9 +32,9 @@ Core ministry workflows are implemented over verified backend contracts. Staff A
 | Staff Administration | Complete | Event-sourced Staff Administration is implemented across the backend and dashboard. Canonical Staff Identity powers administration, assignment, and display throughout Ministry OS. |
 | Canonical Care Ownership | Complete | Assignment and unassignment now write canonical formation events and update derived ministry projections. |
 | Ownership Actor Provenance | Complete | Dashboard care ownership commands send actor identity through the verified backend contract. |
-| Cross-Page Consistency | In validation | Ministry State Matrix and morning workflow validation remain before pilot launch. |
+| Cross-Page Consistency | Complete | Today -> Person 360 -> Journey -> Care -> Insights workflow continuity and pastor acceptance are verified. |
 | Authentication Hardening | Open pilot gate | Pilot access and sensitive-action boundaries require explicit approval |
-| Production Readiness | In progress | Final hardening and validation |
+| Production Readiness | Final gate | Dashboard production deployment and ministry acceptance are verified; pilot access-boundary approval and final launch decision remain. |
 
 ## Architectural Decisions
 
@@ -104,17 +104,17 @@ Pastoral notes are not permanently append-only. Staff must be able to correct fa
 
 ### Wave 2 — Cross-Page Architecture Validation
 
-- Verify person identity consistency.
-- Verify care-owner consistency.
-- Verify formation-stage and next-step consistency.
-- Verify pastoral-note and timeline consistency.
-- Verify needs-attention and recommended-action consistency.
-- Confirm no dashboard workspace invents ministry state.
+- [x] Verify person identity consistency.
+- [x] Verify care-owner consistency.
+- [x] Verify formation-stage and next-step consistency.
+- [x] Verify pastoral-note and timeline consistency.
+- [x] Verify needs-attention and recommended-action consistency.
+- [x] Confirm no dashboard workspace invents ministry state.
 
 ### Wave 3 — Pilot Validation
 
-- End-to-end ministry walkthrough
-- Ministry acceptance testing
+- [x] End-to-end ministry walkthrough
+- [x] Ministry acceptance testing
 - Ownership and inactive-staff edge-case validation
 - Pastoral-note correction validation
 - Pilot authentication and authorization decision

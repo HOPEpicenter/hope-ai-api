@@ -1,3 +1,4 @@
+import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
   ensureTable,
   getFormationProfilesTableClient,
@@ -39,6 +40,17 @@ function toCareProfileInput(profile: FunctionFormationProfileEntity) {
 }
 
 export async function getCareCandidates(context: any, req: any): Promise<void> {
+  const auth = requireApiKeyForFunction(req);
+
+  if (!auth.ok) {
+    context.res = {
+      status: auth.status,
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: auth.body
+    };
+    return;
+  }
+
   const requestId = getRequestId(req);
 
   try {

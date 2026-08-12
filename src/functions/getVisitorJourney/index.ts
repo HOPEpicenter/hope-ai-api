@@ -1,3 +1,4 @@
+import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { TableClient } from "@azure/data-tables";
 import { getConnString } from "../_shared/tableClient";
 
@@ -21,6 +22,17 @@ function getFormationProfilesTable(): TableClient {
 }
 
 export async function getVisitorJourney(context: any, req: any): Promise<void> {
+  const auth = requireApiKeyForFunction(req);
+
+  if (!auth.ok) {
+    context.res = {
+      status: auth.status,
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: auth.body
+    };
+    return;
+  }
+
   const visitorId = context.bindingData?.visitorId;
 
   if (!visitorId) {

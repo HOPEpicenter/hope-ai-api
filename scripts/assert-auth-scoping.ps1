@@ -72,6 +72,35 @@ foreach ($u in $protected) {
   Invoke-ExpectStatus -Method GET -Url $u -ExpectedStatus 401 | Out-Null
 }
 
+# Ministry read projections must also require an API key at the Function boundary.
+# Parameterized routes use deliberately nonexistent visitor IDs so the auth
+# assertion does not depend on seeded pilot data.
+$protectedMinistryReads = @(
+  "$BaseUrl/care/candidates",
+  "$BaseUrl/care/candidates/auth-scope-missing-visitor",
+  "$BaseUrl/care/export",
+  "$BaseUrl/care/summary",
+  "$BaseUrl/dashboard/followups",
+  "$BaseUrl/visitors/auth-scope-missing-visitor/journey"
+)
+
+foreach ($u in $protectedMinistryReads) {
+  Invoke-ExpectStatus -Method GET -Url $u -ExpectedStatus 401 | Out-Null
+}
+
+$invalidHeaders = @{
+  "x-api-key" = "invalid-auth-scope-key"
+}
+
+foreach ($u in $protectedMinistryReads) {
+  Invoke-ExpectStatus `
+    -Method GET `
+    -Url $u `
+    -Headers $invalidHeaders `
+    -ExpectedStatus 401 |
+    Out-Null
+}
+
 # POST formation/events must also require key
 Invoke-ExpectStatus -Method POST -Url "$BaseUrl/formation/events" -Body @{} -ExpectedStatus 401 | Out-Null
 

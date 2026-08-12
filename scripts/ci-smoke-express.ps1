@@ -29,13 +29,15 @@ function Invoke-HttpJson {
     [object]$Body,
 
     [Parameter(Mandatory = $false)]
-    [hashtable]$Headers = @{}
+    [hashtable]$Headers = $null
   )
 
   $headers = @{ "Accept" = "application/json" }
 
-  foreach ($headerName in $Headers.Keys) {
-    $headers[$headerName] = $Headers[$headerName]
+  if ($null -ne $Headers) {
+    foreach ($headerName in @($Headers.Keys)) {
+      $headers[$headerName] = $Headers[$headerName]
+    }
   }
   $bodyJson = $null
   if ($null -ne $Body) {

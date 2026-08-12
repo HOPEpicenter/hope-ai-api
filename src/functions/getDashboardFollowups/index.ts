@@ -1,3 +1,4 @@
+import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { isTerminalFollowupOutcome } from "../../services/followups/isTerminalFollowupOutcome";
 import {
   getFormationProfilesTableClient,
@@ -33,6 +34,17 @@ function isOpenAssignedFollowup(profile: FunctionFormationProfileEntity): boolea
 }
 
 export async function getDashboardFollowups(context: any, req: any): Promise<void> {
+  const auth = requireApiKeyForFunction(req);
+
+  if (!auth.ok) {
+    context.res = {
+      status: auth.status,
+      headers: { "content-type": "application/json; charset=utf-8" },
+      body: auth.body
+    };
+    return;
+  }
+
   const requestId = getRequestId(req);
 
   try {

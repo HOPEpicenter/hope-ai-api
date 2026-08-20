@@ -1,3 +1,38 @@
+## 2026-08-19 Update — Approved six-week visitor retention staff-task slice
+
+Objective:
+
+- close the visitor-retention back door with a consistent six-week staff follow-up plan after a first visit
+
+Approved scope:
+
+- backend-authored staff tasks only
+- explicit visitor contact consent
+- six deterministic weekly tasks derived from the first-visit date
+- active canonical Staff actor and owner validation
+- audited task outcomes, owner changes, pause, resume, and cancellation
+- read-time due/overdue projection without a scheduler
+- Azure Table event persistence within the existing grant-funded architecture
+
+Hard exclusions:
+
+- no automated email, text, or phone calls
+- no paid messaging or workflow service
+- no dashboard-owned task calculation
+- no activation or duplication of OPS task-preview orchestration
+- no real visitor-card data in tests
+
+Delivery sequence:
+
+1. backend contract, event projection, commands, queue, and regression coverage
+2. CI and staging validation with synthetic visitors
+3. dashboard staff-task presentation as a separate pull request
+4. controlled six-week pilot measurement before any automation discussion
+
+Current rule:
+
+- the general Phase 2 freeze remains in place except for this explicitly approved, staff-task-only retention slice
+
 ## 2026-08-19 Update — Controlled pilot production E2E closure
 
 What was verified:

@@ -72,3 +72,22 @@ Documented safe blocks:
 - TC-14B requires an isolated environment for safe backend-failure injection.
 
 No confirmed production E2E defect remains open.
+
+## P5 - Six-Week Visitor Retention Staff Tasks
+
+Status: Backend foundation in review
+
+Scope:
+
+- Start one six-week plan only after explicit contact consent is recorded.
+- Create six backend-authored staff tasks from the first-visit date.
+- Require an active canonical Staff actor for every mutation.
+- Support owner assignment/reassignment, weekly outcomes, pause, resume, and cancellation.
+- Derive due/overdue state deterministically during reads; do not run a scheduler.
+- Do not send email, text, or call a visitor automatically.
+- Keep dashboard adoption and controlled-pilot validation as separate follow-up slices.
+
+Success gate:
+
+- Backend build, focused regression tests, full CI, staging deployment, and synthetic-data verification must pass before dashboard adoption.
+

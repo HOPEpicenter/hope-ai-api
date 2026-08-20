@@ -22,6 +22,7 @@ No frontend code should infer, duplicate, or override backend-authored ministry 
 | Journey state | Backend | Dashboard presents backend-authored journey state and story evidence. |
 | Care state | Backend | Care candidates, urgency, ownership, escalation, and outcomes are backend-owned. |
 | Follow-up state | Backend | Terminal/non-terminal semantics live in backend contracts and projections. |
+| Six-week visitor follow-up | Backend | Plan lifecycle, owner, weekly staff tasks, outcomes, consent, and due-state projection are backend-owned. |
 | Prayer state | Backend | Prayer request timestamps and related projections are backend-owned. |
 | Next-step state | Backend | Selection and completion are written through backend formation events. |
 | Opportunity intelligence | Backend | Segments, recommended actions, reasons, resolution metadata, and evidence are backend-authored. |
@@ -53,6 +54,8 @@ Dashboard must not:
 - rank opportunity segments
 - create frontend-only recommendations
 - persist ministry state
+- schedule or send visitor messages, calls, or emails
+- calculate six-week follow-up dates or task status
 - start orchestration, schedulers, or background mutation loops
 - bypass backend operator attribution or API-key rules
 

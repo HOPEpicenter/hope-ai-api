@@ -182,6 +182,7 @@ Merged PR count: 13
 | Formation | Complete/Hardening | Runtime, profile projection, replay, drift, actor attribution, prayer/next-step/followup projections. |
 | Care | Complete for pilot | Candidate read model, summary, export, assignment, bulk assignment, integrity checks. |
 | Followups | Complete for pilot | Terminal/non-terminal semantics, dashboard and OPS queues, attribution. |
+| Six-week visitor follow-up | Foundation in review | Consent-gated event stream, six deterministic staff tasks, owner/status/outcome commands, queue reads; no outbound automation. |
 | Timeline | Complete for pilot | Integration/global timeline, shadow parity, unified route docs. |
 | Dashboard Card | Complete for pilot | Stage, next step, outcome, prayer, assignment, risk/recommendation consistency. |
 | Activity Intelligence | Complete for pilot | Formation cohorts, opportunities, worklists, contract coverage. |

@@ -1,8 +1,8 @@
-# HOPE Pilot Readiness v2 — Revision 6
+# HOPE Pilot Readiness v2 — Revision 7
 
 Date: 2026-08-19
 
-Status: Controlled Pilot Authorized
+Status: Controlled Pilot Authorized; Six-Week Staff-Task Foundation In Review
 
 ## Executive Summary
 
@@ -12,11 +12,14 @@ Core ministry workflows are implemented over verified backend contracts. Staff A
 
 Authenticated production end-to-end validation closed on 2026-08-19 with 13 core scenarios passed, 0 failed, and 3 safely blocked by deliberate production-safety constraints. The one material finding, TC-13 Visitor Snapshot identity convergence, was corrected in backend PR #1169 and passed the production retest. Controlled pilot launch remains authorized. Engineering remains frozen unless pilot evidence identifies a material blocker or a required launch-safety correction.
 
+A Phase 2 retention slice is now in review: a consent-gated, backend-authoritative six-week visitor follow-up plan that creates staff tasks only. It does not send visitor communications, introduce a paid service, or activate the existing OPS task-preview/orchestration surface. Dashboard adoption remains separate and must consume this contract without deriving task state.
+
 ## Current Pilot Readiness
 
 | Area | Status | Notes |
 | --- | --- | --- |
 | Backend contracts | Complete | Verified dashboard contracts in use |
+| Six-Week Visitor Follow-Up v1 | In review | Backend event contract, deterministic staff tasks, owner/status/outcome commands, queue reads, and regression coverage; no outbound automation. |
 | Today Dashboard | Complete | Pastor-focused ministry command center |
 | People 360 | Complete | Unified ministry profile and timeline |
 | Journey Workspace | Complete | Ministry story and next-step presentation |
@@ -181,3 +184,22 @@ The system will be considered pilot-ready when:
 - Pastoral notes have a backend-backed audited editing path.
 - End-to-end ministry workflows pass validation, with any production-safety blocks explicitly documented.
 - Pilot documentation matches verified implementation.
+
+## Approved Phase 2 Slice — Six-Week Visitor Follow-Up v1
+
+This slice addresses visitor retention by giving staff a consistent six-week work plan after a first visit.
+
+Guardrails:
+
+- staff tasks only
+- explicit contact consent required
+- active Staff actor attribution required
+- canonical Staff ownership
+- deterministic read-time due/overdue state
+- no outbound message, call, or email automation
+- no scheduler or background mutation loop
+- no production card data in tests
+- dashboard remains a presentation layer over backend truth
+
+The controlled pilot remains authorized while this isolated Phase 2 slice proceeds through review, CI, staging, and synthetic validation.
+

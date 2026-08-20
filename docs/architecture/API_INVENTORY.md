@@ -23,6 +23,12 @@ This is a high-level inventory derived from PR history. Use code inspection for 
 | `GET /staff-identities` | Complete | Canonical Staff Identity directory projected from seeded identities and immutable Staff events. |
 | `POST /staff-identities` | Locally verified | Creates dynamic Staff identities through `staff.created`; protected by the administrative API-key boundary. |
 | `PATCH /staff-identities/{staffId}` | Locally verified | Updates or deactivates Staff identities through immutable `staff.updated` and `staff.deactivated` events. |
+| `POST /visitors/{id}/six-week-followup` | Locally verified | Starts one consent-gated six-week staff follow-up plan per visitor. |
+| `GET /visitors/{id}/six-week-followup` | Locally verified | Reads the canonical plan and its six deterministic staff tasks. |
+| `GET /six-week-followups` | Locally verified | Lists active/paused plans as a staff work queue; due state is derived at read time. |
+| `POST /visitors/{id}/six-week-followup/owner` | Locally verified | Assigns or reassigns an active canonical Staff owner. |
+| `POST /visitors/{id}/six-week-followup/tasks/{weekNumber}/outcome` | Locally verified | Records one completed or skipped outcome for a weekly staff task. |
+| `POST /visitors/{id}/six-week-followup/status` | Locally verified | Pauses, resumes, or cancels the plan with audited actor attribution. |
 | Opportunity worklists | Complete | Segment worklists, action reasons, resolution metadata, narrative. |
 | Protected ping / route parity | Complete | Express/Azure parity hardened. |
 

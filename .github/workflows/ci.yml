@@ -67,6 +67,13 @@ jobs:
           npm run build
 
 
+      - name: Six-week visitor follow-up regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npx ts-node tests/followups/projectSixWeekVisitorFollowup.test.ts
+          npx ts-node tests/followups/sixWeekVisitorFollowupCommands.test.ts
+
       - name: Dashboard visitor identity regression
         shell: pwsh
         run: |

@@ -32,6 +32,12 @@ Azure Functions are configured with `authLevel: anonymous`, but protected routes
 | GET | `/api/visitors/{id}/dashboard-card` | Visitor dashboard card | `HOPE_API_KEY` |
 | GET | `/api/visitors/{id}/journey` | Visitor journey | `HOPE_API_KEY` |
 | GET | `/api/visitors/{id}/activity-insights` | Visitor activity insights | `HOPE_API_KEY` |
+| POST | `/api/visitors/{id}/six-week-followup` | Start consent-gated six-week staff follow-up plan | `HOPE_API_KEY` |
+| GET | `/api/visitors/{id}/six-week-followup` | Read six-week follow-up plan | `HOPE_API_KEY` |
+| GET | `/api/six-week-followups` | Staff six-week follow-up queue | `HOPE_API_KEY` |
+| POST | `/api/visitors/{id}/six-week-followup/owner` | Assign/reassign canonical Staff owner | `HOPE_API_KEY` |
+| POST | `/api/visitors/{id}/six-week-followup/tasks/{weekNumber}/outcome` | Complete/skip weekly staff task | `HOPE_API_KEY` |
+| POST | `/api/visitors/{id}/six-week-followup/status` | Pause/resume/cancel plan | `HOPE_API_KEY` |
 | POST | `/api/formation/events` | Append Formation event | `HOPE_API_KEY` |
 | GET | `/api/formation/timeline` | Formation timeline | `HOPE_API_KEY` |
 | GET | `/api/formation/profiles` | Formation profiles list | `HOPE_API_KEY` |

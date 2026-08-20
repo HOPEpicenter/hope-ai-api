@@ -14,6 +14,7 @@ Before adding any new service, endpoint, or dashboard derivation, check this fil
 | Care candidate list | Backend | Care candidate projection, priority, age, escalation, action, assignment. |
 | Care summary/export | Backend | Care rollups and operational export. |
 | Followup queues | Backend | Dashboard and OPS queue projections. |
+| Six-week visitor follow-up | Backend | Consent-gated, event-backed staff tasks with deterministic due-state projection; no outbound automation. |
 | Activity intelligence | Backend | Formation cohorts, opportunities, worklists. |
 | Opportunity narrative | Backend | Opportunity action/reason/resolution/narrative. |
 | Integration/global timeline | Backend | Ministry story/event timeline. |

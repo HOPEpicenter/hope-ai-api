@@ -15,6 +15,28 @@
 > Do not duplicate current roadmap, pilot status, or architectural guidance in this document.
 
 ---
+## 2026-08-19 — Six-week visitor follow-up backend foundation
+
+Opened the first approved Phase 2 visitor-retention slice.
+
+Included:
+
+- one consent-gated plan per visitor
+- six deterministic backend-authored staff tasks
+- canonical Staff actor and owner validation
+- audited weekly outcomes and plan lifecycle events
+- protected Azure Functions and Express-parity routes
+- focused regression coverage and architecture documentation
+
+Guardrails:
+
+- staff tasks only
+- no automated visitor email, text, or call
+- no scheduler or background mutation loop
+- no paid service dependency
+- synthetic test data only
+- dashboard adoption deferred to a separate slice
+
 ## 2026-08-19 — Controlled pilot production E2E closure
 
 Completed authenticated production validation of the private HOPE Ministry OS dashboard.

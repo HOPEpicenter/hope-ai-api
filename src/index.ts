@@ -18,6 +18,7 @@ import opsParityRouter from "./routes/opsParity";
 import protectedRouter from "./routes/protected";
 import { careRouter } from "./routes/care";
 import { activityIntelligenceRouter } from "./routes/activityIntelligence";
+import { sixWeekFollowupsRouter } from "./routes/sixWeekFollowups";
 
 import { AzureTableEngagementsRepository } from "./repositories/engagementsRepository";
 process.on("unhandledRejection", (reason) => {
@@ -85,6 +86,7 @@ app.use("/api", engagementsRouter);
 app.use("/api", integrationRouter);
 app.use("/api", careRouter);
 app.use("/api", activityIntelligenceRouter);
+app.use("/api", sixWeekFollowupsRouter);
 app.use("/api", dashboardRouter);
 app.use("/api", opsParityRouter);
 app.use("/api", protectedRouter);

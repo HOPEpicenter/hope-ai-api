@@ -4,7 +4,7 @@ Only verified remaining work belongs here.
 
 ## P0 - Documentation Reconciliation
 
-Status: Complete
+Status: Complete — production E2E evidence synchronized on 2026-08-19
 Purpose: Make Pilot Readiness v2 the authoritative engineering operating system.
 
 Tasks:
@@ -55,5 +55,20 @@ Decision rule:
 
 ## P4 - Pilot Validation
 
-Status: Controlled pilot authorized; technical pilot gates and launch decision complete
-Run full pastor workflow against deployed dashboard and API.
+Status: Complete — controlled pilot authorized and production E2E closed
+
+Verified result:
+
+- 13 core scenarios passed
+- 0 core scenarios failed
+- 3 scenarios safely blocked by deliberate production constraints
+- TC-13 dashboard-card identity defect corrected in API PR #1169 and verified in production
+- private Microsoft Entra sign-in and sign-out round trip passed
+
+Documented safe blocks:
+
+- TC-06 requires a second active Staff identity.
+- TC-11 must not bypass production test-record filtering or use a real ministry record solely for testing.
+- TC-14B requires an isolated environment for safe backend-failure injection.
+
+No confirmed production E2E defect remains open.

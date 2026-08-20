@@ -1,6 +1,6 @@
-# HOPE Pilot Readiness v2 — Revision 5
+# HOPE Pilot Readiness v2 — Revision 6
 
-Date: 2026-07-14
+Date: 2026-08-19
 
 Status: Controlled Pilot Authorized
 
@@ -8,7 +8,9 @@ Status: Controlled Pilot Authorized
 
 The HOPE Ministry OS dashboard has transitioned from feature construction to pilot hardening.
 
-Core ministry workflows are implemented over verified backend contracts. Staff Administration, editable pastoral notes, canonical care ownership, actor provenance, cross-page workflow continuity, accessibility and empty-state validation, pastor-facing ministry acceptance, pilot access-boundary hardening, and deployment validation are complete. Controlled pilot launch is authorized. Engineering remains frozen unless pilot evidence identifies a material blocker or a required launch-safety correction.
+Core ministry workflows are implemented over verified backend contracts. Staff Administration, editable pastoral notes, canonical care ownership, actor provenance, cross-page workflow continuity, accessibility and empty-state validation, pastor-facing ministry acceptance, pilot access-boundary hardening, and deployment validation are complete.
+
+Authenticated production end-to-end validation closed on 2026-08-19 with 13 core scenarios passed, 0 failed, and 3 safely blocked by deliberate production-safety constraints. The one material finding, TC-13 Visitor Snapshot identity convergence, was corrected in backend PR #1169 and passed the production retest. Controlled pilot launch remains authorized. Engineering remains frozen unless pilot evidence identifies a material blocker or a required launch-safety correction.
 
 ## Current Pilot Readiness
 
@@ -21,20 +23,42 @@ Core ministry workflows are implemented over verified backend contracts. Staff A
 | Care Workspace | Complete | Assignment and outcome workflow |
 | Insights | Complete | Ministry readiness worklists |
 | Admin Readiness Center | Complete | Contract registry and readiness dashboard |
-| Identity Presentation Layer | Complete | Human-friendly person and owner names |
+| Identity Presentation Layer | Complete | Current visitor and owner names are backend-authored; production TC-13 verified identity edits converge in Visitor Snapshot after API PR #1169. |
 | Ministry Event Language | Complete | Backend event codes translated for pastors |
 | Display Language Layer | Complete | Status, risk, and reason labels centralized |
 | Canonical Projected Staff Directory | Complete | Dashboard assignment and display consume backend-projected Staff identities |
-| Test Record Filtering | Complete | Engineering/test data hidden from key ministry views |
+| Test Record Filtering | Complete | Engineering/test data hidden from key ministry views; this intentionally blocks synthetic Care outcome execution in production. |
 | Visitor CRUD | Complete | Person create/edit workflow in dashboard |
 | Editable Notes | Complete | Backend event-sourced audited editing and dashboard correction workflow implemented |
 | Staff Identity v1 | Complete | Canonical staff identity abstraction and assignment validation |
 | Staff Administration | Complete | Event-sourced Staff Administration is implemented across the backend and dashboard. Canonical Staff Identity powers administration, assignment, and display throughout Ministry OS. |
 | Canonical Care Ownership | Complete | Assignment and unassignment now write canonical formation events and update derived ministry projections. |
 | Ownership Actor Provenance | Complete | Dashboard care ownership commands send actor identity through the verified backend contract. |
-| Cross-Page Consistency | Complete | Today -> Person 360 -> Journey -> Care -> Insights workflow continuity and pastor acceptance are verified. |
-| Authentication Hardening | Complete | Pilot-sensitive ministry reads and visitor-list access are protected by the application API key and validated in staging. |
-| Production Readiness | Controlled pilot authorized | Dashboard deployment, ministry acceptance, pilot access-boundary hardening, staging validation, and launch authorization are complete. |
+| Cross-Page Consistency | Complete | Today -> Person 360 -> Journey -> Care -> Insights continuity passed authenticated production E2E validation. |
+| Authentication Hardening | Complete | Production dashboard access is protected by Microsoft Entra ID assignment; dashboard-to-backend API access remains protected by application keys. Unauthenticated pages redirect to sign-in and protected APIs return 401. |
+| Production Readiness | Controlled pilot authorized | Private production deployment, sign-in/sign-out round trip, ministry workflows, and final production E2E closure are verified. |
+
+## Production E2E Closure — 2026-08-19
+
+Consolidated core scenario result:
+
+| Result | Count |
+| --- | ---: |
+| Passed | 13 |
+| Failed | 0 |
+| Safely blocked | 3 |
+
+The three blocked scenarios are documented coverage limitations, not confirmed product defects:
+
+| Scenario | Reason |
+| --- | --- |
+| TC-06 Reassign care owner | Only one active Staff identity was available; a safe reassignment requires a second active Staff member. |
+| TC-11 Record care outcome from Care | Production intentionally hides likely test records from the Care queue; using a real ministry record solely for testing was rejected. |
+| TC-14B Backend-failure state | A production backend failure was not induced because it would risk pilot availability. |
+
+TC-13 initially failed because the canonical visitor dashboard-card response omitted the current `displayName`, causing Visitor Snapshot to fall back to “Selected Person.” API PR #1169 added the backend-owned field and regression coverage. The production closure run then displayed the updated synthetic visitor name and passed TC-13.
+
+No confirmed production E2E defect remains open.
 
 ## Architectural Decisions
 
@@ -120,6 +144,9 @@ Pastoral notes are not permanently append-only. Staff must be able to correct fa
 - [x] Pilot authentication and authorization decision
 - [x] Documentation freeze
 - [x] Deployment validation
+- [x] Authenticated production end-to-end validation
+- [x] TC-13 backend identity-contract correction and production retest
+- [x] Safe production-test limitations documented
 - [x] Pilot launch
 
 ## Engineering Governance
@@ -152,5 +179,5 @@ The system will be considered pilot-ready when:
 - Engineering/test records are hidden from ministry workflows by default.
 - Staff assignment is abstracted from technical IDs.
 - Pastoral notes have a backend-backed audited editing path.
-- End-to-end ministry workflows pass validation.
+- End-to-end ministry workflows pass validation, with any production-safety blocks explicitly documented.
 - Pilot documentation matches verified implementation.

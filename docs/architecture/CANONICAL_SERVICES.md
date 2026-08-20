@@ -10,7 +10,7 @@ Before adding any new service, endpoint, or dashboard derivation, check this fil
 |---|---|---|
 | Visitor identity | Backend | Visitor records and profile fields. |
 | Formation profile | Backend | Canonical outcome/journey/followup state. |
-| Dashboard card | Backend | Person-facing canonical summary for dashboard surfaces. |
+| Dashboard card | Backend | Person-facing canonical summary for dashboard surfaces, including the current canonical visitor `displayName`. |
 | Care candidate list | Backend | Care candidate projection, priority, age, escalation, action, assignment. |
 | Care summary/export | Backend | Care rollups and operational export. |
 | Followup queues | Backend | Dashboard and OPS queue projections. |

@@ -1,148 +1,66 @@
 # HOPE Ministry OS — Pilot Readiness Board
 
-Date: 2026-07-14
+Date: 2026-08-19
 
-Status: Pilot Hardening
+Status: Controlled Pilot Authorized — Production E2E Closed
 
 ## Pilot Objective
 
-A pastor can confidently open HOPE Ministry OS every morning, understand who needs attention, act faithfully, share responsibility, and trust that every workspace reflects the same ministry truth.
-
-## Scope Rule
-
-Every pre-pilot PR must do at least one of the following:
-
-1. increase ministry trust;
-2. reduce pilot risk;
-3. prove cross-page consistency;
-4. synchronize documentation with verified implementation.
-
-Phase 2 intelligence and communication systems remain frozen until pilot completion.
+A pastor can confidently open the private HOPE Ministry OS every morning, understand who needs attention, act faithfully, share responsibility, and trust that every workspace reflects the same backend-authored ministry truth.
 
 ## Readiness Summary
 
-| Area | Status | Evidence or Remaining Gate |
+| Area | Status | Verified evidence |
 | --- | --- | --- |
-| Backend contracts | Complete | Verified dashboard-facing contracts are deployed |
-| Canonical event sourcing | Complete | Commands write canonical engagement or formation events |
-| Deterministic replay | Complete | Replay, idempotency, projection, and ordering coverage exists |
-| Today | Feature complete | Morning-loop acceptance remains |
-| Person 360 | Feature complete | Cross-page acceptance remains |
-| Journey | Feature complete | Cross-page next-step validation remains |
-| Care | Feature complete | Ownership edge-case validation remains |
-| Insights | Feature complete | Worklist resolution validation remains |
-| Staff directory | Complete | Canonical projected directory in use |
-| Staff administration | Complete | Dashboard create, edit, and deactivate workflow merged |
-| Editable pastoral notes | Complete | Dashboard edit and audit experience merged |
-| Canonical care ownership | Complete | Assignment and unassignment now use formation events |
-| Actor provenance | Complete | Dashboard ownership commands send actor identity |
-| Admin readiness | Feature complete | Final launch-readiness review remains |
-| Authentication and authorization | Open pilot gate | Pilot access policy and sensitive-action boundaries require explicit approval |
-| Cross-page consistency | In validation | Ministry State Matrix must be proven |
-| Ministry acceptance | Not complete | Pastor walkthrough required |
-| Documentation freeze | Not complete | Current documentation must match July implementation |
-| Controlled pilot decision | Pending | Depends on completion of launch gates |
+| Backend contracts | Complete | Canonical dashboard, visitor, journey, care, notes, staff, and intelligence contracts are deployed. |
+| Today | Production verified | Queue metrics, ministry plan, recommendations, and selected-person continuation passed E2E. |
+| Person 360 | Production verified | Identity editing, contact actions, notes, care ownership, journey actions, and story continuity passed E2E. |
+| Journey | Production verified | Next-step selection and completion projected across workspaces. |
+| Care | Production verified with safe test limitation | Ownership assignment and release passed; synthetic Care outcome execution remains intentionally blocked by test-record filtering. |
+| Insights | Production verified | Selected-person context and updated identity converge through the canonical dashboard card. |
+| Admin | Production verified | Protected system-health surface loaded without a visible backend warning. |
+| Authentication and privacy | Complete | Microsoft Entra ID protects production pages; unauthenticated APIs return 401; sign-out/sign-in round trip passed. |
+| Staff directory | Complete | Canonical projected Staff identities power assignment and display. |
+| Editable pastoral notes | Complete | Correction, version 2, and two history entries passed production E2E. |
+| Cross-page consistency | Complete | Consolidated core result: 13 passed, 0 failed, 3 safely blocked. |
+| Controlled pilot decision | Authorized | No confirmed production E2E defect remains open. |
 
-## Wave 1 — Architecture Baseline
+## Production E2E Evidence
 
-Status: Documentation synchronization in progress
+- Initial full run: 20260819214658
+- Targeted retest: 20260820020435
+- Final closure run: 20260820024251
+- Consolidated core scenarios: 13 passed, 0 failed, 3 safely blocked
+- TC-13 correction: API PR #1169
+- TC-13 production result: Visitor Snapshot displayed the updated canonical visitor name
 
-- [x] Create Pilot Readiness documentation branch.
-- [x] Update `docs/architecture/PILOT_READINESS_V2.md`.
-- [x] Synchronize `docs/MASTER_PLAN.md` with the active pilot architecture.
-- [x] Reclassify `docs/master-checklist.md` as the historical engineering completion log.
-- [ ] Update `docs/UPDATE_NOTES.md`.
-- [x] Add Ministry State Matrix.
-- [x] Add Morning Ministry Workflow.
-- [x] Add Pilot Readiness Board.
-- [x] Record canonical projected Staff directory adoption after dashboard PR #80.
-- [x] Record visitor snapshot React effect hardening after dashboard PR #81.
-- [ ] Validate documentation links and formatting.
-- [ ] Commit and open documentation PR.
-- [ ] CI passes.
-- [ ] Merge through PR.
+## Documented Safe Blocks
 
-## Wave 2 — Cross-Page Architecture Validation
+| Scenario | Classification | Follow-up trigger |
+| --- | --- | --- |
+| TC-06 Reassign care owner | Coverage limitation | Retest when a second active Staff identity is intentionally available. |
+| TC-11 Record care outcome from Care | Intentional test-data safety boundary | Do not weaken test filtering or mutate a real ministry record solely for validation. |
+| TC-14B Backend-failure state | Production availability safeguard | Exercise only in an isolated environment where failure injection is safe. |
 
-Status: Not started
+These blocks do not authorize placeholder data, hidden production mutations, or weaker pastor-facing filtering.
 
-- [ ] Verify person identity consistency.
-- [ ] Verify care-owner consistency.
-- [ ] Verify ownership event history.
-- [ ] Verify formation-stage consistency.
-- [ ] Verify next-step consistency.
-- [ ] Verify needs-attention consistency.
-- [ ] Verify meaningful-contact consistency.
-- [ ] Verify pastoral-note consistency.
-- [ ] Verify timeline consistency.
-- [ ] Verify recommended-action consistency.
-- [ ] Record every disagreement as an explicit pilot defect.
-- [ ] Confirm no dashboard page invents business state.
+## Closed Production Finding
 
-## Wave 3 — Ministry Scenario Validation
+TC-13 exposed a backend contract omission: visitor dashboard cards did not include the current canonical `displayName`. API PR #1169 added the field and a required CI regression. The production retest passed after deployment.
 
-Status: Not started
+## Controlled Pilot Operating Rules
 
-- [ ] New person to active care.
-- [ ] Ownership transfer.
-- [ ] Unassigned person remains visible.
-- [ ] Pastoral note correction.
-- [ ] Journey next-step selection and completion.
-- [ ] Care outcome resolution.
-- [ ] Partial backend failure.
-- [ ] Staff deactivation with historical assignments.
-- [ ] Duplicate command or event replay.
-- [ ] Out-of-order historical event behavior.
-
-## Wave 4 — Pilot Access and Safety
-
-Status: Not started
-
-- [ ] Define pilot user list.
-- [ ] Define who may view pastoral notes.
-- [ ] Define who may edit pastoral notes.
-- [ ] Define who may assign care.
-- [ ] Define who may manage staff.
-- [ ] Define who may access system readiness details.
-- [ ] Verify actor provenance for sensitive actions.
-- [ ] Verify inactive staff access and assignment behavior.
-- [ ] Document interim pilot authorization limitations.
-- [ ] Approve controlled-pilot risk posture.
-
-## Wave 5 — Pastoral Trust Review
-
-Status: Not started
-
-- [ ] Today clearly answers who needs attention.
-- [ ] Every priority item explains why.
-- [ ] Every action identifies responsibility.
-- [ ] Person 360 communicates the ministry story in under one minute.
-- [ ] Journey communicates formation movement rather than duplicating Timeline.
-- [ ] Care communicates responsibility and the next faithful action.
-- [ ] Insights produces ministry worklists rather than unexplained analytics.
-- [ ] Admin separates ministry administration from engineering diagnostics.
-- [ ] Raw technical IDs and event codes are absent from pastor-facing experiences.
-- [ ] Navigation preserves person and worklist context.
-
-## Wave 6 — Controlled Pilot Launch
-
-Status: Not started
-
-- [ ] Backend CI is green.
-- [ ] Dashboard CI is green.
-- [ ] Azure staging deploy is successful.
-- [ ] Dashboard production deploy is verified.
-- [ ] Production environment configuration is verified.
-- [ ] End-to-end ministry walkthrough passes.
-- [ ] Ministry acceptance walkthrough passes.
-- [ ] Known pilot limitations are documented.
-- [ ] Rollback and issue-triage procedures are documented.
-- [ ] Documentation freeze is complete.
-- [ ] Controlled pilot is approved.
+1. Keep production access private and assignment-based through Microsoft Entra ID.
+2. Keep backend ministry truth authoritative; dashboard code owns presentation only.
+3. Use real ministry records for ministry work, not for destructive or artificial test execution.
+4. Keep synthetic records hidden from pastor-facing workflows by default.
+5. Treat the three blocked cases as documented limitations until their safe follow-up triggers exist.
+6. Reopen engineering only for material pilot evidence or required launch-safety corrections.
+7. Continue PowerShell-only, PR-only, contract-first implementation governance.
 
 ## Frozen Phase 2 Work
 
-The following remain intentionally out of scope until pilot completion:
+The following remain out of scope during the controlled pilot unless a separate evidence-backed plan is approved:
 
 - Community Intelligence Engine
 - Email Engine
@@ -156,13 +74,6 @@ The following remain intentionally out of scope until pilot completion:
 - Family Intelligence
 - Community Mapping
 
-## Current Launch Recommendation
+## Current Recommendation
 
-The architecture is suitable for a controlled live ministry pilot after:
-
-1. documentation reflects the verified July implementation;
-2. the morning ministry workflow passes;
-3. cross-page ministry invariants pass;
-4. pilot authentication and authorization boundaries are explicitly approved.
-
-Broad organization-wide launch remains deferred until ministry acceptance and pilot findings are incorporated.
+Continue the controlled private pilot. Monitor real ministry use, preserve the documented safety boundaries, and capture material findings before expanding scope.

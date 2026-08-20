@@ -67,6 +67,12 @@ jobs:
           npm run build
 
 
+      - name: Dashboard visitor identity regression
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npx ts-node tests/dashboard/resolveCanonicalVisitorDisplayName.test.ts
+
       - name: Regression target normalization assert
         shell: pwsh
         run: |

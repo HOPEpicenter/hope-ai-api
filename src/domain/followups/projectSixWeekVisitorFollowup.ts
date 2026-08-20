@@ -318,3 +318,9 @@ export function projectSixWeekVisitorFollowups(
       }
 
       const aDue = a.nextTask?.dueDate ?? "9999-12-31";
+      const bDue = b.nextTask?.dueDate ?? "9999-12-31";
+
+      return aDue.localeCompare(bDue) ||
+        a.visitorId.localeCompare(b.visitorId);
+    });
+}

@@ -1,3 +1,28 @@
+## 2026-08-19 Update — Controlled pilot production E2E closure
+
+What was verified:
+
+- private production dashboard access requires Microsoft Entra ID
+- unauthenticated page requests redirect to sign-in and protected API requests return 401
+- sign-out removes access and sign-in returns the assigned pilot user to Today
+- consolidated core production E2E result is 13 passed, 0 failed, and 3 safely blocked
+- direct email and call links, journey actions, care ownership, editable pastoral notes, identity editing, contextual navigation, accessibility basics, and Admin health passed
+- TC-13 Visitor Snapshot identity convergence was corrected in API PR #1169 and passed the production retest
+
+Documented safe blocks:
+
+- TC-06 waits for a second active Staff identity
+- TC-11 preserves production test-record filtering and does not use a real ministry record solely for testing
+- TC-14B avoids inducing a backend failure in production
+
+Current rule:
+
+- controlled pilot remains authorized
+- no confirmed production E2E defect is open
+- do not weaken test-data safety boundaries to force blocked production tests
+- reopen engineering only for material pilot evidence or launch-safety corrections
+- keep Phase 2 expansion frozen until controlled-pilot evidence supports it
+
 ## 2026-06-02 Update — Orchestration guardrail closeout
 
 What we verified:

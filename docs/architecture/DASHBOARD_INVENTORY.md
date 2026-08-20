@@ -114,21 +114,22 @@ Merged PR count: 16
 
 | Page | Status | Backend Source | Remaining Pilot Work |
 |---|---|---|---|
-| Today | Green | dashboard followups, care summary, opportunity worklists, visitor dashboard card | Pastor workflow acceptance complete; morning-briefing decision remains a separate investigation. |
-| People / Person 360 | Green | visitors, visitor summary, dashboard card, journey, timeline | Pastor workflow and accessibility acceptance complete. |
+| Today | Green | dashboard followups, care summary, opportunity worklists, visitor dashboard card | Authenticated production workflow acceptance complete; morning-briefing decision remains a separate investigation. |
+| People / Person 360 | Green | visitors, visitor summary, dashboard card, journey, timeline | Production E2E verified identity editing, direct contact actions, notes, ownership, journey actions, and snapshot identity convergence. |
 | Journey | Green | formation events/profile/journey endpoints | Empty/error-state and workflow-continuity acceptance complete. |
-| Care | Green | care candidates, care summary, care commands | Pastor action-flow acceptance complete. |
-| Insights | Green | activity intelligence / opportunity worklists | Segment failure handling and pilot wording acceptance complete. |
-| Admin | Yellow/Green | readiness/system surfaces | Avoid fake health; add verified health only when contract exists. |
+| Care | Green | care candidates, care summary, care commands | Ownership action flow passed; synthetic outcome execution remains intentionally blocked by production test-record filtering. |
+| Insights | Green | activity intelligence / opportunity worklists | Selected-person context and updated identity convergence passed production E2E. |
+| Admin | Green | readiness/system surfaces | Protected production system-health surface loaded without a visible backend warning. |
 
 ## Component/UX Readiness
 
 | Component/Feature | Status | Notes |
 |---|---|---|
 | App shell | Complete | Foundation exists from PR #1. |
-| Snapshot rail | Complete | Backend-verified state only. |
+| Snapshot rail | Complete | Backend-verified state only; current visitor `displayName` passed production TC-13 after API PR #1169. |
 | Contextual navigation | Complete | Visitor context preserved across workspaces. |
 | PersonMinistryHeader | Complete | Shared header and resilient identity fallback. |
 | DataHealthBanner | Complete | Backend warnings and nonfatal states. |
 | Smoke helper | Complete | Supports backend-backed page verification. |
+| Authentication boundary | Complete | Private production pages require Microsoft Entra ID; unauthenticated APIs return 401 and sign-out/sign-in round trip passed. |
 | Pastor-first copy | Complete for current workspaces | Today, People, Journey, Care, Insights, Admin polished. |

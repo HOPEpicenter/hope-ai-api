@@ -257,4 +257,13 @@ Merged PR count: 13
 | #1133 | 2026-06-23 | Align task preview simulation compliance assertions |
 | #1134 | 2026-06-23 | Record pilot readiness staging certification |
 | #1136 | 2026-06-23 | Reduce task preview queue enrichment latency |
+
+### Controlled pilot authorization and production E2E closure (#1167-#1169)
+
+Merged PR count: 3
+
+| PR | Merged | Title |
+|---:|---|---|
 | #1167 | 2026-08-11 | docs: reconcile final pilot readiness |
+| #1168 | 2026-08-11 | docs: authorize controlled pilot launch |
+| #1169 | 2026-08-19 | Fix visitor identity in dashboard cards |

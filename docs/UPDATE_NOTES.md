@@ -15,6 +15,34 @@
 > Do not duplicate current roadmap, pilot status, or architectural guidance in this document.
 
 ---
+## 2026-08-19 — Controlled pilot production E2E closure
+
+Completed authenticated production validation of the private HOPE Ministry OS dashboard.
+
+Verified:
+
+- Microsoft Entra ID sign-in and sign-out round trip
+- unauthenticated page redirects and protected API 401 responses
+- direct email and call actions
+- Today -> Person 360 -> Journey -> Care -> Insights workflow continuity
+- journey next-step selection and completion
+- care ownership assignment and release
+- pastoral note creation, correction, version 2, and preserved history
+- visitor identity editing and cross-page convergence
+- Admin system-health surface and basic accessibility
+
+Consolidated result:
+
+- 13 core scenarios passed
+- 0 core scenarios failed
+- 3 scenarios were safely blocked by production constraints
+
+The one confirmed defect was TC-13: the canonical visitor dashboard card omitted the current visitor `displayName`. API PR #1169 added the backend-owned field and required CI regression. The production retest then displayed the updated visitor name and passed.
+
+The safe blocks remain intentional: TC-06 needs a second active Staff identity, TC-11 must preserve test-record filtering, and TC-14B requires an isolated failure-injection environment.
+
+Controlled pilot authorization remains in effect with no confirmed production E2E defect open.
+
 ## 2026-07-13 — Dynamic Staff Administration v1 fully validated
 
 Follow-up validation completed after merge.

@@ -8,7 +8,7 @@ This is a high-level inventory derived from PR history. Use code inspection for 
 |---|---|---|
 | `/visitors` | Complete | Create/read/list/update identity. Phone/address/birthday supported. |
 | `/visitors/{id}/notes` | Complete | Emits existing `note.add` engagement event. |
-| `/visitors/{id}/dashboard-card` | Complete | Enriched canonical dashboard card. |
+| `/visitors/{id}/dashboard-card` | Complete | Enriched canonical dashboard card including the current backend-owned visitor `displayName`; production TC-13 and required CI regression verified. |
 | `/formation/events` | Complete | Formation V1 event ingestion with actor attribution guardrails. |
 | `/formation/profile` | Complete | Canonical formation profile projection. |
 | `/integration/timeline/global` | Complete | Unified story/timeline route with parity history. |

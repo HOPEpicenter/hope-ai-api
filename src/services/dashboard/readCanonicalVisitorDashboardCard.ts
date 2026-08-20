@@ -1,5 +1,6 @@
 import { IntegrationService } from "../integration/integrationService";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
+import { AzureTableVisitorsRepository } from "../../repositories/visitorsRepository";
 import { readCanonicalVisitorSummary } from "../visitors/readCanonicalVisitorSummary";
 import { deriveFollowupPriority } from "../followups/deriveFollowupPriority";
 import { deriveFollowupUrgency } from "../followups/deriveFollowupUrgency";
@@ -7,12 +8,24 @@ import { projectFollowupState } from "../../functions/_shared/followupProjection
 import { TIMELINE_DERIVATION_LIMIT } from "../integration/timelineConstants";
 import { readCanonicalStaffIdentity } from "../staff/readCanonicalStaffDirectory";
 import type { CanonicalVisitorDashboardCard } from "./canonicalDashboardContracts";
+import { readCanonicalVisitorIdentity } from "./visitorIdentity";
 
 const integrationService = new IntegrationService(new EngagementEventsRepository());
+const visitorsRepository = new AzureTableVisitorsRepository();
 
 type ReadStaffIdentity = (
   staffId: string
 ) => Promise<{ displayName?: string | null } | null>;
+
+export function resolveCanonicalVisitorDisplayName(
+  visitorId: string,
+  visitor: unknown
+): string | null {
+  return readCanonicalVisitorIdentity(
+    visitorId,
+    visitor
+  ).displayName;
+}
 
 export async function resolveCanonicalAssignedStaffName(
   assignedTo: string | null | undefined,
@@ -42,12 +55,26 @@ export async function resolveCanonicalAssignedStaffName(
 export async function readCanonicalVisitorDashboardCard(
   visitorId: string
 ): Promise<CanonicalVisitorDashboardCard> {
-  const page = await integrationService.readIntegratedTimeline(visitorId, TIMELINE_DERIVATION_LIMIT);
+  const [
+    page,
+    visitorSummary,
+    visitor
+  ] = await Promise.all([
+    integrationService.readIntegratedTimeline(
+      visitorId,
+      TIMELINE_DERIVATION_LIMIT
+    ),
+    readCanonicalVisitorSummary(visitorId),
+    visitorsRepository.getById(visitorId)
+  ]);
+
   const items = Array.isArray(page?.items) ? page.items : [];
   const latest = items[0] ?? null;
-
-  const visitorSummary = await readCanonicalVisitorSummary(visitorId);
   const summary = visitorSummary.summary;
+  const displayName = resolveCanonicalVisitorDisplayName(
+    visitorId,
+    visitor
+  );
 
   const profile = summary.formation.profile ?? null;
   const projection = projectFollowupState(profile);
@@ -147,6 +174,7 @@ export async function readCanonicalVisitorDashboardCard(
 
   return {
     visitorId,
+    displayName,
     lastActivityAt: latest?.occurredAt ?? null,
     lastActivitySummary: latest?.summary ?? null,
     stage,

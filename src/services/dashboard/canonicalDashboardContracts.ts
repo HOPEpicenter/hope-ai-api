@@ -3,6 +3,7 @@ import type { CanonicalUnifiedVisitorStory } from "../narratives/canonicalOperat
 import type { CanonicalVisitorIdentity } from "./visitorIdentity";
 export type CanonicalVisitorDashboardCard = {
   visitorId: string;
+  displayName: string | null;
   lastActivityAt: string | null;
   lastActivitySummary: string | null;
   stage: string | null;

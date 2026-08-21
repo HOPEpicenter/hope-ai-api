@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getPersonSnapshot/index.js",
+  "entryPoint": "getPersonSnapshot",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "person/{id}/snapshot"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

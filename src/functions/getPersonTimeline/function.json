@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getPersonTimeline/index.js",
+  "entryPoint": "getPersonTimeline",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "person/{id}/timeline"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getPersonReadiness/index.js",
+  "entryPoint": "getPersonReadiness",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "person/{id}/readiness"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

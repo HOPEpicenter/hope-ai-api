@@ -106,9 +106,9 @@ function buildHealth(
   const reasons = signals.map(signal => signal.signal);
 
   for (const signal of signals) {
-    if (signal.priority === "urgent") score -= 25;
-    else if (signal.priority === "elevated") score -= 12;
-    else score -= 4;
+    if (signal.priority === "urgent") score -= 60;
+    else if (signal.priority === "elevated") score -= 30;
+    else score -= 10;
   }
 
   score = Math.max(0, Math.min(100, score));

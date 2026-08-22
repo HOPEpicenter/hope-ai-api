@@ -46,4 +46,25 @@ assert.ok(aggregate.readiness.some(item => item.signal === ReadinessSignal.ENGAG
 assert.ok(aggregate.readiness.some(item => item.signal === ReadinessSignal.FOLLOWUP_OVERDUE));
 assert.ok(aggregate.readiness.some(item => item.signal === ReadinessSignal.SIX_WEEK_TASK_OVERDUE));
 
+const urgentOnlyAggregate = buildPersonAggregate({
+  visitorId: "visitor-urgent-only",
+  generatedAt: "2026-08-22T00:00:00.000Z",
+  integratedTimeline: [],
+  integrationSummary: {
+    needsFollowup: false,
+    followupResolved: true
+  },
+  engagementRisk: { riskLevel: "high", riskScore: 100, engagement: { engaged: false } },
+  formationProfile: { stage: "Connected", assignedTo: null, lastPrayerRequestedAt: null },
+  sixWeekPlan: null
+});
+
+assert.equal(urgentOnlyAggregate.ministryHealth.score, 40);
+assert.equal(urgentOnlyAggregate.ministryHealth.band, "NEEDS_ATTENTION");
+assert.ok(
+  urgentOnlyAggregate.readiness.some(
+    item => item.signal === ReadinessSignal.ENGAGEMENT_RISK_HIGH
+  )
+);
+
 console.log("buildPersonAggregate.test.ts passed");

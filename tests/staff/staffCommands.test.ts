@@ -179,6 +179,57 @@ async function run(): Promise<void> {
     error: "displayName is required"
   });
 
+  const bindResult = await updateStaffIdentity(
+    {
+      staffId: "staff-dynamic-1",
+      actorId: "admin-user-7",
+      entraTenantId: "783EF4B1-7E96-4A71-80DD-06865B015DA9",
+      entraObjectId: "C1717A19-C719-4ED2-8B72-E013800095DE"
+    },
+    {
+      repository: repository as any,
+      now: () => "2026-07-13T14:15:00.000Z",
+      newEventId: () => "evt-bind-staff"
+    }
+  );
+
+  assert.equal(bindResult.accepted, true);
+  assert.deepEqual(repository.events[3]?.data, {
+    entraTenantId: "783ef4b1-7e96-4a71-80dd-06865b015da9",
+    entraObjectId: "c1717a19-c719-4ed2-8b72-e013800095de"
+  });
+
+  const duplicateBindingResult = await createStaffIdentity(
+    {
+      displayName: "Pastor Duplicate Binding",
+      actorId: "admin-user-8",
+      entraTenantId: "783ef4b1-7e96-4a71-80dd-06865b015da9",
+      entraObjectId: "c1717a19-c719-4ed2-8b72-e013800095de"
+    },
+    { repository: repository as any }
+  );
+
+  assert.deepEqual(duplicateBindingResult, {
+    accepted: false,
+    status: 409,
+    error: "Entra identity is already bound to a staff identity"
+  });
+
+  const partialBindingResult = await createStaffIdentity(
+    {
+      displayName: "Pastor Partial Binding",
+      actorId: "admin-user-9",
+      entraTenantId: "783ef4b1-7e96-4a71-80dd-06865b015da9"
+    },
+    { repository: repository as any }
+  );
+
+  assert.deepEqual(partialBindingResult, {
+    accepted: false,
+    status: 400,
+    error: "entraTenantId and entraObjectId must be provided together"
+  });
+
   console.log("staffCommands.test.ts passed");
 }
 

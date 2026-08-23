@@ -34,7 +34,9 @@ const events: StaffEvent[] = [
     data: {
       displayName: "Pastor Original",
       roleLabel: "Pastoral Care",
-      status: "active"
+      status: "active",
+      entraTenantId: "783EF4B1-7E96-4A71-80DD-06865B015DA9",
+      entraObjectId: "C1717A19-C719-4ED2-8B72-E013800095DE"
     }
   },
   {
@@ -85,12 +87,36 @@ assert(
   projected.lastEventId === "evt-deactivate",
   "Expected deactivation event as lastEventId."
 );
+assert(
+  projected.entraTenantId === "783ef4b1-7e96-4a71-80dd-06865b015da9" &&
+    projected.entraObjectId === "c1717a19-c719-4ed2-8b72-e013800095de",
+  "Expected normalized Entra binding."
+);
 
 const emptyProjection = projectStaffDirectory([]);
 
 assert(
   emptyProjection.length === 0,
   "An empty Staff event stream must produce an empty canonical directory."
+);
+const legacyBindingProjection = projectStaffDirectory([
+  {
+    eventId: "evt-legacy-staff-created",
+    staffId: "staff-legacy",
+    type: "staff.created",
+    occurredAt: "2026-07-13T12:00:00.000Z",
+    actorId: "admin-test",
+    data: {
+      displayName: "Legacy Staff",
+      status: "active"
+    }
+  }
+]);
+
+assert(
+  legacyBindingProjection[0]?.entraTenantId === null &&
+    legacyBindingProjection[0]?.entraObjectId === null,
+  "Existing Staff events without Entra data must project null bindings."
 );
 
 const compatibilityIdentity = first.find(

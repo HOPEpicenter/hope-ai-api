@@ -1,6 +1,7 @@
 import {
   projectStaffDirectory,
-  type CanonicalStaffIdentity
+  type CanonicalStaffIdentity,
+  normalizeEntraStaffBinding
 } from "../../domain/staff/projectStaffDirectory";
 import { StaffEventsRepository } from "../../repositories/staffEventsRepository";
 import {
@@ -13,6 +14,29 @@ export async function readCanonicalStaffDirectory(
   const events = await repo.listAll();
 
   return projectStaffDirectory(events);
+}
+
+export async function readCanonicalStaffIdentityByEntraBinding(
+  entraTenantId: string,
+  entraObjectId: string,
+  repo = new StaffEventsRepository()
+): Promise<CanonicalStaffIdentity | null> {
+  const binding = normalizeEntraStaffBinding(
+    entraTenantId,
+    entraObjectId
+  );
+
+  if (!binding) {
+    return null;
+  }
+
+  return (
+    (await readCanonicalStaffDirectory(repo)).find(
+      item =>
+        item.entraTenantId === binding.entraTenantId &&
+        item.entraObjectId === binding.entraObjectId
+    ) ?? null
+  );
 }
 
 export async function readCanonicalStaffIdentity(
@@ -67,6 +91,8 @@ export async function readMutationActorStaffIdentity(
     status: "active",
     createdAt: null,
     updatedAt: null,
-    lastEventId: null
+    lastEventId: null,
+    entraTenantId: null,
+    entraObjectId: null
   };
 }

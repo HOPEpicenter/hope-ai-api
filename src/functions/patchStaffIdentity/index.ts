@@ -46,7 +46,9 @@ export async function patchStaffIdentity(
       roleLabel: body.roleLabel,
       status: body.status,
       reason: body.reason,
-      actorId: body.actorId
+      actorId: body.actorId,
+      entraTenantId: body.entraTenantId,
+      entraObjectId: body.entraObjectId
     });
 
     if (!result.accepted) {

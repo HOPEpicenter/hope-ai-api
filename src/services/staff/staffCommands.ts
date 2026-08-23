@@ -4,12 +4,14 @@ import type {
   StaffEventData,
   StaffEventType
 } from "../../domain/staff/projectStaffDirectory";
+import { normalizeEntraStaffBinding } from "../../domain/staff/projectStaffDirectory";
 import type {
   StaffStatus
 } from "../operators/operatorIdentity";
 import { StaffEventsRepository } from "../../repositories/staffEventsRepository";
 import {
-  readCanonicalStaffIdentity
+  readCanonicalStaffIdentity,
+  readCanonicalStaffIdentityByEntraBinding
 } from "./readCanonicalStaffDirectory";
 
 type StaffEventWriter = Pick<StaffEventsRepository, "append">;
@@ -25,6 +27,8 @@ export type CreateStaffIdentityInput = {
   displayName: string;
   roleLabel?: string | null;
   actorId: string;
+  entraTenantId?: string | null;
+  entraObjectId?: string | null;
 };
 
 export type UpdateStaffIdentityInput = {
@@ -34,6 +38,8 @@ export type UpdateStaffIdentityInput = {
   status?: StaffStatus;
   reason?: string | null;
   actorId: string;
+  entraTenantId?: string | null;
+  entraObjectId?: string | null;
 };
 
 export type AcceptedStaffCommand = {
@@ -67,6 +73,43 @@ function normalizeOptionalText(
   const normalized = String(value ?? "").trim();
 
   return normalized || null;
+}
+
+function hasEntraBindingInput(input: {
+  entraTenantId?: string | null;
+  entraObjectId?: string | null;
+}): boolean {
+  return input.entraTenantId !== undefined || input.entraObjectId !== undefined;
+}
+
+function validateEntraBinding(input: {
+  entraTenantId?: string | null;
+  entraObjectId?: string | null;
+}):
+  | { ok: true; binding: { entraTenantId: string; entraObjectId: string } | null }
+  | { ok: false; error: string } {
+  if (!hasEntraBindingInput(input)) {
+    return { ok: true, binding: null };
+  }
+
+  if (
+    input.entraTenantId === undefined || input.entraTenantId === null ||
+    input.entraObjectId === undefined || input.entraObjectId === null
+  ) {
+    return {
+      ok: false,
+      error: "entraTenantId and entraObjectId must be provided together"
+    };
+  }
+
+  const binding = normalizeEntraStaffBinding(
+    input.entraTenantId,
+    input.entraObjectId
+  );
+
+  return binding
+    ? { ok: true, binding }
+    : { ok: false, error: "entraTenantId and entraObjectId must be valid GUIDs" };
 }
 
 function defaultEventId(): string {
@@ -118,8 +161,30 @@ export async function createStaffIdentity(
     };
   }
 
+  const entraBindingResult = validateEntraBinding(input);
+
+  if (!entraBindingResult.ok) {
+    return { accepted: false, status: 400, error: entraBindingResult.error };
+  }
+
   const repository =
     dependencies.repository ?? new StaffEventsRepository();
+
+  if (entraBindingResult.binding) {
+    const existingBinding = await readCanonicalStaffIdentityByEntraBinding(
+      entraBindingResult.binding.entraTenantId,
+      entraBindingResult.binding.entraObjectId,
+      repository
+    );
+
+    if (existingBinding) {
+      return {
+        accepted: false,
+        status: 409,
+        error: "Entra identity is already bound to a staff identity"
+      };
+    }
+  }
 
   const event = buildEvent({
     eventId: (dependencies.newEventId ?? defaultEventId)(),
@@ -131,7 +196,8 @@ export async function createStaffIdentity(
     data: {
       displayName,
       roleLabel: normalizeOptionalText(input.roleLabel) ?? null,
-      status: "active"
+      status: "active",
+      ...(entraBindingResult.binding ?? {})
     }
   });
 
@@ -195,11 +261,17 @@ export async function updateStaffIdentity(
 
   const roleLabel = normalizeOptionalText(input.roleLabel);
   const reason = normalizeOptionalText(input.reason);
+  const entraBindingResult = validateEntraBinding(input);
+
+  if (!entraBindingResult.ok) {
+    return { accepted: false, status: 400, error: entraBindingResult.error };
+  }
 
   const hasMutableField =
     displayName !== undefined ||
     roleLabel !== undefined ||
-    input.status !== undefined;
+    input.status !== undefined ||
+    hasEntraBindingInput(input);
 
   if (!hasMutableField) {
     return {
@@ -225,6 +297,30 @@ export async function updateStaffIdentity(
     };
   }
 
+  if (input.status === "inactive" && entraBindingResult.binding) {
+    return {
+      accepted: false,
+      status: 400,
+      error: "Entra identity cannot be rebound while deactivating staff"
+    };
+  }
+
+  if (entraBindingResult.binding) {
+    const existingBinding = await readCanonicalStaffIdentityByEntraBinding(
+      entraBindingResult.binding.entraTenantId,
+      entraBindingResult.binding.entraObjectId,
+      repository
+    );
+
+    if (existingBinding && existingBinding.staffId !== staffId) {
+      return {
+        accepted: false,
+        status: 409,
+        error: "Entra identity is already bound to a staff identity"
+      };
+    }
+  }
+
   const type: StaffEventType =
     input.status === "inactive"
       ? "staff.deactivated"
@@ -248,7 +344,8 @@ export async function updateStaffIdentity(
             : {}),
           ...(reason !== undefined
             ? { reason }
-            : {})
+            : {}),
+          ...(entraBindingResult.binding ?? {})
         };
 
   const event = buildEvent({

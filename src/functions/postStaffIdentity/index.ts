@@ -39,7 +39,9 @@ export async function postStaffIdentity(
     const result = await createStaffIdentity({
       displayName: body.displayName,
       roleLabel: body.roleLabel,
-      actorId: body.actorId
+      actorId: body.actorId,
+      entraTenantId: body.entraTenantId,
+      entraObjectId: body.entraObjectId
     });
 
     if (!result.accepted) {

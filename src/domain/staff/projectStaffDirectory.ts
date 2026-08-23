@@ -12,6 +12,8 @@ export type StaffEventData = {
   roleLabel?: string | null;
   status?: StaffStatus;
   reason?: string | null;
+  entraTenantId?: string | null;
+  entraObjectId?: string | null;
 };
 
 export type StaffEvent = {
@@ -31,10 +33,29 @@ export type CanonicalStaffIdentity = {
   createdAt: string | null;
   updatedAt: string | null;
   lastEventId: string | null;
+  entraTenantId: string | null;
+  entraObjectId: string | null;
 };
+
+const GUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function normalizeText(value: unknown): string {
   return String(value ?? "").trim();
+}
+
+export function normalizeEntraStaffBinding(
+  entraTenantId: unknown,
+  entraObjectId: unknown
+): { entraTenantId: string; entraObjectId: string } | null {
+  const tenantId = normalizeText(entraTenantId).toLowerCase();
+  const objectId = normalizeText(entraObjectId).toLowerCase();
+
+  if (!GUID_PATTERN.test(tenantId) || !GUID_PATTERN.test(objectId)) {
+    return null;
+  }
+
+  return { entraTenantId: tenantId, entraObjectId: objectId };
 }
 
 export function projectStaffDirectory(
@@ -56,6 +77,11 @@ export function projectStaffDirectory(
         continue;
       }
 
+      const entraBinding = normalizeEntraStaffBinding(
+        event.data.entraTenantId,
+        event.data.entraObjectId
+      );
+
       records.set(event.staffId, {
         staffId: event.staffId,
         displayName,
@@ -63,7 +89,9 @@ export function projectStaffDirectory(
         status: event.data.status ?? "active",
         createdAt: event.occurredAt,
         updatedAt: event.occurredAt,
-        lastEventId: event.eventId
+        lastEventId: event.eventId,
+        entraTenantId: entraBinding?.entraTenantId ?? null,
+        entraObjectId: entraBinding?.entraObjectId ?? null
       });
 
       continue;
@@ -76,6 +104,11 @@ export function projectStaffDirectory(
     }
 
     if (event.type === "staff.updated") {
+      const entraBinding = normalizeEntraStaffBinding(
+        event.data.entraTenantId,
+        event.data.entraObjectId
+      );
+
       records.set(event.staffId, {
         ...existing,
         displayName:
@@ -91,7 +124,17 @@ export function projectStaffDirectory(
             ? existing.status
             : event.data.status,
         updatedAt: event.occurredAt,
-        lastEventId: event.eventId
+        lastEventId: event.eventId,
+        entraTenantId:
+          event.data.entraTenantId === undefined &&
+          event.data.entraObjectId === undefined
+            ? existing.entraTenantId
+            : entraBinding?.entraTenantId ?? null,
+        entraObjectId:
+          event.data.entraTenantId === undefined &&
+          event.data.entraObjectId === undefined
+            ? existing.entraObjectId
+            : entraBinding?.entraObjectId ?? null
       });
 
       continue;

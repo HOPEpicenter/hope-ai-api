@@ -93,3 +93,6 @@ post*/
 !src/functions/post*/
 
 tmp-*.csv
+
+!getStaffIdentityByEntraBinding/
+!getStaffIdentityByEntraBinding/function.json

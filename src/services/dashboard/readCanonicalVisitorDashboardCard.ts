@@ -17,6 +17,34 @@ type ReadStaffIdentity = (
   staffId: string
 ) => Promise<{ displayName?: string | null } | null>;
 
+export function resolveCanonicalDashboardCareState(input: {
+  followupStatus: CanonicalVisitorDashboardCard["followupStatus"];
+  integrationNeedsFollowup: boolean | null | undefined;
+  integrationFollowupResolved: boolean | null | undefined;
+  riskNeedsFollowup: boolean | null | undefined;
+  riskRecommendedAction: string | null | undefined;
+}): {
+  followupResolved: boolean;
+  needsFollowup: boolean | null;
+  recommendedAction: string | null;
+} {
+  const followupResolved =
+    input.integrationFollowupResolved === true ||
+    input.followupStatus === "resolved";
+
+  return {
+    followupResolved,
+    needsFollowup: followupResolved
+      ? false
+      : input.integrationNeedsFollowup ??
+        input.riskNeedsFollowup ??
+        null,
+    recommendedAction: followupResolved
+      ? "Care follow-up completed"
+      : input.riskRecommendedAction ?? null
+  };
+}
+
 export function resolveCanonicalVisitorDisplayName(
   visitorId: string,
   visitor: unknown
@@ -113,8 +141,22 @@ export async function readCanonicalVisitorDashboardCard(
       : "clear";
 
   const risk = summary.engagement?.risk ?? null;
+  const integration =
+    summary.integration && typeof summary.integration === "object"
+      ? (summary.integration as {
+          needsFollowup?: boolean | null;
+          followupResolved?: boolean | null;
+        })
+      : null;
+  const careState = resolveCanonicalDashboardCareState({
+    followupStatus,
+    integrationNeedsFollowup: integration?.needsFollowup,
+    integrationFollowupResolved: integration?.followupResolved,
+    riskNeedsFollowup: risk?.engagement?.needsFollowup,
+    riskRecommendedAction: risk?.recommendedAction
+  });
   const priority = deriveFollowupPriority({
-    needsFollowup: risk?.engagement?.needsFollowup ?? null,
+    needsFollowup: careState.needsFollowup,
     riskLevel: risk?.riskLevel ?? null,
     riskScore: risk?.riskScore ?? null
   });
@@ -196,8 +238,9 @@ export async function readCanonicalVisitorDashboardCard(
     followupOverdue: followupUrgency === "OVERDUE",
     riskLevel: risk?.riskLevel ?? null,
     riskScore: risk?.riskScore ?? null,
-    needsFollowup: risk?.engagement?.needsFollowup ?? null,
-    recommendedAction: risk?.recommendedAction ?? null,
+    needsFollowup: careState.needsFollowup,
+    followupResolved: careState.followupResolved,
+    recommendedAction: careState.recommendedAction,
     priorityBand: priority.priorityBand,
     priorityScore: priority.priorityScore,
     priorityReason: priority.priorityReason

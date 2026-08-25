@@ -19,6 +19,18 @@ class InMemoryStaffRepository {
 async function run(): Promise<void> {
   const repository = new InMemoryStaffRepository([
     {
+      eventId: "evt-admin-created",
+      staffId: "staff-admin-1",
+      type: "staff.created",
+      occurredAt: "2026-08-25T11:00:00.000Z",
+      actorId: "staff-admin-1",
+      data: {
+        displayName: "Douglas Myrie",
+        roleLabel: "Administrator",
+        status: "active"
+      }
+    },
+    {
       eventId: "evt-create",
       staffId: "staff-audit-1",
       type: "staff.created",
@@ -65,6 +77,7 @@ async function run(): Promise<void> {
   assert.equal(audit[0]?.eventId, "evt-deactivate");
   assert.equal(audit[0]?.actorId, "staff-admin-1");
   assert.equal(audit[0]?.changes.reason, "Acceptance verification");
+  assert.equal(audit[0]?.actorDisplayName, "Douglas Myrie");
   assert.equal(audit[0]?.changes.entraBindingChanged, false);
   assert.equal(audit[1]?.eventId, "evt-create");
   assert.equal(audit[1]?.changes.entraBindingChanged, true);
@@ -74,6 +87,7 @@ async function run(): Promise<void> {
     "Audit output must not expose Entra identifiers"
   );
 
+  assert.equal(audit[1]?.actorDisplayName, "Douglas Myrie");
   const missing = await readStaffIdentityAudit(
     "staff-missing",
     repository as any

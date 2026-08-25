@@ -3,6 +3,7 @@ import type {
   StaffEventData,
   StaffEventType
 } from "../../domain/staff/projectStaffDirectory";
+import { projectStaffDirectory } from "../../domain/staff/projectStaffDirectory";
 import { StaffEventsRepository } from "../../repositories/staffEventsRepository";
 
 export type StaffIdentityAuditEntry = {
@@ -10,6 +11,7 @@ export type StaffIdentityAuditEntry = {
   type: StaffEventType;
   occurredAt: string;
   actorId: string;
+  actorDisplayName: string | null;
   changes: {
     displayName?: string;
     roleLabel?: string | null;
@@ -19,7 +21,10 @@ export type StaffIdentityAuditEntry = {
   };
 };
 
-function toAuditEntry(event: StaffEvent): StaffIdentityAuditEntry {
+function toAuditEntry(
+  event: StaffEvent,
+  actorDisplayName: string | null
+): StaffIdentityAuditEntry {
   const data: StaffEventData = event.data;
 
   return {
@@ -27,6 +32,7 @@ function toAuditEntry(event: StaffEvent): StaffIdentityAuditEntry {
     type: event.type,
     occurredAt: event.occurredAt,
     actorId: event.actorId,
+    actorDisplayName,
     changes: {
       ...(data.displayName === undefined
         ? {}
@@ -58,6 +64,13 @@ export async function readStaffIdentityAudit(
   }
 
   const events = await repo.listAll();
+  const actorDisplayNames = new Map(
+    projectStaffDirectory(events).map(identity => [
+      identity.staffId,
+      identity.displayName
+    ])
+  );
+
 
   return events
     .filter(event => event.staffId === normalizedStaffId)
@@ -66,5 +79,8 @@ export async function readStaffIdentityAudit(
         right.occurredAt.localeCompare(left.occurredAt) ||
         right.eventId.localeCompare(left.eventId)
     )
-    .map(toAuditEntry);
+    .map(event => toAuditEntry(
+      event,
+      actorDisplayNames.get(event.actorId) ?? null
+    ));
 }

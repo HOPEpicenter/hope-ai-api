@@ -23,32 +23,6 @@ jobs:
           node-version: "22"
           cache: "npm"
 
-      - name: Install Azure Functions Core Tools
-        shell: pwsh
-        run: |
-          $publicNpmConfig = Join-Path $env:RUNNER_TEMP "hope-public-npmrc"
-          @(
-            "registry=https://registry.npmjs.org/"
-            "always-auth=false"
-          ) | Set-Content -LiteralPath $publicNpmConfig -Encoding utf8
-
-          Remove-Item Env:NODE_AUTH_TOKEN -ErrorAction SilentlyContinue
-          Remove-Item Env:NPM_TOKEN -ErrorAction SilentlyContinue
-          Remove-Item Env:npm_config__authToken -ErrorAction SilentlyContinue
-
-          Push-Location $env:RUNNER_TEMP
-          try {
-            npm install -g azure-functions-core-tools@4 `
-              --unsafe-perm true `
-              --userconfig $publicNpmConfig `
-              --globalconfig $publicNpmConfig `
-              --registry=https://registry.npmjs.org/
-          } finally {
-            Pop-Location
-          }
-
-          func --version
-
       - name: Install dependencies
         run: npm ci
 
@@ -60,6 +34,9 @@ jobs:
 
       - name: Verify Functions layout
         run: npm run verify:layout
+
+      - name: Prepare runtime dependencies
+        run: npm prune --omit=dev
 
 
       - name: Validate Azure OIDC inputs
@@ -107,31 +84,51 @@ jobs:
 
           Write-Host "App settings updated via Azure CLI."
 
-          # Deploy with the same path used by repair-staging.ps1
-          Write-Host "Deploying via Azure Functions Core Tools publish..."
-          Write-Host "APP=$app"
+          # Build once in CI, then deploy the exact classic-Functions layout as a ZIP.
+          # This avoids the failing Functions Core Tools npm installation.
+          $packagePath = Join-Path $env:RUNNER_TEMP "$app.zip"
+          $functionDirectories = @(
+            Get-ChildItem -LiteralPath $env:GITHUB_WORKSPACE -Directory |
+              Where-Object {
+                Test-Path -LiteralPath (Join-Path $_.FullName "function.json")
+              } |
+              ForEach-Object { $_.FullName }
+          )
 
-          $published = $false
-          for ($attempt = 1; $attempt -le 2; $attempt++) {
-            Write-Host "func publish attempt $attempt/2 ..."
-            func azure functionapp publish $app --no-build --javascript
+          $deploymentItems = @(
+            (Join-Path $env:GITHUB_WORKSPACE "host.json")
+            (Join-Path $env:GITHUB_WORKSPACE "package.json")
+            (Join-Path $env:GITHUB_WORKSPACE "package-lock.json")
+            (Join-Path $env:GITHUB_WORKSPACE "dist")
+            (Join-Path $env:GITHUB_WORKSPACE "node_modules")
+          ) + $functionDirectories
 
-            if ($LASTEXITCODE -eq 0) {
-              $published = $true
-              break
-            }
-
-            if ($attempt -lt 2) {
-              Write-Host "func publish failed on attempt $attempt. Waiting 15 seconds before retry..."
-              Start-Sleep -Seconds 15
-            }
+          if ($functionDirectories.Count -eq 0) {
+            throw "No root function.json folders were found for deployment."
           }
 
-          if (-not $published) {
-            throw "func publish deployment failed after retry."
+          Compress-Archive `
+            -Path $deploymentItems `
+            -DestinationPath $packagePath `
+            -CompressionLevel Optimal `
+            -Force
+
+          if (-not (Test-Path -LiteralPath $packagePath)) {
+            throw "Deployment ZIP was not created: $packagePath"
           }
 
-          Write-Host "func publish command completed."
+          Write-Host "Deploying ZIP package to $app..."
+          az functionapp deployment source config-zip `
+            --resource-group $rg `
+            --name $app `
+            --src $packagePath `
+            --output none
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Azure ZIP deployment failed with exit code $LASTEXITCODE."
+          }
+
+          Write-Host "Azure ZIP deployment command completed."
 
           # Post-deploy health check (cold-start safe)
           $health = "https://hope-ai-api-staging.azurewebsites.net/api/version"

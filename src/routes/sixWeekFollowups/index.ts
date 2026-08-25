@@ -5,6 +5,7 @@ import { postSixWeekVisitorFollowup } from "../../functions/postSixWeekVisitorFo
 import { postSixWeekVisitorFollowupOwner } from "../../functions/postSixWeekVisitorFollowupOwner";
 import { postSixWeekVisitorFollowupStatus } from "../../functions/postSixWeekVisitorFollowupStatus";
 import { postSixWeekVisitorFollowupTaskOutcome } from "../../functions/postSixWeekVisitorFollowupTaskOutcome";
+import { postSixWeekVisitorFollowupHistoricalCareOutcome } from "../../functions/postSixWeekVisitorFollowupHistoricalCareOutcome";
 import { invokeFunction } from "../visitors/invokeFunction";
 
 export const sixWeekFollowupsRouter = Router();
@@ -42,6 +43,17 @@ sixWeekFollowupsRouter.post(
   (req, res, next) => {
     invokeFunction(
       postSixWeekVisitorFollowupTaskOutcome,
+      req,
+      res
+    ).catch(next);
+  }
+);
+
+sixWeekFollowupsRouter.post(
+  "/visitors/:visitorId/six-week-followup/tasks/:weekNumber/historical-care-outcome",
+  (req, res, next) => {
+    invokeFunction(
+      postSixWeekVisitorFollowupHistoricalCareOutcome,
       req,
       res
     ).catch(next);

@@ -5,6 +5,7 @@ export type SixWeekFollowupEventType =
   | "six_week_followup.owner_assigned"
   | "six_week_followup.task_completed"
   | "six_week_followup.task_skipped"
+  | "six_week_followup.task_care_outcome_recorded"
   | "six_week_followup.plan_paused"
   | "six_week_followup.plan_resumed"
   | "six_week_followup.plan_cancelled";
@@ -181,6 +182,7 @@ export function projectSixWeekVisitorFollowup(
   let cancellationReason: string | null = null;
 
   const taskEvents = new Map<number, SixWeekFollowupEvent>();
+  const taskCareOutcomeEvents = new Map<number, SixWeekFollowupEvent>();
 
   for (const event of ordered) {
     if (event.type === "six_week_followup.owner_assigned") {
@@ -220,6 +222,19 @@ export function projectSixWeekVisitorFollowup(
       ) {
         taskEvents.set(weekNumber, event);
       }
+
+      continue;
+    }
+
+    if (event.type === "six_week_followup.task_care_outcome_recorded") {
+      const weekNumber = Number(event.data.weekNumber);
+
+      if (
+        weekNumber === 6 &&
+        event.data.careOutcome
+      ) {
+        taskCareOutcomeEvents.set(weekNumber, event);
+      }
     }
   }
 
@@ -227,6 +242,7 @@ export function projectSixWeekVisitorFollowup(
 
   const tasks = SIX_WEEK_TASK_DEFINITIONS.map(definition => {
     const disposition = taskEvents.get(definition.weekNumber);
+    const careOutcomeEvent = taskCareOutcomeEvents.get(definition.weekNumber);
     const dueDate = addDays(firstVisitDate, definition.dueOffsetDays);
     let taskStatus: SixWeekTaskStatus;
 
@@ -250,7 +266,10 @@ export function projectSixWeekVisitorFollowup(
       completedAt: disposition?.occurredAt ?? null,
       completedBy: disposition?.actorId ?? null,
       contactMethod: disposition?.data.contactMethod ?? null,
-      careOutcome: disposition?.data.careOutcome ?? null,
+      careOutcome:
+        careOutcomeEvent?.data.careOutcome ??
+        disposition?.data.careOutcome ??
+        null,
       outcome: normalizeText(disposition?.data.outcome) || null,
       notes: normalizeText(disposition?.data.notes) || null
     };

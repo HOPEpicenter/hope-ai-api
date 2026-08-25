@@ -117,18 +117,58 @@ jobs:
             throw "Deployment ZIP was not created: $packagePath"
           }
 
+          $priorErrorActionPreference = $ErrorActionPreference
+          $ErrorActionPreference = "Continue"
+          $packageBefore = az functionapp config appsettings list `
+            --resource-group $rg `
+            --name $app `
+            --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value | [0]" `
+            --output tsv
+          $packageBeforeExitCode = $LASTEXITCODE
+          $ErrorActionPreference = $priorErrorActionPreference
+
+          if ($packageBeforeExitCode -ne 0) {
+            throw "Unable to read the current package pointer."
+          }
+
           Write-Host "Deploying ZIP package to $app..."
+          $ErrorActionPreference = "Continue"
           az functionapp deployment source config-zip `
             --resource-group $rg `
             --name $app `
             --src $packagePath `
             --output none
+          $zipDeploymentExitCode = $LASTEXITCODE
+          $ErrorActionPreference = $priorErrorActionPreference
 
-          if ($LASTEXITCODE -ne 0) {
-            throw "Azure ZIP deployment failed with exit code $LASTEXITCODE."
+          $ErrorActionPreference = "Continue"
+          $packageAfter = az functionapp config appsettings list `
+            --resource-group $rg `
+            --name $app `
+            --query "[?name=='WEBSITE_RUN_FROM_PACKAGE'].value | [0]" `
+            --output tsv
+          $packageAfterExitCode = $LASTEXITCODE
+          $ErrorActionPreference = $priorErrorActionPreference
+
+          if ($packageAfterExitCode -ne 0) {
+            throw "Unable to read the package pointer after deployment."
           }
 
-          Write-Host "Azure ZIP deployment command completed."
+          if (
+            [string]::IsNullOrWhiteSpace($packageAfter) -or
+            $packageAfter -eq $packageBefore
+          ) {
+            throw "ZIP deployment did not advance the package pointer."
+          }
+
+          if ($zipDeploymentExitCode -ne 0) {
+            Write-Warning (
+              "Kudu returned exit code $zipDeploymentExitCode after the " +
+              "package pointer advanced. Health verification will determine success."
+            )
+          } else {
+            Write-Host "Azure ZIP deployment command completed."
+          }
 
           # Post-deploy health check (cold-start safe)
           $health = "https://hope-ai-api-staging.azurewebsites.net/api/version"

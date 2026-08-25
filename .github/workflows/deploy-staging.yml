@@ -77,7 +77,6 @@ jobs:
             --resource-group $rg `
             --name $app `
             --settings `
-              WEBSITE_RUN_FROM_PACKAGE=1 `
               WEBSITES_ENABLE_APP_SERVICE_STORAGE=true `
               SCM_DO_BUILD_DURING_DEPLOYMENT=false `
               ENABLE_ORYX_BUILD=false | Out-Null

@@ -26,7 +26,17 @@ jobs:
       - name: Install Azure Functions Core Tools
         shell: pwsh
         run: |
-          npm install -g azure-functions-core-tools@4 --unsafe-perm true
+          $publicNpmConfig = Join-Path $env:RUNNER_TEMP "hope-public-npmrc"
+          @(
+            "registry=https://registry.npmjs.org/"
+            "always-auth=false"
+          ) | Set-Content -LiteralPath $publicNpmConfig -Encoding utf8
+
+          npm install -g azure-functions-core-tools@4 `
+            --unsafe-perm true `
+            --userconfig $publicNpmConfig `
+            --registry=https://registry.npmjs.org/
+
           func --version
 
       - name: Install dependencies

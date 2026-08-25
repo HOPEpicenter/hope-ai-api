@@ -21,8 +21,10 @@ This is a high-level inventory derived from PR history. Use code inspection for 
 | `/care/candidates/unassign-bulk` | Complete | Bulk care unassignment. |
 | `/activity-intelligence` | Complete | Ministry intelligence composition endpoint. |
 | `GET /staff-identities` | Complete | Canonical Staff Identity directory projected from seeded identities and immutable Staff events. |
-| `POST /staff-identities` | Locally verified | Creates dynamic Staff identities through `staff.created`; protected by the administrative API-key boundary. |
-| `PATCH /staff-identities/{staffId}` | Locally verified | Updates or deactivates Staff identities through immutable `staff.updated` and `staff.deactivated` events. |
+| `GET /staff-identities/entra/{entraTenantId}/{entraObjectId}` | Complete | Protected canonical Staff Identity lookup by Entra binding. |
+| `GET /staff-identities/{staffId}/audit` | Complete | Administrator-only, event-backed Staff administration history with sanitized Entra binding changes. |
+| `POST /staff-identities` | Complete | Creates dynamic Staff identities through `staff.created`; requires an active configured canonical administrator. |
+| `PATCH /staff-identities/{staffId}` | Complete | Updates, rebinds, deactivates, or reactivates Staff identities through immutable events; requires an active configured canonical administrator. |
 | `POST /visitors/{id}/six-week-followup` | Locally verified | Starts one consent-gated six-week staff follow-up plan per visitor. |
 | `GET /visitors/{id}/six-week-followup` | Locally verified | Reads the canonical plan and its six deterministic staff tasks. |
 | `GET /six-week-followups` | Locally verified | Lists active/paused plans as a staff work queue; due state is derived at read time. |

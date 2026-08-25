@@ -32,10 +32,20 @@ jobs:
             "always-auth=false"
           ) | Set-Content -LiteralPath $publicNpmConfig -Encoding utf8
 
-          npm install -g azure-functions-core-tools@4 `
-            --unsafe-perm true `
-            --userconfig $publicNpmConfig `
-            --registry=https://registry.npmjs.org/
+          Remove-Item Env:NODE_AUTH_TOKEN -ErrorAction SilentlyContinue
+          Remove-Item Env:NPM_TOKEN -ErrorAction SilentlyContinue
+          Remove-Item Env:npm_config__authToken -ErrorAction SilentlyContinue
+
+          Push-Location $env:RUNNER_TEMP
+          try {
+            npm install -g azure-functions-core-tools@4 `
+              --unsafe-perm true `
+              --userconfig $publicNpmConfig `
+              --globalconfig $publicNpmConfig `
+              --registry=https://registry.npmjs.org/
+          } finally {
+            Pop-Location
+          }
 
           func --version
 

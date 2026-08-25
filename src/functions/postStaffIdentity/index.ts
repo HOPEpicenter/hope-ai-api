@@ -7,8 +7,8 @@ import {
   logFunctionError
 } from "../../shared/observability/functionObservability";
 import {
-  requireAdminApiKeyForFunction
-} from "../_shared/adminApiKey";
+  requireAdminStaffActorForFunction
+} from "../_shared/adminStaffActor";
 
 export async function postStaffIdentity(
   context: any,
@@ -17,7 +17,7 @@ export async function postStaffIdentity(
   const requestId = getRequestId(req);
 
   try {
-    const auth = requireAdminApiKeyForFunction(req);
+    const auth = await requireAdminStaffActorForFunction(req);
 
     if (!auth.ok) {
       context.res = {
@@ -39,7 +39,7 @@ export async function postStaffIdentity(
     const result = await createStaffIdentity({
       displayName: body.displayName,
       roleLabel: body.roleLabel,
-      actorId: body.actorId,
+      actorId: auth.actorId,
       entraTenantId: body.entraTenantId,
       entraObjectId: body.entraObjectId
     });
@@ -76,7 +76,7 @@ export async function postStaffIdentity(
   } catch (err: any) {
     logFunctionError(context, "postStaffIdentity", err, {
       requestId,
-      actorId: req?.body?.actorId ?? null
+      actorId: null
     });
 
     context.res = {

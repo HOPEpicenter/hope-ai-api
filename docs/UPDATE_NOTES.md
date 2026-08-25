@@ -15,6 +15,23 @@
 > Do not duplicate current roadmap, pilot status, or architectural guidance in this document.
 
 ---
+## 2026-08-25 — Authoritative Staff Identity administration and audit
+
+Completed the Staff Identity onboarding authority boundary and administrator audit read surface.
+
+Included:
+
+- event-backed Entra tenant and object bindings on canonical Staff identities
+- protected canonical lookup by Entra binding
+- server-derived mutation actors; browser request bodies cannot choose `actorId`
+- Staff create, rebind, update, deactivate, and reactivate commands limited to configured, active canonical administrators
+- immutable administration-history read contract derived from Staff events
+- sanitized audit output that omits raw Entra binding identifiers
+- authenticated dashboard administration history presenter
+
+Acceptance verified that an administrator-created Staff identity can be deactivated and its event-backed creation and deactivation history is visible to an authenticated administrator.
+
+---
 ## 2026-08-19 — Six-week visitor follow-up backend foundation
 
 Opened the first approved Phase 2 visitor-retention slice.

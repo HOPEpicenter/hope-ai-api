@@ -79,6 +79,10 @@ Staff Identity v1 is now the backend identity boundary for care/followup ownersh
 
 The dashboard resolves owners through a centralized staff directory abstraction. The backend supports a projected, event-sourced Staff directory with administrative create, update, and deactivate commands. Dashboard Staff Administration and assignment workflows now consume the canonical projected Staff directory.
 
+Staff Identity administration is backend-authoritative. The dashboard derives the authenticated administrator identity and sends it only in a private server-to-server request; the browser cannot select or submit an `actorId`.
+
+Only configured administrators with active canonical Staff identities can create, bind or rebind Entra identities, deactivate, or reactivate Staff identities. Linked ordinary staff can perform authorized ministry actions but cannot administer Staff identities. Administration history is read from immutable Staff events and omits raw Entra binding identifiers.
+
 Care assignment and unassignment write canonical `FOLLOWUP_ASSIGNED` and `FOLLOWUP_UNASSIGNED` formation events. Current ownership is derived through projections, and actor provenance is preserved through the command contract.
 
 ### Test Records

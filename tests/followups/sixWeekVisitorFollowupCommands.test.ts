@@ -60,7 +60,8 @@ async function run(): Promise<void> {
     readAssignee: async (staffId: string) =>
       staffId === "staff-owner"
         ? { staffId, status: "active" as const }
-        : null
+        : null,
+    recordCareEvent: async () => undefined
   };
 
   const missingConsent = await startSixWeekVisitorFollowup(

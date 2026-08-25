@@ -15,6 +15,8 @@ export type SixWeekContactMethod =
   | "in_person"
   | "none";
 
+export type SixWeekCareOutcome = "connected" | "closed";
+
 export type SixWeekFollowupEventData = {
   firstVisitDate?: string;
   ownerStaffId?: string | null;
@@ -23,6 +25,7 @@ export type SixWeekFollowupEventData = {
   weekNumber?: number;
   contactMethod?: SixWeekContactMethod;
   outcome?: string;
+  careOutcome?: SixWeekCareOutcome | null;
   notes?: string | null;
   reason?: string | null;
 };

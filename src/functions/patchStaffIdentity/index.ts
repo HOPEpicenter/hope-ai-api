@@ -7,8 +7,8 @@ import {
   logFunctionError
 } from "../../shared/observability/functionObservability";
 import {
-  requireAdminApiKeyForFunction
-} from "../_shared/adminApiKey";
+  requireAdminStaffActorForFunction
+} from "../_shared/adminStaffActor";
 
 export async function patchStaffIdentity(
   context: any,
@@ -17,7 +17,7 @@ export async function patchStaffIdentity(
   const requestId = getRequestId(req);
 
   try {
-    const auth = requireAdminApiKeyForFunction(req);
+    const auth = await requireAdminStaffActorForFunction(req);
 
     if (!auth.ok) {
       context.res = {
@@ -46,7 +46,7 @@ export async function patchStaffIdentity(
       roleLabel: body.roleLabel,
       status: body.status,
       reason: body.reason,
-      actorId: body.actorId,
+      actorId: auth.actorId,
       entraTenantId: body.entraTenantId,
       entraObjectId: body.entraObjectId
     });
@@ -84,7 +84,7 @@ export async function patchStaffIdentity(
     logFunctionError(context, "patchStaffIdentity", err, {
       requestId,
       staffId: req?.params?.staffId ?? null,
-      actorId: req?.body?.actorId ?? null
+      actorId: null
     });
 
     context.res = {

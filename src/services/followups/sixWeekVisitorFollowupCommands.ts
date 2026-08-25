@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type {
+  SixWeekCareOutcome,
   SixWeekContactMethod,
   SixWeekFollowupEvent,
   SixWeekFollowupEventType,
@@ -16,6 +17,11 @@ import {
   readCanonicalStaffIdentity,
   readMutationActorStaffIdentity
 } from "../staff/readCanonicalStaffDirectory";
+import {
+  isSixWeekCareOutcome,
+  syncSixWeekTaskToCare,
+  type SixWeekCareEventRecorder
+} from "./syncSixWeekTaskToCare";
 
 type FollowupRepository = Pick<
   SixWeekFollowupEventsRepository,
@@ -34,6 +40,7 @@ export type SixWeekFollowupCommandDependencies = {
   visitorExists?: (visitorId: string) => Promise<boolean>;
   readActor?: (actorId: string) => Promise<StaffIdentity | null>;
   readAssignee?: (staffId: string) => Promise<StaffIdentity | null>;
+  recordCareEvent?: SixWeekCareEventRecorder;
 };
 
 export type SixWeekFollowupCommandSuccess = {
@@ -76,6 +83,7 @@ export type RecordSixWeekTaskOutcomeInput = {
   disposition: "completed" | "skipped";
   contactMethod: SixWeekContactMethod;
   outcome: string;
+  careOutcome?: SixWeekCareOutcome | null;
   notes?: string | null;
   actorId: string;
 };
@@ -333,6 +341,32 @@ export async function recordSixWeekTaskOutcome(
   if (!CONTACT_METHODS.has(input.contactMethod)) {
     return commandFailure(400, "contactMethod is invalid");
   }
+
+  const careOutcome = normalizeText(input.careOutcome).toLowerCase();
+  const verifiedCareContact =
+    input.disposition === "completed" && input.contactMethod !== "none";
+
+  if (careOutcome && !isSixWeekCareOutcome(careOutcome)) {
+    return commandFailure(
+      400,
+      "careOutcome must be connected or closed"
+    );
+  }
+
+  if (input.weekNumber !== 6 && careOutcome) {
+    return commandFailure(
+      400,
+      "careOutcome is only valid for week 6"
+    );
+  }
+
+  if (input.weekNumber === 6 && verifiedCareContact && !careOutcome) {
+    return commandFailure(
+      400,
+      "careOutcome is required for verified week 6 contact"
+    );
+  }
+
   if (!outcome) return commandFailure(400, "outcome is required");
   if (outcome.length > 160) {
     return commandFailure(400, "outcome must be 160 characters or fewer");
@@ -364,6 +398,21 @@ export async function recordSixWeekTaskOutcome(
 
   if (!task) return commandFailure(404, "Follow-up task not found");
   if (task.status === "completed" || task.status === "skipped") {
+    const storedTaskEvent = (
+      await repository.listByVisitor(visitorId)
+    ).find(
+      event =>
+        (event.type === "six_week_followup.task_completed" ||
+          event.type === "six_week_followup.task_skipped") &&
+        Number(event.data.weekNumber) === input.weekNumber
+    );
+
+    if (storedTaskEvent) {
+      await syncSixWeekTaskToCare(storedTaskEvent, {
+        recordCareEvent: dependencies.recordCareEvent
+      });
+    }
+
     return {
       accepted: true,
       status: 200,
@@ -386,24 +435,52 @@ export async function recordSixWeekTaskOutcome(
       ? "six_week_followup.task_completed"
       : "six_week_followup.task_skipped";
 
-  return appendAndProject({
+  const event: SixWeekFollowupEvent = {
+    eventId: (dependencies.newEventId ?? defaultEventId)(),
+    visitorId,
+    type: eventType,
+    occurredAt,
+    actorId,
+    data: {
+      weekNumber: input.weekNumber,
+      contactMethod: input.contactMethod,
+      outcome,
+      careOutcome: isSixWeekCareOutcome(careOutcome)
+        ? careOutcome
+        : null,
+      notes
+    }
+  };
+
+  const result = await appendAndProject({
     repository,
     asOf: occurredAt,
     successStatus: 202,
-    event: {
-      eventId: (dependencies.newEventId ?? defaultEventId)(),
-      visitorId,
-      type: eventType,
-      occurredAt,
-      actorId,
-      data: {
-        weekNumber: input.weekNumber,
-        contactMethod: input.contactMethod,
-        outcome,
-        notes
-      }
-    }
+    event
   });
+
+  if (!result.accepted) {
+    return result;
+  }
+
+  const storedTaskEvent = result.created
+    ? event
+    : (
+        await repository.listByVisitor(visitorId)
+      ).find(
+        item =>
+          (item.type === "six_week_followup.task_completed" ||
+            item.type === "six_week_followup.task_skipped") &&
+          Number(item.data.weekNumber) === input.weekNumber
+      );
+
+  if (storedTaskEvent) {
+    await syncSixWeekTaskToCare(storedTaskEvent, {
+      recordCareEvent: dependencies.recordCareEvent
+    });
+  }
+
+  return result;
 }
 
 export async function changeSixWeekFollowupStatus(

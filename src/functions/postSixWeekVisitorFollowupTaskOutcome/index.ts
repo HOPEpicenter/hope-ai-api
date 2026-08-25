@@ -36,6 +36,7 @@ export async function postSixWeekVisitorFollowupTaskOutcome(
       disposition: body.disposition,
       contactMethod: body.contactMethod,
       outcome: body.outcome,
+      careOutcome: body.careOutcome,
       notes: body.notes,
       actorId: body.actorId
     });

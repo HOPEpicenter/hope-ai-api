@@ -101,6 +101,7 @@ export type SixWeekFollowupTask = {
   completedAt: string | null;
   completedBy: string | null;
   contactMethod: SixWeekContactMethod | null;
+  careOutcome: SixWeekCareOutcome | null;
   outcome: string | null;
   notes: string | null;
 };
@@ -249,6 +250,7 @@ export function projectSixWeekVisitorFollowup(
       completedAt: disposition?.occurredAt ?? null,
       completedBy: disposition?.actorId ?? null,
       contactMethod: disposition?.data.contactMethod ?? null,
+      careOutcome: disposition?.data.careOutcome ?? null,
       outcome: normalizeText(disposition?.data.outcome) || null,
       notes: normalizeText(disposition?.data.notes) || null
     };

@@ -26,6 +26,7 @@ export type CanonicalVisitorDashboardCard = {
   riskLevel: string | null;
   riskScore: number | null;
   needsFollowup: boolean | null;
+  followupResolved: boolean;
   recommendedAction: string | null;
   priorityBand: "urgent" | "high" | "normal" | "low";
   priorityScore: number;

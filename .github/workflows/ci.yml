@@ -73,6 +73,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           npx ts-node tests/followups/projectSixWeekVisitorFollowup.test.ts
           npx ts-node tests/followups/sixWeekVisitorFollowupCommands.test.ts
+          npx ts-node tests/followups/confirmHistoricalSixWeekCareOutcome.test.ts
 
       - name: Dashboard visitor identity regression
         shell: pwsh

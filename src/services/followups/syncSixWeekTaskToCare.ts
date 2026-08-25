@@ -41,6 +41,62 @@ function narrativeFor(event: SixWeekFollowupEvent): string {
     .join("\n\n");
 }
 
+export async function syncHistoricalSixWeekTaskCareOutcomeToCare(
+  taskEvent: SixWeekFollowupEvent,
+  outcomeEvent: SixWeekFollowupEvent,
+  dependencies: SixWeekCareSyncDependencies = {}
+): Promise<SixWeekCareSyncResult> {
+  const contactResult = await syncSixWeekTaskToCare(
+    taskEvent,
+    dependencies
+  );
+  const careOutcome = isSixWeekCareOutcome(outcomeEvent.data.careOutcome)
+    ? outcomeEvent.data.careOutcome
+    : null;
+
+  if (
+    taskEvent.type !== "six_week_followup.task_completed" ||
+    Number(taskEvent.data.weekNumber) !== 6 ||
+    taskEvent.data.contactMethod === "none" ||
+    outcomeEvent.type !== "six_week_followup.task_care_outcome_recorded" ||
+    Number(outcomeEvent.data.weekNumber) !== 6 ||
+    !careOutcome
+  ) {
+    return contactResult;
+  }
+
+  const recordCareEvent =
+    dependencies.recordCareEvent ?? recordFormationEventV1;
+
+  await recordCareEvent({
+    v: 1,
+    eventId: `${outcomeEvent.eventId}:care-outcome`,
+    visitorId: taskEvent.visitorId,
+    type: "FOLLOWUP_OUTCOME_RECORDED",
+    occurredAt: outcomeEvent.occurredAt,
+    source: resolveMutationSource({
+      system: "six_week_followup",
+      actorId: outcomeEvent.actorId
+    }),
+    data: {
+      outcome: careOutcome,
+      notes: [taskEvent.data.outcome, taskEvent.data.notes, outcomeEvent.data.notes]
+        .map(normalizeText)
+        .filter(Boolean)
+        .join("\n\n"),
+      sixWeekWeekNumber: 6,
+      sixWeekEventId: outcomeEvent.eventId,
+      sixWeekSourceTaskEventId: taskEvent.eventId
+    }
+  });
+
+  return {
+    contactRecorded: contactResult.contactRecorded,
+    outcomeRecorded: true,
+    outcomeRequired: false
+  };
+}
+
 export async function syncSixWeekTaskToCare(
   event: SixWeekFollowupEvent,
   dependencies: SixWeekCareSyncDependencies = {}

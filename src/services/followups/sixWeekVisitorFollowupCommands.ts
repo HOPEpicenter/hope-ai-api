@@ -19,6 +19,7 @@ import {
 } from "../staff/readCanonicalStaffDirectory";
 import {
   isSixWeekCareOutcome,
+  syncHistoricalSixWeekTaskCareOutcomeToCare,
   syncSixWeekTaskToCare,
   type SixWeekCareEventRecorder
 } from "./syncSixWeekTaskToCare";
@@ -84,6 +85,14 @@ export type RecordSixWeekTaskOutcomeInput = {
   contactMethod: SixWeekContactMethod;
   outcome: string;
   careOutcome?: SixWeekCareOutcome | null;
+  notes?: string | null;
+  actorId: string;
+};
+
+export type ConfirmHistoricalSixWeekCareOutcomeInput = {
+  visitorId: string;
+  weekNumber: number;
+  careOutcome: SixWeekCareOutcome;
   notes?: string | null;
   actorId: string;
 };
@@ -479,6 +488,111 @@ export async function recordSixWeekTaskOutcome(
       recordCareEvent: dependencies.recordCareEvent
     });
   }
+
+  return result;
+}
+
+export async function confirmHistoricalSixWeekCareOutcome(
+  input: ConfirmHistoricalSixWeekCareOutcomeInput,
+  dependencies: SixWeekFollowupCommandDependencies = {}
+): Promise<SixWeekFollowupCommandResult> {
+  const visitorId = normalizeText(input.visitorId);
+  const actorId = normalizeText(input.actorId);
+  const careOutcome = normalizeText(input.careOutcome).toLowerCase();
+  const notes = normalizeText(input.notes) || null;
+
+  if (!visitorId) return commandFailure(400, "visitorId is required");
+  if (input.weekNumber !== 6) {
+    return commandFailure(400, "only historical week 6 care outcomes can be confirmed");
+  }
+  if (!isSixWeekCareOutcome(careOutcome)) {
+    return commandFailure(400, "careOutcome must be connected or closed");
+  }
+  if (notes && notes.length > 2000) {
+    return commandFailure(400, "notes must be 2000 characters or fewer");
+  }
+  if (!actorId) return commandFailure(400, "actorId is required");
+
+  const actorFailure = await requireActiveActor(actorId, dependencies);
+  if (actorFailure) return actorFailure;
+
+  const repository = repositoryFor(dependencies);
+  const events = await repository.listByVisitor(visitorId);
+  const plan = projectSixWeekVisitorFollowup(events);
+
+  if (!plan) return commandFailure(404, "Follow-up plan not found");
+
+  const taskEvent = events.find(
+    event =>
+      event.type === "six_week_followup.task_completed" &&
+      Number(event.data.weekNumber) === 6
+  );
+
+  if (!taskEvent) {
+    return commandFailure(409, "Week 6 must be completed before confirming a care outcome");
+  }
+  if (taskEvent.data.contactMethod === "none") {
+    return commandFailure(409, "Week 6 has no verified care contact");
+  }
+
+  const existingConfirmation = events.find(
+    event =>
+      event.type === "six_week_followup.task_care_outcome_recorded" &&
+      Number(event.data.weekNumber) === 6
+  );
+
+  if (existingConfirmation) {
+    await syncHistoricalSixWeekTaskCareOutcomeToCare(
+      taskEvent,
+      existingConfirmation,
+      { recordCareEvent: dependencies.recordCareEvent }
+    );
+
+    return {
+      accepted: true,
+      status: 200,
+      created: false,
+      eventId: existingConfirmation.eventId,
+      eventType: existingConfirmation.type,
+      plan
+    };
+  }
+
+  if (plan.tasks[5]?.careOutcome) {
+    return commandFailure(409, "Week 6 care outcome is already recorded");
+  }
+
+  const occurredAt = (
+    dependencies.now ?? (() => new Date().toISOString())
+  )();
+
+  const event: SixWeekFollowupEvent = {
+    eventId: (dependencies.newEventId ?? defaultEventId)(),
+    visitorId,
+    type: "six_week_followup.task_care_outcome_recorded",
+    occurredAt,
+    actorId,
+    data: {
+      weekNumber: 6,
+      careOutcome,
+      notes
+    }
+  };
+
+  const result = await appendAndProject({
+    repository,
+    asOf: occurredAt,
+    successStatus: 202,
+    event
+  });
+
+  if (!result.accepted) return result;
+
+  await syncHistoricalSixWeekTaskCareOutcomeToCare(
+    taskEvent,
+    event,
+    { recordCareEvent: dependencies.recordCareEvent }
+  );
 
   return result;
 }

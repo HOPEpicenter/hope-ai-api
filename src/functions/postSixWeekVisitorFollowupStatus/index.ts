@@ -1,4 +1,5 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
+import { resolveSixWeekAdministrativeOverride } from "../_shared/adminStaffActor";
 import {
   changeSixWeekFollowupStatus
 } from "../../services/followups/sixWeekVisitorFollowupCommands";
@@ -27,11 +28,25 @@ export async function postSixWeekVisitorFollowupStatus(
     }
 
     const body = req?.body ?? {};
+    const administrativeOverride =
+      await resolveSixWeekAdministrativeOverride(req);
+
+    if (!administrativeOverride.ok) {
+      context.res = {
+        status: administrativeOverride.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: administrativeOverride.body
+      };
+      return;
+    }
+
     const result = await changeSixWeekFollowupStatus({
       visitorId: req?.params?.visitorId,
       action: body.action,
       reason: body.reason,
-      actorId: body.actorId
+      actorId: administrativeOverride.actorId ?? body.actorId,
+      administrativeOverrideVerified:
+        administrativeOverride.administrativeOverrideVerified
     });
 
     context.res = {

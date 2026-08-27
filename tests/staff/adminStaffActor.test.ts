@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
-  requireAdminStaffActorForFunction
+  requireAdminStaffActorForFunction,
+  resolveSixWeekAdministrativeOverride
 } from "../../src/functions/_shared/adminStaffActor";
 
 function request(headers: Record<string, string>): any {
@@ -38,6 +39,37 @@ async function run(): Promise<void> {
     );
 
     assert.deepEqual(accepted, { ok: true, actorId: "staff-admin-1" });
+
+    const noOverride = await resolveSixWeekAdministrativeOverride(
+      request({}),
+      async () => null
+    );
+
+    assert.deepEqual(noOverride, { ok: true, actorId: null });
+
+    const verifiedOverride = await resolveSixWeekAdministrativeOverride(
+      request({
+        "x-admin-api-key": "test-admin-key",
+        "x-hope-admin-actor-id": "staff-admin-1"
+      }),
+      async staffId => ({
+        staffId,
+        displayName: "Pastor Administrator",
+        roleLabel: "Administrator",
+        status: "active",
+        createdAt: "2026-08-25T00:00:00.000Z",
+        updatedAt: "2026-08-25T00:00:00.000Z",
+        lastEventId: "evt-admin",
+        entraTenantId: null,
+        entraObjectId: null
+      })
+    );
+
+    assert.deepEqual(verifiedOverride, {
+      ok: true,
+      actorId: "staff-admin-1",
+      administrativeOverrideVerified: true
+    });
 
     const missingActor = await requireAdminStaffActorForFunction(
       request({ "x-admin-api-key": "test-admin-key" }),

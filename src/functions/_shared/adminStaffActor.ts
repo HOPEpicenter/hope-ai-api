@@ -11,6 +11,14 @@ export type RequiredAdminStaffActor =
   | { ok: true; actorId: string }
   | { ok: false; status: number; body: Record<string, unknown> };
 
+export type SixWeekAdministrativeOverride =
+  | {
+      ok: true;
+      actorId: string | null;
+      administrativeOverrideVerified?: true;
+    }
+  | { ok: false; status: number; body: Record<string, unknown> };
+
 function readHeader(req: any, name: string): string {
   const upperName = name.toUpperCase();
 
@@ -100,4 +108,32 @@ export async function requireAdminStaffActorForFunction(
   }
 
   return { ok: true, actorId: actor.staffId };
+}
+
+export async function resolveSixWeekAdministrativeOverride(
+  req: any,
+  readStaffIdentity: CanonicalStaffReader = readCanonicalStaffIdentity
+): Promise<SixWeekAdministrativeOverride> {
+  const hasAdministrativeHeaders =
+    Boolean(readHeader(req, "x-admin-api-key")) ||
+    Boolean(readHeader(req, "x-hope-admin-actor-id"));
+
+  if (!hasAdministrativeHeaders) {
+    return { ok: true, actorId: null };
+  }
+
+  const administrator = await requireAdminStaffActorForFunction(
+    req,
+    readStaffIdentity
+  );
+
+  if (!administrator.ok) {
+    return administrator;
+  }
+
+  return {
+    ok: true,
+    actorId: administrator.actorId,
+    administrativeOverrideVerified: true
+  };
 }

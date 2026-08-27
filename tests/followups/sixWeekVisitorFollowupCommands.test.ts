@@ -54,11 +54,13 @@ async function run(): Promise<void> {
     newEventId: () => `evt-${++eventNumber}`,
     visitorExists: async (visitorId: string) => visitorId === "visitor-1",
     readActor: async (staffId: string) =>
-      staffId === "staff-actor"
+      staffId === "staff-actor" ||
+      staffId === "staff-care-team"
         ? { staffId, status: "active" as const }
         : null,
     readAssignee: async (staffId: string) =>
-      staffId === "staff-owner"
+      staffId === "staff-owner" ||
+      staffId === "staff-actor"
         ? { staffId, status: "active" as const }
         : null,
     recordCareEvent: async () => undefined
@@ -115,7 +117,7 @@ async function run(): Promise<void> {
   assert.equal(duplicate.plan.firstVisitDate, "2026-08-19");
   assert.equal(repository.events.length, 1);
 
-  const assigned = await assignSixWeekFollowupOwner(
+  const prohibitedClaim = await assignSixWeekFollowupOwner(
     {
       visitorId: "visitor-1",
       ownerStaffId: "staff-owner",
@@ -124,9 +126,42 @@ async function run(): Promise<void> {
     dependencies
   );
 
+  assert.deepEqual(prohibitedClaim, {
+    accepted: false,
+    status: 403,
+    error: "A Care Team Staff member may only claim a follow-up plan for themselves"
+  });
+
+  const assigned = await assignSixWeekFollowupOwner(
+    {
+      visitorId: "visitor-1",
+      ownerStaffId: "staff-actor",
+      actorId: "staff-actor"
+    },
+    dependencies
+  );
+
   assert.equal(assigned.accepted, true);
   if (!assigned.accepted) throw new Error("Expected owner assignment.");
-  assert.equal(assigned.plan.ownerStaffId, "staff-owner");
+  assert.equal(assigned.plan.ownerStaffId, "staff-actor");
+
+  const otherCareTeamTask = await recordSixWeekTaskOutcome(
+    {
+      visitorId: "visitor-1",
+      weekNumber: 1,
+      disposition: "completed",
+      contactMethod: "call",
+      outcome: "Unauthorized attempt",
+      actorId: "staff-care-team"
+    },
+    dependencies
+  );
+
+  assert.deepEqual(otherCareTeamTask, {
+    accepted: false,
+    status: 403,
+    error: "Only the assigned follow-up owner may perform this action"
+  });
 
   const taskResult = await recordSixWeekTaskOutcome(
     {

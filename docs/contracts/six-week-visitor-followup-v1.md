@@ -1,6 +1,6 @@
 # Six-Week Visitor Follow-Up Contract v1
 
-**Status:** Backend foundation implemented  
+**Status:** Deployed and accepted for the controlled pilot
 **Owner:** HOPE backend  
 **Outbound communication:** None
 
@@ -34,6 +34,15 @@ The visitor card image that informed this phase contains real personal informati
 
 The backend derives `upcoming`, `due`, and `overdue` from the first-visit date and the read-time `asOf` timestamp. No timer function or background mutation loop is required.
 
+## Authorization and Accountability
+
+- The shared queue remains visible to active Staff; visibility does not confer mutation authority.
+- An unassigned plan may be claimed only when `ownerStaffId` equals the acting active Staff identity.
+- The assigned owner may record task outcomes and pause, resume, or cancel the plan.
+- Other active Staff receive `403` for owner-only actions.
+- Reassigning a claimed plan or overriding owner-only actions requires backend verification of both `x-admin-api-key` and `x-hope-admin-actor-id` against an active configured canonical administrator.
+- Client-submitted role, actor, or override fields do not create administrative authority.
+
 ## Canonical Events
 
 - `six_week_followup.plan_started`
@@ -55,9 +64,9 @@ All routes require `HOPE_API_KEY`.
 | `POST` | `/api/visitors/{visitorId}/six-week-followup` | Start the consented plan idempotently. |
 | `GET` | `/api/visitors/{visitorId}/six-week-followup` | Read the canonical plan and six tasks. |
 | `GET` | `/api/six-week-followups` | Read active/paused staff work for Today and Care. |
-| `POST` | `/api/visitors/{visitorId}/six-week-followup/owner` | Assign or reassign the responsible Staff identity. |
-| `POST` | `/api/visitors/{visitorId}/six-week-followup/tasks/{weekNumber}/outcome` | Complete or skip one weekly task with an outcome. |
-| `POST` | `/api/visitors/{visitorId}/six-week-followup/status` | Pause, resume, or cancel the plan. |
+| `POST` | `/api/visitors/{visitorId}/six-week-followup/owner` | Claim an unassigned plan as the acting Staff member; reassign a claimed plan only through verified administrator override. |
+| `POST` | `/api/visitors/{visitorId}/six-week-followup/tasks/{weekNumber}/outcome` | Complete or skip one weekly task as the assigned owner or verified administrator. |
+| `POST` | `/api/visitors/{visitorId}/six-week-followup/status` | Pause, resume, or cancel as the assigned owner or verified administrator. |
 
 ## Projection Rules
 
@@ -89,7 +98,6 @@ The dashboard must not:
 
 ## Deferred Work
 
-- Dashboard workflow implementation.
 - Retention reporting in Insights.
 - Intake-form consent and preferred-channel controls.
 - Isolated-environment end-to-end failure testing.

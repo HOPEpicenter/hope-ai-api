@@ -25,12 +25,12 @@ This is a high-level inventory derived from PR history. Use code inspection for 
 | `GET /staff-identities/{staffId}/audit` | Complete | Administrator-only, event-backed Staff administration history with sanitized Entra binding changes. |
 | `POST /staff-identities` | Complete | Creates dynamic Staff identities through `staff.created`; requires an active configured canonical administrator. |
 | `PATCH /staff-identities/{staffId}` | Complete | Updates, rebinds, deactivates, or reactivates Staff identities through immutable events; requires an active configured canonical administrator. |
-| `POST /visitors/{id}/six-week-followup` | Locally verified | Starts one consent-gated six-week staff follow-up plan per visitor. |
-| `GET /visitors/{id}/six-week-followup` | Locally verified | Reads the canonical plan and its six deterministic staff tasks. |
-| `GET /six-week-followups` | Locally verified | Lists active/paused plans as a staff work queue; due state is derived at read time. |
-| `POST /visitors/{id}/six-week-followup/owner` | Locally verified | Assigns or reassigns an active canonical Staff owner. |
-| `POST /visitors/{id}/six-week-followup/tasks/{weekNumber}/outcome` | Locally verified | Records one completed or skipped outcome for a weekly staff task. |
-| `POST /visitors/{id}/six-week-followup/status` | Locally verified | Pauses, resumes, or cancels the plan with audited actor attribution. |
+| `POST /visitors/{id}/six-week-followup` | Deployed and accepted | Starts one consent-gated six-week staff follow-up plan per visitor. |
+| `GET /visitors/{id}/six-week-followup` | Deployed and accepted | Reads the canonical plan and its six deterministic staff tasks. |
+| `GET /six-week-followups` | Deployed and accepted | Lists active/paused plans as a shared staff queue; due state is derived at read time. |
+| `POST /visitors/{id}/six-week-followup/owner` | Deployed and accepted | An active Staff member may self-claim an unassigned plan; reassignment requires backend-verified administrator override. |
+| `POST /visitors/{id}/six-week-followup/tasks/{weekNumber}/outcome` | Deployed and accepted | Records one completed or skipped outcome only for the assigned owner or backend-verified administrator. |
+| `POST /visitors/{id}/six-week-followup/status` | Deployed and accepted | Pauses, resumes, or cancels only for the assigned owner or backend-verified administrator. |
 | Opportunity worklists | Complete | Segment worklists, action reasons, resolution metadata, narrative. |
 | Protected ping / route parity | Complete | Express/Azure parity hardened. |
 

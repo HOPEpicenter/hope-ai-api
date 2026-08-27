@@ -1,0 +1,21 @@
+{
+  "bindings": [
+    {
+      "authLevel": "anonymous",
+      "type": "httpTrigger",
+      "direction": "in",
+      "name": "req",
+      "methods": [
+        "post"
+      ],
+      "route": "staff-identities/entra/{entraTenantId}/{entraObjectId}/activate"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ],
+  "scriptFile": "../dist/functions/postStaffInvitationActivation/index.js",
+  "entryPoint": "postStaffInvitationActivation"
+}

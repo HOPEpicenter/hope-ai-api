@@ -10,6 +10,12 @@ The system should answer:
 
 > Who should we communicate with, why should we communicate, what context matters, and how do we preserve relational continuity across ministry interactions?
 
+## Phase 5 Activation Boundary
+
+Phase 5 begins with backend-first policy and contract work. The first slice may define consent, preferences, staff-initiated communication intent/outcome, canonical audit events, and read projections.
+
+It must not send an email, SMS, or automated call; activate a provider; create a scheduler; or let the browser become an authority or orchestration engine. A delivery provider can be considered only in a separately approved slice with opt-out, rate-limit, cost, audit, and failure-handling design.
+
 ---
 
 ## Core Principle

@@ -1,3 +1,19 @@
+## 2026-08-27 Update — Six-week authorization deployment and synthetic acceptance
+
+What landed:
+
+- backend PR #1198 enforced shared-queue visibility with owner accountability;
+- dashboard PR #143 forwards server-verified administrator authority only;
+- unassigned plans may be claimed only by the acting active Staff member;
+- task outcomes and plan status changes require the assigned owner unless the backend verifies both administrator headers; and
+- staging synthetic acceptance passed for shared visibility, self-claim, owner-only task/status actions, other-Staff `403`, client-flag spoof rejection, and verified administrator override.
+
+Current rule:
+
+- six-week follow-up is deployed and accepted for the controlled pilot;
+- no outbound email, SMS, phone, provider integration, scheduler, or automatic communication is enabled; and
+- Phase 5 begins with communication policy and contract work before any delivery capability.
+
 ## 2026-08-19 Update — Approved six-week visitor retention staff-task slice
 
 Objective:

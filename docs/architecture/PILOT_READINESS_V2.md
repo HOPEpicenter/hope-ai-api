@@ -1,8 +1,8 @@
-# HOPE Pilot Readiness v2 — Revision 7
+# HOPE Pilot Readiness v2 — Revision 8
 
-Date: 2026-08-19
+Date: 2026-08-27
 
-Status: Controlled Pilot Authorized; Six-Week Staff-Task Foundation In Review
+Status: Controlled Pilot Authorized; Six-Week Staff-Task Workflow Deployed and Accepted
 
 ## Executive Summary
 
@@ -12,14 +12,14 @@ Core ministry workflows are implemented over verified backend contracts. Staff A
 
 Authenticated production end-to-end validation closed on 2026-08-19 with 13 core scenarios passed, 0 failed, and 3 safely blocked by deliberate production-safety constraints. The one material finding, TC-13 Visitor Snapshot identity convergence, was corrected in backend PR #1169 and passed the production retest. Controlled pilot launch remains authorized. Engineering remains frozen unless pilot evidence identifies a material blocker or a required launch-safety correction.
 
-A Phase 2 retention slice is now in review: a consent-gated, backend-authoritative six-week visitor follow-up plan that creates staff tasks only. It does not send visitor communications, introduce a paid service, or activate the existing OPS task-preview/orchestration surface. Dashboard adoption remains separate and must consume this contract without deriving task state.
+The consent-gated, backend-authoritative six-week visitor follow-up workflow is deployed and accepted with staff tasks only. Shared queue visibility remains intact; an unassigned plan may be claimed only by the acting active Staff member; task/status actions require the assigned owner; and administrator override requires backend verification of both `x-admin-api-key` and `x-hope-admin-actor-id`. It does not send visitor communications, introduce a paid service, or activate the existing OPS task-preview/orchestration surface. The dashboard consumes the backend contract without deriving task state or trusting client authority.
 
 ## Current Pilot Readiness
 
 | Area | Status | Notes |
 | --- | --- | --- |
 | Backend contracts | Complete | Verified dashboard contracts in use |
-| Six-Week Visitor Follow-Up v1 | In review | Backend event contract, deterministic staff tasks, owner/status/outcome commands, queue reads, and regression coverage; no outbound automation. |
+| Six-Week Visitor Follow-Up v1 | Deployed and accepted | Consent-gated deterministic staff tasks, shared queue, owner/status/outcome commands, backend-verified administrator override, CI, deployment, and synthetic acceptance passed; no outbound automation. |
 | Today Dashboard | Complete | Pastor-focused ministry command center |
 | People 360 | Complete | Unified ministry profile and timeline |
 | Journey Workspace | Complete | Ministry story and next-step presentation |
@@ -62,6 +62,19 @@ The three blocked scenarios are documented coverage limitations, not confirmed p
 TC-13 initially failed because the canonical visitor dashboard-card response omitted the current `displayName`, causing Visitor Snapshot to fall back to “Selected Person.” API PR #1169 added the backend-owned field and regression coverage. The production closure run then displayed the updated synthetic visitor name and passed TC-13.
 
 No confirmed production E2E defect remains open.
+
+## Six-Week Authorization Acceptance — 2026-08-27
+
+Backend PR #1198 and dashboard PR #143 are merged and deployed. Synthetic acceptance used only the labeled Sam Douglas test visitor and confirmed:
+
+- shared queue visibility for the active plan;
+- active Staff self-claim succeeds while cross-claim returns `403`;
+- a non-owner receives `403` for task and status actions;
+- the assigned owner can complete a task and pause/resume the plan;
+- a client-supplied override flag does not bypass authorization; and
+- an administrator override succeeds only after the backend verifies both required administrator headers and restores the recorded owner.
+
+No real ministry visitor data was changed during this acceptance.
 
 ## Architectural Decisions
 
@@ -206,4 +219,3 @@ Guardrails:
 - dashboard remains a presentation layer over backend truth
 
 The controlled pilot remains authorized while this isolated Phase 2 slice proceeds through review, CI, staging, and synthetic validation.
-

@@ -5,7 +5,9 @@ import type {
 export type StaffEventType =
   | "staff.created"
   | "staff.updated"
-  | "staff.deactivated";
+  | "staff.deactivated"
+  | "staff.invited"
+  | "staff.activated";
 
 export type StaffEventData = {
   displayName?: string;
@@ -70,7 +72,7 @@ export function projectStaffDirectory(
   );
 
   for (const event of ordered) {
-    if (event.type === "staff.created") {
+    if (event.type === "staff.created" || event.type === "staff.invited") {
       const displayName = normalizeText(event.data.displayName);
 
       if (!displayName || records.has(event.staffId)) {
@@ -103,7 +105,7 @@ export function projectStaffDirectory(
       continue;
     }
 
-    if (event.type === "staff.updated") {
+    if (event.type === "staff.updated" || event.type === "staff.activated") {
       const entraBinding = normalizeEntraStaffBinding(
         event.data.entraTenantId,
         event.data.entraObjectId

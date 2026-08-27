@@ -1,4 +1,4 @@
-export type StaffStatus = "active" | "inactive";
+export type StaffStatus = "pending" | "active" | "inactive";
 
 export const STAFF_IDENTITY_REGISTRY = [
   {

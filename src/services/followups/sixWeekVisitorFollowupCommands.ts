@@ -76,6 +76,7 @@ export type AssignSixWeekFollowupOwnerInput = {
   visitorId: string;
   ownerStaffId: string;
   actorId: string;
+  administrativeOverrideVerified?: true;
 };
 
 export type RecordSixWeekTaskOutcomeInput = {
@@ -87,6 +88,7 @@ export type RecordSixWeekTaskOutcomeInput = {
   careOutcome?: SixWeekCareOutcome | null;
   notes?: string | null;
   actorId: string;
+  administrativeOverrideVerified?: true;
 };
 
 export type ConfirmHistoricalSixWeekCareOutcomeInput = {
@@ -95,6 +97,7 @@ export type ConfirmHistoricalSixWeekCareOutcomeInput = {
   careOutcome: SixWeekCareOutcome;
   notes?: string | null;
   actorId: string;
+  administrativeOverrideVerified?: true;
 };
 
 export type ChangeSixWeekPlanStatusInput = {
@@ -102,6 +105,7 @@ export type ChangeSixWeekPlanStatusInput = {
   action: "pause" | "resume" | "cancel";
   reason?: string | null;
   actorId: string;
+  administrativeOverrideVerified?: true;
 };
 
 const CONTACT_METHODS = new Set<SixWeekContactMethod>([
@@ -179,6 +183,32 @@ function commandFailure(
   error: string
 ): SixWeekFollowupCommandFailure {
   return { accepted: false, status, error };
+}
+
+function requirePlanOwnerAuthorization(
+  plan: SixWeekVisitorFollowupPlan,
+  actorId: string,
+  administrativeOverrideVerified?: true
+): SixWeekFollowupCommandFailure | null {
+  if (administrativeOverrideVerified === true) {
+    return null;
+  }
+
+  if (!plan.ownerStaffId) {
+    return commandFailure(
+      403,
+      "Follow-up plan must be claimed by an active Staff member"
+    );
+  }
+
+  if (plan.ownerStaffId !== actorId) {
+    return commandFailure(
+      403,
+      "Only the assigned follow-up owner may perform this action"
+    );
+  }
+
+  return null;
 }
 
 async function appendAndProject(params: {
@@ -311,6 +341,26 @@ export async function assignSixWeekFollowupOwner(
   if (existing.status === "completed" || existing.status === "cancelled") {
     return commandFailure(409, "Follow-up plan is closed");
   }
+  if (existing.ownerStaffId) {
+    if (input.administrativeOverrideVerified !== true) {
+      if (existing.ownerStaffId === actorId) {
+        return commandFailure(409, "Follow-up plan already has an owner");
+      }
+
+      return commandFailure(
+        403,
+        "Only a verified ministry administrator may reassign a claimed follow-up plan"
+      );
+    }
+  } else if (
+    input.administrativeOverrideVerified !== true &&
+    ownerStaffId !== actorId
+  ) {
+    return commandFailure(
+      403,
+      "A Care Team Staff member may only claim a follow-up plan for themselves"
+    );
+  }
 
   const occurredAt = (
     dependencies.now ?? (() => new Date().toISOString())
@@ -394,6 +444,12 @@ export async function recordSixWeekTaskOutcome(
   );
 
   if (!existing) return commandFailure(404, "Follow-up plan not found");
+  const authorizationFailure = requirePlanOwnerAuthorization(
+    existing,
+    actorId,
+    input.administrativeOverrideVerified
+  );
+  if (authorizationFailure) return authorizationFailure;
   if (existing.status === "paused") {
     return commandFailure(409, "Follow-up plan is paused");
   }
@@ -521,6 +577,12 @@ export async function confirmHistoricalSixWeekCareOutcome(
   const plan = projectSixWeekVisitorFollowup(events);
 
   if (!plan) return commandFailure(404, "Follow-up plan not found");
+  const authorizationFailure = requirePlanOwnerAuthorization(
+    plan,
+    actorId,
+    input.administrativeOverrideVerified
+  );
+  if (authorizationFailure) return authorizationFailure;
 
   const taskEvent = events.find(
     event =>
@@ -623,6 +685,12 @@ export async function changeSixWeekFollowupStatus(
   );
 
   if (!existing) return commandFailure(404, "Follow-up plan not found");
+  const authorizationFailure = requirePlanOwnerAuthorization(
+    existing,
+    actorId,
+    input.administrativeOverrideVerified
+  );
+  if (authorizationFailure) return authorizationFailure;
   if (existing.status === "completed" || existing.status === "cancelled") {
     return commandFailure(409, "Follow-up plan is closed");
   }

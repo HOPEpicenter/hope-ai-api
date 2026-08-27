@@ -42,6 +42,14 @@ async function main(): Promise<void> {
       }
     },
     {
+      eventId: "plan-owner-assigned",
+      visitorId,
+      type: "six_week_followup.owner_assigned",
+      occurredAt: "2026-07-01T00:01:00.000Z",
+      actorId: "staff-confirming",
+      data: { ownerStaffId: "staff-confirming" }
+    },
+    {
       eventId: "week-six-completed",
       visitorId,
       type: "six_week_followup.task_completed",
@@ -107,7 +115,7 @@ async function main(): Promise<void> {
   assert.equal(retry.accepted, true);
   if (!retry.accepted) throw new Error("Expected idempotent confirmation.");
   assert.equal(retry.created, false);
-  assert.equal(repository.events.length, 3);
+  assert.equal(repository.events.length, 4);
 
   console.log("confirmHistoricalSixWeekCareOutcome.test.ts passed");
 }

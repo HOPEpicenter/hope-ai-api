@@ -8,6 +8,7 @@ import type {
 
 /** Phase 5 contract-only DTOs. Route implementation belongs to a later PR. */
 export type RecordMinistryCommunicationIntentRequestV1 = {
+  communicationId: string;
   channel: MinistryCommunicationChannel;
   intent: MinistryCommunicationIntent;
   context: "care" | "formation" | "six_week_followup" | "person_360";

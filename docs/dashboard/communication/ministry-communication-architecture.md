@@ -20,6 +20,8 @@ It must not send an email, SMS, or automated call; activate a provider; create a
 
 Phase 5.1 defines the default-off feature flag and canonical contracts. Phase 5.2 adds append-only backend event storage and deterministic replay projection for staff-recorded preferences, intents, outcomes, and cancellations. Neither slice exposes a mutation route or performs delivery.
 
+Phase 5.3 adds feature-gated backend read and recording routes. The caller must provide an active canonical Staff ID in the server-forwarded `x-hope-staff-actor-id` header; request-body actor fields are ignored.
+
 ---
 
 ## Core Principle

@@ -6,9 +6,45 @@ import { postSixWeekVisitorFollowupOwner } from "../../functions/postSixWeekVisi
 import { postSixWeekVisitorFollowupStatus } from "../../functions/postSixWeekVisitorFollowupStatus";
 import { postSixWeekVisitorFollowupTaskOutcome } from "../../functions/postSixWeekVisitorFollowupTaskOutcome";
 import { postSixWeekVisitorFollowupHistoricalCareOutcome } from "../../functions/postSixWeekVisitorFollowupHistoricalCareOutcome";
+import { ministryCommunications } from "../../functions/ministryCommunications";
 import { invokeFunction } from "../visitors/invokeFunction";
 
 export const sixWeekFollowupsRouter = Router();
+
+sixWeekFollowupsRouter.get(
+  "/visitors/:visitorId/ministry-communications",
+  (req, res, next) => {
+    invokeFunction(ministryCommunications, req, res).catch(next);
+  }
+);
+
+sixWeekFollowupsRouter.post(
+  "/visitors/:visitorId/ministry-communications/preferences",
+  (req, res, next) => {
+    invokeFunction(ministryCommunications, req, res).catch(next);
+  }
+);
+
+sixWeekFollowupsRouter.post(
+  "/visitors/:visitorId/ministry-communications/intents",
+  (req, res, next) => {
+    invokeFunction(ministryCommunications, req, res).catch(next);
+  }
+);
+
+sixWeekFollowupsRouter.post(
+  "/visitors/:visitorId/ministry-communications/:communicationId/outcome",
+  (req, res, next) => {
+    invokeFunction(ministryCommunications, req, res).catch(next);
+  }
+);
+
+sixWeekFollowupsRouter.post(
+  "/visitors/:visitorId/ministry-communications/:communicationId/cancel",
+  (req, res, next) => {
+    invokeFunction(ministryCommunications, req, res).catch(next);
+  }
+);
 
 sixWeekFollowupsRouter.get(
   "/six-week-followups",

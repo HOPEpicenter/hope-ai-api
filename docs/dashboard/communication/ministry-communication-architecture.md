@@ -16,6 +16,10 @@ Phase 5 begins with backend-first policy and contract work. The first slice may 
 
 It must not send an email, SMS, or automated call; activate a provider; create a scheduler; or let the browser become an authority or orchestration engine. A delivery provider can be considered only in a separately approved slice with opt-out, rate-limit, cost, audit, and failure-handling design.
 
+### Implemented foundation
+
+Phase 5.1 defines the default-off feature flag and canonical contracts. Phase 5.2 adds append-only backend event storage and deterministic replay projection for staff-recorded preferences, intents, outcomes, and cancellations. Neither slice exposes a mutation route or performs delivery.
+
 ---
 
 ## Core Principle

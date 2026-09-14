@@ -118,14 +118,14 @@ export async function getActivityIntelligence(
     });
 
     const phase5Enabled = getFeatureFlags().phase5Communications;
+    const retentionAsOf = new Date().toISOString();
     const sixWeekRetention = phase5Enabled
       ? deriveSixWeekRetentionSummary(
           projectSixWeekVisitorFollowups(
-            await new SixWeekFollowupEventsRepository().listAll()
+            await new SixWeekFollowupEventsRepository().listAll(),
+            retentionAsOf
           ),
-          new Date().toISOString()
-        ),
-          new Date().toISOString()
+          retentionAsOf
         )
       : null;
 

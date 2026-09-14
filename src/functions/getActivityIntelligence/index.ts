@@ -119,14 +119,24 @@ export async function getActivityIntelligence(
 
     const phase5Enabled = getFeatureFlags().phase5Communications;
     const retentionAsOf = new Date().toISOString();
-    const sixWeekRetention = phase5Enabled
-      ? deriveSixWeekRetentionSummary(
-          projectSixWeekVisitorFollowups(
-            await new SixWeekFollowupEventsRepository().listAll(),
-            retentionAsOf
-          ),
+    const projectedSixWeekPlans = phase5Enabled
+      ? projectSixWeekVisitorFollowups(
+          await new SixWeekFollowupEventsRepository().listAll(),
           retentionAsOf
         )
+      : [];
+    const realSixWeekPlans = phase5Enabled
+      ? (await Promise.all(
+          projectedSixWeekPlans.map(async plan => ({
+            plan,
+            visitor: await getVisitorById(plan.visitorId)
+          }))
+        ))
+          .filter(entry => entry.visitor !== null && !isSyntheticVisitorRecord(entry.visitor))
+          .map(entry => entry.plan)
+      : [];
+    const sixWeekRetention = phase5Enabled
+      ? deriveSixWeekRetentionSummary(realSixWeekPlans, retentionAsOf)
       : null;
 
     context.res = {

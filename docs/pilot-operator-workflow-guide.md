@@ -74,9 +74,11 @@ incorrect or duplicate record
 
 ### Important Outcome Behavior
 
-Recording a followup outcome is currently a terminal action for the active followup assignment.
+Most followup outcomes resolve the active followup assignment.
 
-After an outcome is recorded:
+`no response` is a non-terminal contact attempt. Record it only after a real attempt, then follow the current care and followup context for the next action.
+
+After a terminal outcome is recorded:
 
 - The visitor leaves the active Ready Care queue.
 - The followup is treated as resolved for the current assignment.

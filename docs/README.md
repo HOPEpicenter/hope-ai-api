@@ -27,6 +27,7 @@ Historical documents may record completed work, but they must not define current
 | What work remains before pilot? | `architecture/PILOT_READINESS_BOARD.md` |
 | Why was an architectural choice made? | `architecture/DECISIONS.md` |
 | What evidence supports the final pilot decision? | `architecture/PILOT_ACCEPTANCE_REPORT.md` |
+| How should staff start the controlled pilot and enter the first real visitor? | `pilot-start-package.md` |
 | What changed historically? | `UPDATE_NOTES.md` |
 | What engineering work was completed historically? | `master-checklist.md` |
 

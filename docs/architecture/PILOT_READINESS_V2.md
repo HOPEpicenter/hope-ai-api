@@ -76,6 +76,26 @@ Backend PR #1198 and dashboard PR #143 are merged and deployed. Synthetic accept
 
 No real ministry visitor data was changed during this acceptance.
 
+
+## Phase 5.6 Communications Preview Acceptance — 2026-09-06
+
+Phase 5.6 preview acceptance is complete. It verified staff-authored communications preview behavior only; it did not enable or invoke any delivery capability.
+
+### Verified Acceptance Lane
+
+Use the fixed, authenticated staging dashboard for all Entra-authenticated synthetic acceptance:
+
+`https://mango-moss-087f3e10f.3.azurestaticapps.net`
+
+Do not use dynamic Azure Static Web Apps pull-request preview URLs as an Entra-authenticated acceptance lane. Their changing hosts are not part of the registered callback and acceptance configuration.
+
+### Verified Result and Guardrails
+
+Acceptance used only the synthetic visitor `491eced3-ad8a-406c-b65c-34610aae792e` (`ZZ PILOT CARE TEST 20260827`). The authenticated staging UI recorded permission controls, a `Not Sent` outcome, and a cancelled item.
+
+No provider, email, phone call, or text delivery was invoked. No real ministry data was changed.
+
+Dashboard PRs #146, #148, #150, #151, and #152 established and exercised the controlled preview configuration. PR #152 restored the fixed staging dashboard to its default-off state and merged at `e894f8c2baaca1b0d02b34ab86029866a440cb35`; its staging deployment succeeded. Backend staging `FEATURE_PHASE5_COMMUNICATIONS`, the staging dashboard Phase 5 configuration, and production are all restored to default-off.
 ## Architectural Decisions
 
 ### Display Layer

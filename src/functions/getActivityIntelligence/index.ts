@@ -1,4 +1,5 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
+import { getFeatureFlags } from "../../config/featureFlags";
 import {
   ensureTable,
   getFormationProfilesTableClient,
@@ -11,6 +12,9 @@ import { readCareCandidateList } from "../../services/care/readCareCandidateList
 import { readCanonicalOpsFollowupsNarrative } from "../../services/followups/readCanonicalOpsFollowupsNarrative";
 import { buildActivityIntelligence } from "../../services/intelligence/activityIntelligenceService";
 import { getFormationEventsTableClient } from "../../storage/formation/formationTables";
+import { SixWeekFollowupEventsRepository } from "../../repositories/sixWeekFollowupEventsRepository";
+import { projectSixWeekVisitorFollowups } from "../../domain/followups/projectSixWeekVisitorFollowup";
+import { deriveSixWeekRetentionSummary } from "../../services/followups/deriveSixWeekRetentionSummary";
 import {
   apiErrorBody,
   getRequestId,
@@ -113,6 +117,28 @@ export async function getActivityIntelligence(
       formationProfiles: validProfiles
     });
 
+    const phase5Enabled = getFeatureFlags().phase5Communications;
+    const retentionAsOf = new Date().toISOString();
+    const projectedSixWeekPlans = phase5Enabled
+      ? projectSixWeekVisitorFollowups(
+          await new SixWeekFollowupEventsRepository().listAll(),
+          retentionAsOf
+        )
+      : [];
+    const realSixWeekPlans = phase5Enabled
+      ? (await Promise.all(
+          projectedSixWeekPlans.map(async plan => ({
+            plan,
+            visitor: await getVisitorById(plan.visitorId)
+          }))
+        ))
+          .filter(entry => entry.visitor !== null && !isSyntheticVisitorRecord(entry.visitor))
+          .map(entry => entry.plan)
+      : [];
+    const sixWeekRetention = phase5Enabled
+      ? deriveSixWeekRetentionSummary(realSixWeekPlans, retentionAsOf)
+      : null;
+
     context.res = {
       status: 200,
       headers: { "content-type": "application/json; charset=utf-8" },
@@ -124,6 +150,7 @@ export async function getActivityIntelligence(
           ...intelligence.followups,
           owners: followups.owners
         },
+        sixWeekRetention,
         projectionIntegrity: {
           orphanProfilesExcluded
         }

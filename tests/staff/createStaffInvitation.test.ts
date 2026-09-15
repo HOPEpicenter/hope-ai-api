@@ -63,6 +63,7 @@ async function run(): Promise<void> {
       displayName: "Pastor Invitee",
       roleLabel: "Care Team",
       status: "pending",
+      email: "invitee@example.org",
       entraTenantId: "783ef4b1-7e96-4a71-80dd-06865b015da9",
       entraObjectId: "c1717a19-c719-4ed2-8b72-e013800095de"
     }

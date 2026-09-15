@@ -158,6 +158,7 @@ export async function createStaffInvitation(
       displayName,
       roleLabel: normalizeOptionalText(input.roleLabel),
       status: "pending",
+      email,
       ...binding
     }
   };

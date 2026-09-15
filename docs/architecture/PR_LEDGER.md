@@ -65,6 +65,8 @@
 | #59 | 2026-07-02 | Polish Person 360 ministry experience |
 | #60 | 2026-07-02 | Polish Journey story language |
 | #62 | 2026-07-02 | Polish Insights ministry readiness copy |
+| #157 | 2026-09-15 | feat(staff): manage admin contact details |
+| #158 | 2026-09-15 | fix(staff): preserve null contact fields |
 
 ## API PR Waves
 
@@ -267,3 +269,12 @@ Merged PR count: 3
 | #1167 | 2026-08-11 | docs: reconcile final pilot readiness |
 | #1168 | 2026-08-11 | docs: authorize controlled pilot launch |
 | #1169 | 2026-08-19 | Fix visitor identity in dashboard cards |
+
+### Staff contact identity and invitation email continuation (#1207-#1208)
+
+Merged PR count: 2
+
+| PR | Merged | Title |
+|---:|---|---|
+| #1207 | 2026-09-15 | Add canonical staff contact details |
+| #1208 | 2026-09-15 | fix(staff): retain invitation email in event |

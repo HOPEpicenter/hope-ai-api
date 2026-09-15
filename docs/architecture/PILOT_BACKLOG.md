@@ -75,7 +75,7 @@ No confirmed production E2E defect remains open.
 
 ## P5 - Six-Week Visitor Retention Staff Tasks
 
-Status: Backend foundation in review
+Status: Complete — deployed and accepted with staff tasks only
 
 Scope:
 
@@ -87,7 +87,10 @@ Scope:
 - Do not send email, text, or call a visitor automatically.
 - Keep dashboard adoption and controlled-pilot validation as separate follow-up slices.
 
-Success gate:
+Verified result:
 
-- Backend build, focused regression tests, full CI, staging deployment, and synthetic-data verification must pass before dashboard adoption.
+- Backend PR #1198 and dashboard PR #143 deployed the consent-gated, backend-authoritative staff-task workflow.
+- Synthetic authorization acceptance passed on 2026-08-27.
+- Read-only cross-workspace production acceptance confirmed the active plan and current staff task remain consistent across Today, Person 360, Journey, Care, and Insights.
+- No outbound communication automation, scheduler, or real-ministry-data test was introduced.
 

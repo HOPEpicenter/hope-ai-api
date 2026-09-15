@@ -110,6 +110,19 @@ Merged PR count: 16
 | #60 | 2026-07-02 | Polish Journey story language |
 | #62 | 2026-07-02 | Polish Insights ministry readiness copy |
 
+### Staff administration contact details
+
+Status: Complete
+PR range: #157-#158
+Merged PR count: 2
+
+| PR | Merged | Title |
+|---:|---|---|
+| #157 | 2026-09-15 | feat(staff): manage admin contact details |
+| #158 | 2026-09-15 | fix(staff): preserve null contact fields |
+
+The dashboard presents optional Staff email and phone details only in Admin → Staff Management. Administrators can add, update, or clear the fields through the existing authorized Staff Identity PATCH proxy. JSON `null` is preserved for cleared fields; the dashboard does not show Staff contact details in pastor-facing ministry workspaces.
+
 ## Page Readiness
 
 | Page | Status | Backend Source | Remaining Pilot Work |

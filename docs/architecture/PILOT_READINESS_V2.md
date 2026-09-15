@@ -33,7 +33,7 @@ The consent-gated, backend-authoritative six-week visitor follow-up workflow is 
 | Test Record Filtering | Complete | Engineering/test data hidden from key ministry views; this intentionally blocks synthetic Care outcome execution in production. |
 | Visitor CRUD | Complete | Person create/edit workflow in dashboard |
 | Editable Notes | Complete | Backend event-sourced audited editing and dashboard correction workflow implemented |
-| Staff Identity v1 | Complete | Canonical staff identity abstraction and assignment validation |
+| Staff Identity v1 | Complete | Canonical event-backed staff identity, assignment validation, and optional administrator-managed email and phone fields. Future invitations retain the normalized invitation email. |
 | Staff Administration | Complete | Event-sourced Staff Administration is implemented across the backend and dashboard. Canonical Staff Identity powers administration, assignment, and display throughout Ministry OS. |
 | Canonical Care Ownership | Complete | Assignment and unassignment now write canonical formation events and update derived ministry projections. |
 | Ownership Actor Provenance | Complete | Dashboard care ownership commands send actor identity through the verified backend contract. |
@@ -76,6 +76,14 @@ Backend PR #1198 and dashboard PR #143 are merged and deployed. Synthetic accept
 
 No real ministry visitor data was changed during this acceptance.
 
+
+## Staff Contact Details and Production Workflow Acceptance — 2026-09-15
+
+Backend PR #1207 added optional event-backed `email` and `phone` fields to Canonical Staff Identity. Backend PR #1208 ensures future `staff.invited` events retain the normalized invitation email. Both backend PRs passed CI and production and staging deployments.
+
+Dashboard PR #157 added Administrator-only display and editing of Staff contact details through the existing authorized Staff Identity PATCH proxy. Dashboard PR #158 corrected the proxy so JSON `null` clears a contact field instead of persisting the literal text `null`. Both dashboard PRs passed lint, build, PR validation, and production deployment.
+
+A read-only production acceptance used only synthetic visitor `491eced3-ad8a-406c-b65c-34610aae792e` (`ZZ PILOT CARE TEST 20260827`) and confirmed continuity across Today, People / Person 360, Journey, Care, and Insights. The pages agreed on the current journey, care owner, recorded activity, six-week staff task, and next-step state. No real ministry data was changed during this acceptance.
 
 ## Phase 5.6 Communications Preview Acceptance — 2026-09-06
 

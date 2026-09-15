@@ -29,6 +29,8 @@ export type CreateStaffIdentityInput = {
   actorId: string;
   entraTenantId?: string | null;
   entraObjectId?: string | null;
+  email?: string | null;
+  phone?: string | null;
 };
 
 export type UpdateStaffIdentityInput = {
@@ -40,6 +42,8 @@ export type UpdateStaffIdentityInput = {
   actorId: string;
   entraTenantId?: string | null;
   entraObjectId?: string | null;
+  email?: string | null;
+  phone?: string | null;
 };
 
 export type AcceptedStaffCommand = {
@@ -73,6 +77,16 @@ function normalizeOptionalText(
   const normalized = String(value ?? "").trim();
 
   return normalized || null;
+}
+
+function normalizeOptionalEmail(
+  value: unknown
+): string | null | undefined {
+  const normalized = normalizeOptionalText(value);
+
+  return typeof normalized === "string"
+    ? normalized.toLowerCase()
+    : normalized;
 }
 
 function hasEntraBindingInput(input: {
@@ -167,6 +181,8 @@ export async function createStaffIdentity(
     return { accepted: false, status: 400, error: entraBindingResult.error };
   }
 
+  const email = normalizeOptionalEmail(input.email);
+  const phone = normalizeOptionalText(input.phone);
   const repository =
     dependencies.repository ?? new StaffEventsRepository();
 
@@ -197,7 +213,9 @@ export async function createStaffIdentity(
       displayName,
       roleLabel: normalizeOptionalText(input.roleLabel) ?? null,
       status: "active",
-      ...(entraBindingResult.binding ?? {})
+      ...(entraBindingResult.binding ?? {}),
+      ...(email !== undefined ? { email } : {}),
+      ...(phone !== undefined ? { phone } : {})
     }
   });
 
@@ -262,6 +280,8 @@ export async function updateStaffIdentity(
   const roleLabel = normalizeOptionalText(input.roleLabel);
   const reason = normalizeOptionalText(input.reason);
   const entraBindingResult = validateEntraBinding(input);
+  const email = normalizeOptionalEmail(input.email);
+  const phone = normalizeOptionalText(input.phone);
 
   if (!entraBindingResult.ok) {
     return { accepted: false, status: 400, error: entraBindingResult.error };
@@ -271,6 +291,8 @@ export async function updateStaffIdentity(
     displayName !== undefined ||
     roleLabel !== undefined ||
     input.status !== undefined ||
+    email !== undefined ||
+    phone !== undefined ||
     hasEntraBindingInput(input);
 
   if (!hasMutableField) {
@@ -345,7 +367,9 @@ export async function updateStaffIdentity(
           ...(reason !== undefined
             ? { reason }
             : {}),
-          ...(entraBindingResult.binding ?? {})
+          ...(entraBindingResult.binding ?? {}),
+          ...(email !== undefined ? { email } : {}),
+          ...(phone !== undefined ? { phone } : {})
         };
 
   const event = buildEvent({

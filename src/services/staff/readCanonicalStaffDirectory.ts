@@ -93,6 +93,8 @@ export async function readMutationActorStaffIdentity(
     updatedAt: null,
     lastEventId: null,
     entraTenantId: null,
-    entraObjectId: null
+    entraObjectId: null,
+    email: null,
+    phone: null
   };
 }

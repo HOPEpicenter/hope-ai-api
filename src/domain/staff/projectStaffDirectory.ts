@@ -16,6 +16,8 @@ export type StaffEventData = {
   reason?: string | null;
   entraTenantId?: string | null;
   entraObjectId?: string | null;
+  email?: string | null;
+  phone?: string | null;
 };
 
 export type StaffEvent = {
@@ -37,6 +39,8 @@ export type CanonicalStaffIdentity = {
   lastEventId: string | null;
   entraTenantId: string | null;
   entraObjectId: string | null;
+  email: string | null;
+  phone: string | null;
 };
 
 const GUID_PATTERN =
@@ -44,6 +48,14 @@ const GUID_PATTERN =
 
 function normalizeText(value: unknown): string {
   return String(value ?? "").trim();
+}
+
+function normalizeEmail(value: unknown): string | null {
+  return normalizeText(value).toLowerCase() || null;
+}
+
+function normalizePhone(value: unknown): string | null {
+  return normalizeText(value) || null;
 }
 
 export function normalizeEntraStaffBinding(
@@ -93,7 +105,9 @@ export function projectStaffDirectory(
         updatedAt: event.occurredAt,
         lastEventId: event.eventId,
         entraTenantId: entraBinding?.entraTenantId ?? null,
-        entraObjectId: entraBinding?.entraObjectId ?? null
+        entraObjectId: entraBinding?.entraObjectId ?? null,
+        email: normalizeEmail(event.data.email),
+        phone: normalizePhone(event.data.phone)
       });
 
       continue;
@@ -136,7 +150,15 @@ export function projectStaffDirectory(
           event.data.entraTenantId === undefined &&
           event.data.entraObjectId === undefined
             ? existing.entraObjectId
-            : entraBinding?.entraObjectId ?? null
+            : entraBinding?.entraObjectId ?? null,
+        email:
+          event.data.email === undefined
+            ? existing.email
+            : normalizeEmail(event.data.email),
+        phone:
+          event.data.phone === undefined
+            ? existing.phone
+            : normalizePhone(event.data.phone)
       });
 
       continue;

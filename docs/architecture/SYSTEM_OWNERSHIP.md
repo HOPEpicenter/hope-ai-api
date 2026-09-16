@@ -28,6 +28,7 @@ No frontend code should infer, duplicate, or override backend-authored ministry 
 | Opportunity intelligence | Backend | Segments, recommended actions, reasons, resolution metadata, and evidence are backend-authored. |
 | Activity intelligence | Backend | Dashboard consumes backend-composed intelligence only. |
 | Morning briefing decision | Backend | The read-only briefing composes existing canonical signals and owns source availability, action ordering, and reason metadata. |
+| Care-scope semantics | Backend | Activity Intelligence owns the broader operational care load; Today and Care Summary present the narrower actionable assigned-open-follow-up queue. |
 | Timeline ordering | Backend | Integration/global timeline ordering and pagination are backend-owned. |
 | Dashboard cards | Backend | Canonical visitor dashboard card is backend-authored. |
 | Task preview / simulation | Backend | Read-only OPS simulation and preview summaries remain backend-owned. |

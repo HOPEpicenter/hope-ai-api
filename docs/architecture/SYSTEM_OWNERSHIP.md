@@ -27,6 +27,7 @@ No frontend code should infer, duplicate, or override backend-authored ministry 
 | Next-step state | Backend | Selection and completion are written through backend formation events. |
 | Opportunity intelligence | Backend | Segments, recommended actions, reasons, resolution metadata, and evidence are backend-authored. |
 | Activity intelligence | Backend | Dashboard consumes backend-composed intelligence only. |
+| Morning briefing decision | Backend | The read-only briefing composes existing canonical signals and owns source availability, action ordering, and reason metadata. |
 | Timeline ordering | Backend | Integration/global timeline ordering and pagination are backend-owned. |
 | Dashboard cards | Backend | Canonical visitor dashboard card is backend-authored. |
 | Task preview / simulation | Backend | Read-only OPS simulation and preview summaries remain backend-owned. |
@@ -53,6 +54,7 @@ Dashboard must not:
 - infer formation stage
 - rank opportunity segments
 - create frontend-only recommendations
+- compose or rank a morning briefing from individual ministry contracts
 - persist ministry state
 - schedule or send visitor messages, calls, or emails
 - calculate six-week follow-up dates or task status

@@ -44,14 +44,16 @@ Check keyboard navigation, focus order, labels, contrast, empty/error states, wa
 
 ## P3 - Morning Briefing Decision
 
-Status: Investigate before building  
-Do not build until code/docs confirm whether an existing canonical read model already covers the need.
+Status: Backend contract implemented, feature-gated, and dashboard adoption deferred
+The audit found that Today was an effective operator cockpit but not a single canonical morning decision: it composed care summary, follow-up, activity, and opportunity signals in the dashboard. The backend now owns that composition through the read-only `GET /api/morning-briefing` contract.
 
 Decision rule:
 
 - If existing Today + care summary + activity intelligence + opportunity worklists provide enough, build UI only.
 - If not, build backend canonical composition read model first.
 - Never derive ministry state in the dashboard.
+
+The contract is disabled by default with `FEATURE_MORNING_BRIEFING`. It reuses canonical care, follow-up, activity-intelligence, and opportunity services; it adds no mutations, orchestration, assignment behavior, or dashboard logic. Unavailable source data produces an explicit incomplete/unavailable response rather than an all-clear briefing.
 
 ## P4 - Pilot Validation
 

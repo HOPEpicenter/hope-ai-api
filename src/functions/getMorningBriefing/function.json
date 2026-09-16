@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/getMorningBriefing/index.js",
+  "entryPoint": "getMorningBriefing",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [ "get" ],
+      "route": "morning-briefing"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

@@ -20,6 +20,7 @@ This is a high-level inventory derived from PR history. Use code inspection for 
 | `/care/candidates/assign-bulk` | Complete | Bulk care assignment. |
 | `/care/candidates/unassign-bulk` | Complete | Bulk care unassignment. |
 | `/activity-intelligence` | Complete | Ministry intelligence composition endpoint. |
+| `/morning-briefing` | Feature-gated | Read-only canonical morning decision composed from existing care, follow-up, activity, and opportunity contracts; disabled by default. |
 | `GET /staff-identities` | Complete | Canonical Staff Identity directory projected from seeded identities and immutable Staff events. |
 | `GET /staff-identities/entra/{entraTenantId}/{entraObjectId}` | Complete | Protected canonical Staff Identity lookup by Entra binding. |
 | `GET /staff-identities/{staffId}/audit` | Complete | Administrator-only, event-backed Staff administration history with sanitized Entra binding changes. |

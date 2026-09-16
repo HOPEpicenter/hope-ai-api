@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { getActivityIntelligence } from "../../functions/getActivityIntelligence";
+import { getMorningBriefing } from "../../functions/getMorningBriefing";
 import { getOpportunityWorklist } from "../../functions/getOpportunityWorklist";
 
 type AzureFunctionHandler = (context: any, req: any) => Promise<void>;
@@ -28,6 +29,10 @@ export const activityIntelligenceRouter = Router();
 
 activityIntelligenceRouter.get("/activity-intelligence", (req, res, next) => {
   invokeFunction(getActivityIntelligence, req, res).catch(next);
+});
+
+activityIntelligenceRouter.get("/morning-briefing", (req, res, next) => {
+  invokeFunction(getMorningBriefing, req, res).catch(next);
 });
 
 activityIntelligenceRouter.get("/activity-intelligence/opportunities/:segment", (req, res, next) => {

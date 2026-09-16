@@ -8,6 +8,25 @@ The dashboard is a thin pastoral/operator surface. It must not duplicate backend
 
 The backend is the source of truth.
 
+### GET /api/morning-briefing
+
+Purpose:
+
+Returns the backend-authored morning decision for a pastor-facing briefing without changing the existing Today, care, follow-up, activity-intelligence, or opportunity contracts.
+
+Ownership:
+
+- The backend composes canonical care urgency and ownership counts, follow-up load, activity/formation health, opportunity signals, and deterministic recommended actions.
+- The dashboard may present the response only; it must not recompute action order, source availability, ministry state, or reasons.
+
+Rollout:
+
+- The endpoint is disabled by default with `FEATURE_MORNING_BRIEFING`.
+- Disabled requests return `404` with `MORNING_BRIEFING_DISABLED`.
+- Source failure returns `503` with `MORNING_BRIEFING_UNAVAILABLE` and an explicit incomplete briefing envelope.
+
+The response includes `schemaVersion`, `complete`, per-source availability, `decision.firstAction`, ordered `decision.actions`, care and follow-up counts, operational/formation health, and ownership counts. Each action includes its canonical source path, reason, priority, and count.
+
 ## Architectural Principles
 
 1. Backend owns truth, orchestration, projection, reconciliation, and integrity.

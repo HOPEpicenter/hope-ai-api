@@ -1,53 +1,16 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { getFeatureFlags } from "../../config/featureFlags";
-import {
-  ensureTable,
-  getFormationProfilesTableClient,
-  listFormationProfiles,
-  type FunctionFormationProfileEntity
-} from "../_shared/formation";
 import { getVisitorById } from "../_shared/visitorsRepository";
 import { isSyntheticVisitorRecord } from "../../services/visitors/isSyntheticVisitorRecord";
-import { readCareCandidateList } from "../../services/care/readCareCandidateList";
-import { readCanonicalOpsFollowupsNarrative } from "../../services/followups/readCanonicalOpsFollowupsNarrative";
-import { buildActivityIntelligence } from "../../services/intelligence/activityIntelligenceService";
-import { getFormationEventsTableClient } from "../../storage/formation/formationTables";
 import { SixWeekFollowupEventsRepository } from "../../repositories/sixWeekFollowupEventsRepository";
 import { projectSixWeekVisitorFollowups } from "../../domain/followups/projectSixWeekVisitorFollowup";
 import { deriveSixWeekRetentionSummary } from "../../services/followups/deriveSixWeekRetentionSummary";
+import { readCanonicalActivityIntelligence } from "../../services/intelligence/readCanonicalActivityIntelligence";
 import {
   apiErrorBody,
   getRequestId,
   logFunctionError
 } from "../../shared/observability/functionObservability";
-
-function toCareProfileInput(profile: FunctionFormationProfileEntity) {
-  return {
-    visitorId: profile.visitorId,
-    assignedTo: profile.assignedTo ?? null,
-    lastFollowupOutcome: profile.lastFollowupOutcome ?? null,
-    lastFollowupOutcomeAt: profile.lastFollowupOutcomeAt ?? null
-  };
-}
-
-async function listAllFormationProfiles(
-  table: any
-): Promise<FunctionFormationProfileEntity[]> {
-  const profiles: FunctionFormationProfileEntity[] = [];
-  let cursor: string | undefined = undefined;
-
-  do {
-    const page = await listFormationProfiles(table, {
-      limit: 200,
-      cursor
-    });
-
-    profiles.push(...page.items);
-    cursor = page.cursor ?? undefined;
-  } while (cursor);
-
-  return profiles;
-}
 
 export async function getActivityIntelligence(
   context: any,
@@ -66,56 +29,8 @@ export async function getActivityIntelligence(
       return;
     }
 
-    const profilesTable = getFormationProfilesTableClient();
-    const eventsTable = getFormationEventsTableClient();
-
-    await ensureTable(profilesTable);
-    await ensureTable(eventsTable);
-
-    const formationProfiles = await listAllFormationProfiles(profilesTable);
-
-    const validProfiles: FunctionFormationProfileEntity[] = [];
-    let orphanProfilesExcluded = 0;
-
-    for (const profile of formationProfiles) {
-      const visitorId = String(profile.visitorId ?? "").trim();
-
-      if (!visitorId) {
-        orphanProfilesExcluded++;
-        continue;
-      }
-
-      const visitor = await getVisitorById(visitorId);
-      if (!visitor) {
-        orphanProfilesExcluded++;
-        continue;
-      }
-
-      if (isSyntheticVisitorRecord(visitor)) {
-        continue;
-      }
-
-      validProfiles.push(profile);
-    }
-
-    const care = readCareCandidateList({
-      profiles: validProfiles.map(toCareProfileInput)
-    });
-
-    const followups = await readCanonicalOpsFollowupsNarrative({
-      eventsTable,
-      profilesTable,
-      limit: 500,
-      cursor: 0,
-      includeResolved: true,
-      includeSynthetic: false
-    });
-
-    const intelligence = buildActivityIntelligence({
-      careSummary: care.summary,
-      followupStats: followups.stats,
-      formationProfiles: validProfiles
-    });
+    const canonical = await readCanonicalActivityIntelligence();
+    const { intelligence } = canonical;
 
     const phase5Enabled = getFeatureFlags().phase5Communications;
     const retentionAsOf = new Date().toISOString();
@@ -148,11 +63,11 @@ export async function getActivityIntelligence(
         ...intelligence,
         followups: {
           ...intelligence.followups,
-          owners: followups.owners
+          owners: canonical.owners
         },
         sixWeekRetention,
         projectionIntegrity: {
-          orphanProfilesExcluded
+          ...canonical.projectionIntegrity
         }
       }
     };

@@ -117,6 +117,13 @@ const baseInput: MorningBriefingCompositionInput = {
 
   assert.equal(result.decision.status, "attention");
   assert.equal(result.decision.firstAction?.key, "urgent-care");
+  assert.equal(result.decision.firstAction?.label, "Review urgent operational care signals");
+  assert.equal(
+    result.decision.firstAction?.reason,
+    "2 urgent care candidate(s) are in the Activity Intelligence care load."
+  );
+  assert.equal(result.decision.firstAction?.source, "activity-intelligence");
+  assert.equal(result.decision.firstAction?.sourcePath, "/api/activity-intelligence");
   assert.deepEqual(
     result.decision.actions.map((item) => item.key),
     [

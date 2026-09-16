@@ -87,10 +87,10 @@ export function composeMorningBriefing(
     actions.push(action(
       "urgent-care",
       "urgent",
-      "Contact people needing urgent care",
-      `${intelligence.careLoad.urgentCount} urgent care candidate(s) are in the canonical care summary.`,
-      "care-summary",
-      "/api/care/summary",
+      "Review urgent operational care signals",
+      `${intelligence.careLoad.urgentCount} urgent care candidate(s) are in the Activity Intelligence care load.`,
+      "activity-intelligence",
+      "/api/activity-intelligence",
       intelligence.careLoad.urgentCount
     ));
   }

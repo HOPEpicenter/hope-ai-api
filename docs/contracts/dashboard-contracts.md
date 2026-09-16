@@ -27,6 +27,12 @@ Rollout:
 
 The response includes `schemaVersion`, `complete`, per-source availability, `decision.firstAction`, ordered `decision.actions`, care and follow-up counts, operational/formation health, and ownership counts. Each action includes its canonical source path, reason, priority, and count.
 
+Care-scope distinction:
+
+- Activity Intelligence care load is a broader operational signal composed from valid, non-synthetic formation profiles and may include urgent or unassigned care candidates outside the actionable assigned follow-up queue.
+- Today and Care Summary use the narrower actionable queue of open, assigned, non-terminal follow-ups.
+- Morning Briefing urgent-care actions therefore identify `Activity Intelligence` and `/api/activity-intelligence` as their source; they must not be described as the Care Summary queue.
+
 ## Architectural Principles
 
 1. Backend owns truth, orchestration, projection, reconciliation, and integrity.

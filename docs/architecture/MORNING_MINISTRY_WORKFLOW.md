@@ -76,6 +76,31 @@ Today must answer:
 - Each actionable item has a pastoral reason.
 - Each actionable item leads directly to useful person context or action.
 
+### Morning Briefing Care Lanes
+
+`GET /api/morning-briefing` exposes three backend-authored care lanes:
+
+- `urgent-care` — canonical care candidates whose priority is urgent;
+- `unassigned-care` — canonical care candidates without an assigned owner;
+- `shared-care-queue` — canonical care candidates whose assignment bucket is
+  the shared care queue.
+
+Each lane includes:
+
+- a stable key and pastor-facing label;
+- the aggregate count from Activity Intelligence;
+- up to five targets in canonical care-candidate order;
+- the number of additional matching targets beyond that cap.
+
+Each target includes the canonical visitor ID, display name, truthful care
+reason, and backend-authored Person 360 path. A matching Morning Briefing
+action includes its primary target when one is available.
+
+The lanes reuse the canonical care candidate projection and its deterministic
+ordering. They do not create a second care projection or mutate ministry data.
+Both unassigned-care counts and targets retain Activity Intelligence
+provenance.
+
 ## Step 2 — Open Person 360
 
 Person 360 must answer:

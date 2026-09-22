@@ -14,8 +14,18 @@ import {
   type ActivityIntelligenceResult
 } from "./activityIntelligenceService";
 
+export type CanonicalMorningBriefingCareCandidate = {
+  visitorId: string;
+  displayName: string;
+  reason: "needs_care";
+  carePriority: "normal" | "elevated" | "urgent";
+  assignmentState: "assigned" | "unassigned";
+  assignmentBucket: "owned" | "queue";
+};
+
 export type CanonicalActivityIntelligenceRead = {
   intelligence: ActivityIntelligenceResult;
+  careCandidates: CanonicalMorningBriefingCareCandidate[];
   owners: Awaited<ReturnType<typeof readCanonicalOpsFollowupsNarrative>>["owners"];
   projectionIntegrity: {
     orphanProfilesExcluded: number;
@@ -59,6 +69,7 @@ export async function readCanonicalActivityIntelligence(): Promise<CanonicalActi
 
   const formationProfiles = await listAllFormationProfiles(profilesTable);
   const validProfiles: FunctionFormationProfileEntity[] = [];
+  const visitorNamesById = new Map<string, string>();
   let orphanProfilesExcluded = 0;
 
   for (const profile of formationProfiles) {
@@ -76,6 +87,7 @@ export async function readCanonicalActivityIntelligence(): Promise<CanonicalActi
     }
 
     validProfiles.push(profile);
+    visitorNamesById.set(visitorId, visitor.name);
   }
 
   const care = readCareCandidateList({
@@ -97,6 +109,16 @@ export async function readCanonicalActivityIntelligence(): Promise<CanonicalActi
       followupStats: followups.stats,
       formationProfiles: validProfiles
     }),
+    careCandidates: care.items.map((candidate) => ({
+      visitorId: candidate.visitorId,
+      displayName:
+        visitorNamesById.get(candidate.visitorId) ??
+        "Unknown person",
+      reason: candidate.reason,
+      carePriority: candidate.carePriority,
+      assignmentState: candidate.assignmentState,
+      assignmentBucket: candidate.assignmentBucket
+    })),
     owners: followups.owners,
     projectionIntegrity: {
       orphanProfilesExcluded

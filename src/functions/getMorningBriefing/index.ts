@@ -39,7 +39,8 @@ export async function getMorningBriefing(context: any, req: any): Promise<void> 
   try {
     const canonical = await readCanonicalActivityIntelligence();
     const briefing = composeMorningBriefing({
-      intelligence: canonical.intelligence
+      intelligence: canonical.intelligence,
+      careCandidates: canonical.careCandidates
     });
 
     context.res = {

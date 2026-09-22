@@ -1,10 +1,33 @@
 import type { ActivityIntelligenceResult } from "./activityIntelligenceService";
+import type {
+  CanonicalMorningBriefingCareCandidate
+} from "./readCanonicalActivityIntelligence";
 
 export const MORNING_BRIEFING_SCHEMA_VERSION = 1 as const;
+export const MORNING_BRIEFING_CARE_TARGET_LIMIT = 5 as const;
 
 export type MorningBriefingSourceStatus = "available" | "unavailable";
 export type MorningBriefingDecisionStatus = "attention" | "watch" | "clear" | "unavailable";
 export type MorningBriefingActionPriority = "urgent" | "high" | "medium";
+export type MorningBriefingCareLaneKey =
+  | "urgent-care"
+  | "unassigned-care"
+  | "shared-care-queue";
+
+export type MorningBriefingCareTarget = {
+  visitorId: string;
+  displayName: string;
+  reason: string;
+  personPath: string;
+};
+
+export type MorningBriefingCareLane = {
+  key: MorningBriefingCareLaneKey;
+  label: string;
+  count: number;
+  targets: MorningBriefingCareTarget[];
+  additionalTargetCount: number;
+};
 
 export type MorningBriefingAction = {
   key: string;
@@ -14,6 +37,7 @@ export type MorningBriefingAction = {
   source: "care-summary" | "activity-intelligence";
   sourcePath: string;
   count: number;
+  primaryTarget?: MorningBriefingCareTarget;
 };
 
 export type MorningBriefing = {
@@ -34,6 +58,7 @@ export type MorningBriefing = {
   care: {
     urgentCount: number;
     unassignedCount: number;
+    lanes: MorningBriefingCareLane[];
   };
   followups: {
     total: number;
@@ -54,9 +79,42 @@ export type MorningBriefing = {
 
 export type MorningBriefingCompositionInput = {
   intelligence: ActivityIntelligenceResult;
+  careCandidates?: readonly CanonicalMorningBriefingCareCandidate[];
   generatedAt?: string;
   sourceStatus?: Partial<MorningBriefing["sources"]>;
 };
+
+function toCareTarget(
+  candidate: CanonicalMorningBriefingCareCandidate
+): MorningBriefingCareTarget {
+  return {
+    visitorId: candidate.visitorId,
+    displayName: candidate.displayName,
+    reason: "Needs care",
+    personPath: `/people?visitorId=${encodeURIComponent(candidate.visitorId)}`
+  };
+}
+
+function careLane(
+  key: MorningBriefingCareLaneKey,
+  label: string,
+  count: number,
+  candidates: readonly CanonicalMorningBriefingCareCandidate[],
+  matches: (candidate: CanonicalMorningBriefingCareCandidate) => boolean
+): MorningBriefingCareLane {
+  const targets = candidates
+    .filter(matches)
+    .slice(0, MORNING_BRIEFING_CARE_TARGET_LIMIT)
+    .map(toCareTarget);
+
+  return {
+    key,
+    label,
+    count,
+    targets,
+    additionalTargetCount: Math.max(0, count - targets.length)
+  };
+}
 
 function action(
   key: string,
@@ -65,9 +123,24 @@ function action(
   reason: string,
   source: MorningBriefingAction["source"],
   sourcePath: string,
-  count: number
+  count: number,
+  primaryTarget?: MorningBriefingCareTarget
 ): MorningBriefingAction {
-  return { key, priority, label, reason, source, sourcePath, count };
+  const result: MorningBriefingAction = {
+    key,
+    priority,
+    label,
+    reason,
+    source,
+    sourcePath,
+    count
+  };
+
+  if (primaryTarget) {
+    result.primaryTarget = primaryTarget;
+  }
+
+  return result;
 }
 
 export function composeMorningBriefing(
@@ -82,6 +155,33 @@ export function composeMorningBriefing(
   };
   const complete = Object.values(sources).every((status) => status === "available");
   const actions: MorningBriefingAction[] = [];
+  const careCandidates = input.careCandidates ?? [];
+  const careLanes: MorningBriefingCareLane[] = [
+    careLane(
+      "urgent-care",
+      "Urgent care",
+      intelligence.careLoad.urgentCount,
+      careCandidates,
+      (candidate) => candidate.carePriority === "urgent"
+    ),
+    careLane(
+      "unassigned-care",
+      "Unassigned care",
+      intelligence.careLoad.unassignedCount,
+      careCandidates,
+      (candidate) => candidate.assignmentState === "unassigned"
+    ),
+    careLane(
+      "shared-care-queue",
+      "Shared care queue",
+      intelligence.careLoad.queueCount,
+      careCandidates,
+      (candidate) => candidate.assignmentBucket === "queue"
+    )
+  ];
+  const careLanesByKey = new Map(
+    careLanes.map((lane) => [lane.key, lane] as const)
+  );
 
   if (intelligence.careLoad.urgentCount > 0) {
     actions.push(action(
@@ -91,7 +191,8 @@ export function composeMorningBriefing(
       `${intelligence.careLoad.urgentCount} urgent care candidate(s) are in the Activity Intelligence care load.`,
       "activity-intelligence",
       "/api/activity-intelligence",
-      intelligence.careLoad.urgentCount
+      intelligence.careLoad.urgentCount,
+      careLanesByKey.get("urgent-care")?.targets[0]
     ));
   }
 
@@ -113,9 +214,10 @@ export function composeMorningBriefing(
       "high",
       "Assign care ownership",
       `${intelligence.careLoad.unassignedCount} care candidate(s) do not have an assigned owner.`,
-      "care-summary",
-      "/api/care/summary",
-      intelligence.careLoad.unassignedCount
+      "activity-intelligence",
+      "/api/activity-intelligence",
+      intelligence.careLoad.unassignedCount,
+      careLanesByKey.get("unassigned-care")?.targets[0]
     ));
   }
 
@@ -165,7 +267,8 @@ export function composeMorningBriefing(
     },
     care: {
       urgentCount: intelligence.careLoad.urgentCount,
-      unassignedCount: intelligence.careLoad.unassignedCount
+      unassignedCount: intelligence.careLoad.unassignedCount,
+      lanes: careLanes
     },
     followups: {
       total: intelligence.followups.total,

@@ -67,6 +67,13 @@ jobs:
           npm run build
 
 
+      - name: Morning Briefing care summary regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          npx --no-install ts-node tests/intelligence/morningBriefingService.test.ts
+
       - name: Six-week visitor follow-up regressions
         shell: pwsh
         run: |

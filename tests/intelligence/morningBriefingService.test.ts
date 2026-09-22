@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readCareCandidateList } from "../../src/services/care/readCareCandidateList";
 import {
   composeMorningBriefing,
   MORNING_BRIEFING_CARE_TARGET_LIMIT,
@@ -289,6 +290,78 @@ const baseInput: MorningBriefingCompositionInput = {
   );
   assert.equal(sharedQueueLane?.label, "Shared care queue");
   assert.equal(sharedQueueLane?.additionalTargetCount, 2);
+}
+
+{
+  const projected = readCareCandidateList({
+    profiles: [{
+      visitorId: "p3-2-unassigned-care",
+      assignedTo: null,
+      lastFollowupOutcome: "needs_care",
+      lastFollowupOutcomeAt: "2026-08-19T21:49:21.721Z",
+      now: new Date("2026-09-22T15:47:33.851Z")
+    }]
+  });
+  const result = composeMorningBriefing({
+    ...baseInput,
+    intelligence: { ...baseInput.intelligence, careLoad: projected.summary },
+    careCandidates: projected.items.map((candidate) => ({
+      ...candidate,
+      displayName: "P3.2 care regression"
+    }))
+  });
+  assert.equal(result.followups.total, 0);
+  assert.deepEqual(result.todayCareSummary, {
+    peopleNeedingCare: 1, needsAttentionToday: 1, urgentCare: 1
+  });
+  assert.deepEqual(result.care.lanes.map((lane) => lane.count), [1, 1, 1]);
+}
+
+{
+  // Overlapping signals count once; totals are not capped to target limits.
+  const candidates = [
+    careCandidate("urgent-unassigned", {
+      carePriority: "urgent",
+      assignmentState: "unassigned",
+      assignmentBucket: "queue"
+    }),
+    careCandidate("elevated-owned", { carePriority: "elevated" }),
+    careCandidate("normal-unassigned", {
+      assignmentState: "unassigned",
+      assignmentBucket: "queue"
+    }),
+    ...Array.from({ length: 5 }, (_, index) =>
+      careCandidate(`normal-owned-${index}`)
+    )
+  ];
+  const input: MorningBriefingCompositionInput = {
+    ...baseInput,
+    intelligence: {
+      ...baseInput.intelligence,
+      careLoad: {
+        ...baseInput.intelligence.careLoad,
+        totalCandidates: 8, urgentCount: 1,
+        assignedCount: 6, unassignedCount: 2, ownedCount: 6, queueCount: 2
+      }
+    },
+    careCandidates: candidates
+  };
+  assert.deepEqual(composeMorningBriefing(input).todayCareSummary, {
+    peopleNeedingCare: 8, needsAttentionToday: 3, urgentCare: 1
+  });
+  assert.equal(composeMorningBriefing({
+    ...input,
+    sourceStatus: { activityIntelligence: "unavailable" }
+  }).todayCareSummary, null);
+}
+
+{
+  assert.equal(composeMorningBriefing(baseInput).todayCareSummary, null);
+  assert.deepEqual(composeMorningBriefing({
+    ...baseInput, careCandidates: []
+  }).todayCareSummary, {
+    peopleNeedingCare: 0, needsAttentionToday: 0, urgentCare: 0
+  });
 }
 
 console.log("morningBriefingService.test.ts passed");

@@ -40,6 +40,13 @@ export type MorningBriefingAction = {
   primaryTarget?: MorningBriefingCareTarget;
 };
 
+export type TodayCareSummary = {
+  peopleNeedingCare: number;
+  /** Urgent, elevated, or unassigned care candidates; counted once. */
+  needsAttentionToday: number;
+  urgentCare: number;
+};
+
 export type MorningBriefing = {
   schemaVersion: typeof MORNING_BRIEFING_SCHEMA_VERSION;
   generatedAt: string;
@@ -55,6 +62,7 @@ export type MorningBriefing = {
     firstAction: MorningBriefingAction | null;
     actions: MorningBriefingAction[];
   };
+  todayCareSummary: TodayCareSummary | null;
   care: {
     urgentCount: number;
     unassignedCount: number;
@@ -265,6 +273,19 @@ export function composeMorningBriefing(
       firstAction: complete ? actions[0] ?? null : null,
       actions: complete ? actions : []
     },
+    todayCareSummary: complete && input.careCandidates !== undefined
+      ? {
+          peopleNeedingCare: careCandidates.length,
+          needsAttentionToday: careCandidates.filter((candidate) =>
+            candidate.carePriority === "urgent" ||
+            candidate.carePriority === "elevated" ||
+            candidate.assignmentState === "unassigned"
+          ).length,
+          urgentCare: careCandidates.filter(
+            (candidate) => candidate.carePriority === "urgent"
+          ).length
+        }
+      : null,
     care: {
       urgentCount: intelligence.careLoad.urgentCount,
       unassignedCount: intelligence.careLoad.unassignedCount,

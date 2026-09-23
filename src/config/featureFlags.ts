@@ -4,6 +4,7 @@ export type FeatureFlags = {
   morningBriefing: boolean;
   phase5Communications: boolean;
   staffInvitations: boolean;
+  sixWeekScriptGuidance: boolean;
 };
 
 export function getFeatureFlags(): FeatureFlags {
@@ -16,5 +17,7 @@ export function getFeatureFlags(): FeatureFlags {
       String(process.env.FEATURE_PHASE5_COMMUNICATIONS ?? "").trim().toLowerCase() === "true",
     staffInvitations:
       String(process.env.FEATURE_STAFF_INVITATIONS ?? "").trim().toLowerCase() === "true",
+    sixWeekScriptGuidance:
+      String(process.env.FEATURE_SIX_WEEK_SCRIPT_GUIDANCE ?? "").trim().toLowerCase() === "true",
   };
 }

@@ -138,6 +138,49 @@ assert.equal(
   "2026-01-02T00:00:00.000Z"
 );
 
+const thirdCompletion = event(
+  "completed-3",
+  "NEXT_STEP_COMPLETED",
+  "2026-01-04T00:00:00.000Z",
+  { nextStep: "Salvation" }
+);
+const firstCorrection = event(
+  "correction-first",
+  NEXT_STEP_COMPLETION_CORRECTED,
+  "2026-01-05T00:00:00.000Z",
+  { targetEventIds: ["completed-1"], reason: "Accidental completion" }
+);
+const conflictingCorrection = event(
+  "correction-conflicting",
+  NEXT_STEP_COMPLETION_CORRECTED,
+  "2026-01-06T00:00:00.000Z",
+  {
+    targetEventIds: ["completed-1", "completed-3"],
+    reason: "Repeated request"
+  }
+);
+const conflictingResolved = resolveEffectiveNextStepCompletionEvents([
+  selected,
+  firstCompletion,
+  thirdCompletion,
+  firstCorrection,
+  conflictingCorrection
+]);
+
+assert.deepEqual(conflictingResolved.correctedCompletionEventIds, ["completed-1"]);
+assert.deepEqual(conflictingResolved.ignoredCorrectionEventIds, [
+  "correction-conflicting"
+]);
+assert.deepEqual(
+  conflictingResolved.effectiveEvents.map(item => item.idempotencyKey),
+  ["selected-1", "completed-3"],
+  "a correction that repeats one target must not partly supersede an uncorrected target"
+);
+assert.equal(
+  replayNextStepProfile(conflictingResolved.effectiveEvents).lastNextStepCompletedAt,
+  "2026-01-04T00:00:00.000Z"
+);
+
 const prematureCorrection = event(
   "correction-premature",
   NEXT_STEP_COMPLETION_CORRECTED,

@@ -1,12 +1,28 @@
-name: Deploy hope-ai-api to Azure Functions
+name: Deploy hope-ai-api-prod to Azure Functions
+
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hope-ai-api-prod-deployment
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: pwsh
 
     steps:
       - name: Checkout
@@ -16,18 +32,91 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Build and verify Functions layout
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm ci --no-audit --no-fund
+          npm run build
+          npm run verify:layout
+          npm prune --omit=dev --no-audit --no-fund
 
-      - name: Build (TypeScript -> dist)
-        run: npm run build
+      - name: Prepare deployment package
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $package = Join-Path $env:RUNNER_TEMP 'hope-prod-package'
+          New-Item -ItemType Directory -Path $package | Out-Null
 
-      - name: Deploy to Azure Functions
-        uses: Azure/functions-action@v1.5.3
+          foreach ($item in @(
+            'host.json', 'package.json', 'package-lock.json',
+            'dist', 'node_modules'
+          )) {
+            Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE $item) `
+              -Destination $package -Recurse
+          }
+
+          $functions = @(
+            Get-ChildItem -LiteralPath $env:GITHUB_WORKSPACE -Directory |
+              Where-Object {
+                Test-Path -LiteralPath (Join-Path $_.FullName 'function.json')
+              }
+          )
+          if ($functions.Count -eq 0) {
+            throw 'No root function.json directories found.'
+          }
+
+          foreach ($function in $functions) {
+            Copy-Item -LiteralPath $function.FullName `
+              -Destination $package -Recurse
+          }
+
+          "HOPE_DEPLOY_PACKAGE=$package" |
+            Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Check production deployment identity
+        env:
+          PROD_CLIENT_ID: ${{ secrets.AZURE_PROD_CLIENT_ID }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:PROD_CLIENT_ID)) {
+            throw 'AZURE_PROD_CLIENT_ID must be configured before deployment.'
+          }
+
+      - name: Sign in to grant subscription
+        uses: azure/login@v3
         with:
-          app-name: hope-ai-api
-          package: .
-          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+          client-id: ${{ secrets.AZURE_PROD_CLIENT_ID }}
+          tenant-id: 783ef4b1-7e96-4a71-80dd-06865b015da9
+          subscription-id: fbafd6e4-21ad-41d9-8f98-091c3c73ded2
 
+      - name: Deploy production package
+        uses: Azure/functions-action@v1
+        with:
+          app-name: hope-ai-api-prod
+          package: ${{ env.HOPE_DEPLOY_PACKAGE }}
+          remote-build: false
+
+      - name: Check production version endpoint
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $healthy = $false
+          for ($attempt = 1; $attempt -le 24; $attempt++) {
+            try {
+              $response = Invoke-WebRequest `
+                -Uri 'https://hope-ai-api-prod.azurewebsites.net/api/version' `
+                -Method Get -SkipHttpErrorCheck -TimeoutSec 20
+              if ($response.StatusCode -eq 200) {
+                $healthy = $true
+                break
+              }
+              Write-Host "Version endpoint status: $($response.StatusCode)"
+            } catch {
+              Write-Host 'Version endpoint not yet reachable.'
+            }
+            Start-Sleep -Seconds 5
+          }
+          if (-not $healthy) {
+            throw 'Production version endpoint did not become healthy.'
+          }
+          Write-Host 'Production version endpoint returned HTTP 200.'

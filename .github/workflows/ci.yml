@@ -74,6 +74,12 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           npx --no-install ts-node tests/intelligence/morningBriefingService.test.ts
 
+      - name: Formation effective-event replay regression
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npx --no-install ts-node tests/formation/effectiveNextStepCompletionEvents.test.ts
+
       - name: Six-week visitor follow-up regressions
         shell: pwsh
         run: |
@@ -112,4 +118,3 @@ jobs:
           if ($env:EXPRESS_OUT_LOG -and (Test-Path $env:EXPRESS_OUT_LOG)) { Get-Content $env:EXPRESS_OUT_LOG -Tail 200 }
           Write-Host "==== EXPRESS ERR (tail 200) ====" -ForegroundColor Yellow
           if ($env:EXPRESS_ERR_LOG -and (Test-Path $env:EXPRESS_ERR_LOG)) { Get-Content $env:EXPRESS_ERR_LOG -Tail 200 }
-

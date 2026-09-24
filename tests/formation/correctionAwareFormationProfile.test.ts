@@ -4,6 +4,8 @@ import {
   CorrectionReplayUnavailableError,
   deriveFormationProfileFromEvents,
   hasNextStepCompletionCorrection,
+  listFormationEventsByVisitorId,
+  NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX,
   replaceFormationProfileAfterReplay,
   resolveCorrectionAwareFormationProfile,
   type FunctionFormationEventEntity,
@@ -160,6 +162,38 @@ async function run(): Promise<void> {
     requestedPageSize,
     1,
     "routine no-correction probes fetch at most one minimal event row"
+  );
+
+  const mixedRowsTable = {
+    listEntities: () => ({
+      async *[Symbol.asyncIterator]() {
+        yield {
+          PartitionKey: visitorId,
+          RowKey: NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX + "completed-1",
+          visitorId
+        };
+        yield {
+          PartitionKey: visitorId,
+          RowKey: selected.rowKey,
+          visitorId,
+          type: selected.type,
+          occurredAt: selected.occurredAt,
+          recordedAt: selected.recordedAt,
+          idempotencyKey: selected.idempotencyKey,
+          metadata: selected.metadata
+        };
+      }
+    })
+  };
+  const visibleEvents = await listFormationEventsByVisitorId(
+    mixedRowsTable as any,
+    visitorId,
+    { limit: 1 }
+  );
+  assert.deepEqual(
+    visibleEvents.map(item => item.rowKey),
+    [selected.rowKey],
+    "transaction guard rows must neither appear in Formation history nor consume the event limit"
   );
 
   console.log("correctionAwareFormationProfile.test.ts passed");

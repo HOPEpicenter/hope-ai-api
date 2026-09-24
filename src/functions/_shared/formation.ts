@@ -90,6 +90,9 @@ const FORMATION_EVENTS_TABLE = process.env.FORMATION_EVENTS_TABLE || "devFormati
 const FORMATION_PROFILES_TABLE = process.env.FORMATION_PROFILES_TABLE || "devFormationProfiles";
 const MAX_CORRECTION_REPLAY_EVENTS = 10000;
 
+// Reserved for transaction control rows, which are not Formation events.
+export const NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX = "NEXT_STEP_CORRECTION_GUARD__";
+
 function escapeOData(value: string): string {
   return String(value ?? "").replace(/'/g, "''");
 }
@@ -422,9 +425,14 @@ export async function listFormationEventsByVisitorId(
   for await (const entity of table.listEntities<any>({
     queryOptions: { filter, select }
   })) {
+    const rowKey = String(entity.rowKey ?? entity.RowKey ?? "");
+    if (rowKey.startsWith(NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX)) {
+      continue;
+    }
+
     results.push({
       partitionKey: entity.partitionKey ?? entity.PartitionKey,
-      rowKey: entity.rowKey ?? entity.RowKey,
+      rowKey,
       visitorId: entity.visitorId,
       type: entity.type,
       occurredAt: entity.occurredAt,

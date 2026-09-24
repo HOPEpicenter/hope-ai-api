@@ -1,5 +1,8 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
-import { getFormationProfilesTableClient, getFormationProfileByVisitorId } from "../_shared/formation";
+import {
+  getFormationProfilesTableClient,
+  readCorrectionAwareFormationProfile
+} from "../_shared/formation";
 import { readCanonicalVisitorNarrative } from "../../services/visitors/readCanonicalVisitorNarrative";
 
 export async function getVisitorSummary(context: any, req: any): Promise<void> {
@@ -29,7 +32,7 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
 
     const summary = await readCanonicalVisitorNarrative(
       visitorId,
-      async (id) => getFormationProfileByVisitorId(table, id)
+      async (id) => readCorrectionAwareFormationProfile(table, id)
     );
 
     context.res = {
@@ -51,4 +54,3 @@ export async function getVisitorSummary(context: any, req: any): Promise<void> {
     };
   }
 }
-

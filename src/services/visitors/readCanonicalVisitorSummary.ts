@@ -1,5 +1,5 @@
 import { getFormationProfilesTableClient } from "../../storage/formation/formationTables";
-import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
+import { readCorrectionAwareFormationProfile } from "../../functions/_shared/formation";
 import { readCanonicalVisitorNarrative } from "./readCanonicalVisitorNarrative";
 import type { CanonicalVisitorSummary } from "./canonicalVisitorContracts";
 
@@ -10,7 +10,7 @@ export async function readCanonicalVisitorSummary(
 
   const summary = await readCanonicalVisitorNarrative(
     visitorId,
-    async (id) => getFormationProfile(profilesTable as any, id)
+    async (id) => readCorrectionAwareFormationProfile(profilesTable as any, id)
   );
 
   return {

@@ -20,6 +20,9 @@ export function getTimelineSummary(type: string | null | undefined): string {
     case "NEXT_STEP_COMPLETED":
       return "Visitor completed a next step";
 
+    case "NEXT_STEP_COMPLETION_CORRECTED":
+      return "Next-step completion corrected";
+
     default:
       return normalized || "Activity recorded";
   }
@@ -48,6 +51,9 @@ export function getTimelineActivityType(
 
     case "NEXT_STEP_COMPLETED":
       return "NEXT_STEP_COMPLETED";
+
+    case "NEXT_STEP_COMPLETION_CORRECTED":
+      return "NEXT_STEP_COMPLETION_CORRECTED";
 
     default:
       return normalized || "UNKNOWN";

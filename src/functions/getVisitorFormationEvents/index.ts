@@ -2,8 +2,14 @@ import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
   ensureTable,
   getFormationEventsTableClient,
-  listFormationEventsByVisitorId
+  listFormationEventsByVisitorId,
+  readCorrectionAwareFormationEvents,
+  CorrectionReplayUnavailableError
 } from "../_shared/formation";
+import {
+  NEXT_STEP_COMPLETION_CORRECTED,
+  resolveEffectiveNextStepCompletionEvents
+} from "../../domain/formation/effectiveNextStepCompletionEvents";
 
 function parseLimit(val: unknown, fallback = 50): number {
   const n = typeof val === "string" ? Number(val) : fallback;
@@ -39,13 +45,21 @@ export async function getVisitorFormationEvents(context: any, req: any): Promise
     const table = getFormationEventsTableClient();
     await ensureTable(table);
 
-    const fetchLimit = Math.max(500, limit * 50);
-    const ascAll = await listFormationEventsByVisitorId(table, visitorId, {
-      limit: fetchLimit,
-      beforeRowKey: cursor
-    });
+    const correctionAware = await readCorrectionAwareFormationEvents(visitorId);
+    const auditEvents = correctionAware.events ??
+      await listFormationEventsByVisitorId(table, visitorId, {
+        limit,
+        beforeRowKey: cursor
+      });
+    const resolution = resolveEffectiveNextStepCompletionEvents(auditEvents);
+    const effectiveEventIds = new Set(
+      resolution.effectiveEvents.map(event => event.idempotencyKey ?? event.rowKey)
+    );
+    const pageEvents = correctionAware.events && cursor
+      ? auditEvents.filter(event => event.rowKey < cursor)
+      : auditEvents;
 
-    const items = ascAll.slice(0, limit)
+    const items = pageEvents.slice(0, limit)
       .map((event: any) => {
         let metadataObj: any = undefined;
         try {
@@ -67,7 +81,11 @@ export async function getVisitorFormationEvents(context: any, req: any): Promise
           sensitivity: event.sensitivity,
           summary: event.summary,
           metadata: metadataObj,
-          rowKey: event.rowKey
+          rowKey: event.rowKey,
+          effective:
+            event.type === NEXT_STEP_COMPLETION_CORRECTED
+              ? false
+              : effectiveEventIds.has(event.idempotencyKey ?? event.rowKey)
         };
       });
 
@@ -88,6 +106,18 @@ export async function getVisitorFormationEvents(context: any, req: any): Promise
       }
     };
   } catch (err: any) {
+    if (err instanceof CorrectionReplayUnavailableError) {
+      context.res = {
+        status: 503,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: {
+          ok: false,
+          error: err.code
+        }
+      };
+      return;
+    }
+
     context.log.error(err?.message ?? err);
     context.res = {
       status: 400,
@@ -96,4 +126,3 @@ export async function getVisitorFormationEvents(context: any, req: any): Promise
     };
   }
 }
-

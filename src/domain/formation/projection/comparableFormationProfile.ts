@@ -19,6 +19,7 @@ export type ComparableFormationProfile = {
   lastFollowupOutcomeNotes?: string | null;
   lastNextStep?: string | null;
   lastNextStepAt?: string | null;
+  lastNextStepCompletedAt?: string | null;
   lastPrayerRequestedAt?: string | null;
   displayName?: string | null;
   groups?: any[] | null;
@@ -52,9 +53,9 @@ export function toComparableFormationProfileState(
     lastFollowupOutcomeNotes: profile.lastFollowupOutcomeNotes ?? null,
     lastNextStep: profile.lastNextStep ?? null,
     lastNextStepAt: profile.lastNextStepAt ?? null,
+    lastNextStepCompletedAt: profile.lastNextStepCompletedAt ?? null,
     lastPrayerRequestedAt: profile.lastPrayerRequestedAt ?? null,
     displayName: profile.displayName ?? null,
     groups: Array.isArray(profile.groups) ? profile.groups : null
   });
 }
-

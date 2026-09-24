@@ -7,6 +7,14 @@ import { deriveIntegrationSummaryV1 } from "../../domain/integration/deriveInteg
 import { getTimelineActivityType, getTimelineSummary } from "./timelineSemantics";
 import { compareTimelineNewestFirst } from "../../shared/timeline/timelineOrdering";
 import { paginateTimelineItems } from "../../shared/timeline/timelinePaginator";
+import {
+  NEXT_STEP_COMPLETION_CORRECTED,
+  resolveEffectiveNextStepCompletionEvents
+} from "../../domain/formation/effectiveNextStepCompletionEvents";
+import {
+  readCorrectionAwareFormationEvents,
+  CorrectionReplayUnavailableError
+} from "../../functions/_shared/formation";
 
 export type IntegratedTimelinePageV1 = {
   items: any[];
@@ -51,8 +59,68 @@ function toFormationTimelineItem(visitorId: string, event: any) {
     type: event?.type,
     occurredAt: event?.occurredAt,
     stream: "formation" as const,
-    data: event
+    data: event,
+    effective:
+      Object.prototype.hasOwnProperty.call(event ?? {}, "effective")
+        ? event.effective
+        : true,
+    correctionReplayUnavailable: event?.correctionReplayUnavailable === true
   };
+}
+
+export function toCorrectionAwareFormationTimelineItems(
+  visitorId: string,
+  displayedEvents: any[],
+  effectiveStatusEvents = displayedEvents,
+  correctionReplayUnavailable = false
+): any[] {
+  if (correctionReplayUnavailable) {
+    return displayedEvents.map(event => toFormationTimelineItem(visitorId, {
+      ...event,
+      effective: null,
+      correctionReplayUnavailable: true
+    }));
+  }
+
+  const resolution = resolveEffectiveNextStepCompletionEvents(effectiveStatusEvents);
+  const effectiveEventIds = new Set(
+    resolution.effectiveEvents.map(event => event.idempotencyKey ?? event.rowKey)
+  );
+
+  return displayedEvents.map(event => toFormationTimelineItem(visitorId, {
+    ...event,
+    effective:
+      event.type === NEXT_STEP_COMPLETION_CORRECTED
+        ? false
+        : effectiveEventIds.has(event.idempotencyKey ?? event.rowKey)
+  }));
+}
+
+async function readCorrectionAwareFormationTimelineItems(
+  visitorId: string,
+  fallbackEvents: any[]
+): Promise<any[]> {
+  try {
+    const correctionAware = await readCorrectionAwareFormationEvents(visitorId);
+    return correctionAware.events
+      ? toCorrectionAwareFormationTimelineItems(
+          visitorId,
+          fallbackEvents,
+          correctionAware.events
+        )
+      : toCorrectionAwareFormationTimelineItems(visitorId, fallbackEvents);
+  } catch (error) {
+    if (error instanceof CorrectionReplayUnavailableError) {
+      return toCorrectionAwareFormationTimelineItems(
+        visitorId,
+        fallbackEvents,
+        fallbackEvents,
+        true
+      );
+    }
+
+    throw error;
+  }
 }
 
 function toEngagementTimelineItem(event: any) {
@@ -84,7 +152,11 @@ function classifyTimelineActivity(item: any): { activityType: string; activityCa
     return { activityType: "STATUS_CHANGE", activityCategory: "ENGAGEMENT" };
   }
 
-  if (type === "NEXT_STEP_SELECTED" || type === "NEXT_STEP_COMPLETED") {
+  if (
+    type === "NEXT_STEP_SELECTED" ||
+    type === "NEXT_STEP_COMPLETED" ||
+    type === NEXT_STEP_COMPLETION_CORRECTED
+  ) {
     return { activityType: getTimelineActivityType(type), activityCategory: "FORMATION" };
   }
 
@@ -314,10 +386,10 @@ export class IntegrationService {
       limit: sourceLimit
     });
 
-    const formationItems = formationAscAll
-      .slice()
-      .reverse()
-      .map((event: any) => toFormationTimelineItem(visitorId, event));
+    const formationItems = await readCorrectionAwareFormationTimelineItems(
+      visitorId,
+      formationAscAll.slice().reverse()
+    );
 
     const engagementItems = (engagementPage.items ?? []).map((event: any) =>
       toEngagementTimelineItem(event)
@@ -339,9 +411,25 @@ export class IntegrationService {
       if (formationEntities.length >= 200) break;
     }
 
-    const formationItems = formationEntities.map((event: any) =>
-      toFormationTimelineItem(event?.visitorId, event)
-    );
+    const eventsByVisitorId = new Map<string, any[]>();
+    for (const event of formationEntities) {
+      const visitorId = String(event?.visitorId ?? "").trim();
+      if (!visitorId) {
+        continue;
+      }
+
+      const events = eventsByVisitorId.get(visitorId) ?? [];
+      events.push(event);
+      eventsByVisitorId.set(visitorId, events);
+    }
+
+    const formationItems = (
+      await Promise.all(
+        Array.from(eventsByVisitorId.entries()).map(([visitorId, events]) =>
+          readCorrectionAwareFormationTimelineItems(visitorId, events)
+        )
+      )
+    ).flat();
 
     const visitorIds = Array.from(
       new Set(
@@ -402,4 +490,3 @@ export class IntegrationService {
     });
   }
 }
-

@@ -919,10 +919,17 @@ export async function deriveFormationProfileForVisitor(visitorIdInput: string): 
   const eventsTable = getFormationEventsTableClient();
   await ensureTable(eventsTable);
 
+  const correctionPresent = await hasNextStepCompletionCorrection(eventsTable, visitorId);
   const events = await listFormationEventsByVisitorId(eventsTable, {
     visitorId,
-    limit: 10000
+    limit: correctionPresent
+      ? MAX_CORRECTION_REPLAY_EVENTS + 1
+      : MAX_CORRECTION_REPLAY_EVENTS
   });
+
+  if (correctionPresent) {
+    assertCorrectionReplayEventCount(visitorId, events.length);
+  }
 
   return deriveFormationProfileFromEvents(visitorId, events);
 }
@@ -1021,6 +1028,19 @@ export async function readCorrectionAwareFormationProfile(
     : null;
 }
 
+export async function replaceFormationProfileAfterReplay(
+  visitorId: string,
+  eventCount: number,
+  correctionPresent: boolean,
+  replace: () => Promise<unknown>
+): Promise<void> {
+  if (correctionPresent) {
+    assertCorrectionReplayEventCount(visitorId, eventCount);
+  }
+
+  await replace();
+}
+
 export async function auditFormationProfileForVisitor(
   visitorIdInput: string,
   options?: { repair?: boolean }
@@ -1082,9 +1102,14 @@ export async function auditFormationProfileForVisitor(
   if (options?.repair === true && drifted) {
     derived.profile.updatedAt = new Date().toISOString();
 
-    await profilesTable.upsertEntity(
-      serializeGroups(derived.profile) as any,
-      "Replace"
+    await replaceFormationProfileAfterReplay(
+      visitorId,
+      derived.eventCount,
+      await hasNextStepCompletionCorrection(getFormationEventsTableClient(), visitorId),
+      async () => profilesTable.upsertEntity(
+        serializeGroups(derived.profile) as any,
+        "Replace"
+      )
     );
 
     repaired = true;

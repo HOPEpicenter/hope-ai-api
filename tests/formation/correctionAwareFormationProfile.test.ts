@@ -4,6 +4,7 @@ import {
   CorrectionReplayUnavailableError,
   deriveFormationProfileFromEvents,
   hasNextStepCompletionCorrection,
+  replaceFormationProfileAfterReplay,
   resolveCorrectionAwareFormationProfile,
   type FunctionFormationEventEntity,
   type FunctionFormationProfileEntity
@@ -106,6 +107,38 @@ async function run(): Promise<void> {
       error instanceof CorrectionReplayUnavailableError &&
       error.code === "CORRECTION_REPLAY_UNAVAILABLE",
     "a corrected visitor beyond the replay boundary must be unavailable rather than replayed partially"
+  );
+
+  let profileWriteCalled = false;
+  await assert.rejects(
+    replaceFormationProfileAfterReplay(
+      visitorId,
+      10001,
+      true,
+      async () => {
+        profileWriteCalled = true;
+      }
+    ),
+    (error: unknown) => error instanceof CorrectionReplayUnavailableError
+  );
+  assert.equal(
+    profileWriteCalled,
+    false,
+    "a capped corrected replay must fail before replacing the persisted profile"
+  );
+
+  await replaceFormationProfileAfterReplay(
+    visitorId,
+    10000,
+    false,
+    async () => {
+      profileWriteCalled = true;
+    }
+  );
+  assert.equal(
+    profileWriteCalled,
+    true,
+    "normal histories retain existing replacement behavior"
   );
 
   let requestedPageSize: number | undefined;

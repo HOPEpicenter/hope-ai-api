@@ -11,6 +11,8 @@ import {
   resolveEffectiveNextStepCompletionEvents
 } from "../../src/domain/formation/effectiveNextStepCompletionEvents";
 import { CorrectionReplayUnavailableError } from "../../src/functions/_shared/formation";
+import { listFormationEventsByVisitor, listRecentFormationEvents } from "../../src/storage/formation/formationEventsRepo";
+import { NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX } from "../../src/domain/formation/effectiveNextStepCompletionEvents";
 import { validateFormationEventEnvelopeV1Strict } from "../../src/contracts/formationEventEnvelope.v1";
 
 const visitorId = "visitor-synthetic";
@@ -136,6 +138,15 @@ async function run(): Promise<void> {
     }),
     /audited next-step completion correction command/
   );
+
+  const history = new FakeTable([
+    { partitionKey: visitorId, rowKey: NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX + "target__one", visitorId },
+    completed("one")
+  ]);
+  const visitorRows = await listFormationEventsByVisitor(asTable(history), visitorId, { limit: 1 });
+  const recentRows = await listRecentFormationEvents(asTable(history), { limit: 1 });
+  assert.deepEqual(visitorRows.map(row => row.rowKey), [completed("one").rowKey]);
+  assert.deepEqual(recentRows.map(row => row.rowKey), [completed("one").rowKey]);
 
   const previous = process.env.FEATURE_NEXT_STEP_COMPLETION_CORRECTIONS;
   try {

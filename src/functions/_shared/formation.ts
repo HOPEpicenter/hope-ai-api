@@ -27,6 +27,7 @@ import {
 } from "../../services/staff/readCanonicalStaffDirectory";
 import {
   NEXT_STEP_COMPLETION_CORRECTED,
+  NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX,
   resolveEffectiveNextStepCompletionEvents
 } from "../../domain/formation/effectiveNextStepCompletionEvents";
 
@@ -91,7 +92,7 @@ const FORMATION_PROFILES_TABLE = process.env.FORMATION_PROFILES_TABLE || "devFor
 const MAX_CORRECTION_REPLAY_EVENTS = 10000;
 
 // Reserved for transaction control rows, which are not Formation events.
-export const NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX = "NEXT_STEP_CORRECTION_GUARD__";
+export { NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX };
 
 function escapeOData(value: string): string {
   return String(value ?? "").replace(/'/g, "''");

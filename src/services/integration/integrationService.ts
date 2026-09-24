@@ -1,6 +1,6 @@
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { getFormationEventsTableClient, getFormationProfilesTableClient } from "../../storage/formation/formationTables";
-import { listFormationEventsByVisitor } from "../../storage/formation/formationEventsRepo";
+import { listFormationEventsByVisitor, listRecentFormationEvents } from "../../storage/formation/formationEventsRepo";
 import { getFormationProfile } from "../../storage/formation/formationProfilesRepo";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import { deriveIntegrationSummaryV1 } from "../../domain/integration/deriveIntegrationSummary.v1";
@@ -405,11 +405,7 @@ export class IntegrationService {
     const eventsTable = getFormationEventsTableClient();
     await ensureTableExists(eventsTable);
 
-    const formationEntities: any[] = [];
-    for await (const entity of (eventsTable as any).listEntities()) {
-      formationEntities.push(entity);
-      if (formationEntities.length >= 200) break;
-    }
+    const formationEntities = await listRecentFormationEvents(eventsTable as any, { limit: 200 });
 
     const eventsByVisitorId = new Map<string, any[]>();
     for (const event of formationEntities) {

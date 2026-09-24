@@ -1,6 +1,9 @@
 export const NEXT_STEP_COMPLETION_CORRECTED =
   "NEXT_STEP_COMPLETION_CORRECTED";
 
+export const NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX =
+  "NEXT_STEP_CORRECTION_GUARD__";
+
 export type EffectiveFormationEvent = {
   type: string;
   occurredAt: string;

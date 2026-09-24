@@ -4,7 +4,8 @@ import {
   getFormationProfilesTableClient,
   listFormationProfiles,
   ensureTable,
-  type FunctionFormationProfileEntity
+  type FunctionFormationProfileEntity,
+  CorrectionReplayUnavailableError
 } from "../_shared/formation";
 import { projectFollowupState } from "../_shared/followupProjection";
 import { getVisitorById } from "../_shared/visitorsRepository";
@@ -224,6 +225,19 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
     };
 
   } catch (err: any) {
+    if (err instanceof CorrectionReplayUnavailableError) {
+      context.res = {
+        status: 503,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: {
+          ok: false,
+          requestId,
+          error: err.code
+        }
+      };
+      return;
+    }
+
     logFunctionError(context, "getDashboardFollowups", err, {
       requestId,
       limit: req?.query?.limit ?? null,
@@ -241,4 +255,3 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
     };
   }
 }
-

@@ -70,23 +70,24 @@ function toFormationTimelineItem(visitorId: string, event: any) {
 
 export function toCorrectionAwareFormationTimelineItems(
   visitorId: string,
-  events: any[],
+  displayedEvents: any[],
+  effectiveStatusEvents = displayedEvents,
   correctionReplayUnavailable = false
 ): any[] {
   if (correctionReplayUnavailable) {
-    return events.map(event => toFormationTimelineItem(visitorId, {
+    return displayedEvents.map(event => toFormationTimelineItem(visitorId, {
       ...event,
       effective: null,
       correctionReplayUnavailable: true
     }));
   }
 
-  const resolution = resolveEffectiveNextStepCompletionEvents(events);
+  const resolution = resolveEffectiveNextStepCompletionEvents(effectiveStatusEvents);
   const effectiveEventIds = new Set(
     resolution.effectiveEvents.map(event => event.idempotencyKey ?? event.rowKey)
   );
 
-  return events.map(event => toFormationTimelineItem(visitorId, {
+  return displayedEvents.map(event => toFormationTimelineItem(visitorId, {
     ...event,
     effective:
       event.type === NEXT_STEP_COMPLETION_CORRECTED
@@ -102,11 +103,20 @@ async function readCorrectionAwareFormationTimelineItems(
   try {
     const correctionAware = await readCorrectionAwareFormationEvents(visitorId);
     return correctionAware.events
-      ? toCorrectionAwareFormationTimelineItems(visitorId, correctionAware.events)
+      ? toCorrectionAwareFormationTimelineItems(
+          visitorId,
+          fallbackEvents,
+          correctionAware.events
+        )
       : toCorrectionAwareFormationTimelineItems(visitorId, fallbackEvents);
   } catch (error) {
     if (error instanceof CorrectionReplayUnavailableError) {
-      return toCorrectionAwareFormationTimelineItems(visitorId, fallbackEvents, true);
+      return toCorrectionAwareFormationTimelineItems(
+        visitorId,
+        fallbackEvents,
+        fallbackEvents,
+        true
+      );
     }
 
     throw error;

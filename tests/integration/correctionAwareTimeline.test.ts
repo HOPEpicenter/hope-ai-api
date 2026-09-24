@@ -33,20 +33,25 @@ const correction = event(
 
 const completeHistory = toCorrectionAwareFormationTimelineItems(
   "visitor-synthetic",
+  [completion],
   [completion, correction]
-);
-const displayedCompletion = completeHistory.find(
-  item => item.eventId === completion.rowKey
 );
 
 assert.equal(
-  displayedCompletion?.effective,
+  completeHistory.length,
+  1,
+  "the requested timeline window must not expand when correction context is older or newer than the window"
+);
+assert.equal(completeHistory[0].eventId, completion.rowKey);
+assert.equal(
+  completeHistory[0].effective,
   false,
   "a displayed completion is labeled from complete history even when its correction is outside the displayed window"
 );
 
 const unavailable = toCorrectionAwareFormationTimelineItems(
   "visitor-synthetic",
+  [completion],
   [completion],
   true
 );

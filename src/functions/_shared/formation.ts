@@ -473,7 +473,7 @@ export function assertCorrectionReplayEventCount(
   }
 }
 
-async function hasNextStepCompletionCorrection(
+export async function hasNextStepCompletionCorrection(
   table: TableClient,
   visitorId: string
 ): Promise<boolean> {
@@ -481,12 +481,15 @@ async function hasNextStepCompletionCorrection(
     `PartitionKey eq '${escapeOData(visitorId)}' and ` +
     `type eq '${NEXT_STEP_COMPLETION_CORRECTED}'`;
 
-  for await (const _entity of table.listEntities<any>({
+  const pages = table.listEntities<any>({
     queryOptions: {
       filter,
       select: ["PartitionKey"]
     }
-  })) {
+  }).byPage({ maxPageSize: 1 });
+
+  const firstPage = await pages.next();
+  if (!firstPage.done && firstPage.value.length > 0) {
     return true;
   }
 

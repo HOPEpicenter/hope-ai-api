@@ -3,6 +3,7 @@ import {
   assertCorrectionReplayEventCount,
   CorrectionReplayUnavailableError,
   deriveFormationProfileFromEvents,
+  hasNextStepCompletionCorrection,
   resolveCorrectionAwareFormationProfile,
   type FunctionFormationEventEntity,
   type FunctionFormationProfileEntity
@@ -105,6 +106,27 @@ async function run(): Promise<void> {
       error instanceof CorrectionReplayUnavailableError &&
       error.code === "CORRECTION_REPLAY_UNAVAILABLE",
     "a corrected visitor beyond the replay boundary must be unavailable rather than replayed partially"
+  );
+
+  let requestedPageSize: number | undefined;
+  const noCorrectionTable = {
+    listEntities: () => ({
+      byPage: (options: { maxPageSize: number }) => {
+        requestedPageSize = options.maxPageSize;
+        return (async function* () {
+          yield [];
+        })();
+      }
+    })
+  };
+  assert.equal(
+    await hasNextStepCompletionCorrection(noCorrectionTable as any, visitorId),
+    false
+  );
+  assert.equal(
+    requestedPageSize,
+    1,
+    "routine no-correction probes fetch at most one minimal event row"
   );
 
   console.log("correctionAwareFormationProfile.test.ts passed");

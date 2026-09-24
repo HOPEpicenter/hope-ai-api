@@ -35,7 +35,8 @@ import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
   ensureTable,
   getFormationProfilesTableClient,
-  readCorrectionAwareFormationProfile
+  readCorrectionAwareFormationProfile,
+  CorrectionReplayUnavailableError
 } from "../_shared/formation";
 
 export async function getVisitorFormationProfile(context: any, req: any): Promise<void> {
@@ -75,6 +76,15 @@ export async function getVisitorFormationProfile(context: any, req: any): Promis
       }
     };
   } catch (err: any) {
+    if (err instanceof CorrectionReplayUnavailableError) {
+      context.res = {
+        status: 503,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: { ok: false, error: err.code }
+      };
+      return;
+    }
+
     context.log.error(err?.message ?? err);
     context.res = {
       status: 400,

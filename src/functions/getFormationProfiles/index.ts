@@ -37,7 +37,8 @@ import {
   ensureTable,
   getFormationProfilesTableClient,
   readCorrectionAwareFormationProfile,
-  listFormationProfiles
+  listFormationProfiles,
+  CorrectionReplayUnavailableError
 } from "../_shared/formation";
 
 function parseLimit(val: unknown, fallback = 50): number {
@@ -128,6 +129,14 @@ export async function getFormationProfiles(context: any, req: any): Promise<any>
       }
     };
   } catch (err: any) {
+    if (err instanceof CorrectionReplayUnavailableError) {
+      return {
+        status: 503,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: { ok: false, error: err.code }
+      };
+    }
+
     context.log.error(err?.message ?? err);
     return {
       status: 400,

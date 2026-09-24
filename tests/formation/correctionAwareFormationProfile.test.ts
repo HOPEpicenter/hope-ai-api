@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import {
+  assertCorrectionReplayEventCount,
+  CorrectionReplayUnavailableError,
   deriveFormationProfileFromEvents,
   resolveCorrectionAwareFormationProfile,
   type FunctionFormationEventEntity,
@@ -93,6 +95,17 @@ async function run(): Promise<void> {
     correction
   ]);
   assert.deepEqual(effective, replayed.profile);
+
+  assert.doesNotThrow(() =>
+    assertCorrectionReplayEventCount(visitorId, 10000)
+  );
+  assert.throws(
+    () => assertCorrectionReplayEventCount(visitorId, 10001),
+    (error: unknown) =>
+      error instanceof CorrectionReplayUnavailableError &&
+      error.code === "CORRECTION_REPLAY_UNAVAILABLE",
+    "a corrected visitor beyond the replay boundary must be unavailable rather than replayed partially"
+  );
 
   console.log("correctionAwareFormationProfile.test.ts passed");
 }

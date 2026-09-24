@@ -2,7 +2,9 @@ import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
   ensureTable,
   getFormationEventsTableClient,
-  listFormationEventsByVisitorId
+  listFormationEventsByVisitorId,
+  readCorrectionAwareFormationEvents,
+  CorrectionReplayUnavailableError
 } from "../_shared/formation";
 import {
   NEXT_STEP_COMPLETION_CORRECTED,
@@ -43,14 +45,17 @@ export async function getVisitorFormationEvents(context: any, req: any): Promise
     const table = getFormationEventsTableClient();
     await ensureTable(table);
 
-    const auditEvents = await listFormationEventsByVisitorId(table, visitorId, {
-      limit: 10000
-    });
+    const correctionAware = await readCorrectionAwareFormationEvents(visitorId);
+    const auditEvents = correctionAware.events ??
+      await listFormationEventsByVisitorId(table, visitorId, {
+        limit,
+        beforeRowKey: cursor
+      });
     const resolution = resolveEffectiveNextStepCompletionEvents(auditEvents);
     const effectiveEventIds = new Set(
       resolution.effectiveEvents.map(event => event.idempotencyKey ?? event.rowKey)
     );
-    const pageEvents = cursor
+    const pageEvents = correctionAware.events && cursor
       ? auditEvents.filter(event => event.rowKey < cursor)
       : auditEvents;
 
@@ -101,6 +106,18 @@ export async function getVisitorFormationEvents(context: any, req: any): Promise
       }
     };
   } catch (err: any) {
+    if (err instanceof CorrectionReplayUnavailableError) {
+      context.res = {
+        status: 503,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: {
+          ok: false,
+          error: err.code
+        }
+      };
+      return;
+    }
+
     context.log.error(err?.message ?? err);
     context.res = {
       status: 400,

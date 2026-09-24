@@ -85,6 +85,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           npx --no-install ts-node tests/formation/correctionAwareFormationProfile.test.ts
+          npx --no-install ts-node tests/integration/correctionAwareTimeline.test.ts
 
       - name: Six-week visitor follow-up regressions
         shell: pwsh

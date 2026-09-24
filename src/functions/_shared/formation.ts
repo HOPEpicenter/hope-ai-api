@@ -88,6 +88,7 @@ export type FunctionFormationProfileEntity = {
 
 const FORMATION_EVENTS_TABLE = process.env.FORMATION_EVENTS_TABLE || "devFormationEvents";
 const FORMATION_PROFILES_TABLE = process.env.FORMATION_PROFILES_TABLE || "devFormationProfiles";
+const MAX_CORRECTION_REPLAY_EVENTS = 10000;
 
 function escapeOData(value: string): string {
   return String(value ?? "").replace(/'/g, "''");
@@ -451,6 +452,69 @@ export async function listFormationEventsByVisitorId(
   });
 
   return filtered.slice(0, limit);
+}
+
+export class CorrectionReplayUnavailableError extends Error {
+  readonly code = "CORRECTION_REPLAY_UNAVAILABLE";
+
+  constructor(visitorId: string) {
+    super(
+      `Correction-aware replay is unavailable for visitor ${visitorId} because the event history exceeds ${MAX_CORRECTION_REPLAY_EVENTS} events`
+    );
+  }
+}
+
+export function assertCorrectionReplayEventCount(
+  visitorId: string,
+  eventCount: number
+): void {
+  if (eventCount > MAX_CORRECTION_REPLAY_EVENTS) {
+    throw new CorrectionReplayUnavailableError(visitorId);
+  }
+}
+
+async function hasNextStepCompletionCorrection(
+  table: TableClient,
+  visitorId: string
+): Promise<boolean> {
+  const filter =
+    `PartitionKey eq '${escapeOData(visitorId)}' and ` +
+    `type eq '${NEXT_STEP_COMPLETION_CORRECTED}'`;
+
+  for await (const _entity of table.listEntities<any>({
+    queryOptions: {
+      filter,
+      select: ["PartitionKey"]
+    }
+  })) {
+    return true;
+  }
+
+  return false;
+}
+
+export async function readCorrectionAwareFormationEvents(
+  visitorId: string
+): Promise<{
+  events: FunctionFormationEventEntity[] | null;
+  correctionPresent: boolean;
+}> {
+  const eventsTable = getFormationEventsTableClient();
+  await ensureTable(eventsTable);
+
+  const correctionPresent = await hasNextStepCompletionCorrection(eventsTable, visitorId);
+  if (!correctionPresent) {
+    return { events: null, correctionPresent: false };
+  }
+
+  const events = await listFormationEventsByVisitorId(eventsTable, {
+    visitorId,
+    limit: MAX_CORRECTION_REPLAY_EVENTS + 1
+  });
+
+  assertCorrectionReplayEventCount(visitorId, events.length);
+
+  return { events, correctionPresent: true };
 }
 
 async function applyFormationEventToProfile(params: {
@@ -938,14 +1002,10 @@ async function overlayCorrectionAwareFormationProfile(
     return profile;
   }
 
-  const eventsTable = getFormationEventsTableClient();
-  await ensureTable(eventsTable);
-  const events = await listFormationEventsByVisitorId(eventsTable, {
-    visitorId,
-    limit: 10000
-  });
-
-  return resolveCorrectionAwareFormationProfile(profile, events);
+  const correctionAwareEvents = await readCorrectionAwareFormationEvents(visitorId);
+  return correctionAwareEvents.events
+    ? resolveCorrectionAwareFormationProfile(profile, correctionAwareEvents.events)
+    : profile;
 }
 
 export async function readCorrectionAwareFormationProfile(

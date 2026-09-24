@@ -11,6 +11,10 @@ import {
   NEXT_STEP_COMPLETION_CORRECTED,
   resolveEffectiveNextStepCompletionEvents
 } from "../../domain/formation/effectiveNextStepCompletionEvents";
+import {
+  readCorrectionAwareFormationEvents,
+  CorrectionReplayUnavailableError
+} from "../../functions/_shared/formation";
 
 export type IntegratedTimelinePageV1 = {
   items: any[];
@@ -56,11 +60,27 @@ function toFormationTimelineItem(visitorId: string, event: any) {
     occurredAt: event?.occurredAt,
     stream: "formation" as const,
     data: event,
-    effective: event?.effective ?? true
+    effective:
+      Object.prototype.hasOwnProperty.call(event ?? {}, "effective")
+        ? event.effective
+        : true,
+    correctionReplayUnavailable: event?.correctionReplayUnavailable === true
   };
 }
 
-function toCorrectionAwareFormationTimelineItems(visitorId: string, events: any[]): any[] {
+export function toCorrectionAwareFormationTimelineItems(
+  visitorId: string,
+  events: any[],
+  correctionReplayUnavailable = false
+): any[] {
+  if (correctionReplayUnavailable) {
+    return events.map(event => toFormationTimelineItem(visitorId, {
+      ...event,
+      effective: null,
+      correctionReplayUnavailable: true
+    }));
+  }
+
   const resolution = resolveEffectiveNextStepCompletionEvents(events);
   const effectiveEventIds = new Set(
     resolution.effectiveEvents.map(event => event.idempotencyKey ?? event.rowKey)
@@ -73,6 +93,24 @@ function toCorrectionAwareFormationTimelineItems(visitorId: string, events: any[
         ? false
         : effectiveEventIds.has(event.idempotencyKey ?? event.rowKey)
   }));
+}
+
+async function readCorrectionAwareFormationTimelineItems(
+  visitorId: string,
+  fallbackEvents: any[]
+): Promise<any[]> {
+  try {
+    const correctionAware = await readCorrectionAwareFormationEvents(visitorId);
+    return correctionAware.events
+      ? toCorrectionAwareFormationTimelineItems(visitorId, correctionAware.events)
+      : toCorrectionAwareFormationTimelineItems(visitorId, fallbackEvents);
+  } catch (error) {
+    if (error instanceof CorrectionReplayUnavailableError) {
+      return toCorrectionAwareFormationTimelineItems(visitorId, fallbackEvents, true);
+    }
+
+    throw error;
+  }
 }
 
 function toEngagementTimelineItem(event: any) {
@@ -338,7 +376,7 @@ export class IntegrationService {
       limit: sourceLimit
     });
 
-    const formationItems = toCorrectionAwareFormationTimelineItems(
+    const formationItems = await readCorrectionAwareFormationTimelineItems(
       visitorId,
       formationAscAll.slice().reverse()
     );
@@ -375,9 +413,13 @@ export class IntegrationService {
       eventsByVisitorId.set(visitorId, events);
     }
 
-    const formationItems = Array.from(eventsByVisitorId.entries()).flatMap(([visitorId, events]) =>
-      toCorrectionAwareFormationTimelineItems(visitorId, events)
-    );
+    const formationItems = (
+      await Promise.all(
+        Array.from(eventsByVisitorId.entries()).map(([visitorId, events]) =>
+          readCorrectionAwareFormationTimelineItems(visitorId, events)
+        )
+      )
+    ).flat();
 
     const visitorIds = Array.from(
       new Set(

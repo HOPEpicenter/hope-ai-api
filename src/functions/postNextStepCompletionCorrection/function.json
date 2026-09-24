@@ -1,0 +1,21 @@
+{
+  "scriptFile": "../dist/functions/postNextStepCompletionCorrection/index.js",
+  "entryPoint": "postNextStepCompletionCorrection",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": [
+        "post"
+      ],
+      "route": "formation/next-step-completion-corrections"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

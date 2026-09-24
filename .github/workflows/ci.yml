@@ -80,6 +80,12 @@ jobs:
           $ErrorActionPreference = "Stop"
           npx --no-install ts-node tests/formation/effectiveNextStepCompletionEvents.test.ts
 
+      - name: Correction-aware formation profile regression
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npx --no-install ts-node tests/formation/correctionAwareFormationProfile.test.ts
+
       - name: Six-week visitor follow-up regressions
         shell: pwsh
         run: |

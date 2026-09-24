@@ -3,7 +3,7 @@ import { getConnString } from "./tableClient";
 import {
   ensureTable,
   getFormationProfilesTableClient,
-  getFormationProfileByVisitorId
+  readCorrectionAwareFormationProfile
 } from "./formation";
 import { deriveIntegrationSummaryV1 } from "../../domain/integration/deriveIntegrationSummary.v1";
 
@@ -78,7 +78,7 @@ export async function readIntegrationSummaryByVisitorId(visitorId: string): Prom
   await ensureTable(formationProfilesTable);
 
   const latestEngagement = await getLatestEngagementEventByVisitorId(engagementTable, visitorId);
-  const profile = await getFormationProfileByVisitorId(formationProfilesTable, visitorId);
+  const profile = await readCorrectionAwareFormationProfile(formationProfilesTable, visitorId);
 
   const lastEngagementAt = String(latestEngagement?.occurredAt ?? "").trim() || null;
   const lastFormationAt = String(profile?.lastEventAt ?? "").trim() || null;

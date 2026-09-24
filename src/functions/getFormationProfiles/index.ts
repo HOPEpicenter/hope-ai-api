@@ -36,7 +36,7 @@ import { getVisitorById } from "../_shared/visitorsRepository";
 import {
   ensureTable,
   getFormationProfilesTableClient,
-  getFormationProfileByVisitorId,
+  readCorrectionAwareFormationProfile,
   listFormationProfiles
 } from "../_shared/formation";
 
@@ -73,7 +73,7 @@ export async function getFormationProfiles(context: any, req: any): Promise<any>
     let orphanProfilesExcluded = 0;
 
     if (visitorIdQ) {
-      const one = await getFormationProfileByVisitorId(table, visitorIdQ);
+      const one = await readCorrectionAwareFormationProfile(table, visitorIdQ);
       items = one
         ? [mapProfile(one)]
         : [];
@@ -136,4 +136,3 @@ export async function getFormationProfiles(context: any, req: any): Promise<any>
     };
   }
 }
-

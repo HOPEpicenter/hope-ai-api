@@ -25,6 +25,10 @@ import {
 import {
   readMutationActorStaffIdentity
 } from "../../services/staff/readCanonicalStaffDirectory";
+import {
+  NEXT_STEP_COMPLETION_CORRECTED,
+  resolveEffectiveNextStepCompletionEvents
+} from "../../domain/formation/effectiveNextStepCompletionEvents";
 
 function normalizeAssignedTo(input: any): string | null {
   if (input === null || input === undefined) return null;
@@ -853,7 +857,24 @@ export async function deriveFormationProfileForVisitor(visitorIdInput: string): 
     limit: 10000
   });
 
+  return deriveFormationProfileFromEvents(visitorId, events);
+}
+
+export async function deriveFormationProfileFromEvents(
+  visitorIdInput: string,
+  events: FunctionFormationEventEntity[]
+): Promise<{
+  visitorId: string;
+  eventCount: number;
+  profile: FunctionFormationProfileEntity;
+}> {
+  const visitorId = String(visitorIdInput ?? "").trim();
+  if (!visitorId) {
+    throw new Error("visitorId is required");
+  }
+
   events.sort((a, b) => compareEventOrder(a.occurredAt, a.rowKey, b.occurredAt, b.rowKey));
+  const effectiveEvents = resolveEffectiveNextStepCompletionEvents(events).effectiveEvents;
 
   const profile: FunctionFormationProfileEntity = {
     partitionKey: "VISITOR",
@@ -861,7 +882,7 @@ export async function deriveFormationProfileForVisitor(visitorIdInput: string): 
     visitorId
   };
 
-  for (const event of events) {
+  for (const event of effectiveEvents) {
     const eventId = String((event as any).id ?? event.rowKey ?? "").split("__").pop() ?? "";
     const occurredAt = String(event.occurredAt ?? "").trim();
     const type = String(event.type ?? "").trim();
@@ -896,6 +917,45 @@ export async function deriveFormationProfileForVisitor(visitorIdInput: string): 
     eventCount: events.length,
     profile
   };
+}
+
+export async function resolveCorrectionAwareFormationProfile(
+  profile: FunctionFormationProfileEntity,
+  events: FunctionFormationEventEntity[]
+): Promise<FunctionFormationProfileEntity> {
+  if (!events.some(event => event.type === NEXT_STEP_COMPLETION_CORRECTED)) {
+    return profile;
+  }
+
+  return (await deriveFormationProfileFromEvents(profile.visitorId, events)).profile;
+}
+
+async function overlayCorrectionAwareFormationProfile(
+  profile: FunctionFormationProfileEntity
+): Promise<FunctionFormationProfileEntity> {
+  const visitorId = String(profile.visitorId ?? "").trim();
+  if (!visitorId) {
+    return profile;
+  }
+
+  const eventsTable = getFormationEventsTableClient();
+  await ensureTable(eventsTable);
+  const events = await listFormationEventsByVisitorId(eventsTable, {
+    visitorId,
+    limit: 10000
+  });
+
+  return resolveCorrectionAwareFormationProfile(profile, events);
+}
+
+export async function readCorrectionAwareFormationProfile(
+  table: TableClient,
+  visitorId: string
+): Promise<FunctionFormationProfileEntity | null> {
+  const persistedProfile = await getFormationProfileByVisitorId(table, visitorId);
+  return persistedProfile
+    ? overlayCorrectionAwareFormationProfile(persistedProfile)
+    : null;
 }
 
 export async function auditFormationProfileForVisitor(
@@ -1136,7 +1196,9 @@ export async function listFormationProfiles(
       groupsJson: entity.groupsJson
     }) as FunctionFormationProfileEntity;
 
-    if (!matchesProfileFilters(profile, input)) {
+    const correctionAwareProfile = await overlayCorrectionAwareFormationProfile(profile);
+
+    if (!matchesProfileFilters(correctionAwareProfile, input)) {
       continue;
     }
 
@@ -1144,37 +1206,37 @@ export async function listFormationProfiles(
 
     if (
       segment === "connected-without-next-step" &&
-      (String(profile.stage ?? "").trim() !== "Connected" ||
-        String(profile.lastNextStepAt ?? "").trim().length > 0)
+      (String(correctionAwareProfile.stage ?? "").trim() !== "Connected" ||
+        String(correctionAwareProfile.lastNextStepAt ?? "").trim().length > 0)
     ) {
       continue;
     }
 
     if (
       segment === "next-step-selected-not-completed" &&
-      (String(profile.lastNextStepAt ?? "").trim().length === 0 ||
-        String(profile.lastNextStepCompletedAt ?? "").trim().length > 0)
+      (String(correctionAwareProfile.lastNextStepAt ?? "").trim().length === 0 ||
+        String(correctionAwareProfile.lastNextStepCompletedAt ?? "").trim().length > 0)
     ) {
       continue;
     }
 
     if (
       segment === "active-care-without-outcome" &&
-      (String(profile.assignedTo ?? "").trim().length === 0 ||
-        String(profile.lastFollowupOutcomeAt ?? "").trim().length > 0)
+      (String(correctionAwareProfile.assignedTo ?? "").trim().length === 0 ||
+        String(correctionAwareProfile.lastFollowupOutcomeAt ?? "").trim().length > 0)
     ) {
       continue;
     }
 
     if (
       segment === "connected-without-care-owner" &&
-      (String(profile.stage ?? "").trim() !== "Connected" ||
-        String(profile.assignedTo ?? "").trim().length > 0)
+      (String(correctionAwareProfile.stage ?? "").trim() !== "Connected" ||
+        String(correctionAwareProfile.assignedTo ?? "").trim().length > 0)
     ) {
       continue;
     }
 
-    matched.push(profile);
+    matched.push(correctionAwareProfile);
 
     if (matched.length > limit) {
       hasMore = true
@@ -1190,4 +1252,3 @@ export async function listFormationProfiles(
     cursor: nextCursor
   };
 }
-

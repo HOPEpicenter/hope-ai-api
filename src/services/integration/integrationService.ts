@@ -7,6 +7,10 @@ import { deriveIntegrationSummaryV1 } from "../../domain/integration/deriveInteg
 import { getTimelineActivityType, getTimelineSummary } from "./timelineSemantics";
 import { compareTimelineNewestFirst } from "../../shared/timeline/timelineOrdering";
 import { paginateTimelineItems } from "../../shared/timeline/timelinePaginator";
+import {
+  NEXT_STEP_COMPLETION_CORRECTED,
+  resolveEffectiveNextStepCompletionEvents
+} from "../../domain/formation/effectiveNextStepCompletionEvents";
 
 export type IntegratedTimelinePageV1 = {
   items: any[];
@@ -51,8 +55,24 @@ function toFormationTimelineItem(visitorId: string, event: any) {
     type: event?.type,
     occurredAt: event?.occurredAt,
     stream: "formation" as const,
-    data: event
+    data: event,
+    effective: event?.effective ?? true
   };
+}
+
+function toCorrectionAwareFormationTimelineItems(visitorId: string, events: any[]): any[] {
+  const resolution = resolveEffectiveNextStepCompletionEvents(events);
+  const effectiveEventIds = new Set(
+    resolution.effectiveEvents.map(event => event.idempotencyKey ?? event.rowKey)
+  );
+
+  return events.map(event => toFormationTimelineItem(visitorId, {
+    ...event,
+    effective:
+      event.type === NEXT_STEP_COMPLETION_CORRECTED
+        ? false
+        : effectiveEventIds.has(event.idempotencyKey ?? event.rowKey)
+  }));
 }
 
 function toEngagementTimelineItem(event: any) {
@@ -84,7 +104,11 @@ function classifyTimelineActivity(item: any): { activityType: string; activityCa
     return { activityType: "STATUS_CHANGE", activityCategory: "ENGAGEMENT" };
   }
 
-  if (type === "NEXT_STEP_SELECTED" || type === "NEXT_STEP_COMPLETED") {
+  if (
+    type === "NEXT_STEP_SELECTED" ||
+    type === "NEXT_STEP_COMPLETED" ||
+    type === NEXT_STEP_COMPLETION_CORRECTED
+  ) {
     return { activityType: getTimelineActivityType(type), activityCategory: "FORMATION" };
   }
 
@@ -314,10 +338,10 @@ export class IntegrationService {
       limit: sourceLimit
     });
 
-    const formationItems = formationAscAll
-      .slice()
-      .reverse()
-      .map((event: any) => toFormationTimelineItem(visitorId, event));
+    const formationItems = toCorrectionAwareFormationTimelineItems(
+      visitorId,
+      formationAscAll.slice().reverse()
+    );
 
     const engagementItems = (engagementPage.items ?? []).map((event: any) =>
       toEngagementTimelineItem(event)
@@ -339,8 +363,20 @@ export class IntegrationService {
       if (formationEntities.length >= 200) break;
     }
 
-    const formationItems = formationEntities.map((event: any) =>
-      toFormationTimelineItem(event?.visitorId, event)
+    const eventsByVisitorId = new Map<string, any[]>();
+    for (const event of formationEntities) {
+      const visitorId = String(event?.visitorId ?? "").trim();
+      if (!visitorId) {
+        continue;
+      }
+
+      const events = eventsByVisitorId.get(visitorId) ?? [];
+      events.push(event);
+      eventsByVisitorId.set(visitorId, events);
+    }
+
+    const formationItems = Array.from(eventsByVisitorId.entries()).flatMap(([visitorId, events]) =>
+      toCorrectionAwareFormationTimelineItems(visitorId, events)
     );
 
     const visitorIds = Array.from(
@@ -402,4 +438,3 @@ export class IntegrationService {
     });
   }
 }
-

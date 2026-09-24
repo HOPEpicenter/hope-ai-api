@@ -35,7 +35,7 @@ import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
   ensureTable,
   getFormationProfilesTableClient,
-  getFormationProfileByVisitorId
+  readCorrectionAwareFormationProfile
 } from "../_shared/formation";
 
 export async function getVisitorFormationProfile(context: any, req: any): Promise<void> {
@@ -63,7 +63,7 @@ export async function getVisitorFormationProfile(context: any, req: any): Promis
     const table = getFormationProfilesTableClient();
     await ensureTable(table);
 
-    const profile = await getFormationProfileByVisitorId(table, visitorId);
+    const profile = await readCorrectionAwareFormationProfile(table, visitorId);
 
     context.res = {
       status: 200,
@@ -83,4 +83,3 @@ export async function getVisitorFormationProfile(context: any, req: any): Promis
     };
   }
 }
-

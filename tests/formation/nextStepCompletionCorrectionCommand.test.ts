@@ -11,6 +11,7 @@ import {
   resolveEffectiveNextStepCompletionEvents
 } from "../../src/domain/formation/effectiveNextStepCompletionEvents";
 import { CorrectionReplayUnavailableError } from "../../src/functions/_shared/formation";
+import { validateFormationEventEnvelopeV1Strict } from "../../src/contracts/formationEventEnvelope.v1";
 
 const visitorId = "visitor-synthetic";
 const completed = (id: string) => ({
@@ -122,6 +123,19 @@ async function run(): Promise<void> {
     (error: unknown) => error instanceof CorrectionReplayUnavailableError
   );
   assert.equal(large.transactions, 0);
+
+  assert.throws(
+    () => validateFormationEventEnvelopeV1Strict({
+      v: 1,
+      visitorId,
+      eventId: "generic-attempt",
+      type: NEXT_STEP_COMPLETION_CORRECTED,
+      occurredAt: "2026-01-02T00:00:00.000Z",
+      source: { system: "api" },
+      data: { targetEventIds: ["one"], reason: "wrong route" }
+    }),
+    /audited next-step completion correction command/
+  );
 
   const previous = process.env.FEATURE_NEXT_STEP_COMPLETION_CORRECTIONS;
   try {

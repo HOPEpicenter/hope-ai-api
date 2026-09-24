@@ -1,4 +1,5 @@
 import { TableClient } from "@azure/data-tables";
+import { NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX } from "../../domain/formation/effectiveNextStepCompletionEvents";
 
 export interface FormationEventEntity {
   partitionKey: string;
@@ -62,6 +63,8 @@ export async function listFormationEventsByVisitor(
   });
 
   for await (const entity of entities) {
+    const rowKey = String((entity as any).rowKey ?? (entity as any).RowKey ?? "");
+    if (rowKey.startsWith(NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX)) continue;
     results.push(entity);
     if (opts?.limit && results.length >= opts.limit) break;
   }
@@ -92,6 +95,8 @@ export async function listRecentFormationEvents(
   );
 
   for await (const entity of entities) {
+    const rowKey = String((entity as any).rowKey ?? (entity as any).RowKey ?? "");
+    if (rowKey.startsWith(NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX)) continue;
     results.push(entity);
     if (opts?.limit && results.length >= opts.limit) break;
   }

@@ -159,6 +159,32 @@ async function run(): Promise<void> {
     else process.env.FEATURE_NEXT_STEP_COMPLETION_CORRECTIONS = previous;
   }
 
+  const saved = new Map(
+    ["FEATURE_NEXT_STEP_COMPLETION_CORRECTIONS", "HOPE_ADMIN_API_KEY", "HOPE_ADMIN_STAFF_IDS"]
+      .map(key => [key, process.env[key]] as const)
+  );
+  try {
+    process.env.FEATURE_NEXT_STEP_COMPLETION_CORRECTIONS = "true";
+    delete process.env.HOPE_ADMIN_API_KEY;
+    const missingAdminKey: any = {};
+    await postNextStepCompletionCorrection(missingAdminKey, { body: input("missing-key", ["one"]), headers: {} });
+    assert.equal(missingAdminKey.res.status, 500);
+
+    process.env.HOPE_ADMIN_API_KEY = "synthetic-test-key";
+    process.env.HOPE_ADMIN_STAFF_IDS = "staff-synthetic";
+    const missingActor: any = {};
+    await postNextStepCompletionCorrection(missingActor, {
+      body: input("missing-actor", ["one"]),
+      headers: { "x-admin-api-key": "synthetic-test-key" }
+    });
+    assert.equal(missingActor.res.status, 401);
+  } finally {
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+
   console.log("nextStepCompletionCorrectionCommand.test.ts passed");
 }
 void run().catch(error => {

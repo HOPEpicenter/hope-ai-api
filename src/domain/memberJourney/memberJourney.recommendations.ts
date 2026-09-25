@@ -1,0 +1,11 @@
+import type { MemberJourneyAggregate } from "./memberJourney.aggregate";
+
+export type MemberJourneyRecommendationPriority = "urgent" | "high" | "medium" | "low";
+export type MemberJourneyRecommendation = { priority: MemberJourneyRecommendationPriority; action: string; rationale: string; source: "predictive" | "domain"; horizon: "within_24_hours" | "within_7_days" | "within_30_days" };
+const priorityOrder: Record<MemberJourneyRecommendationPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+export function buildMemberJourneyRecommendations(aggregate: MemberJourneyAggregate): MemberJourneyRecommendation[] {
+  const predictive = (aggregate.predictiveMemberIntelligence?.actions ?? []).map((action) => ({ priority: action.horizon === "within_24_hours" ? "urgent" as const : action.horizon === "within_7_days" ? "high" as const : "medium" as const, action: action.action, rationale: action.rationale, source: "predictive" as const, horizon: action.horizon }));
+  const domain = aggregate.riskMoments.map((event) => ({ priority: event.severity === "critical" ? "urgent" as const : "high" as const, action: `Review ${event.domain} ${event.eventType}`, rationale: `Recorded ${event.severity} journey signal.`, source: "domain" as const, horizon: event.severity === "critical" ? "within_24_hours" as const : "within_7_days" as const }));
+  const fallback = aggregate.growthMoments.length ? [{ priority: "low" as const, action: "Affirm the next growth step", rationale: "Recent participation suggests a timely opportunity for encouragement.", source: "domain" as const, horizon: "within_30_days" as const }] : [{ priority: "low" as const, action: "Begin a personal connection", rationale: "No domain or predictive action is currently available.", source: "domain" as const, horizon: "within_30_days" as const }];
+  return [...predictive, ...domain, ...(predictive.length || domain.length ? [] : fallback)].sort((left, right) => priorityOrder[left.priority] - priorityOrder[right.priority] || left.action.localeCompare(right.action));
+}

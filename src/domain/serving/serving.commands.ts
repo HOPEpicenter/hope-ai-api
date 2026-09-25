@@ -1,0 +1,12 @@
+import { createServingActivityRecordedEvent, createServingAssignmentClosedEvent, createServingAssignmentStartedEvent, createServingRoleAssignedEvent, createServingStalledDetectedEvent, type ServingActivityRecorded, type ServingAssignmentClosed, type ServingAssignmentStarted, type ServingPriority, type ServingRoleAssigned, type ServingStalledDetected } from "./serving.events";
+type ServingCommandBase = { memberId: string; assignmentId: string; actorId?: string | null };
+export type StartServingAssignmentCommand = ServingCommandBase & { roleId: string | null; priority: ServingPriority };
+export type AssignServingRoleCommand = ServingCommandBase & { roleId: string };
+export type RecordServingActivityCommand = ServingCommandBase & { activity: string };
+export type DetectServingStalledCommand = ServingCommandBase & { stalledSince: string; reason?: string };
+export type CloseServingAssignmentCommand = ServingCommandBase;
+export const handleStartServingAssignment = (command: StartServingAssignmentCommand): ServingAssignmentStarted => createServingAssignmentStartedEvent(command.memberId, command.assignmentId, command.roleId, command.priority, command.actorId);
+export const handleAssignServingRole = (command: AssignServingRoleCommand): ServingRoleAssigned => createServingRoleAssignedEvent(command.memberId, command.assignmentId, command.roleId, command.actorId);
+export const handleRecordServingActivity = (command: RecordServingActivityCommand): ServingActivityRecorded => createServingActivityRecordedEvent(command.memberId, command.assignmentId, command.activity, command.actorId);
+export const handleDetectServingStalled = (command: DetectServingStalledCommand): ServingStalledDetected => createServingStalledDetectedEvent(command.memberId, command.assignmentId, command.stalledSince, command.reason, command.actorId);
+export const handleCloseServingAssignment = (command: CloseServingAssignmentCommand): ServingAssignmentClosed => createServingAssignmentClosedEvent(command.memberId, command.assignmentId, command.actorId);

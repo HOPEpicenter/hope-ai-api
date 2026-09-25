@@ -1,0 +1,3 @@
+import { buildAttendanceAnalytics } from "../../src/domain/attendance/attendance.analytics";
+import { createInitialAttendanceProfile } from "../../src/domain/attendance/attendanceProfile.projection";
+describe("Attendance analytics", () => { it("counts late attendance as attended", () => { const profile = createInitialAttendanceProfile("member-1"); profile.records = [{ attendanceId: "a", memberId: "member-1", status: "late", recordedAt: "2026-09-01T00:00:00.000Z", stalledSince: null, stallReason: null, completedAt: null }]; expect(buildAttendanceAnalytics([profile])).toMatchObject({ attendedCount: 1, attendanceRate: 1 }); }); });

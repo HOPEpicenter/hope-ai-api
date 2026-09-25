@@ -1,0 +1,3 @@
+import { Router } from "express";
+import { MinistryHealthController } from "./ministryHealth.controller";
+export function createMinistryHealthRoutes(controller: MinistryHealthController): Router { const router = Router(); router.get("/ministry-health/summary", (_req, res) => res.json(controller.getSummary())); router.get("/ministry-health/analytics", (_req, res) => res.json(controller.getAnalytics())); router.get("/ministry-health/insights", (_req, res) => res.json(controller.getInsights())); router.get("/ministry-health/coaching", (_req, res) => res.json(controller.getCoaching())); router.get("/ministry-health/report", (_req, res) => res.json(controller.getReport())); return router; }

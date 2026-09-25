@@ -1,0 +1,4 @@
+import { buildCommunityTimeline } from "../../src/domain/community/community.timeline";
+import { createCommunityEngagementStartedEvent } from "../../src/domain/community/community.events";
+import { createInitialCommunityProfile } from "../../src/domain/community/communityProfile.projection";
+describe("Community timeline", () => { it("maps the required started event type", () => { const event = createCommunityEngagementStartedEvent("member-1", "engagement-1", "group-1", "low"); expect(buildCommunityTimeline(createInitialCommunityProfile("member-1"), [event])[0]?.type).toBe("CommunityEngagementStarted"); }); });

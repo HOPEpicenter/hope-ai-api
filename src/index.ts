@@ -1,4 +1,5 @@
 import express from "express";
+import { requireApiKey } from "./shared/auth/requireApiKey";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import visitorsRouter from "./routes/visitors/visitorsRouter";
@@ -19,6 +20,39 @@ import protectedRouter from "./routes/protected";
 import { careRouter } from "./routes/care";
 import { activityIntelligenceRouter } from "./routes/activityIntelligence";
 import { sixWeekFollowupsRouter } from "./routes/sixWeekFollowups";
+import { FormationProfileController } from "./api/formation/formationProfile.controller";
+import { createFormationProfileRoutes } from "./api/formation/formationProfile.routes";
+import { FormationProfileIndex } from "./domain/formation/formationProfile.index";
+import { CareController } from "./api/care/care.controller";
+import { createCareRoutes } from "./api/care/care.routes";
+import { CareProfileIndex } from "./domain/care/careProfile.index";
+import { ServingController } from "./api/serving/serving.controller";
+import { createServingRoutes } from "./api/serving/serving.routes";
+import { ServingProfileIndex } from "./domain/serving/servingProfile.index";
+import { CommunityController } from "./api/community/community.controller";
+import { createCommunityRoutes } from "./api/community/community.routes";
+import { CommunityProfileIndex } from "./domain/community/communityProfile.index";
+import { GivingController } from "./api/giving/giving.controller";
+import { createGivingRoutes } from "./api/giving/giving.routes";
+import { GivingProfileIndex } from "./domain/giving/givingProfile.index";
+import { AttendanceController } from "./api/attendance/attendance.controller";
+import { createAttendanceRoutes } from "./api/attendance/attendance.routes";
+import { AttendanceProfileIndex } from "./domain/attendance/attendanceProfile.index";
+import { EngagementController } from "./api/engagement/engagement.controller";
+import { createEngagementRoutes } from "./api/engagement/engagement.routes";
+import { EngagementProfileIndex } from "./domain/engagement/engagementProfile.index";
+import { MinistryHealthController } from "./api/ministryHealth/ministryHealth.controller";
+import { createMinistryHealthRoutes } from "./api/ministryHealth/ministryHealth.routes";
+import { AiModelingController } from "./api/aiModeling/aiModeling.controller";
+import { createAiModelingRoutes } from "./api/aiModeling/aiModeling.routes";
+import { PredictiveIntelligenceController } from "./api/predictiveIntelligence/predictiveIntelligence.controller";
+import { createPredictiveIntelligenceRoutes } from "./api/predictiveIntelligence/predictiveIntelligence.routes";
+import { MemberJourneyController } from "./api/memberJourney/memberJourney.controller";
+import { createMemberJourneyRoutes } from "./api/memberJourney/memberJourney.routes";
+import { WorkloadOptimizationController } from "./api/workloadOptimization/workloadOptimization.controller";
+import { createWorkloadOptimizationRoutes } from "./api/workloadOptimization/workloadOptimization.routes";
+import { PastoralBriefingController } from "./api/pastoralBriefing/pastoralBriefing.controller";
+import { createPastoralBriefingRoutes } from "./api/pastoralBriefing/pastoralBriefing.routes";
 
 import { AzureTableEngagementsRepository } from "./repositories/engagementsRepository";
 process.on("unhandledRejection", (reason) => {
@@ -73,6 +107,21 @@ app.use(requestLogMiddleware);
 const visitorsRepository = new AzureTableVisitorsRepository();
 const formationEventsRepository = new AzureTableFormationEventsRepository();
 const engagementsRepository = new AzureTableEngagementsRepository();
+const formationProfileController = new FormationProfileController(
+  new FormationProfileIndex()
+);
+const careController = new CareController(new CareProfileIndex());
+const servingController = new ServingController(new ServingProfileIndex());
+const communityController = new CommunityController(new CommunityProfileIndex());
+const givingController = new GivingController(new GivingProfileIndex());
+const attendanceController = new AttendanceController(new AttendanceProfileIndex());
+const engagementController = new EngagementController(new EngagementProfileIndex());
+const ministryHealthController = new MinistryHealthController();
+const aiModelingController = new AiModelingController();
+const predictiveIntelligenceController = new PredictiveIntelligenceController();
+const memberJourneyController = new MemberJourneyController();
+const workloadOptimizationController = new WorkloadOptimizationController();
+const pastoralBriefingController = new PastoralBriefingController();
 app.use("/ops", createOpsRouter(visitorsRepository, formationEventsRepository, engagementsRepository));
 app.use("/ops/followups", opsFollowupsRouter);
 // Public API routes
@@ -81,6 +130,18 @@ app.use("/api/visitors", visitorsRouter(visitorsRepository));
 app.use("/visitors", visitorsRouter(visitorsRepository));
 app.use("/api", formationEventsRouter);
 app.use("/api", formationRouter);
+app.use("/api", requireApiKey, createFormationProfileRoutes(formationProfileController));
+app.use("/api", requireApiKey, createCareRoutes(careController));
+app.use("/api", requireApiKey, createServingRoutes(servingController));
+app.use("/api", requireApiKey, createCommunityRoutes(communityController));
+app.use("/api", requireApiKey, createGivingRoutes(givingController));
+app.use("/api", requireApiKey, createAttendanceRoutes(attendanceController));
+app.use("/api", requireApiKey, createEngagementRoutes(engagementController));
+app.use("/api", requireApiKey, createAiModelingRoutes(aiModelingController));
+app.use("/api", requireApiKey, createPredictiveIntelligenceRoutes(predictiveIntelligenceController));
+app.use("/api", requireApiKey, createMemberJourneyRoutes(memberJourneyController));
+app.use("/api", requireApiKey, createWorkloadOptimizationRoutes(workloadOptimizationController));
+app.use("/api", requireApiKey, createPastoralBriefingRoutes(pastoralBriefingController));
 app.use("/api", followupQueueRouter);
 app.use("/api", engagementsRouter);
 app.use("/api", integrationRouter);
@@ -91,6 +152,7 @@ app.use("/api", dashboardRouter);
 app.use("/api", opsParityRouter);
 app.use("/api", protectedRouter);
 app.use("/api", legacyRouter);
+app.use("/api", requireApiKey, createMinistryHealthRoutes(ministryHealthController));
 
 /**
  * Global JSON error handler

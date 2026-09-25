@@ -1,0 +1,13 @@
+export type AttendanceStatus = "present" | "absent" | "late";
+export type AttendanceEventBase = { eventId: string; occurredAt: string; memberId: string; attendanceId: string; actorId?: string | null };
+export type AttendanceRecorded = AttendanceEventBase & { type: "AttendanceRecorded"; payload: { status: AttendanceStatus; notes?: string } };
+export type AttendanceStatusUpdated = AttendanceEventBase & { type: "AttendanceStatusUpdated"; payload: { status: AttendanceStatus; notes?: string } };
+export type AttendanceStalledDetected = AttendanceEventBase & { type: "AttendanceStalledDetected"; payload: { stalledSince: string; reason?: string } };
+export type AttendanceCycleCompleted = AttendanceEventBase & { type: "AttendanceCycleCompleted"; payload: { completedAt: string } };
+export type AttendanceEvent = AttendanceRecorded | AttendanceStatusUpdated | AttendanceStalledDetected | AttendanceCycleCompleted;
+
+function base(memberId: string, attendanceId: string, actorId?: string | null): AttendanceEventBase { return { eventId: crypto.randomUUID(), occurredAt: new Date().toISOString(), memberId, attendanceId, actorId: actorId ?? null }; }
+export function createAttendanceRecordedEvent(memberId: string, attendanceId: string, status: AttendanceStatus, notes?: string, actorId?: string | null): AttendanceRecorded { return { ...base(memberId, attendanceId, actorId), type: "AttendanceRecorded", payload: { status, ...(notes === undefined ? {} : { notes }) } }; }
+export function createAttendanceStatusUpdatedEvent(memberId: string, attendanceId: string, status: AttendanceStatus, notes?: string, actorId?: string | null): AttendanceStatusUpdated { return { ...base(memberId, attendanceId, actorId), type: "AttendanceStatusUpdated", payload: { status, ...(notes === undefined ? {} : { notes }) } }; }
+export function createAttendanceStalledDetectedEvent(memberId: string, attendanceId: string, stalledSince: string, reason?: string, actorId?: string | null): AttendanceStalledDetected { return { ...base(memberId, attendanceId, actorId), type: "AttendanceStalledDetected", payload: { stalledSince, ...(reason === undefined ? {} : { reason }) } }; }
+export function createAttendanceCycleCompletedEvent(memberId: string, attendanceId: string, actorId?: string | null): AttendanceCycleCompleted { const event = base(memberId, attendanceId, actorId); return { ...event, type: "AttendanceCycleCompleted", payload: { completedAt: event.occurredAt } }; }

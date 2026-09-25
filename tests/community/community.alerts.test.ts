@@ -1,0 +1,5 @@
+import { buildCommunityAlerts } from "../../src/domain/community/community.alerts";
+import { buildCommunityInsights } from "../../src/domain/community/community.insights";
+import { applyCommunityEventToProfile, createInitialCommunityProfile } from "../../src/domain/community/communityProfile.projection";
+import { createCommunityEngagementStartedEvent } from "../../src/domain/community/community.events";
+describe("Community alerts", () => { it("alerts for a high-priority engagement", () => { const profile = applyCommunityEventToProfile(createInitialCommunityProfile("member-1"), createCommunityEngagementStartedEvent("member-1", "engagement-1", "group-1", "high")); expect(buildCommunityAlerts(profile, buildCommunityInsights(profile))[0]?.signalType).toBe("HighPriorityCommunityEngagement"); }); });

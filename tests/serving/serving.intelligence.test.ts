@@ -1,0 +1,5 @@
+import { buildServingInsights } from "../../src/domain/serving/serving.insights";
+import { buildServingRecommendation } from "../../src/domain/serving/serving.intelligence";
+import { applyServingEventToProfile, createInitialServingProfile } from "../../src/domain/serving/servingProfile.projection";
+import { createServingAssignmentStartedEvent, createServingStalledDetectedEvent } from "../../src/domain/serving/serving.events";
+describe("Serving intelligence", () => { it("prioritizes a stalled assignment", () => { const started = createServingAssignmentStartedEvent("member-1", "assignment-1", "role-1", "medium"); const profile = applyServingEventToProfile(applyServingEventToProfile(createInitialServingProfile("member-1"), started), createServingStalledDetectedEvent("member-1", "assignment-1", started.occurredAt)); expect(buildServingRecommendation(profile, buildServingInsights(profile)).action).toBe("address_stalled_assignment"); }); });

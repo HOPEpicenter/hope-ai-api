@@ -34,7 +34,9 @@ async function run(): Promise<void> {
         updatedAt: "2026-08-25T00:00:00.000Z",
         lastEventId: "evt-admin",
         entraTenantId: null,
-        entraObjectId: null
+        entraObjectId: null,
+        email: null,
+        phone: null
       })
     );
 
@@ -61,7 +63,9 @@ async function run(): Promise<void> {
         updatedAt: "2026-08-25T00:00:00.000Z",
         lastEventId: "evt-admin",
         entraTenantId: null,
-        entraObjectId: null
+        entraObjectId: null,
+        email: null,
+        phone: null
       })
     );
 
@@ -113,7 +117,9 @@ async function run(): Promise<void> {
         updatedAt: "2026-08-25T00:00:00.000Z",
         lastEventId: "evt-admin-inactive",
         entraTenantId: null,
-        entraObjectId: null
+        entraObjectId: null,
+        email: null,
+        phone: null
       })
     );
 

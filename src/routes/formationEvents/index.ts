@@ -12,6 +12,16 @@ import { rebuildFormationProfileForVisitor } from "../../functions/_shared/forma
 import { getVisitorById } from "../../functions/_shared/visitorsRepository";
 import { buildProjectionIntegrityEnvelope } from "../../shared/integration/projectionIntegrityEnvelope";
 import { buildReplayDiagnosticsEnvelope } from "../../shared/integration/replayDiagnosticsEnvelope";
+import { buildFormationAnalytics } from "../../domain/formation/formation.analytics";
+import { getCoachingForMember } from "../../domain/formation/formation.coaching";
+import { FormationIntelligence } from "../../domain/formation/formation.intelligence";
+import { buildFormationMilestones } from "../../domain/formation/formation.milestones";
+import { FormationProfileIndex } from "../../domain/formation/formationProfile.index";
+import { createInitialFormationProfile } from "../../domain/formation/formationProfile.projection";
+import { generateFormationJourneyReport } from "../../domain/formation/formation.report";
+import { buildFormationTimeline } from "../../domain/formation/formation.timeline";
+import { toFormationProfileEvent } from "../visitors/createGetVisitorFormationProfileAdapter";
+import { PastoralInsightsEngine } from "../../services/intelligence/pastoralInsightsEngine";
 
 export const formationEventsRouter = Router();
 formationEventsRouter.use(requireApiKey);
@@ -243,6 +253,63 @@ const ascAll = await listFormationEventsByVisitor(eventsTable as any, visitorId,
     return res.status(200).json({ ok: true, visitorId, items, cursor: nextCursor, nextCursor });
   } catch (e: any) {
     return res.status(toHttpStatus(e, 400)).json({ ok: false, error: e?.message || "Bad Request" });
+  }
+});
+
+formationEventsRouter.get("/formation/report/:memberId", async (req, res) => {
+  try {
+    const memberId = String(req.params.memberId ?? "").trim();
+    const storageConnectionString = process.env.STORAGE_CONNECTION_STRING;
+    if (!storageConnectionString) {
+      return res.status(500).json({ ok: false, error: "Missing STORAGE_CONNECTION_STRING" });
+    }
+
+    const eventsTable = getFormationEventsTableClient(storageConnectionString);
+    await ensureTableExists(eventsTable);
+    const events = (await listFormationEventsByVisitor(eventsTable as any, memberId))
+      .map((entity) => toFormationProfileEvent(entity as Record<string, unknown>, memberId))
+      .filter((event): event is NonNullable<typeof event> => event !== null)
+      .sort((left, right) =>
+        left.occurredAt.localeCompare(right.occurredAt)
+        || left.eventId.localeCompare(right.eventId)
+      );
+    const profileIndex = new FormationProfileIndex();
+    profileIndex.replayEvents(events);
+    const profile = profileIndex.getProfile(memberId)
+      ?? createInitialFormationProfile(memberId);
+    const timeline = buildFormationTimeline(profile, events);
+    const milestones = buildFormationMilestones(timeline);
+    const insights = new PastoralInsightsEngine(profileIndex).getFormationInsights(memberId);
+    const recommendation = new FormationIntelligence().analyze(profile).recommendedNextStep;
+    const analytics = buildFormationAnalytics({
+      profiles: [profile],
+      timelines: [{ memberId, items: timeline }],
+      milestones: [{ memberId, milestones }]
+    });
+    const coaching = getCoachingForMember(
+      profile,
+      timeline,
+      milestones,
+      insights,
+      recommendation
+    );
+
+    return res.json({
+      ok: true,
+      report: generateFormationJourneyReport({
+        memberId,
+        profile,
+        timeline,
+        milestones,
+        coaching,
+        analytics
+      })
+    });
+  } catch (error: any) {
+    return res.status(toHttpStatus(error, 400)).json({
+      ok: false,
+      error: error?.message || "Bad Request"
+    });
   }
 });
 

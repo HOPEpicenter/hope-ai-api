@@ -1,0 +1,3 @@
+import { ServingAggregate } from "../../src/domain/serving/serving.aggregate";
+import { handleRecordServingActivity, handleStartServingAssignment } from "../../src/domain/serving/serving.commands";
+describe("Serving aggregate", () => { it("replays an assignment lifecycle", () => { const aggregate = new ServingAggregate(); aggregate.apply(handleStartServingAssignment({ memberId: "member-1", assignmentId: "assignment-1", roleId: "role-1", priority: "high" })); aggregate.apply(handleRecordServingActivity({ memberId: "member-1", assignmentId: "assignment-1", activity: "Served" })); expect(aggregate.getState()).toMatchObject({ memberId: "member-1", roleId: "role-1", status: "active" }); expect(aggregate.getState().activities).toHaveLength(1); }); });

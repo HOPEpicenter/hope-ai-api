@@ -1,0 +1,10 @@
+import { buildMinistryHealthAggregate, type MinistryHealthAggregate, type MinistryHealthInputs } from "./ministryHealth.aggregate";
+import { buildMinistryHealthAnalytics } from "./ministryHealth.analytics";
+import { buildMinistryHealthCoaching } from "./ministryHealth.coaching";
+import { buildMinistryHealthInsights } from "./ministryHealth.insights";
+import { buildMinistryHealthRecommendations } from "./ministryHealth.intelligence";
+import { buildMinistryHealthMilestones } from "./ministryHealth.milestones";
+import { projectMinistryHealthProfile } from "./ministryHealthProfile.projection";
+import { generateMinistryHealthReport } from "./ministryHealth.report";
+import { buildMinistryHealthTimeline } from "./ministryHealth.timeline";
+export class MinistryHealthService { private aggregate: MinistryHealthAggregate; constructor(inputs: MinistryHealthInputs = {}, generatedAt?: string) { this.aggregate = buildMinistryHealthAggregate(inputs, generatedAt); } refresh(inputs: MinistryHealthInputs, generatedAt?: string): MinistryHealthAggregate { this.aggregate = buildMinistryHealthAggregate(inputs, generatedAt); return this.aggregate; } getSummary() { return { ...this.aggregate.ministryHealthSummary, scores: this.aggregate.ministryHealthScores, alerts: this.aggregate.ministryHealthAlerts, trends: this.aggregate.ministryHealthTrends }; } getAnalytics() { return buildMinistryHealthAnalytics(this.aggregate); } getInsights() { return buildMinistryHealthInsights(this.aggregate); } getCoaching() { return buildMinistryHealthCoaching(buildMinistryHealthRecommendations(this.getInsights())); } getReport() { return generateMinistryHealthReport(this.aggregate, this.getAnalytics(), this.getCoaching()); } getProfile() { return projectMinistryHealthProfile(this.aggregate); } getTimeline() { return buildMinistryHealthTimeline(this.aggregate); } getMilestones() { return buildMinistryHealthMilestones(this.getTimeline()); } }

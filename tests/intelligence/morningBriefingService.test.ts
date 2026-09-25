@@ -5,6 +5,7 @@ import {
   MORNING_BRIEFING_CARE_TARGET_LIMIT,
   type MorningBriefingCompositionInput
 } from "../../src/services/intelligence/morningBriefingService";
+import { FormationProfileIndex } from "../../src/domain/formation/formationProfile.index";
 import type {
   CanonicalMorningBriefingCareCandidate
 } from "../../src/services/intelligence/readCanonicalActivityIntelligence";
@@ -76,7 +77,213 @@ const baseInput: MorningBriefingCompositionInput = {
         highestPriority: null,
         items: []
       }
-    }
+    },
+    formationInsights: [],
+    formationRecommendations: [],
+    formationAlerts: [],
+    formationBriefing: {
+      activePathways: [],
+      stalledSteps: [],
+      completedPathways: [],
+      nextRecommendedStep: "Not yet implemented"
+    },
+    formationTimeline: [],
+    formationMilestones: [],
+    formationAnalytics: {
+      totalPathwaysStarted: 0,
+      totalPathwaysCompleted: 0,
+      averagePathwayDuration: null,
+      averageStepDuration: null,
+      mostCommonStalledStep: null,
+      mostCommonCompletedStep: null,
+      pathwayCompletionRate: 0,
+      stallRate: 0,
+      activePathwayCount: 0,
+      stalledPathwayCount: 0,
+      completedPathwayCount: 0
+    },
+    formationCoaching: []
+    ,careProfile: [],
+    careTimeline: [],
+    careMilestones: [],
+    careInsights: [],
+    careRecommendations: [],
+    careAlerts: [],
+    careAnalytics: {
+      totalMembers: 0,
+      totalCases: 0,
+      openCases: 0,
+      stalledCases: 0,
+      closedCases: 0,
+      highPriorityOpenCases: 0,
+      unassignedOpenCases: 0,
+      closureRate: 0
+    },
+    careCoaching: [],
+    servingProfile: [],
+    servingTimeline: [],
+    servingMilestones: [],
+    servingInsights: [],
+    servingRecommendations: [],
+    servingAlerts: [],
+    servingAnalytics: {
+      totalMembers: 0,
+      totalAssignments: 0,
+      activeAssignments: 0,
+      stalledAssignments: 0,
+      closedAssignments: 0,
+      highPriorityActiveAssignments: 0,
+      unassignedRoleAssignments: 0,
+      totalActivities: 0,
+      closureRate: 0
+    },
+    servingCoaching: [],
+    communityProfile: [],
+    communityTimeline: [],
+    communityMilestones: [],
+    communityInsights: [],
+    communityRecommendations: [],
+    communityAlerts: [],
+    communityAnalytics: {
+      totalMembers: 0,
+      totalEngagements: 0,
+      activeEngagements: 0,
+      stalledEngagements: 0,
+      completedEngagements: 0,
+      highPriorityActiveEngagements: 0,
+      unassignedGroupEngagements: 0,
+      totalInteractions: 0,
+      completionRate: 0
+    },
+    communityCoaching: [],
+    givingProfile: [],
+    givingTimeline: [],
+    givingMilestones: [],
+    givingInsights: [],
+    givingRecommendations: [],
+    givingAlerts: [],
+    givingAnalytics: {
+      totalMembers: 0,
+      totalGifts: 0,
+      totalGiven: 0,
+      averageGiftAmount: 0,
+      activeGifts: 0,
+      stalledGifts: 0,
+      completedGifts: 0,
+      increasingGenerosityMembers: 0,
+      decreasingGenerosityMembers: 0,
+      completionRate: 0
+    },
+    givingCoaching: [],
+    attendanceProfile: [],
+    attendanceTimeline: [],
+    attendanceMilestones: [],
+    attendanceInsights: [],
+    attendanceRecommendations: [],
+    attendanceAlerts: [],
+    attendanceAnalytics: {
+      totalMembers: 0,
+      totalRecords: 0,
+      presentCount: 0,
+      absentCount: 0,
+      lateCount: 0,
+      attendedCount: 0,
+      attendanceRate: 0,
+      stalledRecords: 0,
+      completedCycles: 0
+    },
+    attendanceCoaching: [],
+    engagementProfile: [],
+    engagementTimeline: [],
+    engagementMilestones: [],
+    engagementInsights: [],
+    engagementRecommendations: [],
+    engagementAlerts: [],
+    engagementAnalytics: {
+      totalMembers: 0,
+      totalCycles: 0,
+      totalTouchpoints: 0,
+      totalEngagementScore: 0,
+      averageEngagementScore: 0,
+      stalledCycles: 0,
+      completedCycles: 0,
+      completionRate: 0
+    },
+    engagementCoaching: [],
+    ministryHealthSummary: {
+      status: "healthy",
+      overallScore: 100,
+      domainsAvailable: 0,
+      domainsTotal: 7,
+      alertCount: 0,
+      scores: [],
+      alerts: [],
+      trends: []
+    },
+    ministryHealthAnalytics: {
+      overallScore: 100,
+      status: "healthy",
+      scoresByDomain: {},
+      alertCount: 0,
+      trendCounts: {}
+    },
+    ministryHealthInsights: [],
+    ministryHealthCoaching: {
+      priority: "low",
+      focus: "ministry health",
+      nextStep: null,
+      recommendations: []
+    },
+    aiFeatures: [],
+    aiPredictions: [],
+    aiInsights: [],
+    aiRecommendations: [],
+    predictiveMemberIntelligence: [],
+    predictiveLeadershipIntelligence: {
+      summary: {
+        highRiskMembers: [],
+        careMembers: [],
+        growthMembers: [],
+        leadershipMembers: [],
+        totalMembers: 0,
+        ministryHealthStatus: "healthy"
+      },
+      actions: [],
+      report: {
+        members: [],
+        rankings: [],
+        aiInsights: [],
+        aiRecommendations: []
+      }
+    },
+    memberJourneySummary: { tone: "pastoral", summary: "", currentSeason: "", direction: "steady", pastoralResponse: "" },
+    memberJourneyInsights: { strengths: [], risks: [], opportunities: [], careSignals: [], growthSignals: [], engagementSignals: [], ministryHealthSignals: [] },
+    memberJourneyRecommendations: [],
+    workloadMemberPlan: null,
+    workloadPastorPlans: [],
+    workloadLeadershipSummary: {
+      totalMembers: 0,
+      assignedCount: 0,
+      unassignedCount: 0,
+      urgentCount: 0,
+      byPastor: {}
+    },
+    dailyPastoralBriefing: {
+      generatedAt: "2026-09-15T08:00:00.000Z",
+      urgency: { level: "normal", summary: "No urgent pastoral priorities are currently identified.", memberIds: [] },
+      trendSnapshot: { direction: "stable", summary: "" },
+      actions: [],
+      scriptureEncouragement: null
+    },
+    weeklyPastoralBriefing: {
+      generatedAt: "2026-09-15T08:00:00.000Z",
+      pastoralFocus: "",
+      ministryHealth: { status: "healthy", overallScore: 100, alertCount: 0 },
+      workloadDistribution: { total: 0, urgent: 0, high: 0, medium: 0, low: 0, assigned: 0, unassigned: 0, byPastor: {} },
+      coachingThemes: [],
+      recommendedActions: []
+    },
+    eventPastoralBriefings: []
   }
 };
 
@@ -87,6 +294,116 @@ const baseInput: MorningBriefingCompositionInput = {
   assert.equal(result.decision.status, "clear");
   assert.equal(result.decision.firstAction, null);
   assert.deepEqual(result.decision.actions, []);
+  assert.deepEqual(result.formation, {
+    activePathways: [],
+    stalledSteps: [],
+    completedPathways: [],
+    nextRecommendedStep: null
+  });
+}
+
+{
+  const formationProfileIndex = new FormationProfileIndex();
+  formationProfileIndex.replayEvents([
+    {
+      eventId: "formation-started",
+      occurredAt: "2026-09-01T09:00:00.000Z",
+      source: "api",
+      memberId: "member-active",
+      pathwayId: "pathway-active",
+      type: "PathwayStarted",
+      payload: {
+        startedAt: "2026-09-01T09:00:00.000Z",
+        pathwayType: "new-believer",
+        initialStepId: "welcome"
+      }
+    },
+    {
+      eventId: "formation-stalled",
+      occurredAt: "2026-09-03T09:00:00.000Z",
+      source: "api",
+      memberId: "member-active",
+      pathwayId: "pathway-active",
+      type: "StepStalledDetected",
+      payload: {
+        stepId: "group",
+        stalledSince: "2026-09-02T09:00:00.000Z",
+        reason: "No response"
+      }
+    },
+    {
+      eventId: "formation-completed-started",
+      occurredAt: "2026-09-01T09:00:00.000Z",
+      source: "api",
+      memberId: "member-completed",
+      pathwayId: "pathway-completed",
+      type: "PathwayStarted",
+      payload: {
+        startedAt: "2026-09-01T09:00:00.000Z",
+        pathwayType: "membership",
+        initialStepId: "welcome"
+      }
+    },
+    {
+      eventId: "formation-completed",
+      occurredAt: "2026-09-04T09:00:00.000Z",
+      source: "api",
+      memberId: "member-completed",
+      pathwayId: "pathway-completed",
+      type: "PathwayCompleted",
+      payload: {
+        completedAt: "2026-09-04T09:00:00.000Z",
+        finalStepId: "commissioned"
+      }
+    }
+  ]);
+
+  const result = composeMorningBriefing({
+    ...baseInput,
+    formationProfileIndex
+  });
+
+  assert.deepEqual(result.formation, {
+    activePathways: [
+      {
+        pathwayId: "pathway-active",
+        pathwayType: "new-believer",
+        startedAt: "2026-09-01T09:00:00.000Z",
+        completedAt: null,
+        currentStepId: "welcome",
+        status: "stalled",
+        steps: [
+          {
+            stepId: "group",
+            stalledSince: "2026-09-02T09:00:00.000Z",
+            reason: "No response"
+          }
+        ],
+        memberId: "member-active"
+      }
+    ],
+    stalledSteps: [
+      {
+        stepId: "group",
+        stalledSince: "2026-09-02T09:00:00.000Z",
+        reason: "No response",
+        memberId: "member-active"
+      }
+    ],
+    completedPathways: [
+      {
+        pathwayId: "pathway-completed",
+        pathwayType: "membership",
+        startedAt: "2026-09-01T09:00:00.000Z",
+        completedAt: "2026-09-04T09:00:00.000Z",
+        currentStepId: "commissioned",
+        status: "completed",
+        steps: [],
+        memberId: "member-completed"
+      }
+    ],
+    nextRecommendedStep: null
+  });
 }
 
 {

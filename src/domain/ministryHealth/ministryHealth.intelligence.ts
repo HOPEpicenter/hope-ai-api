@@ -1,0 +1,3 @@
+import type { MinistryHealthInsight } from "./ministryHealth.insights";
+export type MinistryHealthRecommendation = { domain: string; priority: "low" | "medium" | "high"; action: string; reason: string };
+export function buildMinistryHealthRecommendations(insights: readonly MinistryHealthInsight[]): MinistryHealthRecommendation[] { return insights.filter(insight => insight.severity !== "info").map(insight => ({ domain: insight.domain, priority: insight.severity === "critical" ? "high" : "medium", action: `Review ${insight.domain} workload and assign an owner.`, reason: insight.message })); }

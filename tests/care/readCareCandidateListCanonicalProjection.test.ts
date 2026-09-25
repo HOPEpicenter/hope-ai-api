@@ -7,6 +7,7 @@ import type {
 } from "../../src/services/dashboard/canonicalDashboardContracts";
 
 const card: CanonicalVisitorDashboardCard = {
+  displayName: "Sample Visitor",
   visitorId: "visitor-daniel",
   lastActivityAt: "2026-07-14T12:03:00.000Z",
   lastActivitySummary: "Care ownership assigned",
@@ -16,6 +17,8 @@ const card: CanonicalVisitorDashboardCard = {
   stageUpdatedBy: "system",
   lastNextStepAt: null,
   lastNextStepCompletedAt: null,
+  lastNextStep: null,
+  followupResolved: false,
   lastFollowupAssignedAt:
     "2026-07-14T12:03:00.000Z",
   lastFollowupOutcome: "needs_care",

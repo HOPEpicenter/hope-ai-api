@@ -6,6 +6,7 @@ import { createGetVisitorAdapter } from "./getVisitorAdapter";
 import { createListVisitorsAdapter } from "./listVisitorsAdapter";
 import { createGetVisitorSummaryAdapter } from "./createGetVisitorSummaryAdapter";
 import { createGetVisitorDashboardCardAdapter } from "./createGetVisitorDashboardCardAdapter";
+import { createGetVisitorFormationProfileAdapter } from "./createGetVisitorFormationProfileAdapter";
 import { createGetVisitorJourneyAdapter } from "./createGetVisitorJourneyAdapter";
 import { postVisitorNote } from "../../functions/postVisitorNote";
 import { getVisitorNotes } from "../../functions/getVisitorNotes";
@@ -37,6 +38,11 @@ export default function visitorsRouter(visitorsRepository: VisitorsRepository) {
   router.get("/:id", createGetVisitorAdapter(visitorsRepository));
   router.get("/:id/summary", requireApiKey, createGetVisitorSummaryAdapter());
   router.get("/:id/dashboard-card", requireApiKey, createGetVisitorDashboardCardAdapter());
+  router.get(
+    "/:id/dashboard-card/formation-profile",
+    requireApiKey,
+    createGetVisitorFormationProfileAdapter()
+  );
   router.get("/:id/activity-insights", (req, res, next) => {
     invokeFunction(getVisitorActivityInsights, req, res).catch(next);
   });

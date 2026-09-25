@@ -1,0 +1,3 @@
+import { buildGivingTimeline } from "../../src/domain/giving/giving.timeline";
+import { createInitialGivingProfile } from "../../src/domain/giving/givingProfile.projection";
+describe("Giving timeline", () => { it("sorts replay events", () => { const timeline = buildGivingTimeline(createInitialGivingProfile("m"), [{ eventId: "b", occurredAt: "2026-01-02T00:00:00.000Z", memberId: "m", giftId: "g", actorId: null, type: "GiftRecorded", payload: { amount: 1, designation: "general" } }, { eventId: "a", occurredAt: "2026-01-01T00:00:00.000Z", memberId: "m", giftId: "g", actorId: null, type: "GivingCycleCompleted", payload: { completedAt: "2026-01-01T00:00:00.000Z" } }]); expect(timeline.map((item) => item.type)).toEqual(["GivingCycleCompleted", "GiftRecorded"]); }); });

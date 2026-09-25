@@ -1,0 +1,11 @@
+import { applyServingEvent, type ServingActivity, type ServingAssignmentState } from "./serving.aggregate";
+import type { ServingEvent, ServingPriority } from "./serving.events";
+export type ServingProfile = { memberId: string; activeAssignment: ServingAssignmentState | null; history: ServingAssignmentState[]; activities: ServingActivity[]; stalledSince: string | null; roleId: string | null; priority: ServingPriority | null; status: "active" | "stalled" | "closed" | "none"; lastUpdatedAt: string | null };
+export function createInitialServingProfile(memberId: string): ServingProfile { return { memberId, activeAssignment: null, history: [], activities: [], stalledSince: null, roleId: null, priority: null, status: "none", lastUpdatedAt: null }; }
+export function applyServingEventToProfile(profile: ServingProfile, event: ServingEvent): ServingProfile {
+  const existing = profile.history.find((assignment) => assignment.assignmentId === event.assignmentId);
+  const nextAssignment = applyServingEvent(existing ?? { assignmentId: event.assignmentId, memberId: event.memberId, roleId: null, priority: null, activities: [], stalledSince: null, closedAt: null, status: "active" }, event);
+  const history = existing ? profile.history.map((assignment) => assignment.assignmentId === event.assignmentId ? nextAssignment : assignment) : [...profile.history, nextAssignment];
+  const activeAssignment = [...history].filter((assignment) => assignment.status !== "closed").sort((left, right) => right.assignmentId.localeCompare(left.assignmentId))[0] ?? null;
+  return { memberId: event.memberId, activeAssignment, history, activities: history.flatMap((assignment) => assignment.activities).sort((left, right) => left.occurredAt.localeCompare(right.occurredAt)), stalledSince: activeAssignment?.stalledSince ?? null, roleId: activeAssignment?.roleId ?? null, priority: activeAssignment?.priority ?? null, status: activeAssignment?.status ?? (history.length ? "closed" : "none"), lastUpdatedAt: event.occurredAt };
+}

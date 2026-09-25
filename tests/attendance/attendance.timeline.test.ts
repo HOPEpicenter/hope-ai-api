@@ -1,0 +1,4 @@
+import { buildAttendanceTimeline } from "../../src/domain/attendance/attendance.timeline";
+import { createAttendanceRecordedEvent } from "../../src/domain/attendance/attendance.events";
+import { createInitialAttendanceProfile } from "../../src/domain/attendance/attendanceProfile.projection";
+describe("Attendance timeline", () => { it("sorts attendance events deterministically", () => { const first = createAttendanceRecordedEvent("member-1", "a", "present"); const second = createAttendanceRecordedEvent("member-1", "b", "absent"); first.occurredAt = "2026-09-02T00:00:00.000Z"; second.occurredAt = "2026-09-01T00:00:00.000Z"; expect(buildAttendanceTimeline(createInitialAttendanceProfile("member-1"), [first, second]).map((item) => item.attendanceId)).toEqual(["b", "a"]); }); });

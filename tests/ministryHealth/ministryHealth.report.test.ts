@@ -1,0 +1,2 @@
+import { MinistryHealthService } from "../../src/domain/ministryHealth/ministryHealth.service";
+test("builds a report from one coherent aggregate", () => { const report = new MinistryHealthService({ givingAnalytics: { completionRate: 1 } }, "2026-01-01T00:00:00.000Z").getReport(); expect(report.summary.overallScore).toBe(100); expect(report.generatedAt).toBe("2026-01-01T00:00:00.000Z"); });

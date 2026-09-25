@@ -1,0 +1,11 @@
+import { applyCommunityEvent, type CommunityEngagementState, type CommunityInteraction } from "./community.aggregate";
+import type { CommunityEvent, CommunityPriority } from "./community.events";
+export type CommunityProfile = { memberId: string; activeEngagement: CommunityEngagementState | null; history: CommunityEngagementState[]; interactions: CommunityInteraction[]; stalledSince: string | null; groupId: string | null; priority: CommunityPriority | null; status: "active" | "stalled" | "completed" | "none"; lastUpdatedAt: string | null };
+export function createInitialCommunityProfile(memberId: string): CommunityProfile { return { memberId, activeEngagement: null, history: [], interactions: [], stalledSince: null, groupId: null, priority: null, status: "none", lastUpdatedAt: null }; }
+export function applyCommunityEventToProfile(profile: CommunityProfile, event: CommunityEvent): CommunityProfile {
+  const existing = profile.history.find((engagement) => engagement.engagementId === event.engagementId);
+  const nextEngagement = applyCommunityEvent(existing ?? { engagementId: event.engagementId, memberId: event.memberId, groupId: null, priority: null, interactions: [], stalledSince: null, completedAt: null, status: "active" }, event);
+  const history = existing ? profile.history.map((engagement) => engagement.engagementId === event.engagementId ? nextEngagement : engagement) : [...profile.history, nextEngagement];
+  const activeEngagement = [...history].filter((engagement) => engagement.status !== "completed").sort((left, right) => right.engagementId.localeCompare(left.engagementId))[0] ?? null;
+  return { memberId: event.memberId, activeEngagement, history, interactions: history.flatMap((engagement) => engagement.interactions).sort((left, right) => left.occurredAt.localeCompare(right.occurredAt)), stalledSince: activeEngagement?.stalledSince ?? null, groupId: activeEngagement?.groupId ?? null, priority: activeEngagement?.priority ?? null, status: activeEngagement?.status ?? (history.length ? "completed" : "none"), lastUpdatedAt: event.occurredAt };
+}

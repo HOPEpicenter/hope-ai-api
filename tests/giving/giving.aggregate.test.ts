@@ -1,0 +1,3 @@
+import { GivingAggregate } from "../../src/domain/giving/giving.aggregate";
+import type { GivingEvent } from "../../src/domain/giving/giving.events";
+describe("Giving aggregate", () => { it("applies recorded gift state", () => { const aggregate = new GivingAggregate(); aggregate.apply({ eventId: "1", occurredAt: "2026-01-01T00:00:00.000Z", memberId: "m", giftId: "g", actorId: null, type: "GiftRecorded", payload: { amount: 10, designation: "general" } } satisfies GivingEvent); expect(aggregate.getState()).toMatchObject({ amount: 10, designation: "general", status: "active" }); }); });

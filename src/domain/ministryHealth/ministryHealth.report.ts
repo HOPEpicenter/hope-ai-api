@@ -1,0 +1,5 @@
+import type { MinistryHealthAggregate } from "./ministryHealth.aggregate";
+import type { MinistryHealthAnalytics } from "./ministryHealth.analytics";
+import type { MinistryHealthCoaching } from "./ministryHealth.coaching";
+export type MinistryHealthReport = { generatedAt: string; summary: MinistryHealthAggregate["ministryHealthSummary"]; alerts: MinistryHealthAggregate["ministryHealthAlerts"]; analytics: MinistryHealthAnalytics; coaching: MinistryHealthCoaching };
+export function generateMinistryHealthReport(aggregate: MinistryHealthAggregate, analytics: MinistryHealthAnalytics, coaching: MinistryHealthCoaching): MinistryHealthReport { return { generatedAt: aggregate.generatedAt, summary: { ...aggregate.ministryHealthSummary }, alerts: aggregate.ministryHealthAlerts.map(alert => ({ ...alert })), analytics, coaching }; }

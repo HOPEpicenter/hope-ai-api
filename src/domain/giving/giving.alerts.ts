@@ -1,0 +1,4 @@
+import type { GivingInsights } from "./giving.insights";
+import type { GivingProfile } from "./givingProfile.projection";
+export type GivingAlert = { memberId: string; giftId: string | null; signalType: "GivingStalled" | "DecreasingGenerosity"; severity: "medium" | "high"; message: string };
+export function buildGivingAlerts(profile: GivingProfile, insights: GivingInsights): GivingAlert[] { const alerts: GivingAlert[] = profile.gifts.filter((gift) => gift.status === "stalled").map((gift) => ({ memberId: profile.memberId, giftId: gift.giftId, signalType: "GivingStalled", severity: "high", message: "Giving cycle is stalled." })); if (insights.generosityTrend === "decreasing") alerts.push({ memberId: profile.memberId, giftId: profile.activeGift?.giftId ?? null, signalType: "DecreasingGenerosity", severity: "medium", message: "Recent gift amount is lower than the previous recorded gift." }); return alerts; }

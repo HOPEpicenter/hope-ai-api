@@ -1,0 +1,2 @@
+import { EngagementService } from "../../src/domain/engagement/engagement.service";
+describe("engagement service", () => { it("returns event and state", () => { const result = new EngagementService().startCycle({ memberId: "m", engagementCycleId: "c", startedAt: "2026-01-01T00:00:00.000Z" }); expect(result.event.type).toBe("EngagementCycleStarted"); expect(result.state.memberId).toBe("m"); }); });

@@ -1,0 +1,3 @@
+import type { MinistryHealthRecommendation } from "./ministryHealth.intelligence";
+export type MinistryHealthCoaching = { priority: "low" | "medium" | "high"; focus: string; nextStep: string | null; recommendations: MinistryHealthRecommendation[] };
+export function buildMinistryHealthCoaching(recommendations: readonly MinistryHealthRecommendation[]): MinistryHealthCoaching { const priority = recommendations.some(item => item.priority === "high") ? "high" : recommendations.length ? "medium" : "low"; return { priority, focus: recommendations[0]?.domain ?? "ministry health", nextStep: recommendations[0]?.action ?? null, recommendations: recommendations.map(item => ({ ...item })) }; }

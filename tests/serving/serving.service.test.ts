@@ -1,0 +1,2 @@
+import { ServingService } from "../../src/domain/serving/serving.service";
+describe("Serving service", () => { it("starts an assignment", () => { const result = new ServingService().startAssignment({ memberId: "member-1", assignmentId: "assignment-1", roleId: "role-1", priority: "medium" }); expect(result.event.type).toBe("ServingAssignmentStarted"); expect(result.state.status).toBe("active"); }); });

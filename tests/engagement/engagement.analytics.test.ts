@@ -1,0 +1,2 @@
+import { buildEngagementAnalytics } from "../../src/domain/engagement/engagement.analytics";
+describe("engagement analytics", () => { it("has deterministic empty values", () => { expect(buildEngagementAnalytics([])).toEqual({ totalMembers: 0, totalCycles: 0, totalTouchpoints: 0, totalEngagementScore: 0, averageEngagementScore: 0, stalledCycles: 0, completedCycles: 0, completionRate: 0 }); }); });

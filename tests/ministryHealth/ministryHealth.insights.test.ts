@@ -1,0 +1,3 @@
+import { buildMinistryHealthAggregate } from "../../src/domain/ministryHealth/ministryHealth.aggregate";
+import { buildMinistryHealthInsights } from "../../src/domain/ministryHealth/ministryHealth.insights";
+test("explains domain scores", () => { const insights = buildMinistryHealthInsights(buildMinistryHealthAggregate({ careAnalytics: { completionRate: 0.5 } })); expect(insights[0]?.explainability.length).toBeGreaterThan(0); });

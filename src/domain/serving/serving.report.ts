@@ -1,0 +1,7 @@
+import type { ServingAnalytics } from "./serving.analytics";
+import type { ServingCoaching } from "./serving.coaching";
+import type { ServingMilestones } from "./serving.milestones";
+import type { ServingProfile } from "./servingProfile.projection";
+import type { ServingTimelineItem } from "./serving.timeline";
+export type ServingJourneyReport = { memberId: string; assignments: { started: number; closed: number; active: number; stalled: number }; milestones: ServingMilestones; coaching: ServingCoaching; timeline: ServingTimelineItem[]; analyticsHighlights: Pick<ServingAnalytics, "closureRate" | "highPriorityActiveAssignments" | "unassignedRoleAssignments"> };
+export function generateServingJourneyReport(input: { profile: ServingProfile; timeline: readonly ServingTimelineItem[]; milestones: ServingMilestones; coaching: ServingCoaching; analytics: ServingAnalytics }): ServingJourneyReport { return { memberId: input.profile.memberId, assignments: { started: input.milestones.totalAssignmentsStarted, closed: input.milestones.totalAssignmentsClosed, active: input.profile.history.filter((assignment) => assignment.status !== "closed").length, stalled: input.profile.history.filter((assignment) => assignment.status === "stalled").length }, milestones: input.milestones, coaching: input.coaching, timeline: [...input.timeline], analyticsHighlights: { closureRate: input.analytics.closureRate, highPriorityActiveAssignments: input.analytics.highPriorityActiveAssignments, unassignedRoleAssignments: input.analytics.unassignedRoleAssignments } }; }

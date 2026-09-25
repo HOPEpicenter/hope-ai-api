@@ -1,0 +1,2 @@
+import { AttendanceService } from "../../src/domain/attendance/attendance.service";
+describe("Attendance service", () => { it("records attendance with the resulting state", () => { const result = new AttendanceService().record({ memberId: "member-1", attendanceId: "record-1", status: "present" }); expect(result.event.type).toBe("AttendanceRecorded"); expect(result.state.status).toBe("present"); }); });

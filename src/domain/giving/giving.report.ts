@@ -1,0 +1,7 @@
+import type { GivingAnalytics } from "./giving.analytics";
+import type { GivingCoaching } from "./giving.coaching";
+import type { GivingMilestones } from "./giving.milestones";
+import type { GivingProfile } from "./givingProfile.projection";
+import type { GivingTimelineItem } from "./giving.timeline";
+export type GivingJourneyReport = { memberId: string; giving: { gifts: number; totalGiven: number; active: number; stalled: number; completed: number }; milestones: GivingMilestones; coaching: GivingCoaching; timeline: GivingTimelineItem[]; analyticsHighlights: Pick<GivingAnalytics, "averageGiftAmount" | "completionRate" | "decreasingGenerosityMembers"> };
+export function generateGivingJourneyReport(input: { profile: GivingProfile; timeline: readonly GivingTimelineItem[]; milestones: GivingMilestones; coaching: GivingCoaching; analytics: GivingAnalytics }): GivingJourneyReport { return { memberId: input.profile.memberId, giving: { gifts: input.profile.giftCount, totalGiven: input.profile.totalGiven, active: input.profile.gifts.filter((gift) => gift.status !== "completed").length, stalled: input.profile.gifts.filter((gift) => gift.status === "stalled").length, completed: input.profile.gifts.filter((gift) => gift.status === "completed").length }, milestones: input.milestones, coaching: input.coaching, timeline: [...input.timeline], analyticsHighlights: { averageGiftAmount: input.analytics.averageGiftAmount, completionRate: input.analytics.completionRate, decreasingGenerosityMembers: input.analytics.decreasingGenerosityMembers } }; }

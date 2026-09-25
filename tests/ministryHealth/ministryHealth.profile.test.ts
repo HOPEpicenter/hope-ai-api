@@ -1,0 +1,3 @@
+import { buildMinistryHealthAggregate } from "../../src/domain/ministryHealth/ministryHealth.aggregate";
+import { projectMinistryHealthProfile } from "../../src/domain/ministryHealth/ministryHealthProfile.projection";
+test("projects a dashboard profile", () => { const profile = projectMinistryHealthProfile(buildMinistryHealthAggregate({ engagementAnalytics: { completionRate: 1 } }, "2026-01-01T00:00:00.000Z")); expect(profile).toMatchObject({ profileId: "ministry-health", overallScore: 100, domainsAvailable: 1 }); });

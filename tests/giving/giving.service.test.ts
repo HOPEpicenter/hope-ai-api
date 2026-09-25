@@ -1,0 +1,2 @@
+import { GivingService } from "../../src/domain/giving/giving.service";
+describe("Giving service", () => { it("records a gift", () => { const result = new GivingService().recordGift({ memberId: "m", giftId: "g", amount: 15, designation: "general" }); expect(result.state.amount).toBe(15); expect(result.event.type).toBe("GiftRecorded"); }); });

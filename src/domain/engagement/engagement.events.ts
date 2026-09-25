@@ -1,0 +1,12 @@
+export type EngagementEventBase = { eventId: string; occurredAt: string; memberId: string; engagementCycleId: string; actorId?: string | null };
+export type EngagementCycleStarted = EngagementEventBase & { type: "EngagementCycleStarted"; payload: { startedAt: string; goal?: string } };
+export type EngagementTouchpointAdded = EngagementEventBase & { type: "EngagementTouchpointAdded"; payload: { touchpointId: string; channel: string; scoreDelta: number; notes?: string } };
+export type EngagementStalledDetected = EngagementEventBase & { type: "EngagementStalledDetected"; payload: { stalledSince: string; reason?: string } };
+export type EngagementCycleCompleted = EngagementEventBase & { type: "EngagementCycleCompleted"; payload: { completedAt: string } };
+export type EngagementEvent = EngagementCycleStarted | EngagementTouchpointAdded | EngagementStalledDetected | EngagementCycleCompleted;
+
+function base(memberId: string, engagementCycleId: string, actorId?: string | null): EngagementEventBase { return { eventId: crypto.randomUUID(), occurredAt: new Date().toISOString(), memberId, engagementCycleId, actorId: actorId ?? null }; }
+export function createEngagementCycleStartedEvent(memberId: string, engagementCycleId: string, startedAt: string, goal?: string, actorId?: string | null): EngagementCycleStarted { return { ...base(memberId, engagementCycleId, actorId), type: "EngagementCycleStarted", payload: { startedAt, ...(goal === undefined ? {} : { goal }) } }; }
+export function createEngagementTouchpointAddedEvent(memberId: string, engagementCycleId: string, touchpointId: string, channel: string, scoreDelta: number, notes?: string, actorId?: string | null): EngagementTouchpointAdded { return { ...base(memberId, engagementCycleId, actorId), type: "EngagementTouchpointAdded", payload: { touchpointId, channel, scoreDelta, ...(notes === undefined ? {} : { notes }) } }; }
+export function createEngagementStalledDetectedEvent(memberId: string, engagementCycleId: string, stalledSince: string, reason?: string, actorId?: string | null): EngagementStalledDetected { return { ...base(memberId, engagementCycleId, actorId), type: "EngagementStalledDetected", payload: { stalledSince, ...(reason === undefined ? {} : { reason }) } }; }
+export function createEngagementCycleCompletedEvent(memberId: string, engagementCycleId: string, actorId?: string | null): EngagementCycleCompleted { const event = base(memberId, engagementCycleId, actorId); return { ...event, type: "EngagementCycleCompleted", payload: { completedAt: event.occurredAt } }; }

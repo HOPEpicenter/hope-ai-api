@@ -1,0 +1,9 @@
+import { CommunityAggregate, type CommunityEngagementState } from "./community.aggregate";
+import { handleAddCommunityInteraction, handleCompleteCommunityEngagement, handleDetectCommunityStalled, handleStartCommunityEngagement, type AddCommunityInteractionCommand, type CompleteCommunityEngagementCommand, type DetectCommunityStalledCommand, type StartCommunityEngagementCommand } from "./community.commands";
+import type { CommunityEngagementCompleted, CommunityEngagementStarted, CommunityInteractionAdded, CommunityStalledDetected } from "./community.events";
+export class CommunityService {
+  public startEngagement(command: StartCommunityEngagementCommand): { event: CommunityEngagementStarted; state: CommunityEngagementState } { const event = handleStartCommunityEngagement(command); const aggregate = new CommunityAggregate(); aggregate.apply(event); return { event, state: aggregate.getState() }; }
+  public addInteraction(command: AddCommunityInteractionCommand): { event: CommunityInteractionAdded; state: CommunityEngagementState } { const event = handleAddCommunityInteraction(command); const aggregate = new CommunityAggregate(); aggregate.apply(event); return { event, state: aggregate.getState() }; }
+  public detectStalled(command: DetectCommunityStalledCommand): { event: CommunityStalledDetected; state: CommunityEngagementState } { const event = handleDetectCommunityStalled(command); const aggregate = new CommunityAggregate(); aggregate.apply(event); return { event, state: aggregate.getState() }; }
+  public completeEngagement(command: CompleteCommunityEngagementCommand): { event: CommunityEngagementCompleted; state: CommunityEngagementState } { const event = handleCompleteCommunityEngagement(command); const aggregate = new CommunityAggregate(); aggregate.apply(event); return { event, state: aggregate.getState() }; }
+}

@@ -1,0 +1,2 @@
+import { buildMinistryHealthRecommendations } from "../../src/domain/ministryHealth/ministryHealth.intelligence";
+test("prioritizes critical insight actions", () => { expect(buildMinistryHealthRecommendations([{ domain: "care", severity: "critical", message: "Care score is 20.", explainability: [] }])[0]).toMatchObject({ priority: "high", domain: "care" }); });

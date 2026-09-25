@@ -1,0 +1,3 @@
+import { buildGivingAnalytics } from "../../src/domain/giving/giving.analytics";
+import { createInitialGivingProfile } from "../../src/domain/giving/givingProfile.projection";
+describe("Giving analytics", () => { it("returns empty aggregate data", () => { expect(buildGivingAnalytics([createInitialGivingProfile("m")])).toMatchObject({ totalMembers: 1, totalGifts: 0, totalGiven: 0, completionRate: 0 }); }); });

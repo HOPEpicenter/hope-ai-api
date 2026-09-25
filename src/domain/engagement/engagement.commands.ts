@@ -1,0 +1,10 @@
+import { createEngagementCycleCompletedEvent, createEngagementCycleStartedEvent, createEngagementStalledDetectedEvent, createEngagementTouchpointAddedEvent, type EngagementCycleCompleted, type EngagementCycleStarted, type EngagementStalledDetected, type EngagementTouchpointAdded } from "./engagement.events";
+type EngagementCommandBase = { memberId: string; engagementCycleId: string; actorId?: string | null };
+export type StartEngagementCycleCommand = EngagementCommandBase & { startedAt: string; goal?: string };
+export type AddEngagementTouchpointCommand = EngagementCommandBase & { touchpointId: string; channel: string; scoreDelta: number; notes?: string };
+export type DetectEngagementStalledCommand = EngagementCommandBase & { stalledSince: string; reason?: string };
+export type CompleteEngagementCycleCommand = EngagementCommandBase;
+export const handleStartEngagementCycle = (command: StartEngagementCycleCommand): EngagementCycleStarted => createEngagementCycleStartedEvent(command.memberId, command.engagementCycleId, command.startedAt, command.goal, command.actorId);
+export const handleAddEngagementTouchpoint = (command: AddEngagementTouchpointCommand): EngagementTouchpointAdded => createEngagementTouchpointAddedEvent(command.memberId, command.engagementCycleId, command.touchpointId, command.channel, command.scoreDelta, command.notes, command.actorId);
+export const handleDetectEngagementStalled = (command: DetectEngagementStalledCommand): EngagementStalledDetected => createEngagementStalledDetectedEvent(command.memberId, command.engagementCycleId, command.stalledSince, command.reason, command.actorId);
+export const handleCompleteEngagementCycle = (command: CompleteEngagementCycleCommand): EngagementCycleCompleted => createEngagementCycleCompletedEvent(command.memberId, command.engagementCycleId, command.actorId);

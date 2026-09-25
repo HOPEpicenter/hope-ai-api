@@ -1,0 +1,2 @@
+import { buildAttendanceMilestones } from "../../src/domain/attendance/attendance.milestones";
+describe("Attendance milestones", () => { it("counts attendance lifecycle milestones", () => { const milestones = buildAttendanceMilestones([{ occurredAt: "2026-09-01T00:00:00.000Z", type: "AttendanceRecorded", attendanceId: "a" }, { occurredAt: "2026-09-02T00:00:00.000Z", type: "AttendanceCycleCompleted", attendanceId: "a" }]); expect(milestones).toMatchObject({ totalRecords: 1, totalCyclesCompleted: 1 }); }); });

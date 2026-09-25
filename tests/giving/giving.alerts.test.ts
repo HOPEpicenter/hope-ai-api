@@ -1,0 +1,4 @@
+import { buildGivingAlerts } from "../../src/domain/giving/giving.alerts";
+import { buildGivingInsights } from "../../src/domain/giving/giving.insights";
+import { createInitialGivingProfile } from "../../src/domain/giving/givingProfile.projection";
+describe("Giving alerts", () => { it("raises a high alert for a stalled gift", () => { const profile = createInitialGivingProfile("m"); profile.gifts = [{ giftId: "g", memberId: "m", amount: 10, designation: "general", recordedAt: "2026-01-01", stalledSince: "2026-01-02", completedAt: null, status: "stalled" }]; profile.giftCount = 1; profile.totalGiven = 10; expect(buildGivingAlerts(profile, buildGivingInsights(profile))[0]).toMatchObject({ signalType: "GivingStalled", severity: "high" }); }); });

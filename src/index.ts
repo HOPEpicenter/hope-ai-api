@@ -1,4 +1,5 @@
 import express from "express";
+import { requireApiKey } from "./shared/auth/requireApiKey";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import visitorsRouter from "./routes/visitors/visitorsRouter";

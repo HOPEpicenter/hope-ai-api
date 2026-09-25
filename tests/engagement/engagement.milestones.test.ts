@@ -1,0 +1,2 @@
+import { buildEngagementMilestones } from "../../src/domain/engagement/engagement.milestones";
+describe("engagement milestones", () => { it("counts touchpoints", () => { expect(buildEngagementMilestones([{ occurredAt: "2026-01-01T00:00:00.000Z", type: "EngagementTouchpointAdded", engagementCycleId: "c", statusChange: "touchpoint_added" }]).totalTouchpoints).toBe(1); }); });

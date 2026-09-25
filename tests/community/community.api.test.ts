@@ -1,0 +1,3 @@
+import { CommunityController } from "../../src/api/community/community.controller";
+import { CommunityProfileIndex } from "../../src/domain/community/communityProfile.index";
+describe("Community controller", () => { it("returns shaped empty models for an unknown member", () => { const controller = new CommunityController(new CommunityProfileIndex()); expect(controller.getProfile("unknown")).toMatchObject({ memberId: "unknown", activeEngagement: null, history: [], interactions: [], status: "none" }); expect(controller.getTimeline("unknown")).toEqual([]); expect(controller.getMilestones("unknown")).toMatchObject({ totalEngagementsStarted: 0 }); expect(controller.getReport("unknown")).toMatchObject({ memberId: "unknown", engagements: { started: 0 } }); }); });

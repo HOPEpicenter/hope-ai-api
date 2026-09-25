@@ -1,0 +1,3 @@
+import { buildMinistryHealthAggregate } from "../../src/domain/ministryHealth/ministryHealth.aggregate";
+import { buildMinistryHealthAnalytics } from "../../src/domain/ministryHealth/ministryHealth.analytics";
+test("reports scores and trend counts", () => { const analytics = buildMinistryHealthAnalytics(buildMinistryHealthAggregate({ attendanceAnalytics: { completionRate: 1 } })); expect(analytics.scoresByDomain.attendance).toBe(100); expect(analytics.trendCounts.improving).toBe(1); });

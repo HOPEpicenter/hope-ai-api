@@ -1,0 +1,2 @@
+import { buildCommunityAnalytics } from "../../src/domain/community/community.analytics";
+describe("Community analytics", () => { it("returns empty analytics", () => { expect(buildCommunityAnalytics([])).toMatchObject({ totalMembers: 0, completionRate: 0 }); }); });

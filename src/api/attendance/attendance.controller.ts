@@ -1,0 +1,11 @@
+import { buildAttendanceAlerts } from "../../domain/attendance/attendance.alerts";
+import { buildAttendanceAnalytics } from "../../domain/attendance/attendance.analytics";
+import { getAttendanceCoaching } from "../../domain/attendance/attendance.coaching";
+import { buildAttendanceInsights } from "../../domain/attendance/attendance.insights";
+import { buildAttendanceRecommendation } from "../../domain/attendance/attendance.intelligence";
+import { buildAttendanceMilestones } from "../../domain/attendance/attendance.milestones";
+import { AttendanceProfileIndex } from "../../domain/attendance/attendanceProfile.index";
+import { createInitialAttendanceProfile } from "../../domain/attendance/attendanceProfile.projection";
+import { generateAttendanceJourneyReport } from "../../domain/attendance/attendance.report";
+import { buildAttendanceTimeline } from "../../domain/attendance/attendance.timeline";
+export class AttendanceController { constructor(private readonly profiles: AttendanceProfileIndex) {} private model(memberId: string) { const profile = this.profiles.getProfile(memberId) ?? createInitialAttendanceProfile(memberId); const timeline = buildAttendanceTimeline(profile, this.profiles.getEvents(memberId)); const milestones = buildAttendanceMilestones(timeline); const insights = buildAttendanceInsights(profile); const recommendation = buildAttendanceRecommendation(profile, insights); const analytics = buildAttendanceAnalytics(this.profiles.getAllProfiles()); const coaching = getAttendanceCoaching(profile, milestones, insights, recommendation); return { profile, timeline, milestones, insights, recommendation, alerts: buildAttendanceAlerts(profile, insights), analytics, coaching, report: generateAttendanceJourneyReport({ profile, timeline, milestones, coaching, analytics }) }; } public getProfile(memberId: string) { return this.model(memberId).profile; } public getTimeline(memberId: string) { return this.model(memberId).timeline; } public getMilestones(memberId: string) { return this.model(memberId).milestones; } public getInsights(memberId: string) { return this.model(memberId).insights; } public getRecommendation(memberId: string) { return this.model(memberId).recommendation; } public getCoaching(memberId: string) { return this.model(memberId).coaching; } public getReport(memberId: string) { return this.model(memberId).report; } }

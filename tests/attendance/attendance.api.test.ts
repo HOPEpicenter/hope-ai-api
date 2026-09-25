@@ -1,0 +1,3 @@
+import { AttendanceController } from "../../src/api/attendance/attendance.controller";
+import { AttendanceProfileIndex } from "../../src/domain/attendance/attendanceProfile.index";
+describe("Attendance controller", () => { it("returns shaped empty models for an unknown member", () => { const controller = new AttendanceController(new AttendanceProfileIndex()); expect(controller.getProfile("unknown")).toMatchObject({ memberId: "unknown", records: [], attendanceRate: 0, lastStatus: null }); expect(controller.getTimeline("unknown")).toEqual([]); expect(controller.getMilestones("unknown")).toMatchObject({ totalRecords: 0 }); expect(controller.getReport("unknown")).toMatchObject({ memberId: "unknown", attendance: { recorded: 0 } }); }); });

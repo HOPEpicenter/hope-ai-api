@@ -2,6 +2,11 @@ import type { ActivityIntelligenceResult } from "./activityIntelligenceService";
 import type {
   CanonicalMorningBriefingCareCandidate
 } from "./readCanonicalActivityIntelligence";
+import { FormationProfileIndex } from "../../domain/formation/formationProfile.index";
+import type {
+  FormationProfilePathway,
+  FormationProfileStep
+} from "../../domain/formation/formationProfile.projection";
 
 export const MORNING_BRIEFING_SCHEMA_VERSION = 1 as const;
 export const MORNING_BRIEFING_CARE_TARGET_LIMIT = 5 as const;
@@ -47,6 +52,21 @@ export type TodayCareSummary = {
   urgentCare: number;
 };
 
+export type FormationBriefingPathway = FormationProfilePathway & {
+  memberId: string;
+};
+
+export type FormationBriefingStep = FormationProfileStep & {
+  memberId: string;
+};
+
+export type FormationBriefingCard = {
+  activePathways: FormationBriefingPathway[];
+  stalledSteps: FormationBriefingStep[];
+  completedPathways: FormationBriefingPathway[];
+  nextRecommendedStep: string | null;
+};
+
 export type MorningBriefing = {
   schemaVersion: typeof MORNING_BRIEFING_SCHEMA_VERSION;
   generatedAt: string;
@@ -77,6 +97,7 @@ export type MorningBriefing = {
     operationalHealth: ActivityIntelligenceResult["operationalHealth"];
     formation: Pick<ActivityIntelligenceResult["formation"], "totalProfiles" | "opportunities">;
   };
+  formation: FormationBriefingCard;
   ownership: {
     assignedCount: number;
     unassignedCount: number;
@@ -88,6 +109,7 @@ export type MorningBriefing = {
 export type MorningBriefingCompositionInput = {
   intelligence: ActivityIntelligenceResult;
   careCandidates?: readonly CanonicalMorningBriefingCareCandidate[];
+  formationProfileIndex?: FormationProfileIndex;
   generatedAt?: string;
   sourceStatus?: Partial<MorningBriefing["sources"]>;
 };
@@ -100,6 +122,34 @@ function toCareTarget(
     displayName: candidate.displayName,
     reason: "Needs care",
     personPath: `/people?visitorId=${encodeURIComponent(candidate.visitorId)}`
+  };
+}
+
+export function buildFormationBriefingCard(
+  formationProfileIndex?: FormationProfileIndex
+): FormationBriefingCard {
+  const activePathways: FormationBriefingPathway[] = [];
+  const stalledSteps: FormationBriefingStep[] = [];
+  const completedPathways: FormationBriefingPathway[] = [];
+
+  for (const profile of formationProfileIndex?.getAllProfiles() ?? []) {
+    if (profile.activePathway) {
+      activePathways.push({ ...profile.activePathway, memberId: profile.memberId });
+    }
+
+    stalledSteps.push(
+      ...profile.stalledSteps.map((step) => ({ ...step, memberId: profile.memberId }))
+    );
+    completedPathways.push(
+      ...profile.history.map((pathway) => ({ ...pathway, memberId: profile.memberId }))
+    );
+  }
+
+  return {
+    activePathways,
+    stalledSteps,
+    completedPathways,
+    nextRecommendedStep: null
   };
 }
 
@@ -303,6 +353,7 @@ export function composeMorningBriefing(
         opportunities: intelligence.formation.opportunities
       }
     },
+    formation: buildFormationBriefingCard(input.formationProfileIndex),
     ownership: {
       assignedCount: intelligence.careLoad.assignedCount,
       unassignedCount: intelligence.careLoad.unassignedCount,

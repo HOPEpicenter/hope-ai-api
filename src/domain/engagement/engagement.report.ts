@@ -1,0 +1,7 @@
+import type { EngagementAnalytics } from "./engagement.analytics";
+import type { EngagementCoaching } from "./engagement.coaching";
+import type { EngagementMilestones } from "./engagement.milestones";
+import type { EngagementProfile } from "./engagementProfile.projection";
+import type { EngagementTimelineItem } from "./engagement.timeline";
+export type EngagementJourneyReport = { memberId: string; engagement: { cycles: number; touchpoints: number; engagementScore: number; stalled: number; completedCycles: number }; milestones: EngagementMilestones; coaching: EngagementCoaching; timeline: EngagementTimelineItem[]; analyticsHighlights: Pick<EngagementAnalytics, "averageEngagementScore" | "stalledCycles" | "completedCycles"> };
+export function generateEngagementJourneyReport(input: { profile: EngagementProfile; timeline: readonly EngagementTimelineItem[]; milestones: EngagementMilestones; coaching: EngagementCoaching; analytics: EngagementAnalytics }): EngagementJourneyReport { return { memberId: input.profile.memberId, engagement: { cycles: input.profile.cycles.length, touchpoints: input.profile.touchpointCount, engagementScore: input.profile.engagementScore, stalled: input.profile.stalledCycleCount, completedCycles: input.profile.completedCycleCount }, milestones: input.milestones, coaching: input.coaching, timeline: [...input.timeline], analyticsHighlights: { averageEngagementScore: input.analytics.averageEngagementScore, stalledCycles: input.analytics.stalledCycles, completedCycles: input.analytics.completedCycles } }; }

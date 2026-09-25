@@ -1,0 +1,3 @@
+import type { MinistryHealthAggregate } from "./ministryHealth.aggregate";
+export type MinistryHealthInsight = { domain: string; severity: "info" | "warning" | "critical"; message: string; explainability: string[] };
+export function buildMinistryHealthInsights(aggregate: MinistryHealthAggregate): MinistryHealthInsight[] { return aggregate.ministryHealthScores.filter(score => score.available).map(score => ({ domain: score.domain, severity: score.score < 40 ? "critical" : score.score < 70 ? "warning" : "info", message: `${score.domain} score is ${score.score}.`, explainability: [...score.reasons] })); }

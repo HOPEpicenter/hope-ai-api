@@ -1,0 +1,10 @@
+import { createAttendanceCycleCompletedEvent, createAttendanceRecordedEvent, createAttendanceStalledDetectedEvent, createAttendanceStatusUpdatedEvent, type AttendanceCycleCompleted, type AttendanceRecorded, type AttendanceStatus, type AttendanceStatusUpdated, type AttendanceStalledDetected } from "./attendance.events";
+type AttendanceCommandBase = { memberId: string; attendanceId: string; actorId?: string | null };
+export type RecordAttendanceCommand = AttendanceCommandBase & { status: AttendanceStatus; notes?: string };
+export type UpdateAttendanceStatusCommand = AttendanceCommandBase & { status: AttendanceStatus; notes?: string };
+export type DetectAttendanceStalledCommand = AttendanceCommandBase & { stalledSince: string; reason?: string };
+export type CompleteAttendanceCycleCommand = AttendanceCommandBase;
+export const handleRecordAttendance = (command: RecordAttendanceCommand): AttendanceRecorded => createAttendanceRecordedEvent(command.memberId, command.attendanceId, command.status, command.notes, command.actorId);
+export const handleUpdateAttendanceStatus = (command: UpdateAttendanceStatusCommand): AttendanceStatusUpdated => createAttendanceStatusUpdatedEvent(command.memberId, command.attendanceId, command.status, command.notes, command.actorId);
+export const handleDetectAttendanceStalled = (command: DetectAttendanceStalledCommand): AttendanceStalledDetected => createAttendanceStalledDetectedEvent(command.memberId, command.attendanceId, command.stalledSince, command.reason, command.actorId);
+export const handleCompleteAttendanceCycle = (command: CompleteAttendanceCycleCommand): AttendanceCycleCompleted => createAttendanceCycleCompletedEvent(command.memberId, command.attendanceId, command.actorId);

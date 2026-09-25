@@ -1,0 +1,2 @@
+import { CommunityService } from "../../src/domain/community/community.service";
+describe("Community service", () => { it("starts an engagement", () => { const result = new CommunityService().startEngagement({ memberId: "member-1", engagementId: "engagement-1", groupId: "group-1", priority: "medium" }); expect(result.event.type).toBe("CommunityEngagementStarted"); expect(result.state.groupId).toBe("group-1"); }); });

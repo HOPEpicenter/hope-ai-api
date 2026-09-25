@@ -1,0 +1,3 @@
+import { GivingController } from "../../src/api/giving/giving.controller";
+import { GivingProfileIndex } from "../../src/domain/giving/givingProfile.index";
+describe("Giving controller", () => { it("returns shaped empty models for an unknown member", () => { const controller = new GivingController(new GivingProfileIndex()); expect(controller.getProfile("unknown")).toMatchObject({ memberId: "unknown", gifts: [], totalGiven: 0, giftCount: 0, status: "none" }); expect(controller.getTimeline("unknown")).toEqual([]); expect(controller.getMilestones("unknown")).toMatchObject({ totalGiftsRecorded: 0 }); expect(controller.getReport("unknown")).toMatchObject({ memberId: "unknown", giving: { gifts: 0 } }); }); });

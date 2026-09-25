@@ -3,7 +3,8 @@ import {
   ensureTable,
   getFormationProfilesTableClient,
   listFormationProfiles,
-  type FunctionFormationProfileEntity
+  type FunctionFormationProfileEntity,
+  CorrectionReplayUnavailableError
 } from "../_shared/formation";
 import { getVisitorById } from "../_shared/visitorsRepository";
 import { isSyntheticVisitorRecord } from "../../services/visitors/isSyntheticVisitorRecord";
@@ -140,6 +141,19 @@ export async function getCareCandidates(context: any, req: any): Promise<void> {
       }
     };
   } catch (err: any) {
+    if (err instanceof CorrectionReplayUnavailableError) {
+      context.res = {
+        status: 503,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: {
+          ok: false,
+          requestId,
+          error: err.code
+        }
+      };
+      return;
+    }
+
     logFunctionError(context, "getCareCandidates", err, {
       requestId,
       limit: req?.query?.limit ?? null,

@@ -35,7 +35,8 @@ import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
   ensureTable,
   getFormationProfilesTableClient,
-  getFormationProfileByVisitorId
+  readCorrectionAwareFormationProfile,
+  CorrectionReplayUnavailableError
 } from "../_shared/formation";
 
 export async function getVisitorFormationProfile(context: any, req: any): Promise<void> {
@@ -63,7 +64,7 @@ export async function getVisitorFormationProfile(context: any, req: any): Promis
     const table = getFormationProfilesTableClient();
     await ensureTable(table);
 
-    const profile = await getFormationProfileByVisitorId(table, visitorId);
+    const profile = await readCorrectionAwareFormationProfile(table, visitorId);
 
     context.res = {
       status: 200,
@@ -75,6 +76,15 @@ export async function getVisitorFormationProfile(context: any, req: any): Promis
       }
     };
   } catch (err: any) {
+    if (err instanceof CorrectionReplayUnavailableError) {
+      context.res = {
+        status: 503,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: { ok: false, error: err.code }
+      };
+      return;
+    }
+
     context.log.error(err?.message ?? err);
     context.res = {
       status: 400,
@@ -83,4 +93,3 @@ export async function getVisitorFormationProfile(context: any, req: any): Promis
     };
   }
 }
-

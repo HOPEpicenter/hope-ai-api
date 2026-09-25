@@ -59,5 +59,15 @@ assert.notEqual(
   "canonical next-step value changes should be visible to audit comparison"
 );
 
-console.log("comparableFormationProfile.test.ts passed");
+const changedNextStepCompletion = toComparableFormationProfileState({
+  ...profile,
+  lastNextStepCompletedAt: "2026-01-04T00:00:00Z"
+});
 
+assert.notEqual(
+  comparable,
+  changedNextStepCompletion,
+  "next-step completion changes should be visible to audit comparison"
+);
+
+console.log("comparableFormationProfile.test.ts passed");

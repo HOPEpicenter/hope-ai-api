@@ -1,4 +1,6 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
+import { getFeatureFlags } from "../../config/featureFlags";
+import { getSixWeekScriptGuidance } from "../../domain/followups/sixWeekScriptGuidance";
 import {
   readSixWeekVisitorFollowup
 } from "../../services/followups/readSixWeekVisitorFollowups";
@@ -46,7 +48,14 @@ export async function getSixWeekVisitorFollowup(
       ? {
           status: 200,
           headers: { "content-type": "application/json; charset=utf-8" },
-          body: { ok: true, requestId, plan }
+          body: {
+            ok: true,
+            requestId,
+            plan,
+            ...(getFeatureFlags().sixWeekScriptGuidance
+              ? { guidance: getSixWeekScriptGuidance() }
+              : {})
+          }
         }
       : {
           status: 404,

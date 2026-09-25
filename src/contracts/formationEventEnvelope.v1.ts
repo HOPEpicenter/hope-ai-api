@@ -43,6 +43,9 @@ export function validateFormationEventEnvelopeV1Strict(body: unknown): Formation
 
   // Type-specific requirements (STRICT FOR V1)
   const t = String(o.type).trim();
+  if (t === "NEXT_STEP_COMPLETION_CORRECTED") {
+    throw new Error("Use the audited next-step completion correction command");
+  }
   const d: any = asObject(data) ?? {};
 
   if (t === "FOLLOWUP_ASSIGNED") {

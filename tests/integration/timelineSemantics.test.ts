@@ -34,6 +34,11 @@ const cases = [
     type: "NEXT_STEP_COMPLETED",
     summary: "Visitor completed a next step",
     activityType: "NEXT_STEP_COMPLETED"
+  },
+  {
+    type: "NEXT_STEP_COMPLETION_CORRECTED",
+    summary: "Next-step completion corrected",
+    activityType: "NEXT_STEP_COMPLETION_CORRECTED"
   }
 ];
 

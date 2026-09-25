@@ -3,7 +3,7 @@ import { TableClient } from "@azure/data-tables";
 import { getConnString } from "../_shared/tableClient";
 
 import { getVisitorById } from "../_shared/visitorsRepository";
-import { getFormationProfileByVisitorId } from "../_shared/formation";
+import { readCorrectionAwareFormationProfile } from "../_shared/formation";
 import { readCanonicalJourneyNarrative } from "../../services/journey/readCanonicalJourneyNarrative";
 
 const ENGAGEMENT_TABLE = process.env.ENGAGEMENT_EVENTS_TABLE || "devEngagementEvents";
@@ -51,7 +51,7 @@ export async function getVisitorJourney(context: any, req: any): Promise<void> {
 
   const journey = await readCanonicalJourneyNarrative(
     visitorId,
-    async (id) => getFormationProfileByVisitorId(formationProfilesTable, id)
+    async (id) => readCorrectionAwareFormationProfile(formationProfilesTable, id)
   );
 
   context.res = {
@@ -63,7 +63,6 @@ export async function getVisitorJourney(context: any, req: any): Promise<void> {
     }
   };
 }
-
 
 
 

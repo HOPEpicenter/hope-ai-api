@@ -1,0 +1,3 @@
+import { buildGivingInsights } from "../../src/domain/giving/giving.insights";
+import { createInitialGivingProfile } from "../../src/domain/giving/givingProfile.projection";
+describe("Giving insights", () => { it("identifies increasing generosity", () => { const profile = createInitialGivingProfile("m"); profile.gifts = [{ giftId: "a", memberId: "m", amount: 10, designation: "general", recordedAt: "2026-01-01", stalledSince: null, completedAt: null, status: "active" }, { giftId: "b", memberId: "m", amount: 20, designation: "general", recordedAt: "2026-01-02", stalledSince: null, completedAt: null, status: "active" }]; profile.totalGiven = 30; profile.giftCount = 2; expect(buildGivingInsights(profile).generosityTrend).toBe("increasing"); }); });

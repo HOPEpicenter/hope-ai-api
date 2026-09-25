@@ -1,0 +1,2 @@
+import { buildCommunityMilestones } from "../../src/domain/community/community.milestones";
+describe("Community milestones", () => { it("counts interactions", () => { expect(buildCommunityMilestones([{ occurredAt: "2026-01-01T00:00:00.000Z", type: "CommunityInteractionAdded", engagementId: "engagement-1", interaction: "Attended" }]).totalInteractionsAdded).toBe(1); }); });

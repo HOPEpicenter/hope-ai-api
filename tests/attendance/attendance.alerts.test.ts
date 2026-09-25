@@ -1,0 +1,4 @@
+import { buildAttendanceAlerts } from "../../src/domain/attendance/attendance.alerts";
+import { buildAttendanceInsights } from "../../src/domain/attendance/attendance.insights";
+import { createInitialAttendanceProfile } from "../../src/domain/attendance/attendanceProfile.projection";
+describe("Attendance alerts", () => { it("raises a low-rate alert", () => { const profile = createInitialAttendanceProfile("member-1"); profile.records = [{ attendanceId: "a", memberId: "member-1", status: "absent", recordedAt: "2026-09-01T00:00:00.000Z", stalledSince: null, stallReason: null, completedAt: null }]; profile.absentCount = 1; expect(buildAttendanceAlerts(profile, buildAttendanceInsights(profile))[0]?.signalType).toBe("LowAttendanceRate"); }); });

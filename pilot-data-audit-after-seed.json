@@ -1,0 +1,85 @@
+
+> hope-ai-api@1.0.0 pilot:audit-data
+> node ./scripts/cleanupTestData.js --audit --staging
+
+{
+  "mode": "audit",
+  "destructive": false,
+  "keepIds": [],
+  "staffEvents": "preserved",
+  "confirmationRequired": "DELETE-STAGING-TEST-DATA"
+}
+{
+  "mode": "audit",
+  "tables": [
+    {
+      "label": "Visitors",
+      "tableName": "Visitors",
+      "status": "available",
+      "scanned": 0,
+      "retained": 0,
+      "deletionCandidates": 0,
+      "deleted": 0,
+      "skippedWithoutVisitorId": 0
+    },
+    {
+      "label": "Formation Events",
+      "tableName": "devFormationEvents",
+      "status": "available",
+      "scanned": 0,
+      "retained": 0,
+      "deletionCandidates": 0,
+      "deleted": 0,
+      "skippedWithoutVisitorId": 0
+    },
+    {
+      "label": "Formation Profiles",
+      "tableName": "devFormationProfiles",
+      "status": "available",
+      "scanned": 0,
+      "retained": 0,
+      "deletionCandidates": 0,
+      "deleted": 0,
+      "skippedWithoutVisitorId": 0
+    },
+    {
+      "label": "Engagement Events",
+      "tableName": "EngagementEvents",
+      "status": "available",
+      "scanned": 0,
+      "retained": 0,
+      "deletionCandidates": 0,
+      "deleted": 0,
+      "skippedWithoutVisitorId": 0
+    },
+    {
+      "label": "Engagement Summaries",
+      "tableName": "devEngagementSummaries",
+      "status": "missing",
+      "scanned": 0,
+      "retained": 0,
+      "deletionCandidates": 0,
+      "deleted": 0,
+      "skippedWithoutVisitorId": 0
+    },
+    {
+      "label": "Global Timeline",
+      "tableName": "devGlobalTimeline",
+      "status": "available",
+      "scanned": 0,
+      "retained": 0,
+      "deletionCandidates": 0,
+      "deleted": 0,
+      "skippedWithoutVisitorId": 0
+    }
+  ],
+  "totals": {
+    "scanned": 0,
+    "retained": 0,
+    "deletionCandidates": 0,
+    "deleted": 0
+  },
+  "preservedTables": [
+    "StaffEvents"
+  ]
+}

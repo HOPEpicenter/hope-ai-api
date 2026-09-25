@@ -1,0 +1,2 @@
+import type { MinistryHealthProfile } from "./ministryHealthProfile.projection";
+export class MinistryHealthProfileIndex { private profile: MinistryHealthProfile | null = null; setProfile(profile: MinistryHealthProfile): void { this.profile = { ...profile, scores: profile.scores.map(score => ({ ...score, reasons: [...score.reasons] })) }; } getProfile(): MinistryHealthProfile | null { return this.profile ? { ...this.profile, scores: this.profile.scores.map(score => ({ ...score, reasons: [...score.reasons] })) } : null; } }

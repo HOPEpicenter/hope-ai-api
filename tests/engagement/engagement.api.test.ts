@@ -1,0 +1,3 @@
+import { EngagementController } from "../../src/api/engagement/engagement.controller";
+import { EngagementProfileIndex } from "../../src/domain/engagement/engagementProfile.index";
+describe("engagement api", () => { it("shapes an unknown member profile", () => { const controller = new EngagementController(new EngagementProfileIndex()); expect(controller.getProfile("unknown")).toMatchObject({ memberId: "unknown", engagementScore: 0, cycles: [] }); expect(controller.getTimeline("unknown")).toEqual([]); }); });

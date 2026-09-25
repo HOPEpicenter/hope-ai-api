@@ -1,0 +1,273 @@
+
+> hope-ai-api@1.0.0 pilot:seed-data
+> node ./scripts/seedPilotData.js --execute --confirm=CREATE-HOPE-PILOT-DATA --staging
+
+{
+  "mode": "execute",
+  "destructive": false,
+  "baseUrl": "https://hope-ai-api-staging.azurewebsites.net/api",
+  "staff": {
+    "douglas": {
+      "staffId": "staff-0fee84010a1c40529952c41ef256cacf",
+      "displayName": "Douglas Myrie"
+    },
+    "jessie": {
+      "staffId": "staff-b50c60c5ceb44ec48be837388968cebc",
+      "displayName": "Jessie Blair-Myrie"
+    }
+  },
+  "scenarios": [
+    {
+      "key": "marcus-reed",
+      "name": "Marcus Reed",
+      "email": "pilot.marcus.reed@hope.test",
+      "description": "New person with no recorded ministry activity",
+      "eventTypes": [],
+      "correctedNote": false
+    },
+    {
+      "key": "alicia-grant",
+      "name": "Alicia Grant",
+      "email": "pilot.alicia.grant@hope.test",
+      "description": "Connected person without a selected next step",
+      "eventTypes": [
+        "FOLLOWUP_OUTCOME_RECORDED"
+      ],
+      "correctedNote": false
+    },
+    {
+      "key": "naomi-clarke",
+      "name": "Naomi Clarke",
+      "email": "pilot.naomi.clarke@hope.test",
+      "description": "Active care assigned to Douglas Myrie",
+      "eventTypes": [
+        "FOLLOWUP_ASSIGNED"
+      ],
+      "correctedNote": false
+    },
+    {
+      "key": "daniel-brooks",
+      "name": "Daniel Brooks",
+      "email": "pilot.daniel.brooks@hope.test",
+      "description": "Active care assigned to Jessie Blair-Myrie",
+      "eventTypes": [
+        "FOLLOWUP_ASSIGNED"
+      ],
+      "correctedNote": false
+    },
+    {
+      "key": "olivia-james",
+      "name": "Olivia James",
+      "email": "pilot.olivia.james@hope.test",
+      "description": "Care needed but currently unassigned",
+      "eventTypes": [
+        "FOLLOWUP_ASSIGNED",
+        "FOLLOWUP_UNASSIGNED"
+      ],
+      "correctedNote": false
+    },
+    {
+      "key": "samuel-king",
+      "name": "Samuel King",
+      "email": "pilot.samuel.king@hope.test",
+      "description": "Contact made; outcome still pending",
+      "eventTypes": [
+        "FOLLOWUP_ASSIGNED",
+        "FOLLOWUP_CONTACTED"
+      ],
+      "correctedNote": false
+    },
+    {
+      "key": "rachel-bennett",
+      "name": "Rachel Bennett",
+      "email": "pilot.rachel.bennett@hope.test",
+      "description": "Completed care outcome",
+      "eventTypes": [
+        "FOLLOWUP_ASSIGNED",
+        "FOLLOWUP_CONTACTED",
+        "FOLLOWUP_OUTCOME_RECORDED"
+      ],
+      "correctedNote": false
+    },
+    {
+      "key": "jonathan-price",
+      "name": "Jonathan Price",
+      "email": "pilot.jonathan.price@hope.test",
+      "description": "Next step selected but not completed",
+      "eventTypes": [
+        "NEXT_STEP_SELECTED"
+      ],
+      "correctedNote": false
+    },
+    {
+      "key": "grace-williams",
+      "name": "Grace Williams",
+      "email": "pilot.grace.williams@hope.test",
+      "description": "Next step selected and completed",
+      "eventTypes": [
+        "NEXT_STEP_SELECTED",
+        "NEXT_STEP_COMPLETED"
+      ],
+      "correctedNote": false
+    },
+    {
+      "key": "melissa-carter",
+      "name": "Melissa Carter",
+      "email": "pilot.melissa.carter@hope.test",
+      "description": "Pastoral note created and corrected",
+      "eventTypes": [],
+      "correctedNote": true
+    }
+  ]
+}
+{
+  "ok": true,
+  "mode": "execute",
+  "results": [
+    {
+      "key": "marcus-reed",
+      "name": "Marcus Reed",
+      "visitorId": "a01442e6-5c20-4a54-9024-294b43804c6d",
+      "visitorStatus": 200,
+      "events": [],
+      "note": null
+    },
+    {
+      "key": "alicia-grant",
+      "name": "Alicia Grant",
+      "visitorId": "bb7dc048-51bc-4993-ab97-eca670f8d402",
+      "visitorStatus": 200,
+      "events": [
+        {
+          "type": "FOLLOWUP_OUTCOME_RECORDED",
+          "status": 200
+        }
+      ],
+      "note": null
+    },
+    {
+      "key": "naomi-clarke",
+      "name": "Naomi Clarke",
+      "visitorId": "017910e2-1ee9-4d54-b6ba-25cfd99f7faa",
+      "visitorStatus": 200,
+      "events": [
+        {
+          "type": "FOLLOWUP_ASSIGNED",
+          "status": 200
+        }
+      ],
+      "note": null
+    },
+    {
+      "key": "daniel-brooks",
+      "name": "Daniel Brooks",
+      "visitorId": "7797d1b2-814f-42c7-ba55-47d8251a87f4",
+      "visitorStatus": 200,
+      "events": [
+        {
+          "type": "FOLLOWUP_ASSIGNED",
+          "status": 200
+        }
+      ],
+      "note": null
+    },
+    {
+      "key": "olivia-james",
+      "name": "Olivia James",
+      "visitorId": "df6a9389-944c-4059-ac45-ee188c5a984a",
+      "visitorStatus": 200,
+      "events": [
+        {
+          "type": "FOLLOWUP_ASSIGNED",
+          "status": 200
+        },
+        {
+          "type": "FOLLOWUP_UNASSIGNED",
+          "status": 200
+        }
+      ],
+      "note": null
+    },
+    {
+      "key": "samuel-king",
+      "name": "Samuel King",
+      "visitorId": "00d8bd34-1287-4946-9412-a72be7e3bfc1",
+      "visitorStatus": 200,
+      "events": [
+        {
+          "type": "FOLLOWUP_ASSIGNED",
+          "status": 200
+        },
+        {
+          "type": "FOLLOWUP_CONTACTED",
+          "status": 200
+        }
+      ],
+      "note": null
+    },
+    {
+      "key": "rachel-bennett",
+      "name": "Rachel Bennett",
+      "visitorId": "14b71a9d-2966-4786-b2bc-148aada1862b",
+      "visitorStatus": 200,
+      "events": [
+        {
+          "type": "FOLLOWUP_ASSIGNED",
+          "status": 200
+        },
+        {
+          "type": "FOLLOWUP_CONTACTED",
+          "status": 200
+        },
+        {
+          "type": "FOLLOWUP_OUTCOME_RECORDED",
+          "status": 200
+        }
+      ],
+      "note": null
+    },
+    {
+      "key": "jonathan-price",
+      "name": "Jonathan Price",
+      "visitorId": "858005ff-37dc-4e2d-bc6d-f2b0c76fc4f4",
+      "visitorStatus": 200,
+      "events": [
+        {
+          "type": "NEXT_STEP_SELECTED",
+          "status": 200
+        }
+      ],
+      "note": null
+    },
+    {
+      "key": "grace-williams",
+      "name": "Grace Williams",
+      "visitorId": "d5fb29d8-12cf-45be-93a0-fb0a51baec74",
+      "visitorStatus": 200,
+      "events": [
+        {
+          "type": "NEXT_STEP_SELECTED",
+          "status": 200
+        },
+        {
+          "type": "NEXT_STEP_COMPLETED",
+          "status": 200
+        }
+      ],
+      "note": null
+    },
+    {
+      "key": "melissa-carter",
+      "name": "Melissa Carter",
+      "visitorId": "2a21a2ab-805b-46db-abfc-e219427f56db",
+      "visitorStatus": 200,
+      "events": [],
+      "note": {
+        "noteId": "note-7fc571383b834c5491f16aedd8ed4f86",
+        "action": "reused",
+        "createStatus": null,
+        "updateStatus": null
+      }
+    }
+  ]
+}

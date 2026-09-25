@@ -1,0 +1,2 @@
+import { buildGivingMilestones } from "../../src/domain/giving/giving.milestones";
+describe("Giving milestones", () => { it("counts gifts and amounts", () => { expect(buildGivingMilestones([{ occurredAt: "2026-01-01", type: "GiftRecorded", giftId: "g", amount: 40 }])).toMatchObject({ totalGiftsRecorded: 1, totalAmountRecorded: 40 }); }); });

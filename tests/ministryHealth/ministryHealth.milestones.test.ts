@@ -1,0 +1,2 @@
+import { buildMinistryHealthMilestones } from "../../src/domain/ministryHealth/ministryHealth.milestones";
+test("counts health milestone bands", () => { expect(buildMinistryHealthMilestones([{ occurredAt: "2026-01-01", domain: "care", type: "score_observed", score: 30 }])).toMatchObject({ attentionDomains: 1, alertsRaised: 0 }); });

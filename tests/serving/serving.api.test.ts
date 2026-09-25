@@ -1,0 +1,3 @@
+import { ServingController } from "../../src/api/serving/serving.controller";
+import { ServingProfileIndex } from "../../src/domain/serving/servingProfile.index";
+describe("Serving controller", () => { it("returns shaped empty models for an unknown member", () => { const controller = new ServingController(new ServingProfileIndex()); expect(controller.getProfile("unknown")).toMatchObject({ memberId: "unknown", activeAssignment: null, history: [], activities: [], status: "none" }); expect(controller.getTimeline("unknown")).toEqual([]); expect(controller.getMilestones("unknown")).toMatchObject({ totalAssignmentsStarted: 0 }); expect(controller.getReport("unknown")).toMatchObject({ memberId: "unknown", assignments: { started: 0 } }); }); });

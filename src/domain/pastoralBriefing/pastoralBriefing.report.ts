@@ -1,0 +1,10 @@
+import { buildDailyPastoralBriefing, type DailyPastoralBriefing } from "./pastoralBriefing.daily";
+import { buildEventPastoralBriefings, type PastoralBriefingEvent } from "./pastoralBriefing.events";
+import type { PastoralBriefingInputs } from "./pastoralBriefing.inputs";
+import { buildWeeklyPastoralBriefing, type WeeklyPastoralBriefing } from "./pastoralBriefing.weekly";
+
+export type PastoralBriefingReport<T> = { reportType: "daily" | "weekly" | "events"; generatedAt: string; overview: string; briefing: T; sourceSummary: { predictiveMembers: number; workloadPlans: number; timelineEvents: number } };
+function report<T>(reportType: PastoralBriefingReport<T>["reportType"], input: PastoralBriefingInputs, briefing: T, overview: string): PastoralBriefingReport<T> { return { reportType, generatedAt: input.generatedAt, overview, briefing, sourceSummary: { predictiveMembers: input.predictiveMemberIntelligence.length, workloadPlans: input.workloadMemberPlans.length, timelineEvents: input.recentTimelineEvents.length } }; }
+export function buildDailyPastoralBriefingReport(input: PastoralBriefingInputs): PastoralBriefingReport<DailyPastoralBriefing> { const briefing = buildDailyPastoralBriefing(input); return report("daily", input, briefing, briefing.urgency.summary); }
+export function buildWeeklyPastoralBriefingReport(input: PastoralBriefingInputs): PastoralBriefingReport<WeeklyPastoralBriefing> { const briefing = buildWeeklyPastoralBriefing(input); return report("weekly", input, briefing, briefing.pastoralFocus); }
+export function buildEventPastoralBriefingReport(input: PastoralBriefingInputs): PastoralBriefingReport<readonly PastoralBriefingEvent[]> { const briefing = buildEventPastoralBriefings(input); return report("events", input, briefing, `${briefing.length} pastoral briefing event(s) are available.`); }

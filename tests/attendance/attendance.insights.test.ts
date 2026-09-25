@@ -1,0 +1,3 @@
+import { buildAttendanceInsights } from "../../src/domain/attendance/attendance.insights";
+import { createInitialAttendanceProfile } from "../../src/domain/attendance/attendanceProfile.projection";
+describe("Attendance insights", () => { it("identifies low attendance as needing attention", () => { const profile = createInitialAttendanceProfile("member-1"); profile.records = [{ attendanceId: "a", memberId: "member-1", status: "absent", recordedAt: "2026-09-01T00:00:00.000Z", stalledSince: null, stallReason: null, completedAt: null }]; profile.absentCount = 1; expect(buildAttendanceInsights(profile)).toMatchObject({ attendanceRate: 0, needsAttention: true }); }); });

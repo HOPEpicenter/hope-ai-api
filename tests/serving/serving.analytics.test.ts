@@ -1,0 +1,4 @@
+import { buildServingAnalytics } from "../../src/domain/serving/serving.analytics";
+import { applyServingEventToProfile, createInitialServingProfile } from "../../src/domain/serving/servingProfile.projection";
+import { createServingAssignmentStartedEvent } from "../../src/domain/serving/serving.events";
+describe("Serving analytics", () => { it("summarizes assignment counts", () => { const profile = applyServingEventToProfile(createInitialServingProfile("member-1"), createServingAssignmentStartedEvent("member-1", "assignment-1", "role-1", "medium")); expect(buildServingAnalytics([profile])).toMatchObject({ totalMembers: 1, totalAssignments: 1, activeAssignments: 1, closureRate: 0 }); }); });

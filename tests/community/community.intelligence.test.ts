@@ -1,0 +1,5 @@
+import { buildCommunityInsights } from "../../src/domain/community/community.insights";
+import { buildCommunityRecommendation } from "../../src/domain/community/community.intelligence";
+import { applyCommunityEventToProfile, createInitialCommunityProfile } from "../../src/domain/community/communityProfile.projection";
+import { createCommunityEngagementStartedEvent, createCommunityStalledDetectedEvent } from "../../src/domain/community/community.events";
+describe("Community intelligence", () => { it("prioritizes a stalled engagement", () => { const started = createCommunityEngagementStartedEvent("member-1", "engagement-1", "group-1", "medium"); const profile = applyCommunityEventToProfile(applyCommunityEventToProfile(createInitialCommunityProfile("member-1"), started), createCommunityStalledDetectedEvent("member-1", "engagement-1", started.occurredAt)); expect(buildCommunityRecommendation(profile, buildCommunityInsights(profile)).action).toBe("address_stalled_engagement"); }); });

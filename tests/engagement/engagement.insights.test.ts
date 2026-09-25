@@ -1,0 +1,3 @@
+import { buildEngagementInsights } from "../../src/domain/engagement/engagement.insights";
+import { createInitialEngagementProfile } from "../../src/domain/engagement/engagementProfile.projection";
+describe("engagement insights", () => { it("returns shaped empty insights", () => { expect(buildEngagementInsights(createInitialEngagementProfile("m")).engagementTrend).toBe("insufficient_data"); }); });

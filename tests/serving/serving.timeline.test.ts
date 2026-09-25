@@ -1,0 +1,4 @@
+import { buildServingTimeline } from "../../src/domain/serving/serving.timeline";
+import { createInitialServingProfile } from "../../src/domain/serving/servingProfile.projection";
+import { createServingAssignmentStartedEvent, createServingStalledDetectedEvent } from "../../src/domain/serving/serving.events";
+describe("Serving timeline", () => { it("orders and shapes lifecycle events", () => { const started = createServingAssignmentStartedEvent("member-1", "assignment-1", "role-1", "medium"); started.occurredAt = "2026-09-01T00:00:00.000Z"; const stalled = createServingStalledDetectedEvent("member-1", "assignment-1", "2026-09-02T00:00:00.000Z"); stalled.occurredAt = "2026-09-02T00:00:00.000Z"; expect(buildServingTimeline(createInitialServingProfile("member-1"), [stalled, started]).map((item) => item.type)).toEqual(["ServingAssignmentStarted", "ServingStalledDetected"]); }); });

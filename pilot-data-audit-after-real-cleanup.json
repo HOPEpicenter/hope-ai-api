@@ -1,0 +1,96 @@
+
+> hope-ai-api@1.0.0 pilot:audit-data
+> node ./scripts/cleanupTestData.js --audit --staging
+
+{
+  "mode": "audit",
+  "destructive": false,
+  "keepIds": [
+    "a01442e6-5c20-4a54-9024-294b43804c6d",
+    "bb7dc048-51bc-4993-ab97-eca670f8d402",
+    "017910e2-1ee9-4d54-b6ba-25cfd99f7faa",
+    "7797d1b2-814f-42c7-ba55-47d8251a87f4",
+    "df6a9389-944c-4059-ac45-ee188c5a984a",
+    "00d8bd34-1287-4946-9412-a72be7e3bfc1",
+    "14b71a9d-2966-4786-b2bc-148aada1862b",
+    "858005ff-37dc-4e2d-bc6d-f2b0c76fc4f4",
+    "d5fb29d8-12cf-45be-93a0-fb0a51baec74",
+    "2a21a2ab-805b-46db-abfc-e219427f56db"
+  ],
+  "staffEvents": "preserved",
+  "confirmationRequired": "DELETE-STAGING-TEST-DATA"
+}
+{
+  "mode": "audit",
+  "tables": [
+    {
+      "label": "Visitors",
+      "tableName": "Visitors",
+      "status": "available",
+      "scanned": 35,
+      "retained": 35,
+      "deletionCandidates": 0,
+      "deleted": 0,
+      "skippedWithoutVisitorId": 15
+    },
+    {
+      "label": "Formation Events",
+      "tableName": "devFormationEvents",
+      "status": "available",
+      "scanned": 13,
+      "retained": 13,
+      "deletionCandidates": 0,
+      "deleted": 0,
+      "skippedWithoutVisitorId": 0
+    },
+    {
+      "label": "Formation Profiles",
+      "tableName": "devFormationProfiles",
+      "status": "available",
+      "scanned": 8,
+      "retained": 8,
+      "deletionCandidates": 0,
+      "deleted": 0,
+      "skippedWithoutVisitorId": 0
+    },
+    {
+      "label": "Engagement Events",
+      "tableName": "EngagementEvents",
+      "status": "available",
+      "scanned": 2,
+      "retained": 2,
+      "deletionCandidates": 0,
+      "deleted": 0,
+      "skippedWithoutVisitorId": 0
+    },
+    {
+      "label": "Engagement Summaries",
+      "tableName": "devEngagementSummaries",
+      "status": "available",
+      "scanned": 0,
+      "retained": 0,
+      "deletionCandidates": 0,
+      "deleted": 0,
+      "skippedWithoutVisitorId": 0
+    },
+    {
+      "label": "Global Timeline",
+      "tableName": "devGlobalTimeline",
+      "status": "available",
+      "scanned": 15,
+      "retained": 15,
+      "deletionCandidates": 0,
+      "deleted": 0,
+      "skippedWithoutVisitorId": 0
+    }
+  ],
+  "totals": {
+    "scanned": 73,
+    "retained": 73,
+    "deletionCandidates": 0,
+    "deleted": 0
+  },
+  "preservedTables": [
+    "StaffEvents"
+  ]
+}

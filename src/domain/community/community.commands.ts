@@ -1,0 +1,10 @@
+import { createCommunityEngagementCompletedEvent, createCommunityEngagementStartedEvent, createCommunityInteractionAddedEvent, createCommunityStalledDetectedEvent, type CommunityEngagementCompleted, type CommunityEngagementStarted, type CommunityInteractionAdded, type CommunityPriority, type CommunityStalledDetected } from "./community.events";
+type CommunityCommandBase = { memberId: string; engagementId: string; actorId?: string | null };
+export type StartCommunityEngagementCommand = CommunityCommandBase & { groupId: string | null; priority: CommunityPriority };
+export type AddCommunityInteractionCommand = CommunityCommandBase & { interaction: string };
+export type DetectCommunityStalledCommand = CommunityCommandBase & { stalledSince: string; reason?: string };
+export type CompleteCommunityEngagementCommand = CommunityCommandBase;
+export const handleStartCommunityEngagement = (command: StartCommunityEngagementCommand): CommunityEngagementStarted => createCommunityEngagementStartedEvent(command.memberId, command.engagementId, command.groupId, command.priority, command.actorId);
+export const handleAddCommunityInteraction = (command: AddCommunityInteractionCommand): CommunityInteractionAdded => createCommunityInteractionAddedEvent(command.memberId, command.engagementId, command.interaction, command.actorId);
+export const handleDetectCommunityStalled = (command: DetectCommunityStalledCommand): CommunityStalledDetected => createCommunityStalledDetectedEvent(command.memberId, command.engagementId, command.stalledSince, command.reason, command.actorId);
+export const handleCompleteCommunityEngagement = (command: CompleteCommunityEngagementCommand): CommunityEngagementCompleted => createCommunityEngagementCompletedEvent(command.memberId, command.engagementId, command.actorId);

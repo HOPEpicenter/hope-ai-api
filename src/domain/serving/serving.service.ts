@@ -1,0 +1,10 @@
+import { ServingAggregate, type ServingAssignmentState } from "./serving.aggregate";
+import { handleAssignServingRole, handleCloseServingAssignment, handleDetectServingStalled, handleRecordServingActivity, handleStartServingAssignment, type AssignServingRoleCommand, type CloseServingAssignmentCommand, type DetectServingStalledCommand, type RecordServingActivityCommand, type StartServingAssignmentCommand } from "./serving.commands";
+import type { ServingActivityRecorded, ServingAssignmentClosed, ServingAssignmentStarted, ServingRoleAssigned, ServingStalledDetected } from "./serving.events";
+export class ServingService {
+  public startAssignment(command: StartServingAssignmentCommand): { event: ServingAssignmentStarted; state: ServingAssignmentState } { const event = handleStartServingAssignment(command); const aggregate = new ServingAggregate(); aggregate.apply(event); return { event, state: aggregate.getState() }; }
+  public assignRole(command: AssignServingRoleCommand): { event: ServingRoleAssigned; state: ServingAssignmentState } { const event = handleAssignServingRole(command); const aggregate = new ServingAggregate(); aggregate.apply(event); return { event, state: aggregate.getState() }; }
+  public recordActivity(command: RecordServingActivityCommand): { event: ServingActivityRecorded; state: ServingAssignmentState } { const event = handleRecordServingActivity(command); const aggregate = new ServingAggregate(); aggregate.apply(event); return { event, state: aggregate.getState() }; }
+  public detectStalled(command: DetectServingStalledCommand): { event: ServingStalledDetected; state: ServingAssignmentState } { const event = handleDetectServingStalled(command); const aggregate = new ServingAggregate(); aggregate.apply(event); return { event, state: aggregate.getState() }; }
+  public closeAssignment(command: CloseServingAssignmentCommand): { event: ServingAssignmentClosed; state: ServingAssignmentState } { const event = handleCloseServingAssignment(command); const aggregate = new ServingAggregate(); aggregate.apply(event); return { event, state: aggregate.getState() }; }
+}

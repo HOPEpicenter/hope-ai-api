@@ -1,0 +1,3 @@
+import { buildCommunityInsights } from "../../src/domain/community/community.insights";
+import { createInitialCommunityProfile } from "../../src/domain/community/communityProfile.projection";
+describe("Community insights", () => { it("returns zeroed insight data for an empty profile", () => { expect(buildCommunityInsights(createInitialCommunityProfile("member-1"))).toMatchObject({ activeEngagementCount: 0, needsAttention: false }); }); });

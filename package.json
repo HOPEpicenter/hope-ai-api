@@ -14,6 +14,7 @@
     "start:dist": "node dist/index.js",
     "test": "npm run test:smoke",
     "test:smoke": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/run-smoke.ps1",
+    "test:formation": "jest --runInBand",
     "verify:layout": "pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/verify-functions-layout.ps1",
     "pilot:audit-data": "node ./scripts/cleanupTestData.js --audit",
     "pilot:cleanup-data": "node ./scripts/cleanupTestData.js --execute --confirm=DELETE-STAGING-TEST-DATA",
@@ -33,13 +34,16 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
     "@types/luxon": "^3.7.1",
     "@types/node": "^20.19.30",
     "@types/uuid": "^9.0.8",
     "azurite": "^3.35.0",
     "copyfiles": "^2.4.1",
+    "jest": "^30.2.0",
     "nodemon": "^3.1.11",
     "rimraf": "^6.0.1",
+    "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

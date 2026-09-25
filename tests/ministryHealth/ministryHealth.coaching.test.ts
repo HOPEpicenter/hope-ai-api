@@ -1,0 +1,2 @@
+import { buildMinistryHealthCoaching } from "../../src/domain/ministryHealth/ministryHealth.coaching";
+test("uses the highest recommendation priority for coaching", () => { expect(buildMinistryHealthCoaching([{ domain: "care", priority: "high", action: "Act", reason: "Reason" }])).toMatchObject({ priority: "high", nextStep: "Act" }); });

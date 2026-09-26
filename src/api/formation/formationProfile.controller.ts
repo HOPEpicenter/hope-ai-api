@@ -1,21 +1,22 @@
-import { FormationProfileIndex } from "../../domain/formation/formationProfile.index";
+import { CanonicalFormationProfileReader } from "../../services/formation/canonicalFormationProfileReader";
 
 export class FormationProfileController {
-  constructor(private readonly profiles: FormationProfileIndex) {}
+  constructor(private readonly reader: CanonicalFormationProfileReader) {}
 
-  public getProfile(memberId: string) {
-    return this.profiles.getProfile(memberId);
+  public async getProfile(memberId: string) {
+    const result = await this.reader.readByMemberId(memberId);
+    return result.hasQualifyingEvents ? result.profile : null;
   }
 
-  public getActivePathway(memberId: string) {
-    return this.profiles.getProfile(memberId)?.activePathway ?? null;
+  public async getActivePathway(memberId: string) {
+    return (await this.getProfile(memberId))?.activePathway ?? null;
   }
 
-  public getHistory(memberId: string) {
-    return this.profiles.getProfile(memberId)?.history ?? [];
+  public async getHistory(memberId: string) {
+    return (await this.getProfile(memberId))?.history ?? [];
   }
 
-  public getStalledSteps(memberId: string) {
-    return this.profiles.getProfile(memberId)?.stalledSteps ?? [];
+  public async getStalledSteps(memberId: string) {
+    return (await this.getProfile(memberId))?.stalledSteps ?? [];
   }
 }

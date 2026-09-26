@@ -20,6 +20,9 @@ import protectedRouter from "./routes/protected";
 import { careRouter } from "./routes/care";
 import { activityIntelligenceRouter } from "./routes/activityIntelligence";
 import { sixWeekFollowupsRouter } from "./routes/sixWeekFollowups";
+import { FormationProfileController } from "./api/formation/formationProfile.controller";
+import { createFormationProfileRoutes } from "./api/formation/formationProfile.routes";
+import { CanonicalFormationProfileReader } from "./services/formation/canonicalFormationProfileReader";
 
 import { AzureTableEngagementsRepository } from "./repositories/engagementsRepository";
 process.on("unhandledRejection", (reason) => {
@@ -74,6 +77,9 @@ app.use(requestLogMiddleware);
 const visitorsRepository = new AzureTableVisitorsRepository();
 const formationEventsRepository = new AzureTableFormationEventsRepository();
 const engagementsRepository = new AzureTableEngagementsRepository();
+const formationProfileController = new FormationProfileController(
+  new CanonicalFormationProfileReader()
+);
 app.use("/ops", createOpsRouter(visitorsRepository, formationEventsRepository, engagementsRepository));
 app.use("/ops/followups", opsFollowupsRouter);
 // Public API routes
@@ -82,6 +88,7 @@ app.use("/api/visitors", visitorsRouter(visitorsRepository));
 app.use("/visitors", visitorsRouter(visitorsRepository));
 app.use("/api", formationEventsRouter);
 app.use("/api", formationRouter);
+app.use("/api", requireApiKey, createFormationProfileRoutes(formationProfileController));
 app.use("/api", followupQueueRouter);
 app.use("/api", engagementsRouter);
 app.use("/api", integrationRouter);

@@ -8,6 +8,7 @@ import {
   logFunctionError
 } from "../../shared/observability/functionObservability";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
+import { requirePastoralNotesStaffActor } from "../_shared/pastoralNotesStaffActor";
 
 const service = new EngagementsService(new EngagementEventsRepository());
 
@@ -29,6 +30,19 @@ export async function postVisitorNote(context: any, req: any): Promise<void> {
         status: auth.status,
         headers: { "content-type": "application/json; charset=utf-8" },
         body: { ...auth.body, authRejectedBy: "postVisitorNote" }
+      };
+      return;
+    }
+
+    const actor = await requirePastoralNotesStaffActor(req, "write");
+    if (!actor.ok) {
+      context.res = {
+        status: actor.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: {
+          ...actor.body,
+          authRejectedBy: "postVisitorNote"
+        }
       };
       return;
     }

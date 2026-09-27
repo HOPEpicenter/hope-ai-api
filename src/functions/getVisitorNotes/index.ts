@@ -1,5 +1,6 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { readCanonicalPastoralNotes } from "../../services/engagements/readCanonicalPastoralNotes";
+import { requirePastoralNotesStaffActor } from "../_shared/pastoralNotesStaffActor";
 
 export async function getVisitorNotes(context: any, req: any): Promise<void> {
   try {
@@ -9,6 +10,16 @@ export async function getVisitorNotes(context: any, req: any): Promise<void> {
         status: auth.status,
         headers: { "content-type": "application/json; charset=utf-8" },
         body: auth.body
+      };
+      return;
+    }
+
+    const actor = await requirePastoralNotesStaffActor(req, "view");
+    if (!actor.ok) {
+      context.res = {
+        status: actor.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: actor.body
       };
       return;
     }

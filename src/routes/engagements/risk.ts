@@ -2,6 +2,9 @@ import { Router } from "express";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { EngagementsService } from "../../services/engagements/engagementsService";
 import { readEngagementRiskV1 } from "../../services/engagements/readEngagementRisk";
+import {
+  requireHighRiskStaffActor
+} from "../../functions/_shared/highRiskStaffActor";
 
 export const engagementsRiskRouter = Router();
 
@@ -10,6 +13,15 @@ const service = new EngagementsService(new EngagementEventsRepository());
 // GET /api/engagements/risk?visitorId=...&windowDays=14
 engagementsRiskRouter.get("/engagements/risk", async (req, res, next) => {
   try {
+    const actorAuthorization =
+      await requireHighRiskStaffActor(req);
+
+    if (!actorAuthorization.ok) {
+      return res
+        .status(actorAuthorization.status)
+        .json(actorAuthorization.body);
+    }
+
     const visitorId = String(req.query.visitorId ?? "");
     const windowDays = Number(req.query.windowDays ?? 14);
 

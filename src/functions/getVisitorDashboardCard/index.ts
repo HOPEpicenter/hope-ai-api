@@ -1,6 +1,12 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { readCanonicalVisitorDashboardCard } from "../../services/dashboard/readCanonicalVisitorDashboardCard";
 import {
+  readHighRiskStaffVisibility
+} from "../_shared/highRiskStaffActor";
+import {
+  redactDashboardPastoralRisk
+} from "../../services/authorization/redactDashboardPastoralRisk";
+import {
   apiErrorBody,
   getRequestId,
   logFunctionError
@@ -21,6 +27,20 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
       return;
     }
 
+    const visibility =
+      await readHighRiskStaffVisibility(req);
+
+    if (!visibility.ok) {
+      context.res = {
+        status: visibility.status,
+        headers: {
+          "content-type": "application/json; charset=utf-8"
+        },
+        body: visibility.body
+      };
+      return;
+    }
+
     const visitorId = String(req?.params?.id ?? "").trim();
 
     if (!visitorId) {
@@ -31,7 +51,14 @@ export async function getVisitorDashboardCard(context: any, req: any): Promise<v
       return;
     }
 
-    const card = await readCanonicalVisitorDashboardCard(visitorId);
+    const canonicalCard =
+      await readCanonicalVisitorDashboardCard(visitorId);
+
+    const card =
+      redactDashboardPastoralRisk(
+        canonicalCard,
+        visibility.canViewHighRiskAlerts
+      );
 
     context.res = {
       status: 200,

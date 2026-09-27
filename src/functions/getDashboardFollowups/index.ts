@@ -18,6 +18,12 @@ import { readCanonicalVisitorIdentity, type CanonicalVisitorIdentity } from "../
 import { resolveCanonicalDisplayName } from "../../services/dashboard/resolveCanonicalDisplayName";
 import { buildProjectionIntegrityEnvelope } from "../../shared/integration/projectionIntegrityEnvelope";
 import { readCanonicalVisitorDashboardCard } from "../../services/dashboard/readCanonicalVisitorDashboardCard";
+import {
+  readHighRiskStaffVisibility
+} from "../_shared/highRiskStaffActor";
+import {
+  redactDashboardPastoralRisk
+} from "../../services/authorization/redactDashboardPastoralRisk";
 
 function parseLimit(val: unknown, fallback = 200): number {
   const n = typeof val === "string" ? Number(val) : fallback;
@@ -49,6 +55,20 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
   const requestId = getRequestId(req);
 
   try {
+    const visibility =
+      await readHighRiskStaffVisibility(req);
+
+    if (!visibility.ok) {
+      context.res = {
+        status: visibility.status,
+        headers: {
+          "content-type": "application/json; charset=utf-8"
+        },
+        body: visibility.body
+      };
+      return;
+    }
+
     const limit = parseLimit(req?.query?.limit, 200);
     const requestedCursor = parseCursor(req?.query?.cursor);
 
@@ -168,37 +188,47 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
         );
       }
 
-      return {
-        visitorId,
-        displayName,
-        name: displayName,
-        email: visitorIdentity.email,
-        assignedTo: card.assignedTo ?? projection.assignedTo,
-        assignedToName: card.assignedToName ?? projection.assignedToName,
-        projectionMetadata: projection.projectionMetadata,
-        followupState: projection.followupState,
-        attentionState: projection.attentionState,
-        stage: card.stage,
-        followupStatus: card.followupStatus,
-        followupUrgency: card.followupUrgency,
-        followupOverdue: card.followupOverdue,
-        riskLevel: card.riskLevel,
-        riskScore: card.riskScore,
-        needsFollowup: card.needsFollowup,
-        recommendedAction: card.recommendedAction,
-        priorityBand: card.priorityBand,
-        priorityScore: card.priorityScore,
-        priorityReason: card.priorityReason,
-        lastFollowupAssignedAt:
-          card.lastFollowupAssignedAt ??
-          p.lastFollowupAssignedAt ??
-          null,
-        lastFollowupContactedAt: p.lastFollowupContactedAt ?? null,
-        lastFollowupOutcomeAt:
-          card.lastFollowupOutcomeAt ??
-          p.lastFollowupOutcomeAt ??
-          null
-      };
+      return redactDashboardPastoralRisk(
+        {
+          visitorId,
+          displayName,
+          name: displayName,
+          email: visitorIdentity.email,
+          assignedTo:
+            card.assignedTo ??
+            projection.assignedTo,
+          assignedToName:
+            card.assignedToName ??
+            projection.assignedToName,
+          projectionMetadata:
+            projection.projectionMetadata,
+          followupState: projection.followupState,
+          attentionState: projection.attentionState,
+          stage: card.stage,
+          followupStatus: card.followupStatus,
+          followupUrgency: card.followupUrgency,
+          followupOverdue: card.followupOverdue,
+          riskLevel: card.riskLevel,
+          riskScore: card.riskScore,
+          needsFollowup: card.needsFollowup,
+          recommendedAction: card.recommendedAction,
+          priorityBand: card.priorityBand,
+          priorityScore: card.priorityScore,
+          priorityReason: card.priorityReason,
+          lastFollowupAssignedAt:
+            card.lastFollowupAssignedAt ??
+            p.lastFollowupAssignedAt ??
+            null,
+          lastFollowupContactedAt:
+            p.lastFollowupContactedAt ??
+            null,
+          lastFollowupOutcomeAt:
+            card.lastFollowupOutcomeAt ??
+            p.lastFollowupOutcomeAt ??
+            null
+        },
+        visibility.canViewHighRiskAlerts
+      );
     });
 
     const projectionIntegrity =

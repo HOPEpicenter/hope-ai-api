@@ -14,8 +14,8 @@ import {
   logFunctionError
 } from "../../shared/observability/functionObservability";
 import {
-  readMutationActorStaffIdentity
-} from "../../services/staff/readCanonicalStaffDirectory";
+  requireCareOwnerActor
+} from "../_shared/careOwnerStaffActor";
 
 function toCareProfileInput(profile: FunctionFormationProfileEntity) {
   return {
@@ -48,7 +48,6 @@ export async function postCareCandidateUnassign(
     }
 
     const visitorId = String(req?.params?.visitorId ?? "").trim();
-    const actorId = String(req?.body?.actorId ?? "").trim();
     const eventId = String(req?.body?.eventId ?? "").trim() || randomUUID();
 
     if (!visitorId) {
@@ -61,29 +60,22 @@ export async function postCareCandidateUnassign(
     }
 
 
-    if (!actorId) {
-      context.res = {
-        status: 400,
-        headers: { "content-type": "application/json; charset=utf-8" },
-        body: { ok: false, error: "actorId is required" }
-      };
-      return;
-    }
+    const actorAuthorization =
+      await requireCareOwnerActor(req);
 
-    const actorIdentity =
-      await readMutationActorStaffIdentity(actorId);
-
-    if (!actorIdentity || actorIdentity.status !== "active") {
+    if (!actorAuthorization.ok) {
       context.res = {
-        status: 400,
+        status: actorAuthorization.status,
         headers: { "content-type": "application/json; charset=utf-8" },
         body: {
-          ok: false,
-          error: "actorId must reference an active staff identity"
+          ...actorAuthorization.body,
+          authRejectedBy: "postCareCandidateUnassign"
         }
       };
       return;
     }
+
+    const actorId = actorAuthorization.actor.staffId;
 
     const visitor = await getVisitorById(visitorId);
 

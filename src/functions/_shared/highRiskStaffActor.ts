@@ -12,6 +12,18 @@ type StaffIdentityReader = (
   staffId: string
 ) => Promise<CanonicalStaffIdentity | null>;
 
+export type HighRiskStaffVisibilityResult =
+  | {
+      ok: true;
+      actor: CanonicalStaffIdentity;
+      canViewHighRiskAlerts: boolean;
+    }
+  | {
+      ok: false;
+      status: number;
+      body: Record<string, unknown>;
+    };
+
 export type HighRiskStaffActorResult =
   | {
       ok: true;
@@ -35,10 +47,10 @@ function header(req: any, name: string): string {
   ).trim();
 }
 
-export async function requireHighRiskStaffActor(
+export async function readHighRiskStaffVisibility(
   req: any,
   readIdentity: StaffIdentityReader = readCanonicalStaffIdentity
-): Promise<HighRiskStaffActorResult> {
+): Promise<HighRiskStaffVisibilityResult> {
   const actorId = header(req, "x-hope-staff-actor-id");
 
   if (!actorId) {
@@ -66,7 +78,29 @@ export async function requireHighRiskStaffActor(
     };
   }
 
-  if (!canViewHighRiskAlerts(actor)) {
+  return {
+    ok: true,
+    actor,
+    canViewHighRiskAlerts:
+      canViewHighRiskAlerts(actor)
+  };
+}
+
+export async function requireHighRiskStaffActor(
+  req: any,
+  readIdentity: StaffIdentityReader = readCanonicalStaffIdentity
+): Promise<HighRiskStaffActorResult> {
+  const visibility =
+    await readHighRiskStaffVisibility(
+      req,
+      readIdentity
+    );
+
+  if (!visibility.ok) {
+    return visibility;
+  }
+
+  if (!visibility.canViewHighRiskAlerts) {
     return {
       ok: false,
       status: 403,
@@ -80,6 +114,6 @@ export async function requireHighRiskStaffActor(
 
   return {
     ok: true,
-    actor
+    actor: visibility.actor
   };
 }

@@ -9,6 +9,8 @@ import type {
   StaffStatus
 } from "../operators/operatorIdentity";
 import { StaffEventsRepository } from "../../repositories/staffEventsRepository";
+import type { CanonicalMinistryArea } from "../../domain/ministryAreas/projectMinistryAreas";
+import { readMinistryAreas } from "../ministryAreas/ministryAreaCommands";
 import {
   readCanonicalStaffIdentity,
   readCanonicalStaffIdentityByEntraBinding
@@ -21,6 +23,7 @@ export type StaffCommandDependencies = {
   now?: () => string;
   newEventId?: () => string;
   newStaffId?: () => string;
+  readMinistryArea?: (id: string) => Promise<CanonicalMinistryArea | null>;
 };
 
 export type CreateStaffIdentityInput = {
@@ -31,6 +34,7 @@ export type CreateStaffIdentityInput = {
   entraObjectId?: string | null;
   email?: string | null;
   phone?: string | null;
+  ministryAreaId?: string | null;
 };
 
 export type UpdateStaffIdentityInput = {
@@ -44,6 +48,7 @@ export type UpdateStaffIdentityInput = {
   entraObjectId?: string | null;
   email?: string | null;
   phone?: string | null;
+  ministryAreaId?: string | null;
 };
 
 export type AcceptedStaffCommand = {
@@ -87,6 +92,30 @@ function normalizeOptionalEmail(
   return typeof normalized === "string"
     ? normalized.toLowerCase()
     : normalized;
+}
+
+async function validateMinistryArea(
+  value: string | null | undefined,
+  dependencies: StaffCommandDependencies
+): Promise<
+  | { ok: true; ministryAreaId: string | null | undefined }
+  | { ok: false; status: number; error: string }
+> {
+  if (value === undefined || value === null) {
+    return { ok: true, ministryAreaId: value };
+  }
+  if (typeof value !== "string" || !value.trim()) {
+    return { ok: false, status: 400, error: "ministryAreaId must be a nonempty ID or null" };
+  }
+  const ministryAreaId = value.trim();
+  const read = dependencies.readMinistryArea ?? (async (id: string) =>
+    (await readMinistryAreas()).find(area => area.ministryAreaId === id) ?? null);
+  const area = await read(ministryAreaId);
+  if (!area) return { ok: false, status: 404, error: "Ministry Area not found" };
+  if (area.status !== "active") {
+    return { ok: false, status: 409, error: "Ministry Area is inactive" };
+  }
+  return { ok: true, ministryAreaId };
 }
 
 function hasEntraBindingInput(input: {
@@ -183,6 +212,8 @@ export async function createStaffIdentity(
 
   const email = normalizeOptionalEmail(input.email);
   const phone = normalizeOptionalText(input.phone);
+  const area = await validateMinistryArea(input.ministryAreaId, dependencies);
+  if (!area.ok) return { accepted: false, status: area.status, error: area.error };
   const repository =
     dependencies.repository ?? new StaffEventsRepository();
 
@@ -215,7 +246,8 @@ export async function createStaffIdentity(
       status: "active",
       ...(entraBindingResult.binding ?? {}),
       ...(email !== undefined ? { email } : {}),
-      ...(phone !== undefined ? { phone } : {})
+      ...(phone !== undefined ? { phone } : {}),
+      ...(area.ministryAreaId !== undefined ? { ministryAreaId: area.ministryAreaId } : {})
     }
   });
 
@@ -293,6 +325,7 @@ export async function updateStaffIdentity(
     input.status !== undefined ||
     email !== undefined ||
     phone !== undefined ||
+    input.ministryAreaId !== undefined ||
     hasEntraBindingInput(input);
 
   if (!hasMutableField) {
@@ -318,6 +351,12 @@ export async function updateStaffIdentity(
       error: "Staff identity not found"
     };
   }
+
+  if (input.status === "inactive" && input.ministryAreaId !== undefined) {
+    return { accepted: false, status: 400, error: "ministryAreaId cannot change while deactivating staff" };
+  }
+  const area = await validateMinistryArea(input.ministryAreaId, dependencies);
+  if (!area.ok) return { accepted: false, status: area.status, error: area.error };
 
   if (input.status === "inactive" && entraBindingResult.binding) {
     return {
@@ -369,7 +408,8 @@ export async function updateStaffIdentity(
             : {}),
           ...(entraBindingResult.binding ?? {}),
           ...(email !== undefined ? { email } : {}),
-          ...(phone !== undefined ? { phone } : {})
+          ...(phone !== undefined ? { phone } : {}),
+          ...(area.ministryAreaId !== undefined ? { ministryAreaId: area.ministryAreaId } : {})
         };
 
   const event = buildEvent({

@@ -77,6 +77,14 @@ jobs:
           npx ts-node tests/ministryAreas/ministryAreaAuthorization.test.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Staff Ministry Area linkage regression
+        shell: pwsh
+        env:
+          STORAGE_CONNECTION_STRING: UseDevelopmentStorage=true
+        run: |
+          npx ts-node tests/staff/staffMinistryAreaLinkage.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 
       - name: Six-week visitor follow-up regressions
         shell: pwsh

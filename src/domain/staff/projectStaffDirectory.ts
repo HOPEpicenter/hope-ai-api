@@ -18,6 +18,7 @@ export type StaffEventData = {
   entraObjectId?: string | null;
   email?: string | null;
   phone?: string | null;
+  ministryAreaId?: string | null;
 };
 
 export type StaffEvent = {
@@ -41,6 +42,7 @@ export type CanonicalStaffIdentity = {
   entraObjectId: string | null;
   email: string | null;
   phone: string | null;
+  ministryAreaId: string | null;
 };
 
 const GUID_PATTERN =
@@ -107,7 +109,8 @@ export function projectStaffDirectory(
         entraTenantId: entraBinding?.entraTenantId ?? null,
         entraObjectId: entraBinding?.entraObjectId ?? null,
         email: normalizeEmail(event.data.email),
-        phone: normalizePhone(event.data.phone)
+        phone: normalizePhone(event.data.phone),
+        ministryAreaId: normalizeText(event.data.ministryAreaId) || null
       });
 
       continue;
@@ -158,7 +161,11 @@ export function projectStaffDirectory(
         phone:
           event.data.phone === undefined
             ? existing.phone
-            : normalizePhone(event.data.phone)
+            : normalizePhone(event.data.phone),
+        ministryAreaId:
+          event.data.ministryAreaId === undefined
+            ? existing.ministryAreaId
+            : normalizeText(event.data.ministryAreaId) || null
       });
 
       continue;

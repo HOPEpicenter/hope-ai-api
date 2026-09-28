@@ -10,6 +10,7 @@ export type MinistryAreaEvent = {
   data: {
     displayName?: string;
     status?: MinistryAreaStatus;
+    leaderStaffId?: string | null;
     reason?: string | null;
   };
 };
@@ -18,6 +19,7 @@ export type CanonicalMinistryArea = {
   ministryAreaId: string;
   displayName: string;
   status: MinistryAreaStatus;
+  leaderStaffId: string | null;
   createdAt: string;
   updatedAt: string;
   lastEventId: string;
@@ -50,6 +52,8 @@ export function projectMinistryAreas(events: MinistryAreaEvent[]): CanonicalMini
         ministryAreaId: event.ministryAreaId,
         displayName,
         status: "active",
+        leaderStaffId:
+          String(event.data.leaderStaffId ?? "").trim() || null,
         createdAt: event.occurredAt,
         updatedAt: event.occurredAt,
         lastEventId: event.eventId
@@ -65,6 +69,10 @@ export function projectMinistryAreas(events: MinistryAreaEvent[]): CanonicalMini
         ? existing.displayName
         : normalizeMinistryAreaName(event.data.displayName) || existing.displayName,
       status: event.data.status ?? existing.status,
+      leaderStaffId:
+        event.data.leaderStaffId === undefined
+          ? existing.leaderStaffId
+          : String(event.data.leaderStaffId ?? "").trim() || null,
       updatedAt: event.occurredAt,
       lastEventId: event.eventId
     });

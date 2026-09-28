@@ -30,14 +30,53 @@ const commandId = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(1
 
 async function run(): Promise<void> {
   const repo = new InMemoryRepository();
+  const activeLeader = {
+    staffId: "staff-leader-1",
+    displayName: "Active Leader",
+    roleLabel: "Ministry Leader",
+    status: "active" as const,
+    createdAt: "2026-09-28T00:00:00.000Z",
+    updatedAt: "2026-09-28T00:00:00.000Z",
+    lastEventId: "evt-staff-leader",
+    entraTenantId: null,
+    entraObjectId: null,
+    email: null,
+    phone: null,
+    ministryAreaId: null
+  };
+
+  const inactiveLeader = {
+    ...activeLeader,
+    staffId: "staff-leader-inactive",
+    displayName: "Inactive Leader",
+    status: "inactive" as const
+  };
+
+  let activeLeaderCurrentlyActive = true;
+
+  const readStaffIdentity = async (staffId: string) => {
+    if (staffId === activeLeader.staffId) {
+      return activeLeaderCurrentlyActive
+        ? activeLeader
+        : {
+            ...activeLeader,
+            status: "inactive" as const
+          };
+    }
+
+    if (staffId === inactiveLeader.staffId) return inactiveLeader;
+    return null;
+  };
+
   const deps = { repository: repo, now: () => "2026-09-28T12:00:00.000Z",
-    newMinistryAreaId: () => "ministry-area-opaque1" };
+    newMinistryAreaId: () => "ministry-area-opaque1", readStaffIdentity };
   const created = await createMinistryArea({ commandId: commandId(1), actorId: "admin-1",
     displayName: "  Youth   Ministry  " }, deps);
   assert.deepEqual(created, { accepted: true, eventId: `evt-${commandId(1)}`,
     ministryAreaId: "ministry-area-opaque1", type: "ministryArea.created" });
   assert.deepEqual(await readMinistryAreas(repo), [{
     ministryAreaId: "ministry-area-opaque1", displayName: "Youth Ministry", status: "active",
+    leaderStaffId: null,
     createdAt: "2026-09-28T12:00:00.000Z", updatedAt: "2026-09-28T12:00:00.000Z",
     lastEventId: `evt-${commandId(1)}`
   }]);
@@ -88,6 +127,98 @@ async function run(): Promise<void> {
   assert.equal((await updateMinistryArea({ commandId: commandId(8), actorId: "admin-1",
     ministryAreaId: "ministry-area-opaque1", status: "unknown" as any }, deps)).accepted, false);
 
+  const leaderAssigned = await updateMinistryArea({
+    commandId: commandId(11),
+    actorId: "admin-1",
+    ministryAreaId: "ministry-area-opaque1",
+    leaderStaffId: activeLeader.staffId,
+    reason: "Assign canonical Ministry Area leader"
+  }, deps);
+
+  assert.equal(leaderAssigned.accepted, true);
+  assert.equal(
+    (await readMinistryAreas(repo))[0].leaderStaffId,
+    activeLeader.staffId
+  );
+
+  activeLeaderCurrentlyActive = false;
+
+  const replayAfterLeaderDeactivation =
+    await updateMinistryArea({
+      commandId: commandId(11),
+      actorId: "admin-1",
+      ministryAreaId: "ministry-area-opaque1",
+      leaderStaffId: activeLeader.staffId,
+      reason: "Assign canonical Ministry Area leader"
+    }, deps);
+
+  assert.deepEqual(
+    replayAfterLeaderDeactivation,
+    leaderAssigned
+  );
+
+  assert.equal(
+    (await readMinistryAreas(repo))[0].leaderStaffId,
+    activeLeader.staffId
+  );
+
+  activeLeaderCurrentlyActive = true;
+
+  assert.deepEqual(
+    await updateMinistryArea({
+      commandId: commandId(12),
+      actorId: "admin-1",
+      ministryAreaId: "ministry-area-opaque1",
+      leaderStaffId: "staff-missing"
+    }, deps),
+    {
+      accepted: false,
+      status: 404,
+      error: "Leader Staff identity not found"
+    }
+  );
+
+  assert.deepEqual(
+    await updateMinistryArea({
+      commandId: commandId(13),
+      actorId: "admin-1",
+      ministryAreaId: "ministry-area-opaque1",
+      leaderStaffId: inactiveLeader.staffId
+    }, deps),
+    {
+      accepted: false,
+      status: 409,
+      error: "Leader Staff identity is inactive"
+    }
+  );
+
+  assert.deepEqual(
+    await updateMinistryArea({
+      commandId: commandId(14),
+      actorId: "admin-1",
+      ministryAreaId: "ministry-area-opaque1",
+      leaderStaffId: "   "
+    }, deps),
+    {
+      accepted: false,
+      status: 400,
+      error: "leaderStaffId must be a nonempty Staff ID or null"
+    }
+  );
+
+  const leaderCleared = await updateMinistryArea({
+    commandId: commandId(15),
+    actorId: "admin-1",
+    ministryAreaId: "ministry-area-opaque1",
+    leaderStaffId: null,
+    reason: "Clear Ministry Area leader"
+  }, deps);
+
+  assert.equal(leaderCleared.accepted, true);
+  assert.equal(
+    (await readMinistryAreas(repo))[0].leaderStaffId,
+    null
+  );
   // Replay is stable even if storage returns the rows out of order at identical timestamps.
   const replay = projectMinistryAreas([...repo.events].reverse());
   assert.deepEqual(replay, await readMinistryAreas(repo));

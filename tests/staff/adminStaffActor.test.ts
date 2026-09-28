@@ -36,7 +36,8 @@ async function run(): Promise<void> {
         entraTenantId: null,
         entraObjectId: null,
         email: null,
-        phone: null
+        phone: null,
+        ministryAreaId: null
       })
     );
 
@@ -65,7 +66,8 @@ async function run(): Promise<void> {
         entraTenantId: null,
         entraObjectId: null,
         email: null,
-        phone: null
+        phone: null,
+        ministryAreaId: null
       })
     );
 
@@ -119,7 +121,8 @@ async function run(): Promise<void> {
         entraTenantId: null,
         entraObjectId: null,
         email: null,
-        phone: null
+        phone: null,
+        ministryAreaId: null
       })
     );
 

@@ -31,6 +31,6 @@ two concurrent commands cannot independently accept the same display name.
 Projection replays sequence-ordered events and does not delete inactive areas.
 The request ID is for diagnostics; it is separate from the retry `commandId`.
 
-This foundation does **not** assign a Ministry Area to Staff, change roles,
-change authorization decisions, render a dashboard control, or create real
-ministry records. Staff linkage and active-area validation belong in a later PR.
+The directory foundation does **not** change roles, authorization decisions,
+dashboard controls, or create real ministry records. Staff linkage and
+active-area validation are documented in `ministry-area-staff-linkage.md`.

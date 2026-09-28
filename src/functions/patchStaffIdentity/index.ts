@@ -50,7 +50,8 @@ export async function patchStaffIdentity(
       entraTenantId: body.entraTenantId,
       entraObjectId: body.entraObjectId,
       email: body.email,
-      phone: body.phone
+      phone: body.phone,
+      ministryAreaId: body.ministryAreaId
     });
 
     if (!result.accepted) {

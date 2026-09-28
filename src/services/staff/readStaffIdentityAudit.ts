@@ -17,6 +17,7 @@ export type StaffIdentityAuditEntry = {
     roleLabel?: string | null;
     status?: string;
     reason?: string | null;
+    ministryAreaId?: string | null;
     entraBindingChanged: boolean;
   };
 };
@@ -46,6 +47,9 @@ function toAuditEntry(
       ...(data.reason === undefined
         ? {}
         : { reason: data.reason }),
+      ...(data.ministryAreaId === undefined
+        ? {}
+        : { ministryAreaId: data.ministryAreaId }),
       entraBindingChanged:
         data.entraTenantId !== undefined ||
         data.entraObjectId !== undefined

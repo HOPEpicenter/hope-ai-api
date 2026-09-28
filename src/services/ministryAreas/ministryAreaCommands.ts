@@ -11,12 +11,21 @@ import {
   MinistryAreaEventsRepository,
   type MinistryAreaSnapshot
 } from "../../repositories/ministryAreaEventsRepository";
+import type {
+  CanonicalStaffIdentity
+} from "../../domain/staff/projectStaffDirectory";
+import {
+  readCanonicalStaffIdentity
+} from "../staff/readCanonicalStaffDirectory";
 
 type Repository = Pick<MinistryAreaEventsRepository, "readSnapshot" | "appendIfVersion">;
 export type MinistryAreaCommandDependencies = {
   repository?: Repository;
   now?: () => string;
   newMinistryAreaId?: () => string;
+  readStaffIdentity?: (
+    staffId: string
+  ) => Promise<CanonicalStaffIdentity | null>;
 };
 
 export type MinistryAreaCommandInput = {
@@ -25,6 +34,7 @@ export type MinistryAreaCommandInput = {
   ministryAreaId?: string;
   displayName?: string;
   status?: MinistryAreaStatus;
+  leaderStaffId?: string | null;
   reason?: string | null;
 };
 
@@ -52,6 +62,56 @@ function validateCommon(input: MinistryAreaCommandInput): MinistryAreaCommandRes
   return null;
 }
 
+async function validateLeaderStaff(
+  value: string | null | undefined,
+  deps: MinistryAreaCommandDependencies
+): Promise<
+  | { ok: true; leaderStaffId: string | null | undefined }
+  | { ok: false; status: number; error: string }
+> {
+  if (value === undefined || value === null) {
+    return {
+      ok: true,
+      leaderStaffId: value
+    };
+  }
+
+  if (typeof value !== "string" || !value.trim()) {
+    return {
+      ok: false,
+      status: 400,
+      error: "leaderStaffId must be a nonempty Staff ID or null"
+    };
+  }
+
+  const leaderStaffId = value.trim();
+
+  const read =
+    deps.readStaffIdentity ?? readCanonicalStaffIdentity;
+
+  const staff = await read(leaderStaffId);
+
+  if (!staff) {
+    return {
+      ok: false,
+      status: 404,
+      error: "Leader Staff identity not found"
+    };
+  }
+
+  if (staff.status !== "active") {
+    return {
+      ok: false,
+      status: 409,
+      error: "Leader Staff identity is inactive"
+    };
+  }
+
+  return {
+    ok: true,
+    leaderStaffId
+  };
+}
 function nameConflict(items: CanonicalMinistryArea[], displayName: string, exceptId?: string): boolean {
   const key = ministryAreaNameKey(displayName);
   return items.some(item => item.ministryAreaId !== exceptId &&
@@ -114,11 +174,26 @@ export async function updateMinistryArea(
   if (displayName !== undefined && (!displayName || displayName.length > 120)) {
     return failure(400, "displayName must contain 1 to 120 characters");
   }
-  if (displayName === undefined && input.status === undefined) {
-    return failure(400, "displayName or status is required");
+  if (
+    displayName === undefined &&
+    input.status === undefined &&
+    input.leaderStaffId === undefined
+  ) {
+    return failure(
+      400,
+      "displayName, status, or leaderStaffId is required"
+    );
   }
   const reason = input.reason === undefined ? undefined : String(input.reason ?? "").trim() || null;
   if (reason && reason.length > 500) return failure(400, "reason must contain at most 500 characters");
+
+  const normalizedLeaderStaffId =
+    input.leaderStaffId === undefined || input.leaderStaffId === null
+      ? input.leaderStaffId
+      : typeof input.leaderStaffId === "string"
+        ? input.leaderStaffId.trim()
+        : input.leaderStaffId;
+
   const actorId = input.actorId.trim();
   const eventId = `evt-${input.commandId.toLowerCase()}`;
   const repository = deps.repository ?? new MinistryAreaEventsRepository();
@@ -129,16 +204,35 @@ export async function updateMinistryArea(
     const prior = existingCommand(snapshot, eventId, event =>
       event.type === "ministryArea.updated" && event.ministryAreaId === ministryAreaId &&
       event.actorId === actorId && event.data.displayName === displayName &&
-      event.data.status === input.status && event.data.reason === reason);
+      event.data.status === input.status &&
+      event.data.leaderStaffId === normalizedLeaderStaffId &&
+      event.data.reason === reason);
     if (prior) return prior;
+
+    const leader =
+      await validateLeaderStaff(
+        input.leaderStaffId,
+        deps
+      );
+
+    if (!leader.ok) {
+      return failure(leader.status, leader.error);
+    }
+
     const items = projectMinistryAreas(snapshot.events);
     const existing = items.find(item => item.ministryAreaId === ministryAreaId);
     if (!existing) return failure(404, "Ministry Area not found");
     if (displayName !== undefined && nameConflict(items, displayName, ministryAreaId)) {
       return failure(409, "Ministry Area display name is already in use");
     }
-    if ((displayName === undefined || displayName === existing.displayName) &&
-        (input.status === undefined || input.status === existing.status)) {
+    if (
+      (displayName === undefined || displayName === existing.displayName) &&
+      (input.status === undefined || input.status === existing.status) &&
+      (
+        leader.leaderStaffId === undefined ||
+        leader.leaderStaffId === existing.leaderStaffId
+      )
+    ) {
       return failure(400, "No Ministry Area field would change");
     }
     const event: MinistryAreaEvent = {
@@ -147,6 +241,9 @@ export async function updateMinistryArea(
       data: {
         ...(displayName === undefined ? {} : { displayName }),
         ...(input.status === undefined ? {} : { status: input.status }),
+        ...(leader.leaderStaffId === undefined
+          ? {}
+          : { leaderStaffId: leader.leaderStaffId }),
         ...(reason === undefined ? {} : { reason })
       }
     };

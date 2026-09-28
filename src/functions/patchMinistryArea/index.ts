@@ -16,6 +16,7 @@ export async function patchMinistryArea(context: any, req: any): Promise<void> {
       ministryAreaId: req?.params?.ministryAreaId,
       displayName: body.displayName,
       status: body.status,
+      leaderStaffId: body.leaderStaffId,
       reason: body.reason,
       actorId: auth.actorId
     });

@@ -16,6 +16,7 @@ async function run(): Promise<void> {
     ministryAreaId: "ministry-area-opaque1",
     displayName: "Local Ministry",
     status: "active",
+    leaderStaffId: null,
     createdAt: "2026-09-28T00:00:00Z",
     updatedAt: "2026-09-28T00:00:00Z",
     lastEventId: "evt-area"

@@ -1,0 +1,8 @@
+{
+  "bindings": [
+    { "authLevel": "anonymous", "type": "httpTrigger", "direction": "in", "name": "req", "methods": ["get"], "route": "ministry-areas" },
+    { "type": "http", "direction": "out", "name": "res" }
+  ],
+  "scriptFile": "../dist/functions/getMinistryAreas/index.js",
+  "entryPoint": "getMinistryAreas"
+}

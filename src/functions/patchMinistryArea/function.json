@@ -1,0 +1,8 @@
+{
+  "bindings": [
+    { "authLevel": "anonymous", "type": "httpTrigger", "direction": "in", "name": "req", "methods": ["patch"], "route": "ministry-areas/{ministryAreaId}" },
+    { "type": "http", "direction": "out", "name": "res" }
+  ],
+  "scriptFile": "../dist/functions/patchMinistryArea/index.js",
+  "entryPoint": "patchMinistryArea"
+}

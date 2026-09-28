@@ -1,0 +1,8 @@
+{
+  "bindings": [
+    { "authLevel": "anonymous", "type": "httpTrigger", "direction": "in", "name": "req", "methods": ["get"], "route": "ministry-areas/{ministryAreaId}/audit" },
+    { "type": "http", "direction": "out", "name": "res" }
+  ],
+  "scriptFile": "../dist/functions/getMinistryAreaAudit/index.js",
+  "entryPoint": "getMinistryAreaAudit"
+}

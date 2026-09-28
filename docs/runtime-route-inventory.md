@@ -42,6 +42,7 @@ Azure Functions are configured with `authLevel: anonymous`, but protected routes
 | GET | `/api/formation/timeline` | Formation timeline | `HOPE_API_KEY` |
 | GET | `/api/formation/profiles` | Formation profiles list | `HOPE_API_KEY` |
 | GET | `/api/ministry-areas/{ministryAreaId}/staff` | Administrator-only canonical Staff roster for one Ministry Area | `HOPE_ADMIN_API_KEY` + active configured canonical administrator |
+| GET | `/api/ministry-areas/{ministryAreaId}/overview` | Administrator-only, read-only descriptive view derived from canonical Ministry Area and Staff projections; not an authorization source | `HOPE_ADMIN_API_KEY` + active configured canonical administrator |
 | GET | `/api/staff-identities` | Canonical projected Staff Identity directory | `HOPE_API_KEY` |
 | GET | `/api/staff-identities/entra/{entraTenantId}/{entraObjectId}` | Canonical Staff Identity lookup by Entra binding | `HOPE_API_KEY` |
 | GET | `/api/staff-identities/{staffId}/audit` | Sanitized immutable Staff administration history | `HOPE_ADMIN_API_KEY` + active configured canonical administrator |

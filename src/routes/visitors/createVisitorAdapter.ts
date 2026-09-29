@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { normalizePhoneIdentifier } from "../../repositories/visitorsRepository";
 import type { VisitorsRepository } from "../../repositories";
 
 function isValidEmail(email: string): boolean {
@@ -28,22 +29,20 @@ export function createCreateVisitorAdapter(visitorsRepository: VisitorsRepositor
 
       const name = typeof nameRaw === "string" ? nameRaw.trim() : "";
       const emailRaw = typeof req.body?.email === "string" ? req.body.email.trim() : "";
+      const phoneRaw = typeof req.body?.phone === "string" ? req.body.phone.trim() : "";
 
       if (!name) return res.status(400).json({ ok: false, error: "name is required" });
-      if (!emailRaw) return res.status(400).json({ ok: false, error: "email is required" });
-      if (!isValidEmail(emailRaw)) return res.status(400).json({ ok: false, error: "email is invalid" });
+      if (!emailRaw && !normalizePhoneIdentifier(phoneRaw)) return res.status(400).json({ ok: false, error: "email or phone is required" });
+      if (emailRaw && !isValidEmail(emailRaw)) return res.status(400).json({ ok: false, error: "email is invalid" });
 
-      const existing = await visitorsRepository.getByEmail(emailRaw);
-      if (existing) {
-        // Idempotent: same email -> same visitorId
-        return res.status(200).json({ ok: true, visitorId: existing.visitorId });
-      }
-
-      const result = await visitorsRepository.create({ name, email: emailRaw });
+      const result = await visitorsRepository.create({ name, email: emailRaw || undefined, phone: phoneRaw || undefined });
 
       const status = result.created ? 201 : 200;
       return res.status(status).json({ ok: true, visitorId: result.visitor.visitorId });
     } catch (err: any) {
+      if (err?.message === "VISITOR_IDENTIFIER_CONFLICT") {
+        return res.status(409).json({ ok: false, error: "VISITOR_IDENTIFIER_CONFLICT" });
+      }
       console.error("CREATE_VISITOR_FAILED", err?.message || err);
       return res.status(500).json({ ok: false, error: "CREATE_VISITOR_FAILED" });
     }

@@ -29,6 +29,7 @@ type VisitorEntity = {
   email?: string;
   emailLower?: string;
   phone?: string;
+  phoneCanonical?: string;
   address1?: string;
   address2?: string;
   city?: string;
@@ -41,6 +42,13 @@ type VisitorEntity = {
 
 type EmailIndexEntity = {
   partitionKey: "EMAIL";
+  rowKey: string;
+  visitorId: string;
+  createdAt: string;
+};
+
+type PhoneIndexEntity = {
+  partitionKey: "PHONE";
   rowKey: string;
   visitorId: string;
   createdAt: string;
@@ -68,6 +76,151 @@ function toVisitor(entity: VisitorEntity): FunctionVisitor {
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt
   };
+}
+
+export function normalizePhoneIdentifier(phone: string): string {
+  const trimmed = phone.trim();
+  if (!trimmed || !/^[0-9\s().+\-]+$/.test(trimmed)) return "";
+  return trimmed.replace(/\D/g, "");
+}
+
+async function recoverMissingPhoneIdentity(
+  table: any,
+  rowKey: string,
+  canonical: string,
+  now: string
+): Promise<{ visitorId: string } | null> {
+  const canonicalFilter = `PartitionKey eq 'VISITOR' and phoneCanonical eq '${canonical.replace(/'/g, "''")}'`;
+  const canonicalMatches: VisitorEntity[] = [];
+  for await (const entity of table.listEntities({ queryOptions: { filter: canonicalFilter } })) {
+    canonicalMatches.push(entity);
+  }
+
+  if (canonicalMatches.length > 1) throw new Error("PHONE_IDENTITY_CONFLICT");
+  if (canonicalMatches.length === 1) {
+    return await reserveRecoveredPhone(table, canonicalMatches[0], rowKey, canonical, now);
+  }
+
+  const legacyMatches: VisitorEntity[] = [];
+  for await (const entity of table.listEntities({ queryOptions: { filter: "PartitionKey eq 'VISITOR'" } })) {
+    if (normalizePhoneIdentifier(entity.phone || "") === canonical) legacyMatches.push(entity);
+  }
+
+  if (legacyMatches.length > 1) throw new Error("PHONE_IDENTITY_CONFLICT");
+  if (legacyMatches.length === 0) return null;
+  return await reserveRecoveredPhone(table, legacyMatches[0], rowKey, canonical, now);
+}
+
+async function reserveRecoveredPhone(
+  table: any,
+  entity: VisitorEntity,
+  rowKey: string,
+  canonical: string,
+  now: string
+): Promise<{ visitorId: string }> {
+  let createdIndex = false;
+  try {
+    await table.createEntity({ partitionKey: "PHONE", rowKey, visitorId: entity.rowKey, createdAt: now });
+    createdIndex = true;
+  } catch (err: any) {
+    const code = String(err?.code ?? "");
+    const status = Number(err?.statusCode ?? err?.status ?? 0);
+    if (!(status === 409 || code === "EntityAlreadyExists")) throw err;
+    const existingIndex = await table.getEntity("PHONE", rowKey);
+    if ((existingIndex as any).visitorId !== entity.rowKey) throw new Error("PHONE_IDENTITY_CONFLICT");
+  }
+
+  if (!entity.phoneCanonical) {
+    try {
+      await table.upsertEntity({ ...entity, phoneCanonical: canonical, updatedAt: now } as any, "Replace");
+    } catch (err) {
+      if (createdIndex) {
+        try { await table.deleteEntity("PHONE", rowKey); } catch { }
+      }
+      throw err;
+    }
+  }
+
+  return { visitorId: entity.rowKey };
+}
+
+async function resolveIdentity(
+  table: any,
+  partitionKey: "EMAIL" | "PHONE",
+  rowKey: string,
+  field: "emailLower" | "phoneCanonical",
+  canonical: string,
+  now: string
+): Promise<{ visitorId: string } | null> {
+  try {
+    const index = await table.getEntity(partitionKey, rowKey);
+    const visitorId = (index as any).visitorId as string | undefined;
+    if (!visitorId) return null;
+
+    const existing = await getVisitorById(visitorId);
+    if (existing) return { visitorId };
+
+    const escaped = canonical.replace(/'/g, "''");
+    const filter = `PartitionKey eq 'VISITOR' and ${field} eq '${escaped}'`;
+    let recovered: VisitorEntity | undefined;
+    for await (const entity of table.listEntities({ queryOptions: { filter } })) {
+      recovered = entity;
+      break;
+    }
+
+    if (recovered) {
+      const repaired = {
+        partitionKey: partitionKey,
+        rowKey,
+        visitorId: recovered.rowKey,
+        createdAt: now
+      };
+      await table.upsertEntity(repaired as any, "Replace");
+      return { visitorId: recovered.rowKey };
+    }
+
+    throw new Error(`${partitionKey}_INDEX_STALE_OR_UNREADABLE`);
+  } catch (err: any) {
+    const code = String(err?.code ?? "");
+    const status = Number(err?.statusCode ?? err?.status ?? 0);
+    if (partitionKey === "PHONE" && (code === "ResourceNotFound" || status === 404)) {
+      return await recoverMissingPhoneIdentity(table, rowKey, canonical, now);
+    }
+    if (code === "ResourceNotFound" || status === 404) return null;
+    throw err;
+  }
+}
+
+async function reserveIdentity(
+  table: any,
+  partitionKey: "EMAIL" | "PHONE",
+  rowKey: string,
+  visitorId: string,
+  now: string
+): Promise<{ visitorId?: string; created: boolean }> {
+  try {
+    await table.createEntity({ partitionKey, rowKey, visitorId, createdAt: now });
+    return { created: true };
+  } catch (err: any) {
+    const code = String(err?.code ?? "");
+    const status = Number(err?.statusCode ?? err?.status ?? 0);
+    if (!(status === 409 || code === "EntityAlreadyExists")) throw err;
+
+    const index = await table.getEntity(partitionKey, rowKey);
+    return { visitorId: (index as any).visitorId as string | undefined, created: false };
+  }
+}
+
+async function removeReservations(
+  table: any,
+  reservations: Array<{ partitionKey: "EMAIL" | "PHONE"; rowKey: string }>
+): Promise<void> {
+  for (const reservation of reservations) {
+    try {
+      await table.deleteEntity(reservation.partitionKey, reservation.rowKey);
+    } catch {
+    }
+  }
 }
 
 export async function getVisitorById(visitorId: string): Promise<FunctionVisitor | null> {
@@ -139,6 +292,7 @@ export async function createVisitorRecord(input: {
   const emailTrim = typeof input.email === "string" ? input.email.trim() : undefined;
   const emailLower = emailTrim ? emailTrim.toLowerCase() : undefined;
   const phoneTrim = typeof input.phone === "string" ? input.phone.trim() : undefined;
+  const phoneCanonical = phoneTrim ? normalizePhoneIdentifier(phoneTrim) : undefined;
   const address1Trim = typeof input.address1 === "string" ? input.address1.trim() : undefined;
   const address2Trim = typeof input.address2 === "string" ? input.address2.trim() : undefined;
   const cityTrim = typeof input.city === "string" ? input.city.trim() : undefined;
@@ -146,93 +300,80 @@ export async function createVisitorRecord(input: {
   const postalCodeTrim = typeof input.postalCode === "string" ? input.postalCode.trim() : undefined;
   const birthdayTrim = typeof input.birthday === "string" ? input.birthday.trim() : undefined;
 
-  if (emailLower) {
-    const emailKey = encodeURIComponent(emailLower);
+  const createdReservations: Array<{ partitionKey: "EMAIL" | "PHONE"; rowKey: string }> = [];
+  const emailExisting = emailLower
+    ? await resolveIdentity(table, "EMAIL", encodeURIComponent(emailLower), "emailLower", emailLower, now)
+    : null;
+  const phoneExisting = phoneCanonical
+    ? await resolveIdentity(table, "PHONE", encodeURIComponent(phoneCanonical), "phoneCanonical", phoneCanonical, now)
+    : null;
 
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const indexEntity: EmailIndexEntity = {
-        partitionKey: "EMAIL",
-        rowKey: emailKey,
-        visitorId: id,
-        createdAt: now
-      };
+  if (emailExisting && phoneExisting && emailExisting.visitorId !== phoneExisting.visitorId) {
+    throw new Error("VISITOR_IDENTIFIER_CONFLICT");
+  }
 
-      try {
-        await table.createEntity(indexEntity as any);
-        break;
-      } catch (err: any) {
-        const code = String(err?.code ?? "");
-        const status = Number(err?.statusCode ?? err?.status ?? 0);
+  const existingId = emailExisting?.visitorId ?? phoneExisting?.visitorId;
+  const visitorId = existingId ?? id;
 
-        if (!(status === 409 || code === "EntityAlreadyExists")) {
-          throw err;
-        }
-
-        try {
-          const idx = await table.getEntity<EmailIndexEntity>("EMAIL", emailKey);
-          const existingId = (idx as any).visitorId as string | undefined;
-
-          if (existingId) {
-            const existing = await getVisitorById(existingId);
-            if (existing) {
-              return { visitor: existing, created: false };
-            }
-
-            if (attempt === 0) {
-              try {
-                const emailLowerEsc = emailLower.replace(/'/g, "''");
-                const filter = `PartitionKey eq 'VISITOR' and emailLower eq '${emailLowerEsc}'`;
-
-                let recovered: VisitorEntity | undefined;
-                for await (const entity of table.listEntities<VisitorEntity>({ queryOptions: { filter } })) {
-                  recovered = entity;
-                  break;
-                }
-
-                if (recovered) {
-                  const recoveredVisitor = toVisitor(recovered);
-
-                  const repaired: EmailIndexEntity = {
-                    partitionKey: "EMAIL",
-                    rowKey: emailKey,
-                    visitorId: recoveredVisitor.visitorId,
-                    createdAt: now
-                  };
-
-                  await table.upsertEntity(repaired as any, "Replace");
-                  return { visitor: recoveredVisitor, created: false };
-                }
-              } catch {
-              }
-
-              try {
-                await table.deleteEntity("EMAIL", emailKey);
-              } catch {
-              }
-
-              continue;
-            }
-          }
-        } catch (readErr: any) {
-          const readCode = String(readErr?.code ?? "");
-          const readStatus = Number(readErr?.statusCode ?? readErr?.status ?? 0);
-          if (!(readCode === "ResourceNotFound" || readStatus === 404)) {
-            throw readErr;
-          }
-        }
-
-        throw new Error("EMAIL_INDEX_STALE_OR_UNREADABLE");
-      }
+  for (const identity of [
+    emailLower ? { partitionKey: "EMAIL" as const, rowKey: encodeURIComponent(emailLower) } : null,
+    phoneCanonical ? { partitionKey: "PHONE" as const, rowKey: encodeURIComponent(phoneCanonical) } : null
+  ]) {
+    if (!identity) continue;
+    const reservation = await reserveIdentity(table, identity.partitionKey, identity.rowKey, visitorId, now);
+    if (reservation.visitorId && reservation.visitorId !== visitorId) {
+      await removeReservations(table, createdReservations);
+      throw new Error("VISITOR_IDENTIFIER_CONFLICT");
     }
+    if (reservation.created) createdReservations.push(identity);
+  }
+
+  if (existingId) {
+    const existingEntity = await table.getEntity<VisitorEntity>(VISITOR_PK, existingId);
+    const existingEmailCanonical = existingEntity.emailLower || (existingEntity.email ? existingEntity.email.trim().toLowerCase() : "");
+    const existingPhoneCanonical = existingEntity.phoneCanonical || normalizePhoneIdentifier(existingEntity.phone || "");
+    if (
+      (emailLower && existingEmailCanonical && existingEmailCanonical !== emailLower) ||
+      (phoneCanonical && existingPhoneCanonical && existingPhoneCanonical !== phoneCanonical)
+    ) {
+      await removeReservations(table, createdReservations);
+      throw new Error("VISITOR_IDENTIFIER_CONFLICT");
+    }
+
+    const attachedEntity: VisitorEntity = {
+      ...existingEntity,
+      email: existingEntity.email || emailTrim,
+      emailLower: existingEntity.emailLower || emailLower,
+      phone: existingEntity.phone || phoneTrim,
+      phoneCanonical: existingEntity.phoneCanonical || phoneCanonical,
+      updatedAt: now
+    };
+
+    try {
+      if (
+        attachedEntity.email !== existingEntity.email ||
+        attachedEntity.emailLower !== existingEntity.emailLower ||
+        attachedEntity.phone !== existingEntity.phone ||
+        attachedEntity.phoneCanonical !== existingEntity.phoneCanonical
+      ) {
+        await table.upsertEntity(attachedEntity as any, "Replace");
+      }
+    } catch (err) {
+      await removeReservations(table, createdReservations);
+      throw err;
+    }
+
+    return { visitor: toVisitor(attachedEntity), created: false };
   }
 
   const entity: VisitorEntity = {
     partitionKey: VISITOR_PK,
-    rowKey: id,
+    rowKey: visitorId,
     name: input.name,
     email: emailTrim,
     emailLower,
     phone: phoneTrim,
+    phoneCanonical,
     address1: address1Trim,
     address2: address2Trim,
     city: cityTrim,
@@ -249,13 +390,7 @@ export async function createVisitorRecord(input: {
       new Promise((_, reject) => setTimeout(() => reject(new Error("TABLE_CREATE_TIMEOUT")), 8000))
     ]);
   } catch (err: any) {
-    if (emailLower) {
-      const emailKey = encodeURIComponent(emailLower);
-      try {
-        await table.deleteEntity("EMAIL", emailKey);
-      } catch {
-      }
-    }
+    await removeReservations(table, createdReservations);
     throw err;
   }
 

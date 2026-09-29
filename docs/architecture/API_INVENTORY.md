@@ -23,6 +23,7 @@ This is a high-level inventory derived from PR history. Use code inspection for 
 | `/morning-briefing` | Feature-gated | Read-only canonical morning decision composed from existing care, follow-up, activity, and opportunity contracts; disabled by default. |
 | `GET /ministry-areas/{ministryAreaId}/staff` | Complete | Administrator-only read-only Staff roster derived from canonical Ministry Area and Staff projections; includes active and inactive linked Staff and does not affect authorization. |
 | `GET /ministry-areas/{ministryAreaId}/overview` | Complete | Administrator-only read-only descriptive view derived from canonical Ministry Area and Staff projections; leadership and membership are not authorization sources. |
+| `GET /ministry-areas/{ministryAreaId}/readiness` | Complete | Administrator-only read-only operational signal attributed only to work owned by canonical Staff linked to the area; does not infer visitor-area relationships or grant authorization. |
 | `GET /staff-identities` | Complete | Canonical Staff Identity directory projected from seeded identities and immutable Staff events. |
 | `GET /staff-identities/entra/{entraTenantId}/{entraObjectId}` | Complete | Protected canonical Staff Identity lookup by Entra binding. |
 | `GET /staff-identities/{staffId}/audit` | Complete | Administrator-only, event-backed Staff administration history with sanitized Entra binding changes. |

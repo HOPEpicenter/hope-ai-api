@@ -136,9 +136,9 @@ export function deriveIntegrationSummaryV1(
     needsFollowup = false;
   } else if (hasAssignee) {
     needsFollowup = true;
-  } else if (!input.lastEngagementAt) {
-    needsFollowup = true;
   } else {
+    // No open/actionable follow-up assignment exists. Absence of engagement history alone
+    // must not fabricate a followup need for a visitor nothing has ever been assigned to.
     needsFollowup = false;
   }
 

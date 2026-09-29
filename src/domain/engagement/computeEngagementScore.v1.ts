@@ -6,6 +6,10 @@ export type EngagementScoreComputedV1 = {
   daysSinceLastEngagement: number | null;
   engagementCount: number;
 
+  // True when the visitor has ever recorded an engagement signal (any time, not just in-window).
+  // Distinguishes "never engaged" (no evidence) from "engaged before, gone quiet" (stale evidence).
+  hasPriorHistory: boolean;
+
   // Phase 5 hooks (keep stable fields; tune logic later)
   score: number;
   scoreReasons: string[];
@@ -60,6 +64,7 @@ export function computeEngagementScoreV1(args: {
 
   const engagementCount = inWindowSignals.length;
   const engaged = engagementCount > 0;
+  const hasPriorHistory = args.events.some((e) => e && isSignal(e));
 
   const daysSinceLastEngagement =
     lastEngagedAt ? daysBetweenUtc(lastEngagedAt, nowIso) : null;
@@ -87,12 +92,15 @@ if (daysSinceLastEngagement !== null) {
 
 score = Math.max(0, Math.min(100, score));
 
-const needsFollowup = engagementCount === 0;
+// Only flag followup as needed when there is prior engagement evidence that has since gone quiet.
+// A visitor with zero signals ever recorded has no evidence to act on, not a followup gap.
+const needsFollowup = engagementCount === 0 && hasPriorHistory;
 if (needsFollowup) scoreReasons.push("needs_followup");return {
     engaged,
     lastEngagedAt,
     daysSinceLastEngagement,
     engagementCount,
+    hasPriorHistory,
     score,
     scoreReasons,
     needsFollowup,

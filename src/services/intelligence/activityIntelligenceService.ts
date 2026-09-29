@@ -207,6 +207,7 @@ export type ActivityFormationOpportunity = {
 export type ActivityFormationOpportunitySummary = {
   highestPriority: ActivityFormationOpportunity | null;
   items: ActivityFormationOpportunity[];
+  uniquePeopleCount: number;
 };
 
 export type ActivityFormationSummary = {
@@ -379,7 +380,8 @@ function hasGroupParticipation(profile: ActivityFormationProjectionInput): boole
 }
 
 function buildFormationOpportunities(
-  cohorts: ActivityFormationCohortSummary
+  cohorts: ActivityFormationCohortSummary,
+  uniquePeopleCount: number
 ): ActivityFormationOpportunitySummary {
   const countBySegment: Record<string, number> = {
     "connected-without-next-step": cohorts.connectedWithoutNextStep,
@@ -400,7 +402,8 @@ function buildFormationOpportunities(
 
   return {
     highestPriority: filtered[0] ?? null,
-    items: filtered
+    items: filtered,
+    uniquePeopleCount
   };
 }
 
@@ -429,6 +432,7 @@ function buildFormationSummary(
     nextStepSelectedNotCompleted: 0,
     activeCareWithoutOutcome: 0
   };
+  let uniqueOpportunityPeopleCount = 0;
 
   for (const profile of profiles) {
     addStage(byStage, profile.stage);
@@ -443,20 +447,34 @@ function buildFormationSummary(
     const hasCareOwner = hasText(profile.assignedTo);
     const hasGroups = hasGroupParticipation(profile);
 
-    if (stage === "Connected" && !hasNextStep) {
+    const connectedWithoutNextStep = stage === "Connected" && !hasNextStep;
+    const connectedWithoutCareOwner = stage === "Connected" && !hasCareOwner;
+    const nextStepSelectedNotCompleted = hasNextStep && !hasCompletedNextStep;
+    const activeCareWithoutOutcome = hasCareOwner && !hasText(profile.lastFollowupOutcomeAt);
+
+    if (connectedWithoutNextStep) {
       cohorts.connectedWithoutNextStep++;
     }
 
-    if (stage === "Connected" && !hasCareOwner) {
+    if (connectedWithoutCareOwner) {
       cohorts.connectedWithoutCareOwner++;
     }
 
-    if (hasNextStep && !hasCompletedNextStep) {
+    if (nextStepSelectedNotCompleted) {
       cohorts.nextStepSelectedNotCompleted++;
     }
 
-    if (hasCareOwner && !hasText(profile.lastFollowupOutcomeAt)) {
+    if (activeCareWithoutOutcome) {
       cohorts.activeCareWithoutOutcome++;
+    }
+
+    if (
+      connectedWithoutNextStep ||
+      connectedWithoutCareOwner ||
+      nextStepSelectedNotCompleted ||
+      activeCareWithoutOutcome
+    ) {
+      uniqueOpportunityPeopleCount++;
     }
 
     if (hasNextStep) {
@@ -506,7 +524,7 @@ function buildFormationSummary(
     projectedJourney,
     milestoneSignals,
     cohorts,
-    opportunities: buildFormationOpportunities(cohorts)
+    opportunities: buildFormationOpportunities(cohorts, uniqueOpportunityPeopleCount)
   };
 }
 

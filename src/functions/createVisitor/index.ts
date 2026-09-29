@@ -1,4 +1,4 @@
-import { createVisitorRecord } from "../_shared/visitorsRepository";
+import { createVisitorRecord, normalizePhoneIdentifier } from "../_shared/visitorsRepository";
 
 type CreateVisitorBody = {
   name?: string;
@@ -51,16 +51,16 @@ export async function createVisitor(context: any, req: any): Promise<void> {
       return;
     }
 
-    if (!emailRaw) {
+    if (!emailRaw && !normalizePhoneIdentifier(phoneRaw)) {
       context.res = {
         status: 400,
         headers: { "content-type": "application/json; charset=utf-8" },
-        body: { ok: false, error: "email is required" }
+        body: { ok: false, error: "email or phone is required" }
       };
       return;
     }
 
-    if (!isValidEmail(emailRaw)) {
+    if (emailRaw && !isValidEmail(emailRaw)) {
       context.res = {
         status: 400,
         headers: { "content-type": "application/json; charset=utf-8" },
@@ -87,6 +87,14 @@ export async function createVisitor(context: any, req: any): Promise<void> {
       body: { ok: true, visitorId: result.visitor.visitorId }
     };
   } catch (err: any) {
+    if (err?.message === "VISITOR_IDENTIFIER_CONFLICT") {
+      context.res = {
+        status: 409,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: { ok: false, error: "VISITOR_IDENTIFIER_CONFLICT" }
+      };
+      return;
+    }
     context.log.error(err?.message ?? err);
     context.res = {
       status: 500,

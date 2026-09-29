@@ -8,15 +8,23 @@ This document tracks the public-ish `/api/*` surface for HOPE AI API.
 
 ### POST /api/visitors
 
-Creates (or reuses) a visitor by email.
+Creates (or reuses) a visitor by canonical email and/or phone identity.
+
+**Required fields**
+- `name` is required.
+- At least one of `email` or `phone` is required.
+- `email` and `phone` are each optional, and supplying both is allowed.
+- A supplied email must be valid.
 
 **Idempotency**
-- The API is idempotent by normalized email (`trim + lowercase`)
-- Same email always returns same `visitorId`
+- The API is idempotent by canonical email (`trim + lowercase`) and/or canonical phone identity.
+- Phone identity trims whitespace and removes ordinary display formatting such as spaces, parentheses, periods, and hyphens.
+- The same canonical identifier always returns the same `visitorId`.
+- If supplied email and phone belong to different visitors, the request fails with a conflict; visitors are never merged.
 
 **Request JSON**
 ~~~json
-{ "name": "string", "email": "string" }
+{ "name": "string", "email": "string (optional)", "phone": "string (optional)" }
 ~~~
 
 **Response (201 Created)**

@@ -38,3 +38,13 @@ response. A source failure is never represented as zero work.
 `attention.total` is `urgentCare + overdueFollowups`. It is an operational
 signal count, not a unique-person count; v1 does not deduplicate a person who
 appears in both categories.
+
+## Recommended First Action
+
+The backend authors one deterministic `recommendedFirstAction` using only the
+readiness counts already derived by this service. Its fixed precedence is
+urgent care, overdue follow-ups, escalated care, elevated care, stale care,
+then due follow-ups. The action is aggregate-only and does not identify a
+visitor or establish a visitor-to-Ministry-Area relationship. Ministry Area
+membership and leadership are descriptive and do not grant permissions. The
+action is `null` when none of the supported signals is present.

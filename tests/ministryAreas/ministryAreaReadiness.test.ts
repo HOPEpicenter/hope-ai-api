@@ -18,6 +18,9 @@ import {
   readMinistryAreaReadiness
 } from "../../src/services/ministryAreas/readMinistryAreaReadiness";
 import type {
+  MinistryAreaReadiness
+} from "../../src/services/ministryAreas/readMinistryAreaReadiness";
+import type {
   SixWeekFollowupQueue
 } from "../../src/services/followups/readSixWeekVisitorFollowups";
 
@@ -192,6 +195,69 @@ async function readWith(
   });
 }
 
+async function readWithSignals(signals: {
+  urgent?: number;
+  overdue?: number;
+  escalated?: number;
+  elevated?: number;
+  stale?: number;
+  due?: number;
+}): Promise<MinistryAreaReadiness> {
+  const care: CareCandidate[] = [];
+  const followups: Array<{
+    visitorId: string;
+    ownerStaffId: string;
+    nextTaskStatus: "due" | "overdue";
+  }> = [];
+
+  const addCare = (
+    key: string,
+    count: number,
+    overrides: Partial<CareCandidate>
+  ) => {
+    for (let index = 0; index < count; index += 1) {
+      care.push(
+        careCandidate(`${key}-${index}`, "staff-active", overrides)
+      );
+    }
+  };
+
+  addCare("urgent", signals.urgent ?? 0, {
+    carePriority: "urgent"
+  });
+  addCare("escalated", signals.escalated ?? 0, {
+    escalationLevel: "escalate"
+  });
+  addCare("elevated", signals.elevated ?? 0, {
+    carePriority: "elevated"
+  });
+  addCare("stale", signals.stale ?? 0, {
+    careAgeBucket: "stale"
+  });
+
+  for (let index = 0; index < (signals.due ?? 0); index += 1) {
+    followups.push({
+      visitorId: `due-${index}`,
+      ownerStaffId: "staff-active",
+      nextTaskStatus: "due"
+    });
+  }
+  for (let index = 0; index < (signals.overdue ?? 0); index += 1) {
+    followups.push({
+      visitorId: `overdue-${index}`,
+      ownerStaffId: "staff-active",
+      nextTaskStatus: "overdue"
+    });
+  }
+
+  const result = await readWith({
+    care,
+    queue: queueItems(followups)
+  });
+  assert.ok(result);
+  return result;
+}
+
 async function run(): Promise<void> {
   assert.equal(await readMinistryAreaReadiness("   "), null);
   assert.equal(await readWith({ overview: null }), null);
@@ -211,6 +277,10 @@ async function run(): Promise<void> {
   assert.equal(inactiveArea.ministryArea.status, "inactive");
   assert.equal(inactiveArea.care.totalOwned, 1);
   assert.equal(inactiveArea.sixWeekFollowup.totalOwned, 1);
+  assert.equal(
+    inactiveArea.recommendedFirstAction?.key,
+    "due-followups"
+  );
 
   const noLinkedStaff = await readWith({
     overview: overview([]),
@@ -317,6 +387,117 @@ async function run(): Promise<void> {
     overdueFollowups: 1
   });
 
+  const clear = await readWithSignals({});
+  assert.equal(clear.recommendedFirstAction, null);
+
+  const urgentWins = await readWithSignals({
+    urgent: 2,
+    overdue: 1,
+    escalated: 1,
+    elevated: 1,
+    stale: 1,
+    due: 1
+  });
+  assert.deepEqual(urgentWins.recommendedFirstAction, {
+    key: "urgent-care",
+    priority: "urgent",
+    label: "Review urgent care",
+    reason:
+      "2 urgent care candidate(s) are owned by Staff linked to this Ministry Area.",
+    source: "care",
+    sourcePath:
+      "/api/ministry-areas/ministry-area-readiness/readiness",
+    count: urgentWins.care.urgent
+  });
+  assert.equal(
+    JSON.stringify(urgentWins.recommendedFirstAction).includes("visitor"),
+    false
+  );
+
+  const overdueWins = await readWithSignals({
+    overdue: 2,
+    escalated: 1,
+    elevated: 1,
+    stale: 1,
+    due: 1
+  });
+  assert.deepEqual(overdueWins.recommendedFirstAction, {
+    key: "overdue-followups",
+    priority: "urgent",
+    label: "Review overdue follow-ups",
+    reason:
+      "2 six-week follow-up(s) owned by Staff linked to this Ministry Area are overdue.",
+    source: "six-week-followup",
+    sourcePath:
+      "/api/ministry-areas/ministry-area-readiness/readiness",
+    count: overdueWins.sixWeekFollowup.overdue
+  });
+  assert.equal(
+    JSON.stringify(overdueWins.recommendedFirstAction).includes("visitor"),
+    false
+  );
+
+  const escalatedWins = await readWithSignals({
+    escalated: 2,
+    elevated: 1,
+    stale: 1,
+    due: 1
+  });
+  assert.deepEqual(escalatedWins.recommendedFirstAction, {
+    key: "escalated-care",
+    priority: "high",
+    label: "Review escalated care",
+    reason:
+      "2 care candidate(s) owned by Staff linked to this Ministry Area require escalation.",
+    source: "care",
+    sourcePath:
+      "/api/ministry-areas/ministry-area-readiness/readiness",
+    count: escalatedWins.care.escalated
+  });
+
+  const elevatedWins = await readWithSignals({
+    elevated: 2,
+    stale: 1,
+    due: 1
+  });
+  assert.deepEqual(elevatedWins.recommendedFirstAction, {
+    key: "elevated-care",
+    priority: "high",
+    label: "Review elevated care",
+    reason:
+      "2 elevated care candidate(s) are owned by Staff linked to this Ministry Area.",
+    source: "care",
+    sourcePath:
+      "/api/ministry-areas/ministry-area-readiness/readiness",
+    count: elevatedWins.care.elevated
+  });
+
+  const staleWins = await readWithSignals({ stale: 2, due: 1 });
+  assert.deepEqual(staleWins.recommendedFirstAction, {
+    key: "stale-care",
+    priority: "medium",
+    label: "Review stale care",
+    reason:
+      "2 stale care candidate(s) are owned by Staff linked to this Ministry Area.",
+    source: "care",
+    sourcePath:
+      "/api/ministry-areas/ministry-area-readiness/readiness",
+    count: staleWins.care.stale
+  });
+
+  const dueWins = await readWithSignals({ due: 2 });
+  assert.deepEqual(dueWins.recommendedFirstAction, {
+    key: "due-followups",
+    priority: "medium",
+    label: "Review due follow-ups",
+    reason:
+      "2 six-week follow-up(s) owned by Staff linked to this Ministry Area are due.",
+    source: "six-week-followup",
+    sourcePath:
+      "/api/ministry-areas/ministry-area-readiness/readiness",
+    count: dueWins.sixWeekFollowup.due
+  });
+
   const leadershipOnly = await readWith({
     overview: overview([]),
     care: [careCandidate("leader-care", "staff-leader")],
@@ -331,6 +512,7 @@ async function run(): Promise<void> {
   assert.ok(leadershipOnly);
   assert.equal(leadershipOnly.care.totalOwned, 0);
   assert.equal(leadershipOnly.sixWeekFollowup.totalOwned, 0);
+  assert.equal(leadershipOnly.recommendedFirstAction, null);
 
   await assert.rejects(
     () => readWith({

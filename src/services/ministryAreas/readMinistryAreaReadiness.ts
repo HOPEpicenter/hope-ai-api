@@ -24,6 +24,29 @@ import {
   type SixWeekFollowupQueue
 } from "../followups/readSixWeekVisitorFollowups";
 
+export type MinistryAreaReadinessActionPriority =
+  | "urgent"
+  | "high"
+  | "medium";
+
+export type MinistryAreaReadinessActionKey =
+  | "urgent-care"
+  | "overdue-followups"
+  | "escalated-care"
+  | "elevated-care"
+  | "stale-care"
+  | "due-followups";
+
+export type MinistryAreaReadinessAction = {
+  key: MinistryAreaReadinessActionKey;
+  priority: MinistryAreaReadinessActionPriority;
+  label: string;
+  reason: string;
+  source: "care" | "six-week-followup";
+  sourcePath: string;
+  count: number;
+};
+
 export type MinistryAreaReadiness = {
   ministryArea: Pick<
     CanonicalMinistryArea,
@@ -52,6 +75,7 @@ export type MinistryAreaReadiness = {
     urgentCare: number;
     overdueFollowups: number;
   };
+  recommendedFirstAction: MinistryAreaReadinessAction | null;
 };
 
 export type MinistryAreaReadinessDependencies = {
@@ -61,6 +85,88 @@ export type MinistryAreaReadinessDependencies = {
   readCareCandidates?: () => Promise<CareCandidate[]>;
   readSixWeekQueue?: () => Promise<SixWeekFollowupQueue>;
 };
+
+function buildRecommendedFirstAction(
+  ministryAreaId: string,
+  signals: Pick<MinistryAreaReadiness, "care" | "sixWeekFollowup">
+): MinistryAreaReadinessAction | null {
+  const sourcePath =
+    `/api/ministry-areas/${encodeURIComponent(ministryAreaId)}/readiness`;
+
+  if (signals.care.urgent > 0) {
+    return {
+      key: "urgent-care",
+      priority: "urgent",
+      label: "Review urgent care",
+      reason: `${signals.care.urgent} urgent care candidate(s) are owned by Staff linked to this Ministry Area.`,
+      source: "care",
+      sourcePath,
+      count: signals.care.urgent
+    };
+  }
+
+  if (signals.sixWeekFollowup.overdue > 0) {
+    return {
+      key: "overdue-followups",
+      priority: "urgent",
+      label: "Review overdue follow-ups",
+      reason: `${signals.sixWeekFollowup.overdue} six-week follow-up(s) owned by Staff linked to this Ministry Area are overdue.`,
+      source: "six-week-followup",
+      sourcePath,
+      count: signals.sixWeekFollowup.overdue
+    };
+  }
+
+  if (signals.care.escalated > 0) {
+    return {
+      key: "escalated-care",
+      priority: "high",
+      label: "Review escalated care",
+      reason: `${signals.care.escalated} care candidate(s) owned by Staff linked to this Ministry Area require escalation.`,
+      source: "care",
+      sourcePath,
+      count: signals.care.escalated
+    };
+  }
+
+  if (signals.care.elevated > 0) {
+    return {
+      key: "elevated-care",
+      priority: "high",
+      label: "Review elevated care",
+      reason: `${signals.care.elevated} elevated care candidate(s) are owned by Staff linked to this Ministry Area.`,
+      source: "care",
+      sourcePath,
+      count: signals.care.elevated
+    };
+  }
+
+  if (signals.care.stale > 0) {
+    return {
+      key: "stale-care",
+      priority: "medium",
+      label: "Review stale care",
+      reason: `${signals.care.stale} stale care candidate(s) are owned by Staff linked to this Ministry Area.`,
+      source: "care",
+      sourcePath,
+      count: signals.care.stale
+    };
+  }
+
+  if (signals.sixWeekFollowup.due > 0) {
+    return {
+      key: "due-followups",
+      priority: "medium",
+      label: "Review due follow-ups",
+      reason: `${signals.sixWeekFollowup.due} six-week follow-up(s) owned by Staff linked to this Ministry Area are due.`,
+      source: "six-week-followup",
+      sourcePath,
+      count: signals.sixWeekFollowup.due
+    };
+  }
+
+  return null;
+}
 
 function toCareProfileInput(profile: FunctionFormationProfileEntity) {
   return {
@@ -148,6 +254,31 @@ export async function readMinistryAreaReadiness(
   const overdueFollowups = ownedFollowups.filter(
     item => item.plan.nextTask?.status === "overdue"
   ).length;
+  const care = {
+    totalOwned: ownedCare.length,
+    urgent: urgentCare,
+    elevated: ownedCare.filter(
+      candidate => candidate.carePriority === "elevated"
+    ).length,
+    stale: ownedCare.filter(
+      candidate => candidate.careAgeBucket === "stale"
+    ).length,
+    escalated: ownedCare.filter(
+      candidate => candidate.escalationLevel === "escalate"
+    ).length
+  };
+  const sixWeekFollowup = {
+    totalOwned: ownedFollowups.length,
+    due: ownedFollowups.filter(
+      item => item.plan.nextTask?.status === "due"
+    ).length,
+    overdue: overdueFollowups
+  };
+  const attention = {
+    total: urgentCare + overdueFollowups,
+    urgentCare,
+    overdueFollowups
+  };
 
   return {
     ministryArea: {
@@ -162,30 +293,12 @@ export async function readMinistryAreaReadiness(
       pendingStaff: overview.staffSummary.pending,
       inactiveStaff: overview.staffSummary.inactive
     },
-    care: {
-      totalOwned: ownedCare.length,
-      urgent: urgentCare,
-      elevated: ownedCare.filter(
-        candidate => candidate.carePriority === "elevated"
-      ).length,
-      stale: ownedCare.filter(
-        candidate => candidate.careAgeBucket === "stale"
-      ).length,
-      escalated: ownedCare.filter(
-        candidate => candidate.escalationLevel === "escalate"
-      ).length
-    },
-    sixWeekFollowup: {
-      totalOwned: ownedFollowups.length,
-      due: ownedFollowups.filter(
-        item => item.plan.nextTask?.status === "due"
-      ).length,
-      overdue: overdueFollowups
-    },
-    attention: {
-      total: urgentCare + overdueFollowups,
-      urgentCare,
-      overdueFollowups
-    }
+    care,
+    sixWeekFollowup,
+    attention,
+    recommendedFirstAction: buildRecommendedFirstAction(
+      normalizedId,
+      { care, sixWeekFollowup }
+    )
   };
 }

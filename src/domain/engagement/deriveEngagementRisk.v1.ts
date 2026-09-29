@@ -7,6 +7,7 @@ type ScoreLike = {
   lastEngagedAt: string | null;
   daysSinceLastEngagement: number | null;
   engagementCount: number;
+  hasPriorHistory: boolean;
   score: number;
   scoreReasons: string[];
   needsFollowup: boolean;
@@ -17,6 +18,30 @@ function clamp(n: number, min: number, max: number): number {
 }
 
 export function deriveEngagementRiskV1(score: ScoreLike): EngagementRiskV1 {
+  // No engagement evidence has ever been recorded: absence of history is not evidence of
+  // disengagement, so this must not be scored using the "gone quiet" penalties below.
+  if (!score.hasPriorHistory) {
+    return {
+      ok: true,
+      v: 1,
+      visitorId: score.visitorId,
+      windowDays: score.windowDays,
+      riskLevel: "low",
+      riskScore: 0,
+      signals: ["no_engagement_history"],
+      recommendedAction: "No immediate followup needed",
+      engagement: {
+        engaged: score.engaged,
+        lastEngagedAt: score.lastEngagedAt,
+        daysSinceLastEngagement: score.daysSinceLastEngagement,
+        engagementCount: score.engagementCount,
+        score: score.score,
+        scoreReasons: score.scoreReasons,
+        needsFollowup: score.needsFollowup
+      }
+    };
+  }
+
   const signals: string[] = [];
   let riskScore = 0;
 

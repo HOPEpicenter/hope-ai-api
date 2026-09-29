@@ -33,6 +33,7 @@ export async function readEngagementRiskV1(
     lastEngagedAt: score.lastEngagedAt,
     daysSinceLastEngagement: score.daysSinceLastEngagement,
     engagementCount: score.engagementCount,
+    hasPriorHistory: score.hasPriorHistory,
     score: score.score,
     scoreReasons: score.scoreReasons,
     needsFollowup: score.needsFollowup

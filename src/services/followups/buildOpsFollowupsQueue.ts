@@ -404,6 +404,9 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
           lastEngagedAt: score.lastEngagedAt,
           daysSinceLastEngagement: score.daysSinceLastEngagement,
           engagementCount: score.engagementCount,
+          // An authoritative open follow-up assignment is itself ministry evidence, even when
+          // the engagement timeline has no signals yet (e.g. brand-new visitor just assigned).
+          hasPriorHistory: score.hasPriorHistory || signals.needsFollowup,
           score: score.score,
           scoreReasons: score.scoreReasons,
           needsFollowup: score.needsFollowup

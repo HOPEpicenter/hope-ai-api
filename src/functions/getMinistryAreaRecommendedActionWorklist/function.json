@@ -1,0 +1,21 @@
+{
+  "bindings": [
+    {
+      "authLevel": "anonymous",
+      "type": "httpTrigger",
+      "direction": "in",
+      "name": "req",
+      "methods": [
+        "get"
+      ],
+      "route": "ministry-areas/{ministryAreaId}/recommended-action-worklist"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ],
+  "scriptFile": "../dist/functions/getMinistryAreaRecommendedActionWorklist/index.js",
+  "entryPoint": "getMinistryAreaRecommendedActionWorklist"
+}

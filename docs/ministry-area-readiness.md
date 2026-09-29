@@ -20,6 +20,23 @@ Visitor identity, ministry connections, care opener, leader metadata, and the
 current administrator are not ownership evidence. Leadership and membership
 are descriptive only and do not grant or imply authorization.
 
+## Recommended Action Worklist
+
+`GET /api/ministry-areas/{ministryAreaId}/recommended-action-worklist` is an
+administrator-only, read-only view of the canonical records supporting the
+current recommended first action. It uses the same canonical Ministry Area
+Overview, care candidates, and six-week queue snapshot as readiness, then
+filters owned work through canonical Staff linked to the area. Leadership is
+not an ownership source, membership does not grant permissions, and no
+visitor-to-Ministry-Area relationship is inferred.
+
+The response contains only the safe fields needed to identify a care candidate
+or six-week task. It excludes contact details, Entra identifiers, private
+notes, and raw visitor/event records. When an action exists,
+`items.length` equals `recommendedFirstAction.count`; when no action exists,
+the action is `null` and `items` is empty. Matching records retain their
+canonical source order.
+
 ## Canonical Sources
 
 - Ministry Area and linked Staff: `readMinistryAreaOverview` and its canonical

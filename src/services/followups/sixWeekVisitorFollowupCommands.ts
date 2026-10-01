@@ -18,6 +18,9 @@ import {
   readMutationActorStaffIdentity
 } from "../staff/readCanonicalStaffDirectory";
 import {
+  canOverrideSixWeekPlanOwner
+} from "../authorization/pastoralAuthorization";
+import {
   isSixWeekCareOutcome,
   syncHistoricalSixWeekTaskCareOutcomeToCare,
   syncSixWeekTaskToCare,
@@ -31,7 +34,8 @@ type FollowupRepository = Pick<
 
 type StaffIdentity = {
   staffId: string;
-  status: "active" | "inactive";
+  status: "active" | "inactive" | "pending";
+  roleLabel?: string | null;
 };
 
 export type SixWeekFollowupCommandDependencies = {
@@ -143,20 +147,26 @@ async function defaultVisitorExists(visitorId: string): Promise<boolean> {
 async function requireActiveActor(
   actorId: string,
   dependencies: SixWeekFollowupCommandDependencies
-): Promise<SixWeekFollowupCommandFailure | null> {
+): Promise<
+  | { actor: StaffIdentity; failure: null }
+  | { actor: null; failure: SixWeekFollowupCommandFailure }
+> {
   const actor = await (
     dependencies.readActor ?? readMutationActorStaffIdentity
   )(actorId);
 
   if (!actor || actor.status !== "active") {
     return {
-      accepted: false,
-      status: 400,
-      error: "actorId must reference an active staff identity"
+      actor: null,
+      failure: {
+        accepted: false,
+        status: 400,
+        error: "actorId must reference an active staff identity"
+      }
     };
   }
 
-  return null;
+  return { actor, failure: null };
 }
 
 async function requireActiveAssignee(
@@ -187,10 +197,14 @@ function commandFailure(
 
 function requirePlanOwnerAuthorization(
   plan: SixWeekVisitorFollowupPlan,
-  actorId: string,
+  actor: StaffIdentity,
   administrativeOverrideVerified?: true
 ): SixWeekFollowupCommandFailure | null {
   if (administrativeOverrideVerified === true) {
+    return null;
+  }
+
+  if (canOverrideSixWeekPlanOwner(actor)) {
     return null;
   }
 
@@ -201,7 +215,7 @@ function requirePlanOwnerAuthorization(
     );
   }
 
-  if (plan.ownerStaffId !== actorId) {
+  if (plan.ownerStaffId !== actor.staffId) {
     return commandFailure(
       403,
       "Only the assigned follow-up owner may perform this action"
@@ -274,8 +288,8 @@ export async function startSixWeekVisitorFollowup(
 
   if (!exists) return commandFailure(404, "Visitor not found");
 
-  const actorFailure = await requireActiveActor(actorId, dependencies);
-  if (actorFailure) return actorFailure;
+  const actorResult = await requireActiveActor(actorId, dependencies);
+  if (actorResult.failure) return actorResult.failure;
 
   if (ownerStaffId) {
     const assigneeFailure = await requireActiveAssignee(
@@ -323,8 +337,8 @@ export async function assignSixWeekFollowupOwner(
   }
   if (!actorId) return commandFailure(400, "actorId is required");
 
-  const actorFailure = await requireActiveActor(actorId, dependencies);
-  if (actorFailure) return actorFailure;
+  const actorResult = await requireActiveActor(actorId, dependencies);
+  if (actorResult.failure) return actorResult.failure;
 
   const assigneeFailure = await requireActiveAssignee(
     ownerStaffId,
@@ -435,8 +449,8 @@ export async function recordSixWeekTaskOutcome(
   }
   if (!actorId) return commandFailure(400, "actorId is required");
 
-  const actorFailure = await requireActiveActor(actorId, dependencies);
-  if (actorFailure) return actorFailure;
+  const actorResult = await requireActiveActor(actorId, dependencies);
+  if (actorResult.failure) return actorResult.failure;
 
   const repository = repositoryFor(dependencies);
   const existing = projectSixWeekVisitorFollowup(
@@ -446,7 +460,7 @@ export async function recordSixWeekTaskOutcome(
   if (!existing) return commandFailure(404, "Follow-up plan not found");
   const authorizationFailure = requirePlanOwnerAuthorization(
     existing,
-    actorId,
+    actorResult.actor,
     input.administrativeOverrideVerified
   );
   if (authorizationFailure) return authorizationFailure;
@@ -569,8 +583,8 @@ export async function confirmHistoricalSixWeekCareOutcome(
   }
   if (!actorId) return commandFailure(400, "actorId is required");
 
-  const actorFailure = await requireActiveActor(actorId, dependencies);
-  if (actorFailure) return actorFailure;
+  const actorResult = await requireActiveActor(actorId, dependencies);
+  if (actorResult.failure) return actorResult.failure;
 
   const repository = repositoryFor(dependencies);
   const events = await repository.listByVisitor(visitorId);
@@ -579,7 +593,7 @@ export async function confirmHistoricalSixWeekCareOutcome(
   if (!plan) return commandFailure(404, "Follow-up plan not found");
   const authorizationFailure = requirePlanOwnerAuthorization(
     plan,
-    actorId,
+    actorResult.actor,
     input.administrativeOverrideVerified
   );
   if (authorizationFailure) return authorizationFailure;
@@ -676,8 +690,8 @@ export async function changeSixWeekFollowupStatus(
     return commandFailure(400, "reason is required for pause or cancel");
   }
 
-  const actorFailure = await requireActiveActor(actorId, dependencies);
-  if (actorFailure) return actorFailure;
+  const actorResult = await requireActiveActor(actorId, dependencies);
+  if (actorResult.failure) return actorResult.failure;
 
   const repository = repositoryFor(dependencies);
   const existing = projectSixWeekVisitorFollowup(
@@ -687,7 +701,7 @@ export async function changeSixWeekFollowupStatus(
   if (!existing) return commandFailure(404, "Follow-up plan not found");
   const authorizationFailure = requirePlanOwnerAuthorization(
     existing,
-    actorId,
+    actorResult.actor,
     input.administrativeOverrideVerified
   );
   if (authorizationFailure) return authorizationFailure;

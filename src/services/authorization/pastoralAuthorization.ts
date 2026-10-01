@@ -3,7 +3,12 @@ import type {
 } from "../../domain/staff/projectStaffDirectory";
 
 export type PastoralAuthorizationStaff =
-  CanonicalStaffIdentity | null | undefined;
+  | {
+      status?: string | null;
+      roleLabel?: string | null;
+    }
+  | null
+  | undefined;
 
 const PASTORAL_AUTHORITY_ROLES = new Set([
   "pastor",
@@ -53,6 +58,12 @@ export function canWritePastoralNotes(
 }
 
 export function canViewHighRiskAlerts(
+  staff: PastoralAuthorizationStaff
+): boolean {
+  return isPastoralAuthority(staff);
+}
+
+export function canOverrideSixWeekPlanOwner(
   staff: PastoralAuthorizationStaff
 ): boolean {
   return isPastoralAuthority(staff);

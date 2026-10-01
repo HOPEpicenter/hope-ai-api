@@ -5,6 +5,7 @@ import type {
 import {
   canAssignCareOwner,
   canBeCareOwner,
+  canOverrideSixWeekPlanOwner,
   canViewHighRiskAlerts,
   canViewPastoralNotes,
   canWritePastoralNotes,
@@ -32,7 +33,8 @@ function staff(
     entraTenantId: null,
     entraObjectId: null,
     email: null,
-    phone: null
+    phone: null,
+    ministryAreaId: null
   };
 }
 
@@ -79,6 +81,12 @@ function assertAllCapabilities(
     canViewHighRiskAlerts(identity),
     expected,
     `${label}: canViewHighRiskAlerts`
+  );
+
+  assert.equal(
+    canOverrideSixWeekPlanOwner(identity),
+    expected,
+    `${label}: canOverrideSixWeekPlanOwner`
   );
 }
 

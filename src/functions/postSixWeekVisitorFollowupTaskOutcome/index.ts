@@ -1,5 +1,5 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
-import { resolveSixWeekAdministrativeOverride } from "../_shared/adminStaffActor";
+import { resolveSixWeekActorAuthorization } from "../_shared/sixWeekStaffActor";
 import {
   recordSixWeekTaskOutcome
 } from "../../services/followups/sixWeekVisitorFollowupCommands";
@@ -31,14 +31,13 @@ export async function postSixWeekVisitorFollowupTaskOutcome(
     }
 
     const body = req?.body ?? {};
-    const administrativeOverride =
-      await resolveSixWeekAdministrativeOverride(req);
+    const actorAuth = await resolveSixWeekActorAuthorization(req);
 
-    if (!administrativeOverride.ok) {
+    if (!actorAuth.ok) {
       context.res = {
-        status: administrativeOverride.status,
+        status: actorAuth.status,
         headers: { "content-type": "application/json; charset=utf-8" },
-        body: administrativeOverride.body
+        body: actorAuth.body
       };
       return;
     }
@@ -51,9 +50,9 @@ export async function postSixWeekVisitorFollowupTaskOutcome(
       outcome: body.outcome,
       careOutcome: body.careOutcome,
       notes: body.notes,
-      actorId: administrativeOverride.actorId ?? body.actorId,
+      actorId: actorAuth.actorId,
       administrativeOverrideVerified:
-        administrativeOverride.administrativeOverrideVerified
+        actorAuth.administrativeOverrideVerified
     });
 
     context.res = {

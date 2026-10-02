@@ -84,9 +84,28 @@ function resolveVisitorId(mode, entity) {
     case "global-timeline":
       return explicitVisitorId;
 
+    // Shared mode for visitor-linked event tables: explicit visitorId wins, partitionKey is the fallback.
+    case "visitor-events":
+      return explicitVisitorId || partitionKey;
+
     default:
       return explicitVisitorId;
   }
+}
+
+function resolveExecutionMode(argv, confirmationArgument) {
+  const execute = argv.includes("--execute");
+
+  if (execute && confirmationArgument !== EXECUTION_CONFIRMATION) {
+    throw new Error(
+      `Destructive execution requires --confirm=${EXECUTION_CONFIRMATION}`,
+    );
+  }
+
+  return {
+    execute,
+    mode: execute ? "execute" : "audit",
+  };
 }
 
 function isTableNotFound(error) {
@@ -146,6 +165,22 @@ function buildTableDefinitions() {
         "devGlobalTimeline",
       ),
       mode: "global-timeline",
+    },
+    {
+      label: "Six-Week Followup Events",
+      name: readEnvironment(
+        "SIX_WEEK_FOLLOWUP_EVENTS_TABLE",
+        "VisitorFollowupEvents",
+      ),
+      mode: "visitor-events",
+    },
+    {
+      label: "Ministry Communication Events",
+      name: readEnvironment(
+        "MINISTRY_COMMUNICATION_EVENTS_TABLE",
+        "MinistryCommunicationEvents",
+      ),
+      mode: "visitor-events",
     },
   ];
 }
@@ -235,18 +270,8 @@ async function main() {
   }
 
   const keepIds = parseKeepIds();
-  const execute = process.argv.includes("--execute");
   const confirmation = readArgument("--confirm");
-
-  if (execute && confirmation !== EXECUTION_CONFIRMATION) {
-    throw new Error(
-      `Destructive execution requires --confirm=${EXECUTION_CONFIRMATION}`,
-    );
-  }
-
-  const mode = execute
-    ? "execute"
-    : "audit";
+  const { execute, mode } = resolveExecutionMode(process.argv, confirmation);
 
   console.log(
     JSON.stringify(
@@ -306,13 +331,23 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(
-    "Pilot data audit failed:",
-    error instanceof Error
-      ? error.message
-      : String(error),
-  );
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(
+      "Pilot data audit failed:",
+      error instanceof Error
+        ? error.message
+        : String(error),
+    );
 
-  process.exit(1);
-});
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  EXECUTION_CONFIRMATION,
+  parseKeepIds,
+  resolveVisitorId,
+  buildTableDefinitions,
+  resolveExecutionMode,
+};

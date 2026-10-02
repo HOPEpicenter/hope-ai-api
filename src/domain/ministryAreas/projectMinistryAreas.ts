@@ -11,6 +11,7 @@ export type MinistryAreaEvent = {
     displayName?: string;
     status?: MinistryAreaStatus;
     leaderStaffId?: string | null;
+    leaderStaffIds?: string[];
     reason?: string | null;
   };
 };
@@ -20,6 +21,7 @@ export type CanonicalMinistryArea = {
   displayName: string;
   status: MinistryAreaStatus;
   leaderStaffId: string | null;
+  leaderStaffIds: string[];
   createdAt: string;
   updatedAt: string;
   lastEventId: string;
@@ -31,6 +33,40 @@ export function normalizeMinistryAreaName(value: string): string {
 
 export function ministryAreaNameKey(value: string): string {
   return normalizeMinistryAreaName(value).toLowerCase();
+}
+
+// Normalizes free-form leader IDs: trims, drops blanks, and deduplicates while preserving first-occurrence order.
+export function normalizeLeaderStaffIds(
+  values: Array<string | null | undefined> | undefined
+): string[] {
+  if (!values) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const value of values) {
+    const normalized = String(value ?? "").trim();
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
+  }
+
+  return result;
+}
+
+function leaderStaffIdsFromEventData(
+  data: MinistryAreaEvent["data"],
+  fallback: string[]
+): string[] {
+  if (data.leaderStaffIds !== undefined) {
+    return normalizeLeaderStaffIds(data.leaderStaffIds);
+  }
+
+  if (data.leaderStaffId !== undefined) {
+    const single = String(data.leaderStaffId ?? "").trim();
+    return single ? [single] : [];
+  }
+
+  return fallback;
 }
 
 export function projectMinistryAreas(events: MinistryAreaEvent[]): CanonicalMinistryArea[] {
@@ -48,12 +84,13 @@ export function projectMinistryAreas(events: MinistryAreaEvent[]): CanonicalMini
     if (event.type === "ministryArea.created") {
       const displayName = normalizeMinistryAreaName(event.data.displayName ?? "");
       if (!displayName || records.has(event.ministryAreaId)) continue;
+      const leaderStaffIds = leaderStaffIdsFromEventData(event.data, []);
       records.set(event.ministryAreaId, {
         ministryAreaId: event.ministryAreaId,
         displayName,
         status: "active",
-        leaderStaffId:
-          String(event.data.leaderStaffId ?? "").trim() || null,
+        leaderStaffIds,
+        leaderStaffId: leaderStaffIds[0] ?? null,
         createdAt: event.occurredAt,
         updatedAt: event.occurredAt,
         lastEventId: event.eventId
@@ -63,16 +100,15 @@ export function projectMinistryAreas(events: MinistryAreaEvent[]): CanonicalMini
 
     const existing = records.get(event.ministryAreaId);
     if (!existing) continue;
+    const leaderStaffIds = leaderStaffIdsFromEventData(event.data, existing.leaderStaffIds);
     records.set(event.ministryAreaId, {
       ...existing,
       displayName: event.data.displayName === undefined
         ? existing.displayName
         : normalizeMinistryAreaName(event.data.displayName) || existing.displayName,
       status: event.data.status ?? existing.status,
-      leaderStaffId:
-        event.data.leaderStaffId === undefined
-          ? existing.leaderStaffId
-          : String(event.data.leaderStaffId ?? "").trim() || null,
+      leaderStaffIds,
+      leaderStaffId: leaderStaffIds[0] ?? null,
       updatedAt: event.occurredAt,
       lastEventId: event.eventId
     });

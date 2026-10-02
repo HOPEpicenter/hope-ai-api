@@ -19,6 +19,9 @@ export type MinistryAreaOverview = {
     CanonicalStaffIdentity,
     "staffId" | "displayName" | "roleLabel" | "status"
   > | null;
+  leaders: Array<
+    Pick<CanonicalStaffIdentity, "staffId" | "displayName" | "roleLabel" | "status">
+  >;
   staffSummary: {
     total: number;
     active: number;
@@ -53,26 +56,42 @@ export async function readMinistryAreaOverview(
     return null;
   }
 
+  const leaderStaffIds = rosterResult.ministryArea.leaderStaffIds;
   const leaderStaffId = rosterResult.ministryArea.leaderStaffId;
   const readStaff =
     dependencies.readStaff ?? readCanonicalStaffDirectory;
+  const staffDirectory =
+    leaderStaffIds.length > 0 ? await readStaff() : [];
+
+  function resolveLeaderIdentity(staffId: string) {
+    const identity = staffDirectory.find(
+      candidate => candidate.staffId === staffId
+    );
+
+    return identity
+      ? {
+          staffId: identity.staffId,
+          displayName: identity.displayName,
+          roleLabel: identity.roleLabel,
+          status: identity.status
+        }
+      : null;
+  }
+
+  const leaders = leaderStaffIds
+    .map(resolveLeaderIdentity)
+    .filter(
+      (identity): identity is NonNullable<typeof identity> => identity !== null
+    );
   const leaderIdentity = leaderStaffId
-    ? (await readStaff()).find(
-        identity => identity.staffId === leaderStaffId
-      ) ?? null
+    ? resolveLeaderIdentity(leaderStaffId)
     : null;
   const roster = rosterResult.items;
 
   return {
     ministryArea: rosterResult.ministryArea,
-    leader: leaderIdentity
-      ? {
-          staffId: leaderIdentity.staffId,
-          displayName: leaderIdentity.displayName,
-          roleLabel: leaderIdentity.roleLabel,
-          status: leaderIdentity.status
-        }
-      : null,
+    leader: leaderIdentity,
+    leaders,
     staffSummary: {
       total: roster.length,
       active: roster.filter(item => item.status === "active").length,

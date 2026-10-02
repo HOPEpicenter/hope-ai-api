@@ -49,7 +49,8 @@ const roster = [
 function overview(
   items: typeof roster = roster,
   status: "active" | "inactive" = "active",
-  leaderStaffId: string | null = "staff-leader"
+  leaderStaffId: string | null = "staff-leader",
+  leaderStaffIds: string[] = leaderStaffId ? [leaderStaffId] : []
 ): MinistryAreaOverview {
   return {
     ministryArea: {
@@ -57,11 +58,13 @@ function overview(
       displayName: "Care Ministry",
       status,
       leaderStaffId,
+      leaderStaffIds,
       createdAt: "2026-09-01T00:00:00.000Z",
       updatedAt: "2026-09-01T00:00:00.000Z",
       lastEventId: "evt-ministry-area"
     },
     leader: null,
+    leaders: [],
     staffSummary: {
       total: items.length,
       active: items.filter(item => item.status === "active").length,
@@ -261,6 +264,27 @@ async function readWithSignals(signals: {
 async function run(): Promise<void> {
   assert.equal(await readMinistryAreaReadiness("   "), null);
   assert.equal(await readWith({ overview: null }), null);
+
+  // (T) Readiness exposes both leaderStaffIds and legacy leaderStaffId.
+  const multiLeaderReadiness = await readWith({
+    overview: overview(roster, "active", "staff-leader", ["staff-leader", "staff-second-leader"])
+  });
+  assert.ok(multiLeaderReadiness);
+  assert.deepEqual(
+    multiLeaderReadiness.ministryArea.leaderStaffIds,
+    ["staff-leader", "staff-second-leader"]
+  );
+  assert.equal(multiLeaderReadiness.ministryArea.leaderStaffId, "staff-leader");
+
+  // (U) Multiple leaders do not change roster-based ownership/care/follow-up counts.
+  const singleLeaderReadiness = await readWith({ overview: overview() });
+  assert.ok(singleLeaderReadiness);
+  assert.deepEqual(multiLeaderReadiness.ownership, singleLeaderReadiness.ownership);
+  assert.deepEqual(multiLeaderReadiness.care, singleLeaderReadiness.care);
+  assert.deepEqual(
+    multiLeaderReadiness.sixWeekFollowup,
+    singleLeaderReadiness.sixWeekFollowup
+  );
 
   const inactiveArea = await readWith({
     overview: overview([roster[2]], "inactive"),

@@ -38,7 +38,7 @@ export type {
 export type MinistryAreaReadiness = {
   ministryArea: Pick<
     CanonicalMinistryArea,
-    "ministryAreaId" | "displayName" | "status" | "leaderStaffId"
+    "ministryAreaId" | "displayName" | "status" | "leaderStaffId" | "leaderStaffIds"
   >;
   ownership: {
     staffIds: string[];
@@ -180,7 +180,8 @@ export async function readMinistryAreaReadinessSnapshot(
         ministryAreaId: overview.ministryArea.ministryAreaId,
         displayName: overview.ministryArea.displayName,
         status: overview.ministryArea.status,
-        leaderStaffId: overview.ministryArea.leaderStaffId
+        leaderStaffId: overview.ministryArea.leaderStaffId,
+        leaderStaffIds: overview.ministryArea.leaderStaffIds
       },
       ownership: {
         staffIds,

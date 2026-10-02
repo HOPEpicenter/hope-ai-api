@@ -53,11 +53,13 @@ function overview(
       displayName: "Worklist Ministry",
       status,
       leaderStaffId,
+      leaderStaffIds: leaderStaffId ? [leaderStaffId] : [],
       createdAt: "2026-09-01T00:00:00.000Z",
       updatedAt: "2026-09-01T00:00:00.000Z",
       lastEventId: "evt-area"
     },
     leader: null,
+    leaders: [],
     staffSummary: {
       total: roster.length,
       active: roster.filter(item => item.status === "active").length,

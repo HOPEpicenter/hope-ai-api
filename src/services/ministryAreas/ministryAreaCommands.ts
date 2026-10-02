@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import {
   ministryAreaNameKey,
+  normalizeLeaderStaffIds,
   normalizeMinistryAreaName,
   projectMinistryAreas,
   type CanonicalMinistryArea,
@@ -35,6 +36,7 @@ export type MinistryAreaCommandInput = {
   displayName?: string;
   status?: MinistryAreaStatus;
   leaderStaffId?: string | null;
+  leaderStaffIds?: string[];
   reason?: string | null;
 };
 
@@ -112,6 +114,89 @@ async function validateLeaderStaff(
     leaderStaffId
   };
 }
+
+async function validateLeaderStaffIds(
+  value: string[] | undefined,
+  deps: MinistryAreaCommandDependencies
+): Promise<
+  | { ok: true; leaderStaffIds: string[] | undefined }
+  | { ok: false; status: number; error: string }
+> {
+  if (value === undefined) {
+    return { ok: true, leaderStaffIds: undefined };
+  }
+
+  if (!Array.isArray(value)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "leaderStaffIds must be an array of Staff IDs"
+    };
+  }
+
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+
+  for (const entry of value) {
+    const id = typeof entry === "string" ? entry.trim() : "";
+    if (!id) {
+      return {
+        ok: false,
+        status: 400,
+        error: "leaderStaffIds entries must be nonempty Staff IDs"
+      };
+    }
+    if (seen.has(id)) continue;
+    seen.add(id);
+    normalized.push(id);
+  }
+
+  const read = deps.readStaffIdentity ?? readCanonicalStaffIdentity;
+
+  for (const id of normalized) {
+    const staffMember = await read(id);
+
+    if (!staffMember) {
+      return {
+        ok: false,
+        status: 404,
+        error: `Leader Staff identity not found: ${id}`
+      };
+    }
+
+    if (staffMember.status !== "active") {
+      return {
+        ok: false,
+        status: 409,
+        error: `Leader Staff identity is not active: ${id}`
+      };
+    }
+  }
+
+  return { ok: true, leaderStaffIds: normalized };
+}
+
+type LeaderIntent = "none" | "ids" | "legacy";
+
+function leaderIntentOf(data: MinistryAreaEvent["data"]): LeaderIntent {
+  if (data.leaderStaffIds !== undefined) return "ids";
+  if (data.leaderStaffId !== undefined) return "legacy";
+  return "none";
+}
+
+function effectiveLeaderIdsOf(data: MinistryAreaEvent["data"]): string[] {
+  if (data.leaderStaffIds !== undefined) return normalizeLeaderStaffIds(data.leaderStaffIds);
+  if (data.leaderStaffId !== undefined) {
+    const id = String(data.leaderStaffId ?? "").trim();
+    return id ? [id] : [];
+  }
+  return [];
+}
+
+function leaderIdsEqual(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
 function nameConflict(items: CanonicalMinistryArea[], displayName: string, exceptId?: string): boolean {
   const key = ministryAreaNameKey(displayName);
   return items.some(item => item.ministryAreaId !== exceptId &&
@@ -164,6 +249,12 @@ export async function updateMinistryArea(
 ): Promise<MinistryAreaCommandResult> {
   const invalid = validateCommon(input);
   if (invalid) return invalid;
+  if (input.leaderStaffIds !== undefined && input.leaderStaffId !== undefined) {
+    return failure(
+      400,
+      "Provide either leaderStaffIds or leaderStaffId, not both"
+    );
+  }
   const ministryAreaId = String(input.ministryAreaId ?? "").trim();
   if (!ministryAreaId) return failure(400, "ministryAreaId is required");
   if (input.status !== undefined && input.status !== "active" && input.status !== "inactive") {
@@ -177,15 +268,23 @@ export async function updateMinistryArea(
   if (
     displayName === undefined &&
     input.status === undefined &&
-    input.leaderStaffId === undefined
+    input.leaderStaffId === undefined &&
+    input.leaderStaffIds === undefined
   ) {
     return failure(
       400,
-      "displayName, status, or leaderStaffId is required"
+      "displayName, status, leaderStaffId, or leaderStaffIds is required"
     );
   }
   const reason = input.reason === undefined ? undefined : String(input.reason ?? "").trim() || null;
   if (reason && reason.length > 500) return failure(400, "reason must contain at most 500 characters");
+
+  const leaderIntent: LeaderIntent =
+    input.leaderStaffIds !== undefined
+      ? "ids"
+      : input.leaderStaffId !== undefined
+        ? "legacy"
+        : "none";
 
   const normalizedLeaderStaffId =
     input.leaderStaffId === undefined || input.leaderStaffId === null
@@ -194,6 +293,13 @@ export async function updateMinistryArea(
         ? input.leaderStaffId.trim()
         : input.leaderStaffId;
 
+  const requestedLeaderIds =
+    leaderIntent === "ids"
+      ? normalizeLeaderStaffIds(input.leaderStaffIds)
+      : leaderIntent === "legacy"
+        ? (normalizedLeaderStaffId ? [String(normalizedLeaderStaffId)] : [])
+        : [];
+
   const actorId = input.actorId.trim();
   const eventId = `evt-${input.commandId.toLowerCase()}`;
   const repository = deps.repository ?? new MinistryAreaEventsRepository();
@@ -201,22 +307,36 @@ export async function updateMinistryArea(
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const snapshot = await repository.readSnapshot();
-    const prior = existingCommand(snapshot, eventId, event =>
-      event.type === "ministryArea.updated" && event.ministryAreaId === ministryAreaId &&
-      event.actorId === actorId && event.data.displayName === displayName &&
-      event.data.status === input.status &&
-      event.data.leaderStaffId === normalizedLeaderStaffId &&
-      event.data.reason === reason);
+    const prior = existingCommand(snapshot, eventId, event => {
+      if (
+        event.type !== "ministryArea.updated" ||
+        event.ministryAreaId !== ministryAreaId ||
+        event.actorId !== actorId ||
+        event.data.displayName !== displayName ||
+        event.data.status !== input.status ||
+        event.data.reason !== reason
+      ) {
+        return false;
+      }
+
+      if (leaderIntentOf(event.data) !== leaderIntent) return false;
+      if (leaderIntent === "none") return true;
+
+      return leaderIdsEqual(effectiveLeaderIdsOf(event.data), requestedLeaderIds);
+    });
     if (prior) return prior;
 
-    const leader =
-      await validateLeaderStaff(
-        input.leaderStaffId,
-        deps
-      );
+    let leaderStaffIds: string[] | undefined;
+    let legacyLeaderStaffId: string | null | undefined;
 
-    if (!leader.ok) {
-      return failure(leader.status, leader.error);
+    if (leaderIntent === "ids") {
+      const validated = await validateLeaderStaffIds(input.leaderStaffIds, deps);
+      if (!validated.ok) return failure(validated.status, validated.error);
+      leaderStaffIds = validated.leaderStaffIds;
+    } else if (leaderIntent === "legacy") {
+      const leader = await validateLeaderStaff(input.leaderStaffId, deps);
+      if (!leader.ok) return failure(leader.status, leader.error);
+      legacyLeaderStaffId = leader.leaderStaffId;
     }
 
     const items = projectMinistryAreas(snapshot.events);
@@ -225,12 +345,20 @@ export async function updateMinistryArea(
     if (displayName !== undefined && nameConflict(items, displayName, ministryAreaId)) {
       return failure(409, "Ministry Area display name is already in use");
     }
+
+    const effectiveLeaderStaffIds =
+      leaderIntent === "ids"
+        ? (leaderStaffIds as string[])
+        : leaderIntent === "legacy"
+          ? (legacyLeaderStaffId ? [String(legacyLeaderStaffId)] : [])
+          : existing.leaderStaffIds;
+
     if (
       (displayName === undefined || displayName === existing.displayName) &&
       (input.status === undefined || input.status === existing.status) &&
       (
-        leader.leaderStaffId === undefined ||
-        leader.leaderStaffId === existing.leaderStaffId
+        leaderIntent === "none" ||
+        leaderIdsEqual(effectiveLeaderStaffIds, existing.leaderStaffIds)
       )
     ) {
       return failure(400, "No Ministry Area field would change");
@@ -241,9 +369,8 @@ export async function updateMinistryArea(
       data: {
         ...(displayName === undefined ? {} : { displayName }),
         ...(input.status === undefined ? {} : { status: input.status }),
-        ...(leader.leaderStaffId === undefined
-          ? {}
-          : { leaderStaffId: leader.leaderStaffId }),
+        ...(leaderIntent === "ids" ? { leaderStaffIds } : {}),
+        ...(leaderIntent === "legacy" ? { leaderStaffId: legacyLeaderStaffId } : {}),
         ...(reason === undefined ? {} : { reason })
       }
     };

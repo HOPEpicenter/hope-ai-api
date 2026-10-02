@@ -37,6 +37,7 @@ const area: CanonicalMinistryArea = {
   displayName: "Care Ministry",
   status: "active",
   leaderStaffId: "staff-leader",
+  leaderStaffIds: ["staff-leader"],
   createdAt: "2026-09-28T12:00:00.000Z",
   updatedAt: "2026-09-28T12:00:00.000Z",
   lastEventId: "evt-area-one"
@@ -48,10 +49,29 @@ const inactiveArea: CanonicalMinistryArea = {
   displayName: "Historical Ministry",
   status: "inactive",
   leaderStaffId: "staff-former-leader",
+  leaderStaffIds: ["staff-former-leader"],
   lastEventId: "evt-area-inactive"
 };
 
-const areas = [area, inactiveArea];
+const multiLeaderArea: CanonicalMinistryArea = {
+  ...area,
+  ministryAreaId: "ministry-area-multi-leader",
+  displayName: "Multi Leader Ministry",
+  leaderStaffId: "staff-a",
+  leaderStaffIds: ["staff-a", "staff-leader"],
+  lastEventId: "evt-area-multi-leader"
+};
+
+const secondaryUnresolvedArea: CanonicalMinistryArea = {
+  ...area,
+  ministryAreaId: "ministry-area-secondary-unresolved",
+  displayName: "Secondary Unresolved Ministry",
+  leaderStaffId: "staff-leader",
+  leaderStaffIds: ["staff-leader", "staff-ghost"],
+  lastEventId: "evt-area-secondary-unresolved"
+};
+
+const areas = [area, inactiveArea, multiLeaderArea, secondaryUnresolvedArea];
 const identities: CanonicalStaffIdentity[] = [
   staff({
     staffId: "staff-z",
@@ -133,6 +153,7 @@ async function run(): Promise<void> {
     overview.roster.map(item => item.staffId),
     ["staff-a", "staff-pending", "staff-z"]
   );
+  assert.deepEqual(overview.leaders, [overview.leader]);
 
   const inactiveOverview =
     await readOverview(inactiveArea.ministryAreaId);
@@ -150,7 +171,7 @@ async function run(): Promise<void> {
     area.ministryAreaId,
     {
       readRoster: async () => ({
-        ministryArea: { ...area, leaderStaffId: null },
+        ministryArea: { ...area, leaderStaffId: null, leaderStaffIds: [] },
         items: []
       }),
       readStaff: async () => {
@@ -160,11 +181,12 @@ async function run(): Promise<void> {
   );
   assert.ok(noLeader);
   assert.equal(noLeader.leader, null);
+  assert.deepEqual(noLeader.leaders, []);
 
   const unresolvedHistoricalLeader =
     await readMinistryAreaOverview(area.ministryAreaId, {
       readRoster: async () => ({
-        ministryArea: { ...area, leaderStaffId: "staff-removed" },
+        ministryArea: { ...area, leaderStaffId: "staff-removed", leaderStaffIds: ["staff-removed"] },
         items: []
       }),
       readStaff: async () => identities
@@ -175,6 +197,41 @@ async function run(): Promise<void> {
     "staff-removed"
   );
   assert.equal(unresolvedHistoricalLeader.leader, null);
+  assert.deepEqual(unresolvedHistoricalLeader.leaders, []);
+
+  // (Q) overview.leaders resolves multiple leaders in canonical leaderStaffIds order.
+  const multiLeaderOverview = await readOverview(multiLeaderArea.ministryAreaId);
+  assert.ok(multiLeaderOverview);
+  assert.deepEqual(
+    multiLeaderOverview.leaders.map(item => item.staffId),
+    ["staff-a", "staff-leader"]
+  );
+  // (R) overview.leader continues returning the first (legacy-compatible) leader.
+  assert.deepEqual(multiLeaderOverview.leader, {
+    staffId: "staff-a",
+    displayName: "Alpha Staff",
+    roleLabel: "Pastor",
+    status: "active"
+  });
+
+  // (S) An unresolved secondary leader is omitted from leaders without corrupting canonical IDs.
+  const secondaryUnresolvedOverview =
+    await readOverview(secondaryUnresolvedArea.ministryAreaId);
+  assert.ok(secondaryUnresolvedOverview);
+  assert.deepEqual(
+    secondaryUnresolvedOverview.leaders.map(item => item.staffId),
+    ["staff-leader"]
+  );
+  assert.deepEqual(
+    secondaryUnresolvedOverview.ministryArea.leaderStaffIds,
+    ["staff-leader", "staff-ghost"]
+  );
+  assert.deepEqual(secondaryUnresolvedOverview.leader, {
+    staffId: "staff-leader",
+    displayName: "Area Leader",
+    roleLabel: "Director",
+    status: "active"
+  });
 
   assert.equal(
     await readOverview("ministry-area-missing"),

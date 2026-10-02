@@ -17,6 +17,7 @@ async function run(): Promise<void> {
     displayName: "Local Ministry",
     status: "active",
     leaderStaffId: null,
+    leaderStaffIds: [],
     createdAt: "2026-09-28T00:00:00Z",
     updatedAt: "2026-09-28T00:00:00Z",
     lastEventId: "evt-area"

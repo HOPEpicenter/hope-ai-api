@@ -34,6 +34,7 @@ const area: CanonicalMinistryArea = {
   displayName: "Care Ministry",
   status: "active",
   leaderStaffId: null,
+  leaderStaffIds: [],
   createdAt: "2026-09-28T12:00:00.000Z",
   updatedAt: "2026-09-28T12:00:00.000Z",
   lastEventId: "evt-area-one"

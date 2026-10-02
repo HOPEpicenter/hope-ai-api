@@ -13,19 +13,19 @@ function readEnvironment(name, fallback = "") {
   return normalized || fallback;
 }
 
-function parseKeepIds() {
-  const raw = readEnvironment("KEEP_IDS", "[]");
+function parseIdListEnvironment(name) {
+  const raw = readEnvironment(name, "[]");
 
   let parsed;
 
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error("KEEP_IDS must be a JSON array of visitor IDs.");
+    throw new Error(`${name} must be a JSON array of visitor IDs.`);
   }
 
   if (!Array.isArray(parsed)) {
-    throw new Error("KEEP_IDS must be a JSON array of visitor IDs.");
+    throw new Error(`${name} must be a JSON array of visitor IDs.`);
   }
 
   return new Set(
@@ -33,6 +33,51 @@ function parseKeepIds() {
       .map((value) => String(value ?? "").trim())
       .filter(Boolean),
   );
+}
+
+function parseKeepIds() {
+  return parseIdListEnvironment("KEEP_IDS");
+}
+
+function parseTargetIds() {
+  return parseIdListEnvironment("TARGET_IDS");
+}
+
+// Fail closed: a visitor ID protected by KEEP_IDS must never also be a deletion target.
+function assertNoProtectedTargetOverlap(keepIds, targetIds) {
+  const overlap = [...targetIds].filter((id) => keepIds.has(id));
+
+  if (overlap.length > 0) {
+    throw new Error(
+      `TARGET_IDS overlaps with KEEP_IDS for: ${overlap.join(", ")}`,
+    );
+  }
+}
+
+function resolveDeletionDecision({ mode, entity, keepIds, targetIds }) {
+  const visitorId = resolveVisitorId(mode, entity);
+
+  if (!visitorId) {
+    return { visitorId: "", candidate: false, reason: "no-visitor-id" };
+  }
+
+  // When TARGET_IDS is non-empty, only those exact visitor IDs are in scope.
+  if (targetIds.size > 0 && !targetIds.has(visitorId)) {
+    return { visitorId, candidate: false, reason: "not-targeted" };
+  }
+
+  if (keepIds.has(visitorId)) {
+    return { visitorId, candidate: false, reason: "kept" };
+  }
+
+  const partitionKey = entityPartitionKey(entity);
+  const rowKey = entityRowKey(entity);
+
+  if (!partitionKey || !rowKey) {
+    return { visitorId, candidate: false, reason: "no-keys" };
+  }
+
+  return { visitorId, candidate: true, reason: "eligible" };
 }
 
 function readArgument(name) {
@@ -93,13 +138,21 @@ function resolveVisitorId(mode, entity) {
   }
 }
 
-function resolveExecutionMode(argv, confirmationArgument) {
+function resolveExecutionMode(argv, confirmationArgument, targetIds = new Set()) {
   const execute = argv.includes("--execute");
 
-  if (execute && confirmationArgument !== EXECUTION_CONFIRMATION) {
-    throw new Error(
-      `Destructive execution requires --confirm=${EXECUTION_CONFIRMATION}`,
-    );
+  if (execute) {
+    if (targetIds.size === 0) {
+      throw new Error(
+        "Destructive execution requires a non-empty TARGET_IDS list.",
+      );
+    }
+
+    if (confirmationArgument !== EXECUTION_CONFIRMATION) {
+      throw new Error(
+        `Destructive execution requires --confirm=${EXECUTION_CONFIRMATION}`,
+      );
+    }
   }
 
   return {
@@ -189,6 +242,7 @@ async function inspectTable({
   connectionString,
   tableDefinition,
   keepIds,
+  targetIds,
   execute,
 }) {
   const client = TableClient.fromConnectionString(
@@ -214,30 +268,25 @@ async function inspectTable({
     for await (const entity of client.listEntities()) {
       result.scanned += 1;
 
-      const visitorId = resolveVisitorId(
-        tableDefinition.mode,
+      const decision = resolveDeletionDecision({
+        mode: tableDefinition.mode,
         entity,
-      );
+        keepIds,
+        targetIds,
+      });
 
-      if (!visitorId) {
+      if (!decision.candidate) {
         result.retained += 1;
-        result.skippedWithoutVisitorId += 1;
-        continue;
-      }
 
-      if (keepIds.has(visitorId)) {
-        result.retained += 1;
+        if (decision.reason === "no-visitor-id" || decision.reason === "no-keys") {
+          result.skippedWithoutVisitorId += 1;
+        }
+
         continue;
       }
 
       const partitionKey = entityPartitionKey(entity);
       const rowKey = entityRowKey(entity);
-
-      if (!partitionKey || !rowKey) {
-        result.retained += 1;
-        result.skippedWithoutVisitorId += 1;
-        continue;
-      }
 
       result.deletionCandidates += 1;
 
@@ -270,14 +319,19 @@ async function main() {
   }
 
   const keepIds = parseKeepIds();
+  const targetIds = parseTargetIds();
+
+  assertNoProtectedTargetOverlap(keepIds, targetIds);
+
   const confirmation = readArgument("--confirm");
-  const { execute, mode } = resolveExecutionMode(process.argv, confirmation);
+  const { execute, mode } = resolveExecutionMode(process.argv, confirmation, targetIds);
 
   console.log(
     JSON.stringify(
       {
         mode,
         destructive: execute,
+        targetIds: [...targetIds],
         keepIds: [...keepIds],
         staffEvents: "preserved",
         confirmationRequired: EXECUTION_CONFIRMATION,
@@ -294,6 +348,7 @@ async function main() {
       connectionString,
       tableDefinition,
       keepIds,
+      targetIds,
       execute,
     });
 
@@ -347,7 +402,10 @@ if (require.main === module) {
 module.exports = {
   EXECUTION_CONFIRMATION,
   parseKeepIds,
+  parseTargetIds,
+  assertNoProtectedTargetOverlap,
   resolveVisitorId,
+  resolveDeletionDecision,
   buildTableDefinitions,
   resolveExecutionMode,
 };

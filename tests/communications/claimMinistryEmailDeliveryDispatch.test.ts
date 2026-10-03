@@ -78,8 +78,9 @@ async function run(): Promise<void> {
     "2026-10-03T12:10:00.000Z",
     { repository }
   );
-  assert.equal(claimed.state, "dispatching");
-  assert.equal(claimed.dispatchAttemptId, "attempt-1");
+  assert.equal(claimed.acquired, true);
+  assert.equal(claimed.delivery.state, "dispatching");
+  assert.equal(claimed.delivery.dispatchAttemptId, "attempt-1");
   assert.equal(repository.writes, 1);
 
   const replay = await claimMinistryEmailDeliveryDispatch(
@@ -88,7 +89,8 @@ async function run(): Promise<void> {
     "2026-10-03T12:10:00.000Z",
     { repository }
   );
-  assert.deepEqual(replay, claimed);
+  assert.equal(replay.acquired, false);
+  assert.deepEqual(replay.delivery, claimed.delivery);
   assert.equal(repository.writes, 1, "identical claim replay performs no write");
 
   await assert.rejects(
@@ -120,8 +122,9 @@ async function run(): Promise<void> {
     "2026-10-03T12:12:00.000Z",
     { repository: raceReplay }
   );
-  assert.equal(wonBySameAttempt.state, "dispatching");
-  assert.equal(wonBySameAttempt.dispatchAttemptId, "same-attempt");
+  assert.equal(wonBySameAttempt.acquired, false);
+  assert.equal(wonBySameAttempt.delivery.state, "dispatching");
+  assert.equal(wonBySameAttempt.delivery.dispatchAttemptId, "same-attempt");
 
   const raceStillRequested = new FakeRepository();
   raceStillRequested.onClaimConflict = () => {

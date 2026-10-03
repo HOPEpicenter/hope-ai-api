@@ -30,12 +30,14 @@ const result = applyCanonicalCareProjection(
   },
   {
     visitorId: "visitor-daniel",
+    displayName: "Daniel",
     lastActivityAt: "2026-07-14T12:03:00.000Z",
     lastActivitySummary: "Care ownership assigned",
     stage: "Guest",
     stageReason: "event:FOLLOWUP_ASSIGNED",
     stageUpdatedAt: "2026-07-14T12:03:00.000Z",
     stageUpdatedBy: "system",
+    lastNextStep: null,
     lastNextStepAt: null,
     lastNextStepCompletedAt: null,
     lastFollowupAssignedAt:
@@ -53,6 +55,7 @@ const result = applyCanonicalCareProjection(
     riskLevel: "high",
     riskScore: 100,
     needsFollowup: true,
+    followupResolved: false,
     recommendedAction:
       "Immediate pastoral followup recommended",
     priorityBand: "urgent",

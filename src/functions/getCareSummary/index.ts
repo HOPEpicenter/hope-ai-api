@@ -7,36 +7,15 @@ import {
 } from "../_shared/formation";
 import { getVisitorById } from "../_shared/visitorsRepository";
 import { isSyntheticVisitorRecord } from "../../services/visitors/isSyntheticVisitorRecord";
-import { readCareCandidateList } from "../../services/care/readCareCandidateList";
-import { isTerminalFollowupOutcome } from "../../services/followups/isTerminalFollowupOutcome";
-import { readCanonicalVisitorDashboardCard } from "../../services/dashboard/readCanonicalVisitorDashboardCard";
-import type { CanonicalVisitorDashboardCard } from "../../services/dashboard/canonicalDashboardContracts";
+import {
+  readCanonicalCareProjection
+} from "../../services/care/readCanonicalCareProjection";
 import {
   apiErrorBody,
   getRequestId,
   logFunctionError
 } from "../../shared/observability/functionObservability";
 
-function toCareProfileInput(profile: FunctionFormationProfileEntity) {
-  return {
-    visitorId: profile.visitorId,
-    assignedTo: profile.assignedTo ?? null,
-    lastFollowupOutcome: profile.lastFollowupOutcome ?? null,
-    lastFollowupOutcomeAt: profile.lastFollowupOutcomeAt ?? null
-  };
-}
-
-function isOpenAssignedFollowup(
-  profile: FunctionFormationProfileEntity
-): boolean {
-  return (
-    !!profile.assignedTo &&
-    !(
-      !!profile.lastFollowupOutcomeAt &&
-      isTerminalFollowupOutcome(profile.lastFollowupOutcome)
-    )
-  );
-}
 
 async function listAllFormationProfiles(
   table: any
@@ -105,57 +84,18 @@ export async function getCareSummary(
       validProfiles.push(profile);
     }
 
-    const canonicalCardsByVisitorId = new Map<
-      string,
-      CanonicalVisitorDashboardCard
-    >();
-
-    await Promise.all(
-      validProfiles.map(async (profile) => {
-        const visitorId = String(profile.visitorId ?? "").trim();
-
-        if (!visitorId || canonicalCardsByVisitorId.has(visitorId)) {
-          return;
-        }
-
-        canonicalCardsByVisitorId.set(
-          visitorId,
-          await readCanonicalVisitorDashboardCard(visitorId)
-        );
-      })
-    );
-
-    const summaryProfiles = validProfiles
-      .filter(isOpenAssignedFollowup)
-      .map((profile) => {
-        const visitorId = String(profile.visitorId ?? "").trim();
-        const card = canonicalCardsByVisitorId.get(visitorId);
-
-        return {
-          visitorId,
-          assignedTo:
-            card?.assignedTo ??
-            profile.assignedTo ??
-            null,
-          lastFollowupOutcome: "needs_care",
-          lastFollowupOutcomeAt:
-            card?.lastFollowupAssignedAt ??
-            profile.lastFollowupAssignedAt ??
-            card?.lastFollowupOutcomeAt ??
-            profile.lastFollowupOutcomeAt ??
-            card?.lastActivityAt ??
-            new Date(0).toISOString()
-        };
-      });
-
-    const projected = readCareCandidateList({
-      profiles: summaryProfiles,
-      canonicalCardsByVisitorId,
-      carePriority: String(req?.query?.priority ?? "").trim() || null,
-      careAgeBucket: String(req?.query?.ageBucket ?? "").trim() || null,
-      escalationLevel: String(req?.query?.escalationLevel ?? "").trim() || null,
-      assignmentState: String(req?.query?.assignmentState ?? "").trim() || null,
-      assignmentBucket: String(req?.query?.assignmentBucket ?? "").trim() || null
+    const projected = await readCanonicalCareProjection({
+      profiles: validProfiles,
+      carePriority:
+        String(req?.query?.priority ?? "").trim() || null,
+      careAgeBucket:
+        String(req?.query?.ageBucket ?? "").trim() || null,
+      escalationLevel:
+        String(req?.query?.escalationLevel ?? "").trim() || null,
+      assignmentState:
+        String(req?.query?.assignmentState ?? "").trim() || null,
+      assignmentBucket:
+        String(req?.query?.assignmentBucket ?? "").trim() || null
     });
 
     context.res = {

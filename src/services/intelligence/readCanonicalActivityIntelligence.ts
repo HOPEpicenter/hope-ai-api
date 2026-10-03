@@ -6,7 +6,9 @@ import {
 } from "../../functions/_shared/formation";
 import { getVisitorById } from "../../functions/_shared/visitorsRepository";
 import { isSyntheticVisitorRecord } from "../visitors/isSyntheticVisitorRecord";
-import { readCareCandidateList } from "../care/readCareCandidateList";
+import {
+  readCanonicalCareProjection
+} from "../care/readCanonicalCareProjection";
 import { readCanonicalOpsFollowupsNarrative } from "../followups/readCanonicalOpsFollowupsNarrative";
 import { readSixWeekVisitorFollowupQueue } from "../followups/readSixWeekVisitorFollowups";
 import { getFormationEventsTableClient } from "../../storage/formation/formationTables";
@@ -33,14 +35,6 @@ export type CanonicalActivityIntelligenceRead = {
   };
 };
 
-function toCareProfileInput(profile: FunctionFormationProfileEntity) {
-  return {
-    visitorId: profile.visitorId,
-    assignedTo: profile.assignedTo ?? null,
-    lastFollowupOutcome: profile.lastFollowupOutcome ?? null,
-    lastFollowupOutcomeAt: profile.lastFollowupOutcomeAt ?? null
-  };
-}
 
 async function listAllFormationProfiles(
   table: any
@@ -91,8 +85,8 @@ export async function readCanonicalActivityIntelligence(): Promise<CanonicalActi
     visitorNamesById.set(visitorId, visitor.name);
   }
 
-  const care = readCareCandidateList({
-    profiles: validProfiles.map(toCareProfileInput)
+  const care = await readCanonicalCareProjection({
+    profiles: validProfiles
   });
 
   const followupOwners = await readCanonicalOpsFollowupsNarrative({

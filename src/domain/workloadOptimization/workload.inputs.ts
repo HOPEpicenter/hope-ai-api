@@ -57,6 +57,10 @@ function journeyFor(
 }
 
 function healthRisk(analytics: MinistryHealthAnalytics): number {
+  if (analytics.overallScore === null) {
+    return 0;
+  }
+
   const score = analytics.overallScore > 1
     ? analytics.overallScore / 100
     : analytics.overallScore;

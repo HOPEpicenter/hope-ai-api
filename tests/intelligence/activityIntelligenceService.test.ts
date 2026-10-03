@@ -30,6 +30,126 @@ const baseFollowups = {
   const result = buildActivityIntelligence({
     careSummary: baseCare,
     followupStats: baseFollowups,
+    formationProfiles: []
+  });
+
+  assert.deepStrictEqual(
+    [
+      result.formationAnalyticsAvailability,
+      result.careAnalyticsAvailability,
+      result.servingAnalyticsAvailability,
+      result.communityAnalyticsAvailability,
+      result.givingAnalyticsAvailability,
+      result.attendanceAnalyticsAvailability,
+      result.engagementAnalyticsAvailability
+    ],
+    [
+      { status: "insufficient_data", reason: "Formation event evidence is unavailable." },
+      { status: "insufficient_data", reason: "Care case event evidence is unavailable." },
+      { status: "insufficient_data", reason: "Serving event evidence is unavailable." },
+      { status: "insufficient_data", reason: "Community event evidence is unavailable." },
+      { status: "insufficient_data", reason: "Giving event evidence is unavailable." },
+      { status: "insufficient_data", reason: "Attendance event evidence is unavailable." },
+      { status: "insufficient_data", reason: "Engagement event evidence is unavailable." }
+    ]
+  );
+  const unavailableDomains = [
+    "formation",
+    "care",
+    "serving",
+    "community",
+    "giving",
+    "attendance",
+    "engagement"
+  ] as const;
+  assert.strictEqual(result.ministryHealthSummary.domainsAvailable, 0);
+  assert.strictEqual(result.ministryHealthSummary.overallScore, null);
+  for (const domain of unavailableDomains) {
+    assert.strictEqual(
+      result.ministryHealthSummary.scores.find((score) => score.domain === domain)?.available,
+      false
+    );
+    assert.strictEqual(
+      result.ministryHealthSummary.alerts.some((alert) => alert.domain === domain),
+      false
+    );
+    assert.deepStrictEqual(
+      result.ministryHealthSummary.trends.find((trend) => trend.domain === domain),
+      { domain, direction: "insufficient_data", value: null }
+    );
+    assert.strictEqual(result.ministryHealthAnalytics.scoresByDomain[domain], null);
+  }
+}
+
+{
+  const result = buildActivityIntelligence({
+    careSummary: baseCare,
+    followupStats: baseFollowups,
+    formationProfiles: [],
+    formationEvents: [],
+    careEvents: [],
+    servingEvents: [],
+    communityEvents: [],
+    givingEvents: [],
+    attendanceEvents: [],
+    engagementCycleEvents: []
+  });
+
+  assert.deepStrictEqual(
+    [
+      result.formationAnalyticsAvailability,
+      result.careAnalyticsAvailability,
+      result.servingAnalyticsAvailability,
+      result.communityAnalyticsAvailability,
+      result.givingAnalyticsAvailability,
+      result.attendanceAnalyticsAvailability,
+      result.engagementAnalyticsAvailability
+    ],
+    Array.from({ length: 7 }, () => ({ status: "available", reason: null }))
+  );
+  assert.strictEqual(result.formationAnalytics.totalPathwaysStarted, 0);
+  assert.strictEqual(result.careAnalytics.totalCases, 0);
+  assert.strictEqual(result.servingAnalytics.totalAssignments, 0);
+  assert.strictEqual(result.communityAnalytics.totalEngagements, 0);
+  assert.strictEqual(result.givingAnalytics.totalGifts, 0);
+  assert.strictEqual(result.attendanceAnalytics.attendedCount, 0);
+  assert.strictEqual(result.engagementAnalytics.totalTouchpoints, 0);
+}
+
+{
+  const result = buildActivityIntelligence({
+    careSummary: baseCare,
+    followupStats: baseFollowups,
+    formationProfiles: [],
+    careEvents: [],
+    servingEvents: [],
+    communityEvents: [],
+    givingEvents: [],
+    attendanceEvents: [{
+      eventId: "attendance-evidence",
+      occurredAt: "2026-09-01T00:00:00.000Z",
+      memberId: "member-attendance",
+      attendanceId: "attendance-evidence",
+      type: "AttendanceRecorded",
+      actorId: null,
+      payload: { status: "present" }
+    }],
+    engagementCycleEvents: []
+  });
+
+  assert.notStrictEqual(result.ministryHealthAnalytics.overallScore, null);
+  assert.strictEqual(result.formationAnalyticsAvailability.status, "insufficient_data");
+  assert.deepStrictEqual(result.aiFeatures, []);
+  assert.deepStrictEqual(result.aiPredictions, []);
+  assert.deepStrictEqual(result.aiInsights, []);
+  assert.deepStrictEqual(result.aiRecommendations, []);
+  assert.deepStrictEqual(result.predictiveMemberIntelligence, []);
+}
+
+{
+  const result = buildActivityIntelligence({
+    careSummary: baseCare,
+    followupStats: baseFollowups,
     formationProfiles: [],
     attendanceEvents: [{
       eventId: "attendance-recorded",
@@ -112,6 +232,10 @@ const baseFollowups = {
   assert.strictEqual(result.servingInsights[0]?.highPriorityActiveAssignmentCount, 1);
   assert.strictEqual(result.servingRecommendations[0]?.action, "assign_role");
   assert.strictEqual(result.servingAnalytics.totalAssignments, 1);
+  assert.deepStrictEqual(result.servingAnalyticsAvailability, {
+    status: "available",
+    reason: null
+  });
   assert.strictEqual(result.servingTimeline[0]?.items[0]?.type, "ServingAssignmentStarted");
 }
 
@@ -122,6 +246,10 @@ const baseFollowups = {
   assert.strictEqual(result.communityInsights[0]?.highPriorityActiveEngagementCount, 1);
   assert.strictEqual(result.communityRecommendations[0]?.action, "suggest_group");
   assert.strictEqual(result.communityAnalytics.totalEngagements, 1);
+  assert.deepStrictEqual(result.communityAnalyticsAvailability, {
+    status: "available",
+    reason: null
+  });
   assert.strictEqual(result.communityTimeline[0]?.items[0]?.type, "CommunityEngagementStarted");
 }
 
@@ -132,6 +260,10 @@ const baseFollowups = {
   assert.strictEqual(result.givingInsights[0]?.totalGiven, 50);
   assert.strictEqual(result.givingRecommendations[0]?.action, "continue_giving");
   assert.strictEqual(result.givingAnalytics.totalGifts, 1);
+  assert.deepStrictEqual(result.givingAnalyticsAvailability, {
+    status: "available",
+    reason: null
+  });
   assert.strictEqual(result.givingTimeline[0]?.items[0]?.type, "GiftRecorded");
 }
 
@@ -142,6 +274,10 @@ const baseFollowups = {
   assert.strictEqual(result.attendanceInsights[0]?.attendanceRate, 1);
   assert.strictEqual(result.attendanceRecommendations[0]?.action, "continue_attendance");
   assert.strictEqual(result.attendanceAnalytics.attendedCount, 1);
+  assert.deepStrictEqual(result.attendanceAnalyticsAvailability, {
+    status: "available",
+    reason: null
+  });
   assert.strictEqual(result.attendanceTimeline[0]?.items[0]?.type, "AttendanceRecorded");
 }
 
@@ -156,6 +292,10 @@ const baseFollowups = {
   assert.strictEqual(result.engagementInsights[0]?.engagementScore, 5);
   assert.strictEqual(result.engagementRecommendations[0]?.action, "continue_engagement");
   assert.strictEqual(result.engagementAnalytics.totalTouchpoints, 1);
+  assert.deepStrictEqual(result.engagementAnalyticsAvailability, {
+    status: "available",
+    reason: null
+  });
   assert.strictEqual(result.engagementTimeline[0]?.items[0]?.type, "EngagementCycleStarted");
 }
 
@@ -354,9 +494,18 @@ const baseFollowups = {
     formationProfiles: [],
     formationEvents,
     careEvents: [],
+    servingEvents: [],
+    communityEvents: [],
+    givingEvents: [],
+    attendanceEvents: [],
+    engagementCycleEvents: [],
     generatedAt: "2026-09-10T00:00:00.000Z"
   });
 
+  assert.deepStrictEqual(result.formationAnalyticsAvailability, {
+    status: "available",
+    reason: null
+  });
   assert.deepStrictEqual(
     result.formationInsights.map((insight) => insight.memberId),
     ["member-a", "member-b"]

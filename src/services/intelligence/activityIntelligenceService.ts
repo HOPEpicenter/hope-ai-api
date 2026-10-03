@@ -145,10 +145,21 @@ export type ActivityCareLoadSummary = {
   queueCount: number;
 };
 
-export type ActivityCareAnalyticsAvailability = {
+export type ActivityAnalyticsAvailability = {
   status: "available" | "insufficient_data";
   reason: string | null;
 };
+
+export type ActivityCareAnalyticsAvailability = ActivityAnalyticsAvailability;
+
+function buildActivityAnalyticsAvailability(
+  events: readonly unknown[] | undefined,
+  reason: string
+): ActivityAnalyticsAvailability {
+  return events === undefined
+    ? { status: "insufficient_data", reason }
+    : { status: "available", reason: null };
+}
 
 export type ActivityFollowupStats = {
   total: number;
@@ -252,6 +263,7 @@ export type ActivityIntelligenceResult = {
   formationTimeline: FormationTimelineCollection[];
   formationMilestones: FormationMilestonesCollection[];
   formationAnalytics: FormationAnalytics;
+  formationAnalyticsAvailability: ActivityAnalyticsAvailability;
   formationCoaching: FormationCoaching[];
   careProfile: CareProfile[];
   careTimeline: CareTimelineCollection[];
@@ -260,7 +272,7 @@ export type ActivityIntelligenceResult = {
   careRecommendations: CareRecommendation[];
   careAlerts: CareAlert[];
   careAnalytics: CareAnalytics;
-  careAnalyticsAvailability: ActivityCareAnalyticsAvailability;
+  careAnalyticsAvailability: ActivityAnalyticsAvailability;
   careCoaching: CareCoaching[];
   servingProfile: ServingProfile[];
   servingTimeline: ServingTimelineCollection[];
@@ -269,6 +281,7 @@ export type ActivityIntelligenceResult = {
   servingRecommendations: ServingRecommendation[];
   servingAlerts: ServingAlert[];
   servingAnalytics: ServingAnalytics;
+  servingAnalyticsAvailability: ActivityAnalyticsAvailability;
   servingCoaching: ServingCoaching[];
   communityProfile: CommunityProfile[];
   communityTimeline: CommunityTimelineCollection[];
@@ -277,6 +290,7 @@ export type ActivityIntelligenceResult = {
   communityRecommendations: CommunityRecommendation[];
   communityAlerts: CommunityAlert[];
   communityAnalytics: CommunityAnalytics;
+  communityAnalyticsAvailability: ActivityAnalyticsAvailability;
   communityCoaching: CommunityCoaching[];
   givingProfile: GivingProfile[];
   givingTimeline: GivingTimelineCollection[];
@@ -285,6 +299,7 @@ export type ActivityIntelligenceResult = {
   givingRecommendations: GivingRecommendation[];
   givingAlerts: GivingAlert[];
   givingAnalytics: GivingAnalytics;
+  givingAnalyticsAvailability: ActivityAnalyticsAvailability;
   givingCoaching: GivingCoaching[];
   attendanceProfile: AttendanceProfile[];
   attendanceTimeline: AttendanceTimelineCollection[];
@@ -293,6 +308,7 @@ export type ActivityIntelligenceResult = {
   attendanceRecommendations: AttendanceRecommendation[];
   attendanceAlerts: AttendanceAlert[];
   attendanceAnalytics: AttendanceAnalytics;
+  attendanceAnalyticsAvailability: ActivityAnalyticsAvailability;
   attendanceCoaching: AttendanceCoaching[];
   engagementProfile: EngagementProfile[];
   engagementTimeline: EngagementTimelineCollection[];
@@ -301,6 +317,7 @@ export type ActivityIntelligenceResult = {
   engagementRecommendations: EngagementRecommendation[];
   engagementAlerts: EngagementAlert[];
   engagementAnalytics: EngagementAnalytics;
+  engagementAnalyticsAvailability: ActivityAnalyticsAvailability;
   engagementCoaching: EngagementCoaching[];
   ministryHealthSummary: ReturnType<typeof buildMinistryHealthAggregate>["ministryHealthSummary"] & {
     scores: ReturnType<typeof buildMinistryHealthAggregate>["ministryHealthScores"];
@@ -571,6 +588,10 @@ export function buildActivityIntelligence(
       : input.careSummary.staleCount > 0 || input.followupStats.due > 0
         ? "watch"
         : "healthy";
+  const formationAnalyticsAvailability = buildActivityAnalyticsAvailability(
+    input.formationEvents,
+    "Formation event evidence is unavailable."
+  );
   const formationEvents = (input.formationEvents ?? [])
     .slice()
     .sort((left, right) =>
@@ -626,16 +647,10 @@ export function buildActivityIntelligence(
     buildCareAlerts(profile, careInsights[index]!)
   );
   const careAnalytics = buildCareAnalytics(careProfile);
-  const careAnalyticsAvailability: ActivityCareAnalyticsAvailability =
-    input.careEvents === undefined
-      ? {
-          status: "insufficient_data",
-          reason: "Care case event evidence is unavailable."
-        }
-      : {
-          status: "available",
-          reason: null
-        };
+  const careAnalyticsAvailability = buildActivityAnalyticsAvailability(
+    input.careEvents,
+    "Care case event evidence is unavailable."
+  );
   const careCoaching = careProfile.map((profile, index) =>
     getCareCoaching(
       profile,
@@ -663,6 +678,10 @@ export function buildActivityIntelligence(
     buildServingAlerts(profile, servingInsights[index]!)
   );
   const servingAnalytics = buildServingAnalytics(servingProfile);
+  const servingAnalyticsAvailability = buildActivityAnalyticsAvailability(
+    input.servingEvents,
+    "Serving event evidence is unavailable."
+  );
   const servingCoaching = servingProfile.map((profile, index) =>
     getServingCoaching(
       profile,
@@ -690,6 +709,10 @@ export function buildActivityIntelligence(
     buildCommunityAlerts(profile, communityInsights[index]!)
   );
   const communityAnalytics = buildCommunityAnalytics(communityProfile);
+  const communityAnalyticsAvailability = buildActivityAnalyticsAvailability(
+    input.communityEvents,
+    "Community event evidence is unavailable."
+  );
   const communityCoaching = communityProfile.map((profile, index) =>
     getCommunityCoaching(
       profile,
@@ -717,6 +740,10 @@ export function buildActivityIntelligence(
     buildGivingAlerts(profile, givingInsights[index]!)
   );
   const givingAnalytics = buildGivingAnalytics(givingProfile);
+  const givingAnalyticsAvailability = buildActivityAnalyticsAvailability(
+    input.givingEvents,
+    "Giving event evidence is unavailable."
+  );
   const givingCoaching = givingProfile.map((profile, index) =>
     getGivingCoaching(profile, givingMilestones[index]!.milestones, givingInsights[index]!, givingRecommendations[index]!)
   );
@@ -739,6 +766,10 @@ export function buildActivityIntelligence(
     buildAttendanceAlerts(profile, attendanceInsights[index]!)
   );
   const attendanceAnalytics = buildAttendanceAnalytics(attendanceProfile);
+  const attendanceAnalyticsAvailability = buildActivityAnalyticsAvailability(
+    input.attendanceEvents,
+    "Attendance event evidence is unavailable."
+  );
   const attendanceCoaching = attendanceProfile.map((profile, index) =>
     getAttendanceCoaching(profile, attendanceMilestones[index]!.milestones, attendanceInsights[index]!, attendanceRecommendations[index]!)
   );
@@ -761,6 +792,10 @@ export function buildActivityIntelligence(
     buildEngagementAlerts(profile, engagementInsights[index]!)
   );
   const engagementAnalytics = buildEngagementAnalytics(engagementProfile);
+  const engagementAnalyticsAvailability = buildActivityAnalyticsAvailability(
+    input.engagementCycleEvents,
+    "Engagement event evidence is unavailable."
+  );
   const engagementCoaching = engagementProfile.map((profile, index) =>
     getEngagementCoaching(profile, engagementMilestones[index]!.milestones, engagementInsights[index]!, engagementRecommendations[index]!)
   );
@@ -779,7 +814,13 @@ export function buildActivityIntelligence(
   const hasAiEvidence =
     ministryHealthAnalytics.status !== "insufficient_data" &&
     ministryHealthAnalytics.overallScore !== null &&
-    careAnalyticsAvailability.status === "available";
+    formationAnalyticsAvailability.status === "available" &&
+    careAnalyticsAvailability.status === "available" &&
+    servingAnalyticsAvailability.status === "available" &&
+    communityAnalyticsAvailability.status === "available" &&
+    givingAnalyticsAvailability.status === "available" &&
+    attendanceAnalyticsAvailability.status === "available" &&
+    engagementAnalyticsAvailability.status === "available";
 
   const aiFeatures = hasAiEvidence
     ? [buildAiFeatureVector("global", {
@@ -885,6 +926,7 @@ export function buildActivityIntelligence(
       timelines: formationTimeline,
       milestones: formationMilestones
     }),
+    formationAnalyticsAvailability,
     formationCoaching,
     careProfile,
     careTimeline,
@@ -902,6 +944,7 @@ export function buildActivityIntelligence(
     servingRecommendations,
     servingAlerts,
     servingAnalytics,
+    servingAnalyticsAvailability,
     servingCoaching,
     communityProfile,
     communityTimeline,
@@ -910,6 +953,7 @@ export function buildActivityIntelligence(
     communityRecommendations,
     communityAlerts,
     communityAnalytics,
+    communityAnalyticsAvailability,
     communityCoaching,
     givingProfile,
     givingTimeline,
@@ -918,6 +962,7 @@ export function buildActivityIntelligence(
     givingRecommendations,
     givingAlerts,
     givingAnalytics,
+    givingAnalyticsAvailability,
     givingCoaching,
     attendanceProfile,
     attendanceTimeline,
@@ -926,6 +971,7 @@ export function buildActivityIntelligence(
     attendanceRecommendations,
     attendanceAlerts,
     attendanceAnalytics,
+    attendanceAnalyticsAvailability,
     attendanceCoaching,
     engagementProfile,
     engagementTimeline,
@@ -934,6 +980,7 @@ export function buildActivityIntelligence(
     engagementRecommendations,
     engagementAlerts,
     engagementAnalytics,
+    engagementAnalyticsAvailability,
     engagementCoaching,
     ministryHealthSummary: {
       ...ministryHealthAggregate.ministryHealthSummary,
@@ -961,4 +1008,3 @@ export function buildActivityIntelligence(
     eventPastoralBriefings: buildEventPastoralBriefings(pastoralBriefingInputs)
   };
 }
-

@@ -3,7 +3,7 @@ import type { PastoralBriefingInputs } from "./pastoralBriefing.inputs";
 export type WeeklyPastoralBriefing = {
   generatedAt: string;
   pastoralFocus: string;
-  ministryHealth: { status: string; overallScore: number; alertCount: number };
+  ministryHealth: PastoralBriefingInputs["ministryHealthSummary"];
   workloadDistribution: { total: number; urgent: number; high: number; medium: number; low: number; assigned: number; unassigned: number; byPastor: Record<string, number> };
   coachingThemes: readonly string[];
   recommendedActions: readonly string[];

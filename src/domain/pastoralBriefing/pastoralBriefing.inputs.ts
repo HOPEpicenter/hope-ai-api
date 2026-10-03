@@ -1,5 +1,6 @@
 import type { MemberJourneyNarrative } from "../memberJourney/memberJourney.narrative";
 import type { MinistryHealthAnalytics } from "../ministryHealth/ministryHealth.analytics";
+import type { MinistryHealthAggregate } from "../ministryHealth/ministryHealth.aggregate";
 import type { PredictiveMemberIntelligence } from "../predictiveIntelligence/predictive.report";
 import type { PastoralWorkloadSchedule } from "../workloadOptimization/workload.schedule";
 
@@ -25,7 +26,7 @@ export type PastoralBriefingInputs = {
   workloadMemberPlans: readonly PastoralWorkloadSchedule[];
   memberJourneyNarrative: MemberJourneyNarrative;
   memberJourneySummary: string;
-  ministryHealthSummary: { status: "healthy" | "watch" | "attention"; overallScore: number; alertCount: number };
+  ministryHealthSummary: Pick<MinistryHealthAggregate["ministryHealthSummary"], "status" | "overallScore" | "alertCount">;
   ministryHealthAnalytics: MinistryHealthAnalytics;
   careCoaching: readonly PastoralBriefingCoaching[];
   formationCoaching: readonly PastoralBriefingCoaching[];

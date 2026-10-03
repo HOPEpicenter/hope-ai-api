@@ -7,13 +7,24 @@ import { getFeatureFlags } from "../../src/config/featureFlags";
 
 function run(): void {
   const original = process.env.FEATURE_PHASE5_COMMUNICATIONS;
+  const originalProviderSending =
+    process.env.FEATURE_MINISTRY_EMAIL_PROVIDER_SENDING;
 
   try {
     delete process.env.FEATURE_PHASE5_COMMUNICATIONS;
+    delete process.env.FEATURE_MINISTRY_EMAIL_PROVIDER_SENDING;
     assert.equal(getFeatureFlags().phase5Communications, false);
+    assert.equal(getFeatureFlags().ministryEmailProviderSending, false);
 
     process.env.FEATURE_PHASE5_COMMUNICATIONS = "true";
     assert.equal(getFeatureFlags().phase5Communications, true);
+    assert.equal(getFeatureFlags().ministryEmailProviderSending, false);
+
+    process.env.FEATURE_MINISTRY_EMAIL_PROVIDER_SENDING = "true";
+    assert.equal(getFeatureFlags().ministryEmailProviderSending, true);
+
+    process.env.FEATURE_MINISTRY_EMAIL_PROVIDER_SENDING = "false";
+    assert.equal(getFeatureFlags().ministryEmailProviderSending, false);
 
     const record: MinistryCommunicationRecord = {
       schemaVersion: MINISTRY_COMMUNICATION_SCHEMA_VERSION,
@@ -40,6 +51,12 @@ function run(): void {
       delete process.env.FEATURE_PHASE5_COMMUNICATIONS;
     } else {
       process.env.FEATURE_PHASE5_COMMUNICATIONS = original;
+    }
+    if (originalProviderSending === undefined) {
+      delete process.env.FEATURE_MINISTRY_EMAIL_PROVIDER_SENDING;
+    } else {
+      process.env.FEATURE_MINISTRY_EMAIL_PROVIDER_SENDING =
+        originalProviderSending;
     }
   }
 

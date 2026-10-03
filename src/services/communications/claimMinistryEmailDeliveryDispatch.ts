@@ -14,6 +14,11 @@ export type ClaimMinistryEmailDeliveryDispatchDependencies = {
   repository?: VersionedMinistryEmailDeliveryClaimRepository;
 };
 
+export type ClaimMinistryEmailDeliveryDispatchResult = {
+  acquired: boolean;
+  delivery: MinistryEmailDeliveryRecord;
+};
+
 export class MinistryEmailDeliveryClaimPersistenceError extends Error {
   constructor(
     readonly code:
@@ -63,7 +68,7 @@ export async function claimMinistryEmailDeliveryDispatch(
   dispatchAttemptId: string,
   claimedAt: string,
   dependencies: ClaimMinistryEmailDeliveryDispatchDependencies = {}
-): Promise<MinistryEmailDeliveryRecord> {
+): Promise<ClaimMinistryEmailDeliveryDispatchResult> {
   const repository = repositoryFor(dependencies);
   const versioned = await repository.readVersionedById(deliveryId);
   if (!versioned) {
@@ -80,9 +85,13 @@ export async function claimMinistryEmailDeliveryDispatch(
     dispatchAttemptId,
     claimedAt
   );
-  if (claimed === versioned.record) return versioned.record;
+  if (claimed === versioned.record) {
+    return { acquired: false, delivery: versioned.record };
+  }
 
-  if (await repository.claimIfVersion(claimed, versioned.version)) return claimed;
+  if (await repository.claimIfVersion(claimed, versioned.version)) {
+    return { acquired: true, delivery: claimed };
+  }
 
   const current = await repository.readVersionedById(deliveryId);
   if (!current) {
@@ -90,7 +99,9 @@ export async function claimMinistryEmailDeliveryDispatch(
   }
 
   const replay = claimOrConflict(current.record, dispatchAttemptId, claimedAt);
-  if (replay === current.record) return current.record;
+  if (replay === current.record) {
+    return { acquired: false, delivery: current.record };
+  }
   throw new MinistryEmailDeliveryClaimPersistenceError(
     "DELIVERY_TRANSITION_CONFLICT"
   );

@@ -90,8 +90,9 @@ export type MorningBriefing = {
   };
   followups: {
     total: number;
+    due: number;
     overdue: number;
-    atRisk: number;
+    needsOwner: number;
   };
   activity: {
     operationalHealth: ActivityIntelligenceResult["operationalHealth"];
@@ -258,11 +259,23 @@ export function composeMorningBriefing(
     actions.push(action(
       "overdue-followups",
       "urgent",
-      "Review overdue follow-ups",
-      `${intelligence.followups.overdue} follow-up(s) are overdue in the canonical follow-up narrative.`,
+      "Review overdue Six-Week follow-ups",
+      `${intelligence.followups.overdue} Six-Week follow-up task(s) are overdue.`,
       "activity-intelligence",
       "/api/activity-intelligence",
       intelligence.followups.overdue
+    ));
+  }
+
+  if (intelligence.followups.needsOwner > 0) {
+    actions.push(action(
+      "followups-needing-owner",
+      "urgent",
+      "Assign Six-Week follow-up ownership",
+      `${intelligence.followups.needsOwner} Six-Week follow-up plan(s) need an owner.`,
+      "activity-intelligence",
+      "/api/activity-intelligence",
+      intelligence.followups.needsOwner
     ));
   }
 
@@ -279,15 +292,15 @@ export function composeMorningBriefing(
     ));
   }
 
-  if (intelligence.followups.atRisk > 0) {
+  if (intelligence.followups.due > 0) {
     actions.push(action(
-      "at-risk-followups",
+      "due-followups",
       "high",
-      "Review at-risk follow-ups",
-      `${intelligence.followups.atRisk} follow-up(s) are at risk in the canonical follow-up narrative.`,
+      "Review due Six-Week follow-ups",
+      `${intelligence.followups.due} Six-Week follow-up task(s) are due.`,
       "activity-intelligence",
       "/api/activity-intelligence",
-      intelligence.followups.atRisk
+      intelligence.followups.due
     ));
   }
 
@@ -343,8 +356,9 @@ export function composeMorningBriefing(
     },
     followups: {
       total: intelligence.followups.total,
+      due: intelligence.followups.due,
       overdue: intelligence.followups.overdue,
-      atRisk: intelligence.followups.atRisk
+      needsOwner: intelligence.followups.needsOwner
     },
     activity: {
       operationalHealth: intelligence.operationalHealth,

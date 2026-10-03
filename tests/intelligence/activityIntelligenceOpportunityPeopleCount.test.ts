@@ -17,8 +17,9 @@ test("deduplicates a person who qualifies for multiple opportunity segments", ()
     },
     followupStats: {
       total: 0,
+      due: 0,
       overdue: 0,
-      atRisk: 0
+      needsOwner: 0
     },
     formationProfiles: [
       {

@@ -14,11 +14,9 @@ const baseCare = {
 
 const baseFollowups = {
   total: 0,
-  resolved: 0,
-  escalated: 0,
+  due: 0,
   overdue: 0,
-  atRisk: 0,
-  onTrack: 0
+  needsOwner: 0
 };
 
 const result = buildActivityIntelligence({

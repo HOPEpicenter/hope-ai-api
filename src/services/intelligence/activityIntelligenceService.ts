@@ -147,11 +147,9 @@ export type ActivityCareLoadSummary = {
 
 export type ActivityFollowupStats = {
   total: number;
-  resolved: number;
-  escalated: number;
+  due: number;
   overdue: number;
-  atRisk: number;
-  onTrack: number;
+  needsOwner: number;
 };
 
 export type ActivityFormationProjectionInput = {
@@ -535,7 +533,11 @@ export function buildActivityIntelligence(
   const reasons: string[] = [];
 
   if (input.followupStats.overdue > 0) {
-    reasons.push(`${input.followupStats.overdue} overdue followup(s)`);
+    reasons.push(`${input.followupStats.overdue} overdue six-week followup(s)`);
+  }
+
+  if (input.followupStats.needsOwner > 0) {
+    reasons.push(`${input.followupStats.needsOwner} six-week followup plan(s) need owner`);
   }
 
   if (input.careSummary.escalationCount > 0) {
@@ -550,16 +552,17 @@ export function buildActivityIntelligence(
     reasons.push(`${input.careSummary.staleCount} stale care candidate(s)`);
   }
 
-  if (input.followupStats.atRisk > 0) {
-    reasons.push(`${input.followupStats.atRisk} at-risk followup(s)`);
+  if (input.followupStats.due > 0) {
+    reasons.push(`${input.followupStats.due} six-week followup task(s) due`);
   }
 
   const status: ActivityOperationalHealthStatus =
     input.followupStats.overdue > 0 ||
+    input.followupStats.needsOwner > 0 ||
     input.careSummary.escalationCount > 0 ||
     input.careSummary.urgentCount > 0
       ? "attention"
-      : input.careSummary.staleCount > 0 || input.followupStats.atRisk > 0
+      : input.careSummary.staleCount > 0 || input.followupStats.due > 0
         ? "watch"
         : "healthy";
   const formationEvents = (input.formationEvents ?? [])

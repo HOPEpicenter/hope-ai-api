@@ -21,11 +21,9 @@ const baseCare = {
 
 const baseFollowups = {
   total: 0,
-  resolved: 0,
-  escalated: 0,
+  due: 0,
   overdue: 0,
-  atRisk: 0,
-  onTrack: 0
+  needsOwner: 0
 };
 
 {
@@ -162,7 +160,7 @@ const baseFollowups = {
     },
     followupStats: {
       ...baseFollowups,
-      atRisk: 1
+      due: 1
     },
     formationProfiles: [],
     generatedAt: "2026-01-01T00:00:00.000Z"
@@ -170,7 +168,7 @@ const baseFollowups = {
 
   assert.strictEqual(result.operationalHealth.status, "watch");
   assert.ok(result.operationalHealth.reasons.includes("2 stale care candidate(s)"));
-  assert.ok(result.operationalHealth.reasons.includes("1 at-risk followup(s)"));
+  assert.ok(result.operationalHealth.reasons.includes("1 six-week followup task(s) due"));
 }
 
 {
@@ -182,14 +180,16 @@ const baseFollowups = {
     },
     followupStats: {
       ...baseFollowups,
-      overdue: 1
+      overdue: 1,
+      needsOwner: 1
     },
     formationProfiles: [],
     generatedAt: "2026-01-01T00:00:00.000Z"
   });
 
   assert.strictEqual(result.operationalHealth.status, "attention");
-  assert.ok(result.operationalHealth.reasons.includes("1 overdue followup(s)"));
+  assert.ok(result.operationalHealth.reasons.includes("1 overdue six-week followup(s)"));
+  assert.ok(result.operationalHealth.reasons.includes("1 six-week followup plan(s) need owner"));
   assert.ok(result.operationalHealth.reasons.includes("1 care escalation(s)"));
   assert.ok(result.operationalHealth.reasons.includes("1 urgent care candidate(s)"));
 }

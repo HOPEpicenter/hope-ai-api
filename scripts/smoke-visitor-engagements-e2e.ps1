@@ -467,7 +467,7 @@ try {
     $failures.Add("status response missing 'visitorId'") | Out-Null
   }
 } catch { }
-# [6/6] Score for a brand-new visitor (no events) should be empty/needsFollowup
+# [6/6] A brand-new visitor with no engagement history should not create follow-up work
 Write-Host ""
 Write-Host "[6/6] GET /api/engagements/score (empty visitor => engaged=false)"
 
@@ -503,7 +503,7 @@ if ([string]::IsNullOrWhiteSpace($emptyVisitorId) -or $emptyVisitorId.Length -lt
   try { if ($emptyScore -and ($emptyScore.PSObject.Properties.Name -contains "engaged") -and ($emptyScore.engaged -ne $false)) { $failures.Add("empty score expected engaged=false") | Out-Null } } catch { }
   try { if ($emptyScore -and ($emptyScore.PSObject.Properties.Name -contains "engagementCount") -and ([int]$emptyScore.engagementCount -ne 0)) { $failures.Add("empty score expected engagementCount=0") | Out-Null } } catch { }
   try { if ($emptyScore -and ($emptyScore.PSObject.Properties.Name -contains "score") -and ([int]$emptyScore.score -ne 0)) { $failures.Add("empty score expected score=0") | Out-Null } } catch { }
-  try { if ($emptyScore -and ($emptyScore.PSObject.Properties.Name -contains "needsFollowup") -and ($emptyScore.needsFollowup -ne $true)) { $failures.Add("empty score expected needsFollowup=true") | Out-Null } } catch { }
+  try { if ($emptyScore -and ($emptyScore.PSObject.Properties.Name -contains "needsFollowup") -and ($emptyScore.needsFollowup -ne $false)) { $failures.Add("brand-new visitor score expected needsFollowup=false") | Out-Null } } catch { }
 }
 
 Write-Host ""
@@ -516,4 +516,3 @@ Write-Host "FAIL" -ForegroundColor Red
 $failures | ForEach-Object { Write-Host (" - " + $_) -ForegroundColor Red }
 Write-Host ("Context: visitorId={0} timelineItems={1}" -f $visitorId, $timelineItems.Count)
 exit 1
-

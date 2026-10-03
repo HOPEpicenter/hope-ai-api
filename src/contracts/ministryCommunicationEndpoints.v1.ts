@@ -5,6 +5,7 @@ import type {
   MinistryCommunicationPreferenceState,
   MinistryCommunicationRecord
 } from "../domain/communications/phase5CommunicationContracts";
+import type { MinistryEmailDeliveryRecord } from "../domain/communications/ministryEmailDeliveryContracts";
 
 /** Phase 5 contract-only DTOs. Route implementation belongs to a later PR. */
 export type RecordMinistryCommunicationIntentRequestV1 = {
@@ -44,4 +45,17 @@ export type MinistryCommunicationErrorResponseV1 = {
     | "COMMUNICATION_CONSENT_REQUIRED"
     | "COMMUNICATION_NOT_FOUND";
   message: string;
+};
+
+/** Future staff-initiated email request; recipient and authority are backend-derived. */
+export type RequestMinistryEmailDeliveryV1 = {
+  deliveryId: string;
+  communicationId: string;
+  subject: string;
+  body: string;
+};
+
+export type MinistryEmailDeliveryResponseV1 = {
+  ok: true;
+  delivery: MinistryEmailDeliveryRecord;
 };

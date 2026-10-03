@@ -7,21 +7,15 @@ import {
 } from "../_shared/formation";
 import { getVisitorById } from "../_shared/visitorsRepository";
 import { isSyntheticVisitorRecord } from "../../services/visitors/isSyntheticVisitorRecord";
-import { readCareCandidateList } from "../../services/care/readCareCandidateList";
+import {
+  readCanonicalCareProjection
+} from "../../services/care/readCanonicalCareProjection";
 import {
   apiErrorBody,
   getRequestId,
   logFunctionError
 } from "../../shared/observability/functionObservability";
 
-function toCareProfileInput(profile: FunctionFormationProfileEntity) {
-  return {
-    visitorId: profile.visitorId,
-    assignedTo: profile.assignedTo ?? null,
-    lastFollowupOutcome: profile.lastFollowupOutcome ?? null,
-    lastFollowupOutcomeAt: profile.lastFollowupOutcomeAt ?? null
-  };
-}
 
 async function listAllFormationProfiles(
   table: any
@@ -90,13 +84,18 @@ export async function getCareExport(
       validProfiles.push(profile);
     }
 
-    const projected = readCareCandidateList({
-      profiles: validProfiles.map(toCareProfileInput),
-      carePriority: String(req?.query?.priority ?? "").trim() || null,
-      careAgeBucket: String(req?.query?.ageBucket ?? "").trim() || null,
-      escalationLevel: String(req?.query?.escalationLevel ?? "").trim() || null,
-      assignmentState: String(req?.query?.assignmentState ?? "").trim() || null,
-      assignmentBucket: String(req?.query?.assignmentBucket ?? "").trim() || null
+    const projected = await readCanonicalCareProjection({
+      profiles: validProfiles,
+      carePriority:
+        String(req?.query?.priority ?? "").trim() || null,
+      careAgeBucket:
+        String(req?.query?.ageBucket ?? "").trim() || null,
+      escalationLevel:
+        String(req?.query?.escalationLevel ?? "").trim() || null,
+      assignmentState:
+        String(req?.query?.assignmentState ?? "").trim() || null,
+      assignmentBucket:
+        String(req?.query?.assignmentBucket ?? "").trim() || null
     });
 
     context.res = {

@@ -8,7 +8,9 @@ import {
 } from "../_shared/formation";
 import { getVisitorById } from "../_shared/visitorsRepository";
 import { isSyntheticVisitorRecord } from "../../services/visitors/isSyntheticVisitorRecord";
-import { readCareCandidateList } from "../../services/care/readCareCandidateList";
+import {
+  readCanonicalCareProjection
+} from "../../services/care/readCanonicalCareProjection";
 import {
   apiErrorBody,
   getRequestId,
@@ -31,14 +33,6 @@ function parseCursor(val: unknown): string | undefined {
   return text.length > 0 ? text : undefined;
 }
 
-function toCareProfileInput(profile: FunctionFormationProfileEntity) {
-  return {
-    visitorId: profile.visitorId,
-    assignedTo: profile.assignedTo ?? null,
-    lastFollowupOutcome: profile.lastFollowupOutcome ?? null,
-    lastFollowupOutcomeAt: profile.lastFollowupOutcomeAt ?? null
-  };
-}
 
 export async function getCareCandidates(context: any, req: any): Promise<void> {
   const auth = requireApiKeyForFunction(req);
@@ -71,7 +65,7 @@ export async function getCareCandidates(context: any, req: any): Promise<void> {
     let orphanProfilesExcluded = 0;
     let cursor: string | undefined = requestedCursor;
     let nextCursor: string | undefined = undefined;
-    let projected = readCareCandidateList({
+    let projected = await readCanonicalCareProjection({
       profiles: [],
       carePriority,
       careAgeBucket,
@@ -111,8 +105,8 @@ export async function getCareCandidates(context: any, req: any): Promise<void> {
         validProfiles.push(profile);
       }
 
-      projected = readCareCandidateList({
-        profiles: validProfiles.map(toCareProfileInput),
+      projected = await readCanonicalCareProjection({
+        profiles: validProfiles,
         carePriority,
         careAgeBucket,
         escalationLevel,

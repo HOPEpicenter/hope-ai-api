@@ -23,11 +23,19 @@ const requested: MinistryEmailDeliveryRecord = {
     contactConsent: true,
     emailPreference: "granted"
   },
+  dispatchAttemptId: null,
+  dispatchClaimedAt: null,
   provider: null,
   providerMessageId: null,
   providerAcceptedAt: null,
   failedAt: null,
   failureCode: null
+};
+const dispatching: MinistryEmailDeliveryRecord = {
+  ...requested,
+  state: "dispatching",
+  dispatchAttemptId: "attempt-1",
+  dispatchClaimedAt: "2026-10-03T12:00:30.000Z"
 };
 
 const occurredAt = "2026-10-03T12:01:00.000Z";
@@ -48,6 +56,8 @@ function assertRequestFieldsPreserved(record: MinistryEmailDeliveryRecord): void
     assert.deepEqual(record[field], requested[field], `${field} must remain immutable`);
   }
   assert.deepEqual(record.eligibility, requested.eligibility);
+  assert.equal(record.dispatchAttemptId, dispatching.dispatchAttemptId);
+  assert.equal(record.dispatchClaimedAt, dispatching.dispatchClaimedAt);
   assert.equal("outcome" in record, false);
 }
 
@@ -61,7 +71,7 @@ const acceptedResult: MinistryEmailProviderResult = {
   providerMessageId: "provider-message-1"
 };
 const accepted = transitionMinistryEmailDeliveryProviderResult(
-  requested,
+  dispatching,
   acceptedResult,
   occurredAt
 );
@@ -71,6 +81,8 @@ assert.equal(accepted.providerMessageId, "provider-message-1");
 assert.equal(accepted.providerAcceptedAt, occurredAt);
 assert.equal(accepted.failedAt, null);
 assert.equal(accepted.failureCode, null);
+assert.equal(accepted.dispatchAttemptId, dispatching.dispatchAttemptId);
+assert.equal(accepted.dispatchClaimedAt, dispatching.dispatchClaimedAt);
 assert.notEqual(accepted.state, "delivered");
 assertRequestFieldsPreserved(accepted);
 
@@ -80,7 +92,7 @@ const failedResult: MinistryEmailProviderResult = {
   failureCode: "provider_unavailable"
 };
 const failed = transitionMinistryEmailDeliveryProviderResult(
-  requested,
+  dispatching,
   failedResult,
   occurredAt
 );
@@ -90,6 +102,8 @@ assert.equal(failed.failureCode, "provider_unavailable");
 assert.equal(failed.failedAt, occurredAt);
 assert.equal(failed.providerMessageId, null);
 assert.equal(failed.providerAcceptedAt, null);
+assert.equal(failed.dispatchAttemptId, dispatching.dispatchAttemptId);
+assert.equal(failed.dispatchClaimedAt, dispatching.dispatchClaimedAt);
 assertRequestFieldsPreserved(failed);
 
 assert.deepEqual(
@@ -130,6 +144,12 @@ expectTransitionError(() =>
 );
 expectTransitionError(() =>
   transitionMinistryEmailDeliveryProviderResult(failed, acceptedResult, occurredAt)
+);
+expectTransitionError(() =>
+  transitionMinistryEmailDeliveryProviderResult(requested, acceptedResult, occurredAt)
+);
+expectTransitionError(() =>
+  transitionMinistryEmailDeliveryProviderResult(requested, failedResult, occurredAt)
 );
 
 console.log("transitionMinistryEmailDeliveryProviderResult.test.ts passed");

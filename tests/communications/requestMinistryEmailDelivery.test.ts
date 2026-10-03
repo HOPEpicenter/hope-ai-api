@@ -281,6 +281,8 @@ async function run(): Promise<void> {
   assert.equal(first.status, 201);
   assert.equal(first.created, true);
   assert.equal(first.delivery.state, "requested");
+  assert.equal(first.delivery.dispatchAttemptId, null);
+  assert.equal(first.delivery.dispatchClaimedAt, null);
   assert.equal(first.delivery.recipientEmail, "canonical@example.org");
   assert.equal(first.delivery.subject, valid.input.subject);
   assert.equal(first.delivery.body, valid.input.body);

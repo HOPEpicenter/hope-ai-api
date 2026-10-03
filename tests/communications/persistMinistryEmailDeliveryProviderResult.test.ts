@@ -24,6 +24,8 @@ const requested: MinistryEmailDeliveryRecord = {
     contactConsent: true,
     emailPreference: "granted"
   },
+  dispatchAttemptId: "attempt-persist-1",
+  dispatchClaimedAt: "2026-10-03T12:00:30.000Z",
   provider: null,
   providerMessageId: null,
   providerAcceptedAt: null,
@@ -72,13 +74,20 @@ class FakeRepository implements VersionedMinistryEmailDeliveryRepository {
   }
 }
 
+const dispatching: MinistryEmailDeliveryRecord = {
+  ...requested,
+  state: "dispatching",
+  dispatchAttemptId: "attempt-persist-1",
+  dispatchClaimedAt: "2026-10-03T12:00:30.000Z"
+};
+
 function terminalFrom(
   result: MinistryEmailProviderResult,
   timestamp: string
 ): MinistryEmailDeliveryRecord {
   if (result.accepted) {
     return {
-      ...requested,
+      ...dispatching,
       state: "provider_accepted",
       provider: result.provider,
       providerMessageId: result.providerMessageId,
@@ -86,7 +95,7 @@ function terminalFrom(
     };
   }
   return {
-    ...requested,
+    ...dispatching,
     state: "failed",
     provider: result.provider,
     failedAt: timestamp,
@@ -104,8 +113,10 @@ function assertPersistenceError(
 
 async function run(): Promise<void> {
   const acceptedRepository = new FakeRepository();
+  acceptedRepository.current = structuredClone(dispatching);
   const accepted = await persistMinistryEmailDeliveryProviderResult(
     requested.deliveryId,
+    "attempt-persist-1",
     acceptedResult,
     "2026-10-03T12:01:00.000Z",
     { repository: acceptedRepository }
@@ -114,8 +125,10 @@ async function run(): Promise<void> {
   assert.equal(acceptedRepository.current?.state, "provider_accepted");
 
   const failedRepository = new FakeRepository();
+  failedRepository.current = structuredClone(dispatching);
   const failed = await persistMinistryEmailDeliveryProviderResult(
     requested.deliveryId,
+    "attempt-persist-1",
     failedResult,
     "2026-10-03T12:02:00.000Z",
     { repository: failedRepository }
@@ -124,6 +137,7 @@ async function run(): Promise<void> {
   assert.equal(failedRepository.current?.state, "failed");
 
   const replayRepository = new FakeRepository();
+  replayRepository.current = structuredClone(dispatching);
   replayRepository.loseNextWrite = () => {
     replayRepository.current = terminalFrom(
       acceptedResult,
@@ -133,6 +147,7 @@ async function run(): Promise<void> {
   };
   const concurrentReplay = await persistMinistryEmailDeliveryProviderResult(
     requested.deliveryId,
+    "attempt-persist-1",
     acceptedResult,
     "2026-10-03T12:09:00.000Z",
     { repository: replayRepository }
@@ -145,6 +160,7 @@ async function run(): Promise<void> {
   );
 
   const conflictRepository = new FakeRepository();
+  conflictRepository.current = structuredClone(dispatching);
   conflictRepository.loseNextWrite = () => {
     conflictRepository.current = terminalFrom(
       failedResult,
@@ -155,6 +171,7 @@ async function run(): Promise<void> {
   await assert.rejects(
     persistMinistryEmailDeliveryProviderResult(
       requested.deliveryId,
+      "attempt-persist-1",
       acceptedResult,
       "2026-10-03T12:01:00.000Z",
       { repository: conflictRepository }
@@ -171,6 +188,7 @@ async function run(): Promise<void> {
   await assert.rejects(
     persistMinistryEmailDeliveryProviderResult(
       requested.deliveryId,
+      "attempt-persist-1",
       acceptedResult,
       "2026-10-03T12:01:00.000Z",
       { repository: missingRepository }
@@ -186,14 +204,50 @@ async function run(): Promise<void> {
   const sixWeekEvents = [{ type: "existing-six-week-event" }];
   const communicationBefore = structuredClone(communicationEvents);
   const sixWeekBefore = structuredClone(sixWeekEvents);
+  const noMutationRepository = new FakeRepository();
+  noMutationRepository.current = structuredClone(dispatching);
   await persistMinistryEmailDeliveryProviderResult(
     requested.deliveryId,
+    "attempt-persist-1",
     acceptedResult,
     "2026-10-03T12:01:00.000Z",
-    { repository: new FakeRepository() }
+    { repository: noMutationRepository }
   );
   assert.deepEqual(communicationEvents, communicationBefore);
   assert.deepEqual(sixWeekEvents, sixWeekBefore);
+
+  const wrongAttemptRepository = new FakeRepository();
+  wrongAttemptRepository.current = structuredClone(dispatching);
+  await assert.rejects(
+    persistMinistryEmailDeliveryProviderResult(
+      requested.deliveryId,
+      "stale-attempt",
+      acceptedResult,
+      "2026-10-03T12:01:00.000Z",
+      { repository: wrongAttemptRepository }
+    ),
+    error => {
+      assertPersistenceError(error, "DELIVERY_TRANSITION_CONFLICT");
+      return true;
+    }
+  );
+  assert.equal(wrongAttemptRepository.writes, 0);
+
+  const requestStateRepository = new FakeRepository();
+  await assert.rejects(
+    persistMinistryEmailDeliveryProviderResult(
+      requested.deliveryId,
+      "attempt-persist-1",
+      acceptedResult,
+      "2026-10-03T12:01:00.000Z",
+      { repository: requestStateRepository }
+    ),
+    error => {
+      assertPersistenceError(error, "DELIVERY_TRANSITION_CONFLICT");
+      return true;
+    }
+  );
+  assert.equal(requestStateRepository.writes, 0);
 
   console.log("persistMinistryEmailDeliveryProviderResult.test.ts passed");
 }

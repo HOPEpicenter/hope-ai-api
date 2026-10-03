@@ -25,6 +25,8 @@ function replayMatches(
     return record.state === "provider_accepted" &&
       record.provider === result.provider &&
       record.providerMessageId === result.providerMessageId &&
+      Boolean(record.dispatchAttemptId) &&
+      Boolean(record.dispatchClaimedAt) &&
       record.providerAcceptedAt !== null &&
       record.failedAt === null &&
       record.failureCode === null;
@@ -32,6 +34,8 @@ function replayMatches(
 
   return record.state === "failed" &&
     record.provider === result.provider &&
+    Boolean(record.dispatchAttemptId) &&
+    Boolean(record.dispatchClaimedAt) &&
     record.providerMessageId === null &&
     record.providerAcceptedAt === null &&
     record.failedAt !== null &&
@@ -49,11 +53,15 @@ export function transitionMinistryEmailDeliveryProviderResult(
   } else {
     requireText(result.failureCode, "failureCode");
   }
+  if (record.state === "dispatching") {
+    requireText(record.dispatchAttemptId ?? "", "dispatchAttemptId");
+    requireText(record.dispatchClaimedAt ?? "", "dispatchClaimedAt");
+  }
 
-  if (record.state !== "requested") {
+  if (record.state !== "dispatching") {
     if (replayMatches(record, result)) return record;
     throw new MinistryEmailDeliveryTransitionError(
-      `Cannot transition ministry email delivery from terminal state "${record.state}"`
+      `Cannot transition ministry email delivery from state "${record.state}"`
     );
   }
 

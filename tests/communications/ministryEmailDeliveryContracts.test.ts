@@ -41,6 +41,8 @@ const requested: MinistryEmailDeliveryRecord = {
   body: "Thank you for meeting with us.",
   recipientEmail: "canonical@example.org",
   eligibility,
+  dispatchAttemptId: null,
+  dispatchClaimedAt: null,
   provider: null,
   providerMessageId: null,
   providerAcceptedAt: null,
@@ -58,6 +60,10 @@ assert.equal(requested.body, "Thank you for meeting with us.");
 assert.equal(requested.recipientEmail, "canonical@example.org");
 assert.deepEqual(requested.eligibility, eligibility);
 assert.equal(requested.state, "requested");
+assert.equal(requested.dispatchAttemptId, null);
+assert.equal(requested.dispatchClaimedAt, null);
+assert.equal("leaseExpiresAt" in requested, false);
+assert.equal("retryAfter" in requested, false);
 assert.equal(requested.providerAcceptedAt, null);
 assert.equal(requested.providerMessageId, null);
 
@@ -66,12 +72,15 @@ const accepted: MinistryEmailDeliveryRecord = {
   state: "provider_accepted",
   provider: "sendgrid",
   providerMessageId: "provider-message-1",
-  providerAcceptedAt: "2026-10-03T12:01:00.000Z"
+  providerAcceptedAt: "2026-10-03T12:01:00.000Z",
+  dispatchAttemptId: "attempt-contract-1",
+  dispatchClaimedAt: "2026-10-03T12:00:30.000Z"
 };
 assert.equal(accepted.state, "provider_accepted");
 assert.equal(accepted.provider, "sendgrid");
 assert.equal(accepted.providerMessageId, "provider-message-1");
 assert.equal(accepted.providerAcceptedAt, "2026-10-03T12:01:00.000Z");
+assert.equal(accepted.dispatchAttemptId, "attempt-contract-1");
 
 const failed: MinistryEmailDeliveryRecord = {
   ...requested,

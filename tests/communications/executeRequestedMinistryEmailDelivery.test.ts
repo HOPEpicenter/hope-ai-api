@@ -4,7 +4,7 @@ import type {
   MinistryEmailDeliveryProviderAdapter,
   MinistryEmailProviderRequest
 } from "../../src/services/communications/ministryEmailDeliveryProvider";
-import { executeRequestedMinistryEmailDelivery } from "../../src/services/communications/executeRequestedMinistryEmailDelivery";
+import { executeClaimedMinistryEmailDelivery } from "../../src/services/communications/executeRequestedMinistryEmailDelivery";
 
 const requested: MinistryEmailDeliveryRecord = {
   schemaVersion: 1,
@@ -23,6 +23,8 @@ const requested: MinistryEmailDeliveryRecord = {
     contactConsent: true,
     emailPreference: "granted"
   },
+  dispatchAttemptId: null,
+  dispatchClaimedAt: null,
   provider: null,
   providerMessageId: null,
   providerAcceptedAt: null,
@@ -47,8 +49,14 @@ async function run(): Promise<void> {
     }
   };
 
-  const transitioned = await executeRequestedMinistryEmailDelivery(
-    requested,
+  const dispatching = {
+    ...requested,
+    state: "dispatching" as const,
+    dispatchAttemptId: "attempt-execute-1",
+    dispatchClaimedAt: "2026-10-03T12:00:30.000Z"
+  };
+  const transitioned = await executeClaimedMinistryEmailDelivery(
+    dispatching,
     fakeProvider,
     "2026-10-03T12:01:00.000Z"
   );
@@ -60,6 +68,7 @@ async function run(): Promise<void> {
     body: requested.body
   }]);
   assert.equal(transitioned.state, "provider_accepted");
+  assert.equal(transitioned.dispatchAttemptId, dispatching.dispatchAttemptId);
   assert.equal(transitioned.recipientEmail, "canonical@example.org");
   assert.deepEqual(communicationEvents, communicationBefore);
   assert.deepEqual(sixWeekEvents, sixWeekBefore);
@@ -76,12 +85,18 @@ async function run(): Promise<void> {
     }
   };
   await assert.rejects(
-    executeRequestedMinistryEmailDelivery(
+    executeClaimedMinistryEmailDelivery(
       transitioned,
       shouldNotRun,
       "2026-10-03T12:02:00.000Z"
     ),
-    /requested state/
+    /dispatching state/
+  );
+  assert.equal(calls, 0);
+
+  await assert.rejects(
+    executeClaimedMinistryEmailDelivery(requested, shouldNotRun, "2026-10-03T12:02:00.000Z"),
+    /dispatching state/
   );
   assert.equal(calls, 0);
 

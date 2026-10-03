@@ -1,9 +1,22 @@
 import type { MemberJourneyAggregate } from "./memberJourney.aggregate";
 
 export type MemberJourneyNarrativeTone = "pastoral" | "encouraging" | "attentive";
-export type MemberJourneyNarrative = { tone: MemberJourneyNarrativeTone; summary: string; currentSeason: string; direction: "growing" | "steady" | "needs_attention"; pastoralResponse: string };
+export type MemberJourneyNarrative = { tone: MemberJourneyNarrativeTone; summary: string; currentSeason: string; direction: "growing" | "steady" | "needs_attention" | "insufficient_data"; pastoralResponse: string };
 
 export function buildMemberJourneyNarrative(aggregate: MemberJourneyAggregate): MemberJourneyNarrative {
+  if (
+    aggregate.timeline.length === 0 &&
+    aggregate.aiPredictions === null &&
+    aggregate.predictiveMemberIntelligence === null
+  ) {
+    return {
+      tone: "pastoral",
+      summary: "No journey evidence is currently available.",
+      currentSeason: "There is not enough recorded evidence to describe a current season.",
+      direction: "insufficient_data",
+      pastoralResponse: "Review available records or connect personally before drawing a journey conclusion."
+    };
+  }
   const risk = aggregate.aiPredictions?.scores.retentionRisk ?? 0;
   const growth = aggregate.aiPredictions?.scores.growthPotential ?? 0;
   const direction = risk >= 0.65 || aggregate.riskMoments.length > aggregate.recoveryMoments.length ? "needs_attention" : growth >= 0.6 || aggregate.growthMoments.length > 0 ? "growing" : "steady";

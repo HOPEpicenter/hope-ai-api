@@ -79,6 +79,20 @@ const baseFollowups = {
     );
     assert.strictEqual(result.ministryHealthAnalytics.scoresByDomain[domain], null);
   }
+  assert.strictEqual(result.memberJourneySummary.direction, "insufficient_data");
+  assert.strictEqual(result.dailyPastoralBriefing.trendSnapshot.direction, "insufficient_data");
+  assert.strictEqual(
+    result.dailyPastoralBriefing.urgency.summary,
+    "Pastoral priority evidence is currently insufficient."
+  );
+  assert.deepStrictEqual(result.dailyPastoralBriefing.actions, []);
+  assert.strictEqual(
+    result.eventPastoralBriefings.some((event) => event.category === "ministry_health_alert"),
+    false
+  );
+  assert.deepStrictEqual(result.predictiveMemberIntelligence, []);
+  assert.strictEqual(result.workloadMemberPlan, null);
+  assert.deepStrictEqual(result.workloadPastorPlans, []);
 }
 
 {
@@ -425,7 +439,7 @@ const baseFollowups = {
   assert.strictEqual(result.workloadMemberPlan, null);
   assert.deepStrictEqual(result.workloadPastorPlans, []);
   assert.strictEqual(result.workloadLeadershipSummary.totalMembers, 0);
-  assert.ok(["growing", "steady", "needs_attention"].includes(result.memberJourneySummary.direction));
+  assert.ok(["growing", "steady", "needs_attention", "insufficient_data"].includes(result.memberJourneySummary.direction));
   assert.ok(Array.isArray(result.memberJourneyInsights.ministryHealthSignals));
   assert.ok(result.memberJourneyRecommendations.length > 0);
   assert.ok(["urgent", "high", "normal"].includes(result.dailyPastoralBriefing.urgency.level));

@@ -44,11 +44,9 @@ const baseInput: MorningBriefingCompositionInput = {
     },
     followups: {
       total: 0,
-      resolved: 0,
-      escalated: 0,
+      due: 0,
       overdue: 0,
-      atRisk: 0,
-      onTrack: 0
+      needsOwner: 0
     },
     formation: {
       totalProfiles: 0,
@@ -75,7 +73,8 @@ const baseInput: MorningBriefingCompositionInput = {
       },
       opportunities: {
         highestPriority: null,
-        items: []
+        items: [],
+        uniquePeopleCount: 0
       }
     },
     formationInsights: [],
@@ -426,8 +425,9 @@ const baseInput: MorningBriefingCompositionInput = {
       followups: {
         ...baseInput.intelligence.followups,
         total: 8,
+        due: 2,
         overdue: 1,
-        atRisk: 2
+        needsOwner: 1
       },
       formation: {
         ...baseInput.intelligence.formation,
@@ -446,7 +446,8 @@ const baseInput: MorningBriefingCompositionInput = {
                 href: "/formation-profiles?segment=connected-without-next-step"
               }
             }
-          ]
+          ],
+          uniquePeopleCount: 5
         }
       }
     },
@@ -494,8 +495,9 @@ const baseInput: MorningBriefingCompositionInput = {
     [
       "urgent-care",
       "overdue-followups",
+      "followups-needing-owner",
       "unassigned-care",
-      "at-risk-followups",
+      "due-followups",
       "opportunity-connected_without_next_step"
     ]
   );
@@ -505,7 +507,9 @@ const baseInput: MorningBriefingCompositionInput = {
   assert.equal(unassignedAction?.source, "activity-intelligence");
   assert.equal(unassignedAction?.sourcePath, "/api/activity-intelligence");
   assert.equal(result.care.urgentCount, 2);
+  assert.equal(result.followups.due, 2);
   assert.equal(result.followups.overdue, 1);
+  assert.equal(result.followups.needsOwner, 1);
   assert.equal(result.ownership.queueCount, 3);
   assert.equal(result.activity.formation.opportunities.items[0]?.count, 5);
   assert.deepEqual(

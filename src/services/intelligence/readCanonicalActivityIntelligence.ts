@@ -8,6 +8,7 @@ import { getVisitorById } from "../../functions/_shared/visitorsRepository";
 import { isSyntheticVisitorRecord } from "../visitors/isSyntheticVisitorRecord";
 import { readCareCandidateList } from "../care/readCareCandidateList";
 import { readCanonicalOpsFollowupsNarrative } from "../followups/readCanonicalOpsFollowupsNarrative";
+import { readSixWeekVisitorFollowupQueue } from "../followups/readSixWeekVisitorFollowups";
 import { getFormationEventsTableClient } from "../../storage/formation/formationTables";
 import {
   buildActivityIntelligence,
@@ -94,7 +95,7 @@ export async function readCanonicalActivityIntelligence(): Promise<CanonicalActi
     profiles: validProfiles.map(toCareProfileInput)
   });
 
-  const followups = await readCanonicalOpsFollowupsNarrative({
+  const followupOwners = await readCanonicalOpsFollowupsNarrative({
     eventsTable,
     profilesTable,
     limit: 500,
@@ -103,10 +104,17 @@ export async function readCanonicalActivityIntelligence(): Promise<CanonicalActi
     includeSynthetic: false
   });
 
+  const sixWeekFollowups = await readSixWeekVisitorFollowupQueue();
+
   return {
     intelligence: buildActivityIntelligence({
       careSummary: care.summary,
-      followupStats: followups.stats,
+      followupStats: {
+        total: sixWeekFollowups.count,
+        due: sixWeekFollowups.due,
+        overdue: sixWeekFollowups.overdue,
+        needsOwner: sixWeekFollowups.needsOwner
+      },
       formationProfiles: validProfiles
     }),
     careCandidates: care.items.map((candidate) => ({
@@ -119,7 +127,7 @@ export async function readCanonicalActivityIntelligence(): Promise<CanonicalActi
       assignmentState: candidate.assignmentState,
       assignmentBucket: candidate.assignmentBucket
     })),
-    owners: followups.owners,
+    owners: followupOwners.owners,
     projectionIntegrity: {
       orphanProfilesExcluded
     }

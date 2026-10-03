@@ -7,7 +7,7 @@ import { schedulePastoralWorkload } from "../../domain/workloadOptimization/work
 
 const defaultFusionInput: WorkloadFusionInput = {
   predictiveMemberIntelligence: [],
-  ministryHealthAnalytics: { overallScore: 100, status: "healthy", scoresByDomain: {}, alertCount: 0, trendCounts: {} }
+  ministryHealthAnalytics: { overallScore: null, status: "insufficient_data", scoresByDomain: {}, alertCount: 0, trendCounts: { insufficient_data: 7 } }
 };
 
 export class WorkloadOptimizationController {

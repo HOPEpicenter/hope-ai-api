@@ -757,16 +757,22 @@ export function buildActivityIntelligence(
   const ministryHealthInsights = buildMinistryHealthInsights(ministryHealthAggregate);
   const ministryHealthAnalytics = buildMinistryHealthAnalytics(ministryHealthAggregate);
   const ministryHealthCoaching = buildMinistryHealthCoaching(ministryHealthInsights.filter(insight => insight.severity !== "info").map(insight => ({ domain: insight.domain, priority: insight.severity === "critical" ? "high" as const : "medium" as const, action: `Review ${insight.domain} workload and assign an owner.`, reason: insight.message })));
-  const aiFeatures = [buildAiFeatureVector("global", {
-    formationAnalytics: buildFormationAnalytics({ profiles: formationProfiles, timelines: formationTimeline, milestones: formationMilestones }),
-    careAnalytics,
-    servingAnalytics,
-    communityAnalytics,
-    givingAnalytics,
-    attendanceAnalytics,
-    engagementAnalytics,
-    ministryHealthAnalytics
-  })];
+  const hasAiEvidence =
+    ministryHealthAnalytics.status !== "insufficient_data" &&
+    ministryHealthAnalytics.overallScore !== null;
+
+  const aiFeatures = hasAiEvidence
+    ? [buildAiFeatureVector("global", {
+        formationAnalytics: buildFormationAnalytics({ profiles: formationProfiles, timelines: formationTimeline, milestones: formationMilestones }),
+        careAnalytics,
+        servingAnalytics,
+        communityAnalytics,
+        givingAnalytics,
+        attendanceAnalytics,
+        engagementAnalytics,
+        ministryHealthAnalytics
+      })]
+    : [];
   const aiPredictions = aiFeatures.map(buildAiPredictions);
   const aiInsights = aiFeatures.flatMap((features, index) => buildAiInsights(features, aiPredictions[index]!));
   const aiRecommendations = aiPredictions.flatMap((predictions) =>

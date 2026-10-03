@@ -31,12 +31,39 @@ const baseFollowups = {
     careSummary: baseCare,
     followupStats: baseFollowups,
     formationProfiles: [],
+    attendanceEvents: [{
+      eventId: "attendance-recorded",
+      occurredAt: "2026-09-01T00:00:00.000Z",
+      memberId: "member-attendance",
+      attendanceId: "attendance-1",
+      type: "AttendanceRecorded",
+      actorId: null,
+      payload: { status: "late", notes: "Traffic" }
+    }],
     generatedAt: "2026-10-03T00:00:00.000Z"
   });
 
-  assert.strictEqual(result.ministryHealthSummary.status, "insufficient_data");
-  assert.strictEqual(result.ministryHealthSummary.overallScore, null);
-  assert.strictEqual(result.ministryHealthSummary.domainsAvailable, 0);
+  assert.deepStrictEqual(result.careAnalyticsAvailability, {
+    status: "insufficient_data",
+    reason: "Care case event evidence is unavailable."
+  });
+  assert.strictEqual(result.careAnalytics.totalCases, 0);
+  assert.strictEqual(result.ministryHealthSummary.domainsAvailable, 1);
+  assert.strictEqual(result.ministryHealthSummary.overallScore, 70);
+  assert.strictEqual(result.ministryHealthSummary.scores.find((score) => score.domain === "care")?.available, false);
+  assert.deepStrictEqual(
+    result.ministryHealthSummary.scores.find((score) => score.domain === "care")?.reasons,
+    ["Insufficient source evidence."]
+  );
+  assert.strictEqual(
+    result.ministryHealthSummary.alerts.some((alert) => alert.domain === "care"),
+    false
+  );
+  assert.deepStrictEqual(
+    result.ministryHealthSummary.trends.find((trend) => trend.domain === "care"),
+    { domain: "care", direction: "insufficient_data", value: null }
+  );
+  assert.strictEqual(result.ministryHealthAnalytics.scoresByDomain.care, null);
   assert.deepStrictEqual(result.aiFeatures, []);
   assert.deepStrictEqual(result.aiPredictions, []);
   assert.deepStrictEqual(result.aiInsights, []);
@@ -44,6 +71,25 @@ const baseFollowups = {
   assert.deepStrictEqual(result.predictiveMemberIntelligence, []);
   assert.strictEqual(result.predictiveLeadershipIntelligence.summary.totalMembers, 0);
   assert.deepStrictEqual(result.predictiveLeadershipIntelligence.report.rankings, []);
+  assert.deepStrictEqual(result.predictiveLeadershipIntelligence.actions, []);
+  assert.strictEqual(result.workloadMemberPlan, null);
+  assert.deepStrictEqual(result.workloadPastorPlans, []);
+  assert.strictEqual(result.workloadLeadershipSummary.totalMembers, 0);
+}
+
+{
+  const result = buildActivityIntelligence({
+    careSummary: baseCare,
+    followupStats: baseFollowups,
+    formationProfiles: [],
+    careEvents: []
+  });
+
+  assert.deepStrictEqual(result.careAnalyticsAvailability, {
+    status: "available",
+    reason: null
+  });
+  assert.strictEqual(result.careAnalytics.totalCases, 0);
 }
 
 {
@@ -52,6 +98,10 @@ const baseFollowups = {
   assert.deepStrictEqual(result.careProfile.map((profile) => profile.memberId), ["member-care"]);
   assert.strictEqual(result.careInsights[0]?.highPriorityOpenCaseCount, 1);
   assert.strictEqual(result.careRecommendations[0]?.action, "assign_owner");
+  assert.deepStrictEqual(result.careAnalyticsAvailability, {
+    status: "available",
+    reason: null
+  });
   assert.strictEqual(result.careAnalytics.totalCases, 1);
 }
 
@@ -303,6 +353,7 @@ const baseFollowups = {
     followupStats: baseFollowups,
     formationProfiles: [],
     formationEvents,
+    careEvents: [],
     generatedAt: "2026-09-10T00:00:00.000Z"
   });
 

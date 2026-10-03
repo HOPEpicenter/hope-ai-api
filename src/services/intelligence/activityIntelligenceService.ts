@@ -145,6 +145,11 @@ export type ActivityCareLoadSummary = {
   queueCount: number;
 };
 
+export type ActivityCareAnalyticsAvailability = {
+  status: "available" | "insufficient_data";
+  reason: string | null;
+};
+
 export type ActivityFollowupStats = {
   total: number;
   due: number;
@@ -255,6 +260,7 @@ export type ActivityIntelligenceResult = {
   careRecommendations: CareRecommendation[];
   careAlerts: CareAlert[];
   careAnalytics: CareAnalytics;
+  careAnalyticsAvailability: ActivityCareAnalyticsAvailability;
   careCoaching: CareCoaching[];
   servingProfile: ServingProfile[];
   servingTimeline: ServingTimelineCollection[];
@@ -620,6 +626,16 @@ export function buildActivityIntelligence(
     buildCareAlerts(profile, careInsights[index]!)
   );
   const careAnalytics = buildCareAnalytics(careProfile);
+  const careAnalyticsAvailability: ActivityCareAnalyticsAvailability =
+    input.careEvents === undefined
+      ? {
+          status: "insufficient_data",
+          reason: "Care case event evidence is unavailable."
+        }
+      : {
+          status: "available",
+          reason: null
+        };
   const careCoaching = careProfile.map((profile, index) =>
     getCareCoaching(
       profile,
@@ -762,7 +778,8 @@ export function buildActivityIntelligence(
   const ministryHealthCoaching = buildMinistryHealthCoaching(ministryHealthInsights.filter(insight => insight.severity !== "info").map(insight => ({ domain: insight.domain, priority: insight.severity === "critical" ? "high" as const : "medium" as const, action: `Review ${insight.domain} workload and assign an owner.`, reason: insight.message })));
   const hasAiEvidence =
     ministryHealthAnalytics.status !== "insufficient_data" &&
-    ministryHealthAnalytics.overallScore !== null;
+    ministryHealthAnalytics.overallScore !== null &&
+    careAnalyticsAvailability.status === "available";
 
   const aiFeatures = hasAiEvidence
     ? [buildAiFeatureVector("global", {
@@ -876,6 +893,7 @@ export function buildActivityIntelligence(
     careRecommendations,
     careAlerts,
     careAnalytics,
+    careAnalyticsAvailability,
     careCoaching,
     servingProfile,
     servingTimeline,
@@ -943,5 +961,4 @@ export function buildActivityIntelligence(
     eventPastoralBriefings: buildEventPastoralBriefings(pastoralBriefingInputs)
   };
 }
-
 

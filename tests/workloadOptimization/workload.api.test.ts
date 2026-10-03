@@ -5,8 +5,18 @@ describe("WorkloadOptimizationController", () => {
     const controller = new WorkloadOptimizationController();
     expect(controller.getMember("missing")).toBeNull();
     expect(controller.getPastor("pastor-care")).toEqual([]);
-    expect(controller.getLeadershipSummary()).toMatchObject({ totalMembers: 0, assignedCount: 0 });
-    expect(controller.getLeadershipReport().schedule).toEqual([]);
+    expect(controller.getLeadershipSummary()).toMatchObject({
+      totalMembers: 0,
+      assignedCount: 0,
+      unassignedCount: 0,
+      urgentCount: 0,
+      byPastor: {}
+    });
+    expect(controller.getLeadershipReport()).toMatchObject({
+      rankings: [],
+      assignments: [],
+      schedule: []
+    });
 
     const plan = controller.createPlan({
       predictiveMemberIntelligence: [{

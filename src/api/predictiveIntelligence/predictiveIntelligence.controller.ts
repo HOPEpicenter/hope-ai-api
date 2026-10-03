@@ -1,16 +1,39 @@
-import { createHealthyAiAnalyticsBundle } from "../../domain/aiModeling/ai.features";
-import { buildAiMemberReport } from "../../domain/aiModeling/ai.report";
-import { buildPredictiveLeadershipIntelligence, buildPredictiveMemberIntelligence } from "../../domain/predictiveIntelligence/predictive.report";
+import type { MinistryHealthAnalytics } from "../../domain/ministryHealth/ministryHealth.analytics";
+import {
+  buildPredictiveLeadershipIntelligence,
+  type PredictiveMemberIntelligence
+} from "../../domain/predictiveIntelligence/predictive.report";
+
+export type PredictiveIntelligenceControllerInput = {
+  members: readonly PredictiveMemberIntelligence[];
+  ministryHealthAnalytics: MinistryHealthAnalytics;
+};
+
+const unavailableAnalytics: MinistryHealthAnalytics = {
+  overallScore: null,
+  status: "insufficient_data",
+  scoresByDomain: {},
+  alertCount: 0,
+  trendCounts: { insufficient_data: 7 }
+};
 
 export class PredictiveIntelligenceController {
+  constructor(
+    private readonly input: PredictiveIntelligenceControllerInput = {
+      members: [],
+      ministryHealthAnalytics: unavailableAnalytics
+    }
+  ) {}
+
   getMember(memberId: string) {
-    const aiReport = buildAiMemberReport(memberId, createHealthyAiAnalyticsBundle());
-    return buildPredictiveMemberIntelligence([aiReport.predictions], createHealthyAiAnalyticsBundle().ministryHealthAnalytics)[0]!;
+    return this.input.members.find((member) => member.risk.memberId === memberId) ?? null;
   }
 
   getLeadership() {
-    const analytics = createHealthyAiAnalyticsBundle().ministryHealthAnalytics;
-    return buildPredictiveLeadershipIntelligence({ members: [], ministryHealthAnalytics: analytics });
+    return buildPredictiveLeadershipIntelligence({
+      members: this.input.members,
+      ministryHealthAnalytics: this.input.ministryHealthAnalytics
+    });
   }
 
   getSummary() { return this.getLeadership().summary; }

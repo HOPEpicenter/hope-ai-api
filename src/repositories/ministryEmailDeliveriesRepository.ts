@@ -9,11 +9,23 @@ type MinistryEmailDeliveryEntity = {
   partitionKey: string;
   rowKey: string;
   deliveryJson: string;
+  etag: string;
+};
+
+type MinistryEmailDeliveryWriteEntity = {
+  partitionKey: string;
+  rowKey: string;
+  deliveryJson: string;
 };
 
 type MinistryEmailDeliveryTable = {
-  createEntity(entity: MinistryEmailDeliveryEntity): Promise<unknown>;
+  createEntity(entity: MinistryEmailDeliveryWriteEntity): Promise<unknown>;
   getEntity(partitionKey: string, rowKey: string): Promise<MinistryEmailDeliveryEntity>;
+  updateEntity(
+    entity: MinistryEmailDeliveryWriteEntity,
+    mode: "Replace",
+    options: { etag: string }
+  ): Promise<unknown>;
 };
 
 type TableFactory = (tableName: string) => Promise<MinistryEmailDeliveryTable>;
@@ -21,9 +33,11 @@ type TableFactory = (tableName: string) => Promise<MinistryEmailDeliveryTable>;
 async function getDeliveryTable(tableName: string): Promise<MinistryEmailDeliveryTable> {
   const table = await getTableClient(tableName);
   return {
-    createEntity: entity => table.createEntity<MinistryEmailDeliveryEntity>(entity),
+    createEntity: entity => table.createEntity<MinistryEmailDeliveryWriteEntity>(entity),
     getEntity: (partitionKey, rowKey) =>
-      table.getEntity<MinistryEmailDeliveryEntity>(partitionKey, rowKey)
+      table.getEntity<MinistryEmailDeliveryEntity>(partitionKey, rowKey),
+    updateEntity: (entity, mode, options) =>
+      table.updateEntity<MinistryEmailDeliveryWriteEntity>(entity, mode, options)
   };
 }
 
@@ -41,6 +55,12 @@ function isNotFound(error: unknown): boolean {
   return status === 404 || code === "ResourceNotFound";
 }
 
+function isPreconditionFailed(error: unknown): boolean {
+  const value = error as { statusCode?: unknown; status?: unknown; code?: unknown } | null;
+  const status = Number(value?.statusCode ?? value?.status ?? 0);
+  return status === 412;
+}
+
 function fromEntity(entity: MinistryEmailDeliveryEntity): MinistryEmailDeliveryRecord {
   const record = JSON.parse(entity.deliveryJson) as MinistryEmailDeliveryRecord;
   if (
@@ -50,6 +70,25 @@ function fromEntity(entity: MinistryEmailDeliveryEntity): MinistryEmailDeliveryR
     throw new Error("Stored ministry email delivery identity does not match its table keys");
   }
   return record;
+}
+
+function sameRequest(
+  current: MinistryEmailDeliveryRecord,
+  next: MinistryEmailDeliveryRecord
+): boolean {
+  return current.schemaVersion === next.schemaVersion &&
+    current.deliveryId === next.deliveryId &&
+    current.communicationId === next.communicationId &&
+    current.visitorId === next.visitorId &&
+    current.channel === next.channel &&
+    current.requestedAt === next.requestedAt &&
+    current.requestedBy === next.requestedBy &&
+    current.subject === next.subject &&
+    current.body === next.body &&
+    current.recipientEmail === next.recipientEmail &&
+    current.eligibility.phase5Enabled === next.eligibility.phase5Enabled &&
+    current.eligibility.contactConsent === next.eligibility.contactConsent &&
+    current.eligibility.emailPreference === next.eligibility.emailPreference;
 }
 
 /**
@@ -82,6 +121,72 @@ export class MinistryEmailDeliveriesRepository {
       return fromEntity(await table.getEntity(DELIVERY_ID_PARTITION_KEY, deliveryId));
     } catch (error) {
       if (isNotFound(error)) return null;
+      throw error;
+    }
+  }
+
+  async readVersionedById(
+    deliveryId: string
+  ): Promise<{ record: MinistryEmailDeliveryRecord; version: string } | null> {
+    const table = await this.tableFactory(MINISTRY_EMAIL_DELIVERIES_TABLE_NAME);
+    try {
+      const entity = await table.getEntity(DELIVERY_ID_PARTITION_KEY, deliveryId);
+      if (!entity.etag) {
+        throw new Error("Stored ministry email delivery is missing its ETag");
+      }
+      return { record: fromEntity(entity), version: entity.etag };
+    } catch (error) {
+      if (isNotFound(error)) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * Conditionally replaces an existing requested record using its read ETag.
+   * This is transition-only, never creates missing rows, and never resets a
+   * terminal state; provider calls remain outside this storage operation.
+   */
+  async transitionIfVersion(
+    nextRecord: MinistryEmailDeliveryRecord,
+    expectedVersion: string
+  ): Promise<boolean> {
+    if (!expectedVersion.trim()) return false;
+
+    const table = await this.tableFactory(MINISTRY_EMAIL_DELIVERIES_TABLE_NAME);
+    let currentEntity: MinistryEmailDeliveryEntity;
+    try {
+      currentEntity = await table.getEntity(
+        DELIVERY_ID_PARTITION_KEY,
+        nextRecord.deliveryId
+      );
+    } catch (error) {
+      if (isNotFound(error)) return false;
+      throw error;
+    }
+
+    if (currentEntity.etag !== expectedVersion) return false;
+    const currentRecord = fromEntity(currentEntity);
+    if (
+      currentRecord.state !== "requested" ||
+      (nextRecord.state !== "provider_accepted" && nextRecord.state !== "failed") ||
+      !sameRequest(currentRecord, nextRecord)
+    ) {
+      return false;
+    }
+
+    try {
+      await table.updateEntity(
+        {
+          partitionKey: DELIVERY_ID_PARTITION_KEY,
+          rowKey: nextRecord.deliveryId,
+          deliveryJson: JSON.stringify(nextRecord)
+        },
+        "Replace",
+        { etag: expectedVersion }
+      );
+      return true;
+    } catch (error) {
+      if (isPreconditionFailed(error) || isNotFound(error)) return false;
       throw error;
     }
   }

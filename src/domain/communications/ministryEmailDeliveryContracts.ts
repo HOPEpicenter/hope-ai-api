@@ -7,6 +7,7 @@ export const MINISTRY_EMAIL_DELIVERY_SCHEMA_VERSION = 1 as const;
 /** provider_accepted records provider acceptance, not final recipient delivery. */
 export type MinistryEmailDeliveryState =
   | "requested"
+  | "dispatching"
   | "provider_accepted"
   | "failed";
 
@@ -33,6 +34,12 @@ export type MinistryEmailDeliveryRecord = {
   /** Canonical backend-resolved recipient used for this delivery attempt. */
   recipientEmail: string;
   eligibility: MinistryEmailDeliveryEligibilitySnapshot;
+  /**
+   * Durable worker claim; retained for audit after terminal provider results.
+   * Dispatching claims do not expire automatically and require explicit reconciliation.
+   */
+  dispatchAttemptId: string | null;
+  dispatchClaimedAt: string | null;
   provider: MinistryEmailDeliveryProvider | null;
   providerMessageId: string | null;
   providerAcceptedAt: string | null;

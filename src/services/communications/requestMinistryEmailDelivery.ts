@@ -242,6 +242,8 @@ export async function requestMinistryEmailDelivery(
       contactConsent: true,
       emailPreference: "granted"
     },
+    dispatchAttemptId: null,
+    dispatchClaimedAt: null,
     provider: null,
     providerMessageId: null,
     providerAcceptedAt: null,

@@ -52,6 +52,7 @@ function transitionOrConflict(
  */
 export async function persistMinistryEmailDeliveryProviderResult(
   deliveryId: string,
+  dispatchAttemptId: string,
   result: MinistryEmailProviderResult,
   occurredAt: string,
   dependencies: PersistMinistryEmailDeliveryProviderResultDependencies = {}
@@ -62,6 +63,19 @@ export async function persistMinistryEmailDeliveryProviderResult(
     throw new MinistryEmailDeliveryPersistenceError("DELIVERY_NOT_FOUND");
   }
   if (versioned.record.deliveryId !== deliveryId) {
+    throw new MinistryEmailDeliveryPersistenceError("DELIVERY_TRANSITION_CONFLICT");
+  }
+  if (
+    !dispatchAttemptId ||
+    !dispatchAttemptId.trim() ||
+    versioned.record.dispatchAttemptId !== dispatchAttemptId
+  ) {
+    throw new MinistryEmailDeliveryPersistenceError("DELIVERY_TRANSITION_CONFLICT");
+  }
+
+  if (versioned.record.state !== "dispatching" &&
+      versioned.record.state !== "provider_accepted" &&
+      versioned.record.state !== "failed") {
     throw new MinistryEmailDeliveryPersistenceError("DELIVERY_TRANSITION_CONFLICT");
   }
 
@@ -78,6 +92,9 @@ export async function persistMinistryEmailDeliveryProviderResult(
   }
 
   if (current.record.state === "requested") {
+    throw new MinistryEmailDeliveryPersistenceError("DELIVERY_TRANSITION_CONFLICT");
+  }
+  if (current.record.dispatchAttemptId !== dispatchAttemptId) {
     throw new MinistryEmailDeliveryPersistenceError("DELIVERY_TRANSITION_CONFLICT");
   }
 

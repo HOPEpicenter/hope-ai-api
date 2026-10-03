@@ -62,7 +62,15 @@ function isPreconditionFailed(error: unknown): boolean {
 }
 
 function fromEntity(entity: MinistryEmailDeliveryEntity): MinistryEmailDeliveryRecord {
-  const record = JSON.parse(entity.deliveryJson) as MinistryEmailDeliveryRecord;
+  const stored = JSON.parse(entity.deliveryJson) as Omit<
+    MinistryEmailDeliveryRecord,
+    "dispatchAttemptId" | "dispatchClaimedAt"
+  > & Partial<Pick<MinistryEmailDeliveryRecord, "dispatchAttemptId" | "dispatchClaimedAt">>;
+  const record: MinistryEmailDeliveryRecord = {
+    ...stored,
+    dispatchAttemptId: stored.dispatchAttemptId ?? null,
+    dispatchClaimedAt: stored.dispatchClaimedAt ?? null
+  };
   if (
     entity.partitionKey !== DELIVERY_ID_PARTITION_KEY ||
     record.deliveryId !== entity.rowKey
@@ -141,10 +149,52 @@ export class MinistryEmailDeliveriesRepository {
     }
   }
 
+  /** Durably claims a requested row; ETag prevents multiple workers winning. */
+  async claimIfVersion(
+    nextRecord: MinistryEmailDeliveryRecord,
+    expectedVersion: string
+  ): Promise<boolean> {
+    if (!expectedVersion.trim()) return false;
+
+    const table = await this.tableFactory(MINISTRY_EMAIL_DELIVERIES_TABLE_NAME);
+    let currentEntity: MinistryEmailDeliveryEntity;
+    try {
+      currentEntity = await table.getEntity(
+        DELIVERY_ID_PARTITION_KEY,
+        nextRecord.deliveryId
+      );
+    } catch (error) {
+      if (isNotFound(error)) return false;
+      throw error;
+    }
+
+    if (currentEntity.etag !== expectedVersion) return false;
+    const currentRecord = fromEntity(currentEntity);
+    if (
+      currentRecord.state !== "requested" ||
+      nextRecord.state !== "dispatching" ||
+      currentRecord.dispatchAttemptId !== null ||
+      currentRecord.dispatchClaimedAt !== null ||
+      nextRecord.dispatchAttemptId?.trim() === "" ||
+      !nextRecord.dispatchAttemptId ||
+      !nextRecord.dispatchClaimedAt?.trim() ||
+      nextRecord.provider !== null ||
+      nextRecord.providerMessageId !== null ||
+      nextRecord.providerAcceptedAt !== null ||
+      nextRecord.failedAt !== null ||
+      nextRecord.failureCode !== null ||
+      !sameRequest(currentRecord, nextRecord)
+    ) {
+      return false;
+    }
+
+    return this.replaceWithVersion(nextRecord, expectedVersion);
+  }
+
   /**
-   * Conditionally replaces an existing requested record using its read ETag.
-   * This is transition-only, never creates missing rows, and never resets a
-   * terminal state; provider calls remain outside this storage operation.
+   * Conditionally persists a terminal provider result from an existing claim.
+   * No requested row can jump directly to a provider result, and a terminal
+   * row cannot be overwritten by a stale worker.
    */
   async transitionIfVersion(
     nextRecord: MinistryEmailDeliveryRecord,
@@ -167,13 +217,25 @@ export class MinistryEmailDeliveriesRepository {
     if (currentEntity.etag !== expectedVersion) return false;
     const currentRecord = fromEntity(currentEntity);
     if (
-      currentRecord.state !== "requested" ||
+      currentRecord.state !== "dispatching" ||
       (nextRecord.state !== "provider_accepted" && nextRecord.state !== "failed") ||
-      !sameRequest(currentRecord, nextRecord)
+      !sameRequest(currentRecord, nextRecord) ||
+      !currentRecord.dispatchAttemptId ||
+      !currentRecord.dispatchClaimedAt ||
+      nextRecord.dispatchAttemptId !== currentRecord.dispatchAttemptId ||
+      nextRecord.dispatchClaimedAt !== currentRecord.dispatchClaimedAt
     ) {
       return false;
     }
 
+    return this.replaceWithVersion(nextRecord, expectedVersion);
+  }
+
+  private async replaceWithVersion(
+    nextRecord: MinistryEmailDeliveryRecord,
+    expectedVersion: string
+  ): Promise<boolean> {
+    const table = await this.tableFactory(MINISTRY_EMAIL_DELIVERIES_TABLE_NAME);
     try {
       await table.updateEntity(
         {

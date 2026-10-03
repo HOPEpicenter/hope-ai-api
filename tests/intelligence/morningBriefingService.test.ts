@@ -101,6 +101,7 @@ const baseInput: MorningBriefingCompositionInput = {
       stalledPathwayCount: 0,
       completedPathwayCount: 0
     },
+    formationAnalyticsAvailability: { status: "insufficient_data", reason: "Formation event evidence is unavailable." },
     formationCoaching: []
     ,careProfile: [],
     careTimeline: [],
@@ -118,6 +119,7 @@ const baseInput: MorningBriefingCompositionInput = {
       unassignedOpenCases: 0,
       closureRate: 0
     },
+    careAnalyticsAvailability: { status: "insufficient_data", reason: "Care case event evidence is unavailable." },
     careCoaching: [],
     servingProfile: [],
     servingTimeline: [],
@@ -136,6 +138,7 @@ const baseInput: MorningBriefingCompositionInput = {
       totalActivities: 0,
       closureRate: 0
     },
+    servingAnalyticsAvailability: { status: "insufficient_data", reason: "Serving event evidence is unavailable." },
     servingCoaching: [],
     communityProfile: [],
     communityTimeline: [],
@@ -154,6 +157,7 @@ const baseInput: MorningBriefingCompositionInput = {
       totalInteractions: 0,
       completionRate: 0
     },
+    communityAnalyticsAvailability: { status: "insufficient_data", reason: "Community event evidence is unavailable." },
     communityCoaching: [],
     givingProfile: [],
     givingTimeline: [],
@@ -173,6 +177,7 @@ const baseInput: MorningBriefingCompositionInput = {
       decreasingGenerosityMembers: 0,
       completionRate: 0
     },
+    givingAnalyticsAvailability: { status: "insufficient_data", reason: "Giving event evidence is unavailable." },
     givingCoaching: [],
     attendanceProfile: [],
     attendanceTimeline: [],
@@ -191,6 +196,7 @@ const baseInput: MorningBriefingCompositionInput = {
       stalledRecords: 0,
       completedCycles: 0
     },
+    attendanceAnalyticsAvailability: { status: "insufficient_data", reason: "Attendance event evidence is unavailable." },
     attendanceCoaching: [],
     engagementProfile: [],
     engagementTimeline: [],
@@ -208,10 +214,11 @@ const baseInput: MorningBriefingCompositionInput = {
       completedCycles: 0,
       completionRate: 0
     },
+    engagementAnalyticsAvailability: { status: "insufficient_data", reason: "Engagement event evidence is unavailable." },
     engagementCoaching: [],
     ministryHealthSummary: {
-      status: "healthy",
-      overallScore: 100,
+      status: "insufficient_data",
+      overallScore: null,
       domainsAvailable: 0,
       domainsTotal: 7,
       alertCount: 0,
@@ -220,11 +227,11 @@ const baseInput: MorningBriefingCompositionInput = {
       trends: []
     },
     ministryHealthAnalytics: {
-      overallScore: 100,
-      status: "healthy",
+      overallScore: null,
+      status: "insufficient_data",
       scoresByDomain: {},
       alertCount: 0,
-      trendCounts: {}
+      trendCounts: { insufficient_data: 7 }
     },
     ministryHealthInsights: [],
     ministryHealthCoaching: {
@@ -245,7 +252,7 @@ const baseInput: MorningBriefingCompositionInput = {
         growthMembers: [],
         leadershipMembers: [],
         totalMembers: 0,
-        ministryHealthStatus: "healthy"
+        ministryHealthStatus: "insufficient_data"
       },
       actions: [],
       report: {
@@ -255,7 +262,13 @@ const baseInput: MorningBriefingCompositionInput = {
         aiRecommendations: []
       }
     },
-    memberJourneySummary: { tone: "pastoral", summary: "", currentSeason: "", direction: "steady", pastoralResponse: "" },
+    memberJourneySummary: {
+      tone: "pastoral",
+      summary: "No journey evidence is currently available.",
+      currentSeason: "There is not enough recorded evidence to describe a current season.",
+      direction: "insufficient_data",
+      pastoralResponse: "Review available records or connect personally before drawing a journey conclusion."
+    },
     memberJourneyInsights: { strengths: [], risks: [], opportunities: [], careSignals: [], growthSignals: [], engagementSignals: [], ministryHealthSignals: [] },
     memberJourneyRecommendations: [],
     workloadMemberPlan: null,
@@ -269,15 +282,15 @@ const baseInput: MorningBriefingCompositionInput = {
     },
     dailyPastoralBriefing: {
       generatedAt: "2026-09-15T08:00:00.000Z",
-      urgency: { level: "normal", summary: "No urgent pastoral priorities are currently identified.", memberIds: [] },
-      trendSnapshot: { direction: "stable", summary: "" },
+      urgency: { level: "normal", summary: "Pastoral priority evidence is currently insufficient.", memberIds: [] },
+      trendSnapshot: { direction: "insufficient_data", summary: "Evidence is insufficient to determine a trend." },
       actions: [],
       scriptureEncouragement: null
     },
     weeklyPastoralBriefing: {
       generatedAt: "2026-09-15T08:00:00.000Z",
       pastoralFocus: "",
-      ministryHealth: { status: "healthy", overallScore: 100, alertCount: 0 },
+      ministryHealth: { status: "insufficient_data", overallScore: null, alertCount: 0 },
       workloadDistribution: { total: 0, urgent: 0, high: 0, medium: 0, low: 0, assigned: 0, unassigned: 0, byPastor: {} },
       coachingThemes: [],
       recommendedActions: []

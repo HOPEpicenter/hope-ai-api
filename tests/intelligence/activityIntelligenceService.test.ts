@@ -29,6 +29,26 @@ const baseFollowups = {
 };
 
 {
+  const result = buildActivityIntelligence({
+    careSummary: baseCare,
+    followupStats: baseFollowups,
+    formationProfiles: [],
+    generatedAt: "2026-10-03T00:00:00.000Z"
+  });
+
+  assert.strictEqual(result.ministryHealthSummary.status, "insufficient_data");
+  assert.strictEqual(result.ministryHealthSummary.overallScore, null);
+  assert.strictEqual(result.ministryHealthSummary.domainsAvailable, 0);
+  assert.deepStrictEqual(result.aiFeatures, []);
+  assert.deepStrictEqual(result.aiPredictions, []);
+  assert.deepStrictEqual(result.aiInsights, []);
+  assert.deepStrictEqual(result.aiRecommendations, []);
+  assert.deepStrictEqual(result.predictiveMemberIntelligence, []);
+  assert.strictEqual(result.predictiveLeadershipIntelligence.summary.totalMembers, 0);
+  assert.deepStrictEqual(result.predictiveLeadershipIntelligence.report.rankings, []);
+}
+
+{
   const careEvents: CareEvent[] = [{ eventId: "care-started", occurredAt: "2026-09-01T00:00:00.000Z", memberId: "member-care", caseId: "case-care", type: "CareCaseStarted", actorId: null, payload: { ownerId: null, priority: "high" } }];
   const result = buildActivityIntelligence({ careSummary: baseCare, followupStats: baseFollowups, formationProfiles: [], careEvents });
   assert.deepStrictEqual(result.careProfile.map((profile) => profile.memberId), ["member-care"]);
@@ -204,23 +224,23 @@ const baseFollowups = {
   assert.ok(result.ministryHealthAnalytics);
   assert.ok(Array.isArray(result.ministryHealthInsights));
   assert.ok(result.ministryHealthCoaching);
-  assert.deepStrictEqual(result.aiPredictions.map((prediction) => prediction.memberId), ["global"]);
-  assert.ok(Object.values(result.aiPredictions[0]!.scores).every((score) => score >= 0 && score <= 1));
-  assert.ok(result.aiInsights.length > 0);
-  assert.strictEqual(result.aiRecommendations[0]?.memberId, "global");
-  assert.strictEqual(result.predictiveMemberIntelligence[0]?.risk.memberId, "global");
-  assert.ok(Object.values(result.predictiveMemberIntelligence[0]!.risk).filter((value) => typeof value === "number").every((score) => score >= 0 && score <= 1));
-  assert.strictEqual(result.predictiveLeadershipIntelligence.summary.totalMembers, 1);
-  assert.ok(result.predictiveLeadershipIntelligence.report.rankings.length === 1);
-  assert.strictEqual(result.workloadMemberPlan?.memberId, "global");
-  assert.strictEqual(result.workloadPastorPlans.length, 1);
-  assert.strictEqual(result.workloadLeadershipSummary.totalMembers, 1);
+  assert.deepStrictEqual(result.aiFeatures, []);
+  assert.deepStrictEqual(result.aiPredictions, []);
+  assert.deepStrictEqual(result.aiInsights, []);
+  assert.deepStrictEqual(result.aiRecommendations, []);
+  assert.deepStrictEqual(result.predictiveMemberIntelligence, []);
+  assert.strictEqual(result.predictiveLeadershipIntelligence.summary.totalMembers, 0);
+  assert.deepStrictEqual(result.predictiveLeadershipIntelligence.report.rankings, []);
+  assert.deepStrictEqual(result.predictiveLeadershipIntelligence.actions, []);
+  assert.strictEqual(result.workloadMemberPlan, null);
+  assert.deepStrictEqual(result.workloadPastorPlans, []);
+  assert.strictEqual(result.workloadLeadershipSummary.totalMembers, 0);
   assert.ok(["growing", "steady", "needs_attention"].includes(result.memberJourneySummary.direction));
   assert.ok(Array.isArray(result.memberJourneyInsights.ministryHealthSignals));
   assert.ok(result.memberJourneyRecommendations.length > 0);
   assert.ok(["urgent", "high", "normal"].includes(result.dailyPastoralBriefing.urgency.level));
   assert.strictEqual(result.dailyPastoralBriefing.scriptureEncouragement, null);
-  assert.strictEqual(result.weeklyPastoralBriefing.workloadDistribution.total, 1);
+  assert.strictEqual(result.weeklyPastoralBriefing.workloadDistribution.total, 0);
   assert.ok(Array.isArray(result.eventPastoralBriefings));
 }
 
@@ -340,6 +360,37 @@ const baseFollowups = {
     ]
   );
   assert.ok(result.formationCoaching[1]?.encouragement.length);
+
+  assert.strictEqual(result.ministryHealthSummary.domainsAvailable, 1);
+  assert.notStrictEqual(result.ministryHealthSummary.overallScore, null);
+  assert.deepStrictEqual(
+    result.aiFeatures.map((features) => features.memberId),
+    ["global"]
+  );
+  assert.deepStrictEqual(
+    result.aiPredictions.map((prediction) => prediction.memberId),
+    ["global"]
+  );
+  assert.ok(
+    Object.values(result.aiPredictions[0]!.scores)
+      .every((score) => score >= 0 && score <= 1)
+  );
+  assert.strictEqual(
+    result.predictiveMemberIntelligence[0]?.risk.memberId,
+    "global"
+  );
+  assert.strictEqual(
+    result.predictiveLeadershipIntelligence.summary.totalMembers,
+    1
+  );
+  assert.strictEqual(
+    result.workloadMemberPlan?.memberId,
+    "global"
+  );
+  assert.strictEqual(
+    result.workloadLeadershipSummary.totalMembers,
+    1
+  );
 }
 
 console.log("activityIntelligenceService.test.ts passed");

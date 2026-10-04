@@ -3,12 +3,15 @@
 ## Current capability
 
 The internal readMinistryEmailDispatchInspection reader inspects one delivery
-by deliveryId. This slice introduces no HTTP endpoint, operator authorization
-boundary, recovery write, claim reset, provider lookup, or sending implementation.
+by deliveryId. The administrative HTTP inspection endpoint exposes that reader
+through GET /api/ministry-email-deliveries/{deliveryId}/dispatch-inspection.
 
-Use only through an approved internal diagnostic context. A future endpoint must
-establish explicit administrative authorization before calling this reader.
-The reader itself does not authenticate an operator.
+The HTTP boundary requires the canonical administrative Staff actor check before
+inspection. The reader itself remains authorization-agnostic so internal callers
+must establish their own approved authorization boundary.
+
+This slice introduces no recovery write, claim reset, provider lookup, retry,
+reclaim, concrete sending implementation, provider credentials, or send action.
 
 Inspection remains available while sending flags are off. It reports an explicit
 allowlist of lifecycle metadata. It omits subject, body, recipient email, staff
@@ -52,7 +55,7 @@ boundary and does not verify recovery evidence or administrative authority.
 
 Before real sending, implement and validate evidence-backed resolution with
 operator audit, concurrency protection and replay semantics. Ambiguous evidence
-must leave the delivery unresolved. Provider integration, endpoint authorization,
+must leave the delivery unresolved. Recovery mutation, provider integration,
 configuration, safe observability and controlled acceptance remain separate gates.
 
 No resolution should mutate MinistryCommunicationOutcome or Six-Week state

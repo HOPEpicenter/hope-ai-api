@@ -2,8 +2,9 @@ import type { MinistryEmailDeliveryRecord } from "../domain/communications/minis
 import { getTableClient } from "../storage/tableClient";
 
 export const MINISTRY_EMAIL_DELIVERIES_TABLE_NAME = "MinistryEmailDeliveries";
-// A global partition makes deliveryId unique even if a client reuses it across visitors.
-const DELIVERY_ID_PARTITION_KEY = "EMAIL_DELIVERIES";
+/** Shared partition permits atomic delivery + recovery-audit transactions. */
+export const MINISTRY_EMAIL_DELIVERIES_PARTITION_KEY = "EMAIL_DELIVERIES";
+const DELIVERY_ID_PARTITION_KEY = MINISTRY_EMAIL_DELIVERIES_PARTITION_KEY;
 
 type MinistryEmailDeliveryEntity = {
   partitionKey: string;

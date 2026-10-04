@@ -97,3 +97,37 @@ not mutate MinistryCommunicationOutcome or Six-Week state.
 The future recovery HTTP boundary must independently establish canonical
 administrative actor authorization before supplying actorId to the internal
 recovery service.
+
+## Authorized recovery HTTP command
+
+The administrative recovery command is exposed through:
+
+POST /api/ministry-email-deliveries/{deliveryId}/dispatch-recovery
+
+The endpoint is independently gated by
+FEATURE_MINISTRY_EMAIL_DISPATCH_RECOVERY, which defaults off.
+
+When the flag is off the endpoint returns unavailable before administrative
+authorization or recovery storage access.
+
+When enabled, the endpoint requires the canonical administrative Staff actor
+boundary. actorId is always taken from the authenticated canonical Staff
+identity and is never trusted from the request body.
+
+The request must supply a stable resolutionId, dispatchAttemptId, resolvedAt,
+and affirmative normalized evidence. resolvedAt is part of recovery replay
+identity; an exact administrative retry must reuse the same resolutionId,
+resolvedAt, dispatch attempt, and evidence.
+
+The route deliveryId is authoritative for the recovery command. Any mismatch
+between route identity, dispatchAttemptId, and evidence identity is rejected by
+the recovery foundation.
+
+A newly committed resolution returns HTTP 201. An exact replay returns HTTP
+200. Conflicting state, stale attempts, conflicting replay identity, or a
+concurrent terminal transition return HTTP 409. Uncertain persistence returns
+HTTP 503 and never authorizes resend.
+
+This endpoint does not invoke SendGrid, look up provider state, authorize a
+resend, reset or reclaim a dispatch claim, mutate MinistryCommunicationOutcome,
+or mutate Six-Week state.

@@ -4,6 +4,7 @@ export type FeatureFlags = {
   morningBriefing: boolean;
   phase5Communications: boolean;
   ministryEmailProviderSending: boolean;
+  ministryEmailDispatchRecovery: boolean;
   staffInvitations: boolean;
   sixWeekScriptGuidance: boolean;
 };
@@ -18,6 +19,8 @@ export function getFeatureFlags(): FeatureFlags {
       String(process.env.FEATURE_PHASE5_COMMUNICATIONS ?? "").trim().toLowerCase() === "true",
     ministryEmailProviderSending:
       String(process.env.FEATURE_MINISTRY_EMAIL_PROVIDER_SENDING ?? "").trim().toLowerCase() === "true",
+    ministryEmailDispatchRecovery:
+      String(process.env.FEATURE_MINISTRY_EMAIL_DISPATCH_RECOVERY ?? "").trim().toLowerCase() === "true",
     staffInvitations:
       String(process.env.FEATURE_STAFF_INVITATIONS ?? "").trim().toLowerCase() === "true",
     sixWeekScriptGuidance:

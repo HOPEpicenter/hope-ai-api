@@ -101,6 +101,8 @@ jobs:
           npx ts-node tests/communications/dispatchMinistryEmailDelivery.test.ts
           npx ts-node tests/communications/readMinistryEmailDispatchInspection.test.ts
           npx ts-node tests/communications/getMinistryEmailDispatchInspection.test.ts
+          npx ts-node tests/communications/ministryEmailDispatchRecoveryRepository.test.ts
+          npx ts-node tests/communications/resolveMinistryEmailDispatchRecovery.test.ts
           npx ts-node tests/followups/confirmHistoricalSixWeekCareOutcome.test.ts
 
       - name: Dashboard visitor identity regression

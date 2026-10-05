@@ -185,3 +185,37 @@ resend.
 
 Raw recipient email, provider reason/response strings and other webhook payload
 content are not copied into normalized recovery evidence.
+
+## Signed SendGrid Event Webhook HTTP boundary
+
+The SendGrid Event Webhook HTTP boundary is independently gated by
+FEATURE_MINISTRY_EMAIL_EVENT_WEBHOOK, which defaults off.
+
+The boundary authenticates SendGrid with the signed Event Webhook headers and
+SENDGRID_EVENT_WEBHOOK_PUBLIC_KEY. It does not use HOPE administrative actor
+headers because the external provider is the caller.
+
+Verification order is fail-closed:
+
+1. require the feature flag;
+2. require configured public key;
+3. require signature and timestamp headers;
+4. require original request bytes;
+5. verify the signature over the untouched raw payload;
+6. only then parse JSON;
+7. only then normalize supported provider events.
+
+The handler prefers req.bufferBody when it is a non-empty Buffer, falls back to
+req.rawBody when it is a non-empty string, and never reconstructs signed input
+from req.body or JSON.stringify(req.body).
+
+This slice deliberately does not persist verified evidence. Even after successful
+signature verification and normalization it returns HTTP 503 with
+MINISTRY_EMAIL_EVENT_WEBHOOK_PERSISTENCE_UNAVAILABLE. A non-2xx response keeps
+the provider from treating the event batch as durably accepted before idempotent
+evidence persistence exists.
+
+The endpoint performs no provider invocation, email sending, dispatch recovery,
+retry, reset, reclaim, MinistryCommunicationOutcome mutation or Six-Week
+mutation. Do not enable FEATURE_MINISTRY_EMAIL_EVENT_WEBHOOK in Azure until the
+durable evidence-persistence slice has been implemented and accepted.

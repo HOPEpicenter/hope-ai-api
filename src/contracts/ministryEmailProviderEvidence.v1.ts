@@ -30,14 +30,19 @@ export type NormalizeSendGridProviderEventInput = {
   event: unknown;
 };
 
+export type VerifiedSendGridProviderAcceptanceEvidence =
+  Extract<
+    MinistryEmailDispatchRecoveryEvidence,
+    { kind: "provider_accepted" }
+  > & {
+    source: "verified_provider_event";
+  };
+
 export type NormalizeSendGridProviderEventResult =
   | {
       ok: true;
       eventType: SendGridAcceptanceEventType;
-      evidence: Extract<
-        MinistryEmailDispatchRecoveryEvidence,
-        { kind: "provider_accepted" }
-      >;
+      evidence: VerifiedSendGridProviderAcceptanceEvidence;
     }
   | {
       ok: false;

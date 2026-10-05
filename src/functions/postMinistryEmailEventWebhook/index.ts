@@ -5,12 +5,25 @@ import {
   readMinistryEmailEventWebhookPublicKey
 } from "../../config/ministryEmailEventWebhook";
 import {
+  SENDGRID_ACCEPTANCE_EVENT_TYPES,
   SENDGRID_DELIVERY_ID_ARGUMENT,
   SENDGRID_DISPATCH_ATTEMPT_ID_ARGUMENT
 } from "../../contracts/ministryEmailProviderEvidence.v1";
+import type {
+  PersistMinistryEmailProviderEvidenceInputV1
+} from "../../contracts/ministryEmailProviderEvidencePersistence.v1";
+import type {
+  MinistryEmailDeliveryRecord
+} from "../../domain/communications/ministryEmailDeliveryContracts";
+import {
+  MinistryEmailDeliveriesRepository
+} from "../../repositories/ministryEmailDeliveriesRepository";
 import {
   normalizeSendGridProviderEvent
 } from "../../services/communications/normalizeSendGridProviderEvent";
+import {
+  persistMinistryEmailProviderEvidence
+} from "../../services/communications/persistMinistryEmailProviderEvidence";
 import {
   verifySendGridEventWebhook
 } from "../../services/communications/verifySendGridEventWebhook";
@@ -30,6 +43,11 @@ const SIGNATURE_HEADER =
 const TIMESTAMP_HEADER =
   "X-Twilio-Email-Event-Webhook-Timestamp";
 
+const ACCEPTANCE_EVENT_TYPES =
+  new Set<string>(
+    SENDGRID_ACCEPTANCE_EVENT_TYPES
+  );
+
 export type PostMinistryEmailEventWebhookDependencies = {
   getFlags?: () => {
     ministryEmailEventWebhook: boolean;
@@ -37,6 +55,10 @@ export type PostMinistryEmailEventWebhookDependencies = {
   getPublicKey?: () => string;
   verify?: typeof verifySendGridEventWebhook;
   normalize?: typeof normalizeSendGridProviderEvent;
+  readDelivery?: (
+    deliveryId: string
+  ) => Promise<MinistryEmailDeliveryRecord | null>;
+  persist?: typeof persistMinistryEmailProviderEvidence;
 };
 
 function readHeader(
@@ -262,56 +284,267 @@ export async function postMinistryEmailEventWebhook(
       dependencies.normalize ??
       normalizeSendGridProviderEvent;
 
-    let normalizedCount = 0;
+    const deliveryRepository =
+      dependencies.readDelivery
+        ? null
+        : new MinistryEmailDeliveriesRepository();
+
+    const readDelivery =
+      dependencies.readDelivery ??
+      (
+        (deliveryId: string) =>
+          deliveryRepository!.getById(
+            deliveryId
+          )
+      );
+
+    const persist =
+      dependencies.persist ??
+      persistMinistryEmailProviderEvidence;
+
+    const normalized:
+      PersistMinistryEmailProviderEvidenceInputV1[] =
+        [];
+
+    const batchEvidence =
+      new Map<string, string>();
+
     let ignoredCount = 0;
 
+    /*
+     * Phase 1 performs all canonical-delivery correlation and detects
+     * conflicting duplicate evidence identities before any storage write.
+     */
     for (const event of payload) {
-      const expectedDeliveryId =
+      const eventType =
+        event &&
+        typeof event === "object" &&
+        !Array.isArray(event)
+          ? (
+              event as Record<
+                string,
+                unknown
+              >
+            ).event
+          : undefined;
+
+      if (
+        typeof eventType === "string" &&
+        !ACCEPTANCE_EVENT_TYPES.has(
+          eventType
+        )
+      ) {
+        ignoredCount += 1;
+        continue;
+      }
+
+      const eventDeliveryId =
         correlationText(
           event,
           SENDGRID_DELIVERY_ID_ARGUMENT
         );
 
-      const expectedDispatchAttemptId =
+      const eventDispatchAttemptId =
         correlationText(
           event,
           SENDGRID_DISPATCH_ATTEMPT_ID_ARGUMENT
         );
 
+      if (
+        !eventDeliveryId ||
+        !eventDispatchAttemptId
+      ) {
+        context.res = {
+          status: 400,
+          headers: jsonHeaders,
+          body: apiErrorBody(
+            "INVALID_MINISTRY_EMAIL_PROVIDER_EVENT",
+            "Signed ministry email provider event correlation is invalid",
+            requestId
+          )
+        };
+        return;
+      }
+
+      let delivery:
+        MinistryEmailDeliveryRecord |
+        null;
+
+      try {
+        delivery =
+          await readDelivery(
+            eventDeliveryId
+          );
+      } catch {
+        context.res = {
+          status: 503,
+          headers: jsonHeaders,
+          body: apiErrorBody(
+            "MINISTRY_EMAIL_PROVIDER_EVIDENCE_LOOKUP_UNAVAILABLE",
+            "Ministry email provider evidence correlation is unavailable",
+            requestId
+          )
+        };
+        return;
+      }
+
+      if (!delivery) {
+        context.res = {
+          status: 409,
+          headers: jsonHeaders,
+          body: apiErrorBody(
+            "MINISTRY_EMAIL_PROVIDER_DELIVERY_NOT_FOUND",
+            "Signed provider evidence does not match a canonical delivery",
+            requestId
+          )
+        };
+        return;
+      }
+
+      const canonicalAttemptId =
+        delivery.dispatchAttemptId;
+
+      if (
+        !canonicalAttemptId ||
+        canonicalAttemptId !==
+          eventDispatchAttemptId
+      ) {
+        context.res = {
+          status: 409,
+          headers: jsonHeaders,
+          body: apiErrorBody(
+            "MINISTRY_EMAIL_PROVIDER_DISPATCH_ATTEMPT_CONFLICT",
+            "Signed provider evidence does not match the canonical dispatch attempt",
+            requestId
+          )
+        };
+        return;
+      }
+
       const result = normalize({
-        expectedDeliveryId,
-        expectedDispatchAttemptId,
+        expectedDeliveryId:
+          delivery.deliveryId,
+        expectedDispatchAttemptId:
+          canonicalAttemptId,
         provenance: {
           signatureVerified: true
         },
         event
       });
 
-      if (result.ok) {
-        normalizedCount += 1;
+      if (!result.ok) {
+        context.res = {
+          status:
+            result.code ===
+              "PROVIDER_EVENT_CORRELATION_MISMATCH"
+              ? 409
+              : 400,
+          headers: jsonHeaders,
+          body: apiErrorBody(
+            result.code,
+            "Signed ministry email provider event is invalid",
+            requestId
+          )
+        };
+        return;
+      }
+
+      const input:
+        PersistMinistryEmailProviderEvidenceInputV1 =
+        {
+          eventType: result.eventType,
+          evidence: result.evidence
+        };
+
+      const canonical =
+        JSON.stringify(input);
+
+      const prior =
+        batchEvidence.get(
+          input.evidence.evidenceId
+        );
+
+      if (
+        prior !== undefined &&
+        prior !== canonical
+      ) {
+        context.res = {
+          status: 409,
+          headers: jsonHeaders,
+          body: apiErrorBody(
+            "PROVIDER_EVIDENCE_BATCH_CONFLICT",
+            "Signed provider evidence batch contains a conflicting replay identity",
+            requestId
+          )
+        };
+        return;
+      }
+
+      batchEvidence.set(
+        input.evidence.evidenceId,
+        canonical
+      );
+
+      normalized.push(input);
+    }
+
+    /*
+     * Phase 2 writes only after the whole supported batch has passed
+     * canonical correlation and in-batch replay checks.
+     *
+     * Writes are individually idempotent. If a later write fails, SendGrid
+     * receives non-2xx; a retry safely replays rows already committed.
+     */
+    let persistedCount = 0;
+    let replayedCount = 0;
+
+    for (const input of normalized) {
+      const result =
+        await persist(input);
+
+      if (!result.ok) {
+        const status =
+          result.code ===
+            "PROVIDER_EVIDENCE_REPLAY_CONFLICT"
+            ? 409
+            : result.code ===
+                "INVALID_PROVIDER_EVIDENCE"
+              ? 400
+              : 503;
+
+        context.res = {
+          status,
+          headers: jsonHeaders,
+          body: apiErrorBody(
+            result.code,
+            status === 503
+              ? "Ministry email provider evidence persistence is unavailable"
+              : "Ministry email provider evidence cannot be accepted",
+            requestId
+          )
+        };
+        return;
+      }
+
+      if (result.status === "persisted") {
+        persistedCount += 1;
       }
       else {
-        ignoredCount += 1;
+        replayedCount += 1;
       }
     }
 
-    // Deliberately non-2xx until #1270 adds durable idempotent persistence.
-    // This prevents an accidentally enabled pre-persistence endpoint from
-    // acknowledging and losing SendGrid evidence.
     context.res = {
-      status: 503,
+      status: 200,
       headers: jsonHeaders,
       body: {
-        ...apiErrorBody(
-          "MINISTRY_EMAIL_EVENT_WEBHOOK_PERSISTENCE_UNAVAILABLE",
-          "Verified ministry email event evidence is not yet durably persisted",
-          requestId
-        ),
         ingestion: {
-          receivedCount: payload.length,
-          normalizedCount,
+          receivedCount:
+            payload.length,
+          persistedCount,
+          replayedCount,
           ignoredCount,
-          persisted: false
+          persisted: true
         }
       }
     };

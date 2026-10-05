@@ -219,3 +219,34 @@ The endpoint performs no provider invocation, email sending, dispatch recovery,
 retry, reset, reclaim, MinistryCommunicationOutcome mutation or Six-Week
 mutation. Do not enable FEATURE_MINISTRY_EMAIL_EVENT_WEBHOOK in Azure until the
 durable evidence-persistence slice has been implemented and accepted.
+
+## Durable provider-evidence ingestion
+
+Verified supported provider events are durably persisted only after correlation
+against the canonical MinistryEmailDeliveries row. The event deliveryId must
+resolve to an existing delivery and its current dispatchAttemptId must exactly
+match the signed event correlation value.
+
+Provider-evidence rows are immutable create-only records in the shared
+EMAIL_DELIVERIES partition. Their Azure row keys use a deterministic SHA-256
+identity rather than copying the raw provider event ID into the key.
+
+Exact provider-event replays are idempotent. Reusing the same evidence identity
+with different canonical evidence is a conflict. Lost write acknowledgement is
+resolved by rereading the deterministic evidence row; an absent or unreadable
+row after an uncertain write remains persistence-uncertain.
+
+Webhook batches use a two-phase process. All supported events first pass
+canonical delivery/attempt correlation and in-batch evidence-identity conflict
+checks before any evidence write occurs. Evidence records are then persisted
+individually. If a later write is uncertain, the endpoint returns non-2xx and a
+provider retry safely replays any rows that were already committed.
+
+Unsupported non-delivery events are ignored after signature verification and do
+not require persistence. A webhook receives HTTP 200 only when every supported
+event was either newly persisted or proven to be an exact replay.
+
+Durable provider evidence does not mutate the delivery lifecycle. It does not
+invoke recovery, authorize resend, update MinistryCommunicationOutcome, or
+update Six-Week state. The webhook feature remains default-off until controlled
+staging configuration and acceptance are explicitly authorized.

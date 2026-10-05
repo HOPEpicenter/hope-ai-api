@@ -131,3 +131,57 @@ HTTP 503 and never authorizes resend.
 This endpoint does not invoke SendGrid, look up provider state, authorize a
 resend, reset or reclaim a dispatch claim, mutate MinistryCommunicationOutcome,
 or mutate Six-Week state.
+
+## SendGrid provider-event evidence normalization
+
+Provider-event evidence normalization remains internal and performs no HTTP
+webhook handling, signature verification, storage mutation, provider lookup,
+recovery mutation or email sending.
+
+Future SendGrid sends must attach only opaque non-PII correlation values:
+
+- hope_delivery_id = canonical deliveryId
+- hope_dispatch_attempt_id = durable dispatchAttemptId
+
+These values are intended for SendGrid custom_args so they can return with
+Event Webhook records. Do not place visitor names, recipient email addresses,
+staff identities, message content, ministry data or other PII in custom_args.
+
+Only provider events whose request provenance has already been cryptographically
+verified may become recovery evidence. The future webhook boundary must verify
+SendGrid's signature against the original raw request bytes before marking an
+event signatureVerified.
+
+The following delivery events are accepted as affirmative evidence that SendGrid
+possessed and processed the exact correlated dispatch attempt:
+
+- processed
+- delivered
+- deferred
+- bounce
+- dropped
+
+All normalize to recovery kind provider_accepted with source
+verified_provider_event. Later delivery failure does not retroactively mean the
+provider rejected the Mail Send request.
+
+The normalizer requires:
+
+- exact deliveryId correlation;
+- exact dispatchAttemptId correlation;
+- sg_event_id;
+- sg_message_id;
+- integer Unix event timestamp;
+- an allowlisted delivery event;
+- verified provenance.
+
+sg_event_id becomes evidenceId. sg_message_id becomes providerMessageId. The
+provider timestamp is converted to canonical ISO evidence observedAt.
+
+Unsupported engagement/account events, unsigned events, missing identifiers,
+malformed timestamps and mismatched correlation remain unusable evidence.
+Absence of a provider event is never negative evidence and never authorizes
+resend.
+
+Raw recipient email, provider reason/response strings and other webhook payload
+content are not copied into normalized recovery evidence.

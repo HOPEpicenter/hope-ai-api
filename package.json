@@ -25,6 +25,7 @@
   "dependencies": {
     "@azure/data-tables": "^13.3.2",
     "@azure/functions": "^4.5.0",
+    "@sendgrid/eventwebhook": "8.0.0",
     "@sendgrid/mail": "^8.1.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",

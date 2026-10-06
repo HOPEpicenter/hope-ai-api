@@ -20,6 +20,7 @@ const fakeProvider: MinistryEmailDeliveryProviderAdapter = {
 async function run(): Promise<void> {
   const request: MinistryEmailProviderRequest = {
     deliveryId: "delivery-1",
+    dispatchAttemptId: "attempt-1",
     recipientEmail: "canonical@example.org",
     subject: "Approved subject",
     body: "Approved plain text"

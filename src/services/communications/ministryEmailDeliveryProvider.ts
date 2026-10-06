@@ -2,6 +2,7 @@ import type { MinistryEmailDeliveryProvider } from "../../domain/communications/
 
 export type MinistryEmailProviderRequest = {
   deliveryId: string;
+  dispatchAttemptId: string;
   recipientEmail: string;
   subject: string;
   body: string;

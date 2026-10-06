@@ -63,6 +63,7 @@ async function run(): Promise<void> {
 
   assert.deepEqual(requests, [{
     deliveryId: requested.deliveryId,
+    dispatchAttemptId: dispatching.dispatchAttemptId,
     recipientEmail: requested.recipientEmail,
     subject: requested.subject,
     body: requested.body

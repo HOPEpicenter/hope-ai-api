@@ -126,12 +126,276 @@ async function run(): Promise<void> {
     assert.deepEqual(f.repository.current, requested);
   }
 
+  {
+    const repository =
+      new FakeRepository();
+
+    let resolves = 0;
+
+    const result =
+      await dispatchMinistryEmailDelivery(
+        requested.deliveryId,
+        {
+          repository,
+          getFlags: () => ({
+            phase5Communications:
+              false,
+            ministryEmailProviderSending:
+              true
+          }),
+          resolveProvider: () => {
+            resolves += 1;
+            throw new Error(
+              "disabled dispatch must not resolve provider"
+            );
+          }
+        }
+      );
+
+    assert.equal(
+      result.status,
+      "phase5_disabled"
+    );
+
+    assert.equal(
+      resolves,
+      0
+    );
+
+    assert.equal(
+      repository.reads,
+      0
+    );
+
+    assert.equal(
+      repository.claims,
+      0
+    );
+  }
+
+  {
+    const repository =
+      new FakeRepository();
+
+    let resolves = 0;
+
+    const result =
+      await dispatchMinistryEmailDelivery(
+        requested.deliveryId,
+        {
+          repository,
+          getFlags: () => ({
+            phase5Communications:
+              true,
+            ministryEmailProviderSending:
+              false
+          }),
+          resolveProvider: () => {
+            resolves += 1;
+            throw new Error(
+              "disabled sending must not resolve provider"
+            );
+          }
+        }
+      );
+
+    assert.equal(
+      result.status,
+      "provider_sending_disabled"
+    );
+
+    assert.equal(
+      resolves,
+      0
+    );
+
+    assert.equal(
+      repository.reads,
+      0
+    );
+
+    assert.equal(
+      repository.claims,
+      0
+    );
+  }
+
+  {
+    const repository =
+      new FakeRepository();
+
+    let resolves = 0;
+
+    const result =
+      await dispatchMinistryEmailDelivery(
+        requested.deliveryId,
+        {
+          repository,
+          getFlags: () => ({
+            phase5Communications:
+              true,
+            ministryEmailProviderSending:
+              true
+          }),
+          resolveProvider: () => {
+            resolves += 1;
+
+            return {
+              ok: false,
+              code:
+                "MINISTRY_EMAIL_PROVIDER_NOT_CONFIGURED"
+            };
+          }
+        }
+      );
+
+    assert.equal(
+      result.status,
+      "provider_unavailable"
+    );
+
+    assert.equal(
+      result.reconciliationRequired,
+      false
+    );
+
+    assert.equal(
+      resolves,
+      1
+    );
+
+    assert.equal(
+      repository.reads,
+      0,
+      "provider must resolve before delivery read"
+    );
+
+    assert.equal(
+      repository.claims,
+      0,
+      "provider failure must not acquire a durable claim"
+    );
+
+    assert.deepEqual(
+      repository.current,
+      requested
+    );
+  }
+
+  {
+    const repository =
+      new FakeRepository();
+
+    const resolvedProvider =
+      new FakeProvider();
+
+    let resolves = 0;
+
+    const result =
+      await dispatchMinistryEmailDelivery(
+        requested.deliveryId,
+        {
+          repository,
+          getFlags: () => ({
+            phase5Communications:
+              true,
+            ministryEmailProviderSending:
+              true
+          }),
+          resolveProvider: () => {
+            resolves += 1;
+
+            return {
+              ok: true,
+              provider:
+                resolvedProvider
+            };
+          },
+          createDispatchAttemptId:
+            () => "attempt-resolved-1",
+          now:
+            () => timestamp
+        }
+      );
+
+    assert.equal(
+      result.status,
+      "provider_accepted"
+    );
+
+    assert.equal(
+      resolves,
+      1
+    );
+
+    assert.equal(
+      resolvedProvider.calls,
+      1
+    );
+
+    assert.deepEqual(
+      resolvedProvider.requests,
+      [
+        {
+          deliveryId:
+            requested.deliveryId,
+          dispatchAttemptId:
+            "attempt-resolved-1",
+          recipientEmail:
+            requested.recipientEmail,
+          subject:
+            requested.subject,
+          body:
+            requested.body
+        }
+      ]
+    );
+  }
+
+  {
+    const injected =
+      fixture();
+
+    let resolves = 0;
+
+    (
+      injected.dependencies as
+      typeof injected.dependencies & {
+        resolveProvider: () => never;
+      }
+    ).resolveProvider = () => {
+      resolves += 1;
+
+      throw new Error(
+        "explicit provider must bypass resolver"
+      );
+    };
+
+    assert.equal(
+      (
+        await injected.dispatch()
+      ).status,
+      "provider_accepted"
+    );
+
+    assert.equal(
+      resolves,
+      0
+    );
+
+    assert.equal(
+      injected.provider.calls,
+      1
+    );
+  }
+
   const success = fixture();
   assert.equal((await success.dispatch()).status, "provider_accepted");
   assert.equal(success.repository.current?.providerMessageId, "fake-message-1");
   assert.equal(success.repository.current?.dispatchAttemptId, "attempt-1");
   assert.deepEqual(success.provider.requests, [{
     deliveryId: requested.deliveryId,
+    dispatchAttemptId: "attempt-1",
     recipientEmail: requested.recipientEmail,
     subject: requested.subject,
     body: requested.body

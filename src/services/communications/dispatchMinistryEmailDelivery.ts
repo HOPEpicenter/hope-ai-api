@@ -12,6 +12,10 @@ import type {
   MinistryEmailProviderResult
 } from "./ministryEmailDeliveryProvider";
 import {
+  resolveMinistryEmailDeliveryProvider,
+  type ResolveMinistryEmailDeliveryProviderResult
+} from "./resolveMinistryEmailDeliveryProvider";
+import {
   persistMinistryEmailDeliveryProviderResult,
   MinistryEmailDeliveryPersistenceError,
   type VersionedMinistryEmailDeliveryRepository
@@ -24,6 +28,7 @@ export type MinistryEmailDispatchRepository =
 export type MinistryEmailDispatchStatus =
   | "phase5_disabled"
   | "provider_sending_disabled"
+  | "provider_unavailable"
   | "delivery_not_found"
   | "delivery_read_failed"
   | "already_terminal"
@@ -43,7 +48,9 @@ export type MinistryEmailDispatchResult = {
 };
 
 export type DispatchMinistryEmailDeliveryDependencies = {
-  provider: MinistryEmailDeliveryProviderAdapter;
+  provider?: MinistryEmailDeliveryProviderAdapter;
+  resolveProvider?: () =>
+    ResolveMinistryEmailDeliveryProviderResult;
   repository?: MinistryEmailDispatchRepository;
   getFlags?: () => {
     phase5Communications: boolean;
@@ -60,7 +67,8 @@ export type DispatchMinistryEmailDeliveryDependencies = {
  */
 export async function dispatchMinistryEmailDelivery(
   deliveryId: string,
-  dependencies: DispatchMinistryEmailDeliveryDependencies
+  dependencies:
+    DispatchMinistryEmailDeliveryDependencies = {}
 ): Promise<MinistryEmailDispatchResult> {
   const outcome = (
     status: MinistryEmailDispatchStatus,
@@ -73,6 +81,35 @@ export async function dispatchMinistryEmailDelivery(
   if (!flags.phase5Communications) return outcome("phase5_disabled");
   if (!flags.ministryEmailProviderSending) {
     return outcome("provider_sending_disabled");
+  }
+
+  let provider =
+    dependencies.provider;
+
+  if (!provider) {
+    let resolved:
+      ResolveMinistryEmailDeliveryProviderResult;
+
+    try {
+      resolved = (
+        dependencies.resolveProvider ??
+        resolveMinistryEmailDeliveryProvider
+      )();
+    }
+    catch {
+      return outcome(
+        "provider_unavailable"
+      );
+    }
+
+    if (!resolved.ok) {
+      return outcome(
+        "provider_unavailable"
+      );
+    }
+
+    provider =
+      resolved.provider;
   }
 
   const repository =
@@ -130,7 +167,7 @@ export async function dispatchMinistryEmailDelivery(
       claim.delivery,
       {
         send: async request => {
-          const result = await dependencies.provider.send(request);
+          const result = await provider.send(request);
           captured.result = structuredClone(result);
           return result;
         }

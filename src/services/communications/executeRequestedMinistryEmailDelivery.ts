@@ -24,6 +24,7 @@ export async function executeClaimedMinistryEmailDelivery(
 
   const result = await provider.send({
     deliveryId: record.deliveryId,
+    dispatchAttemptId: record.dispatchAttemptId,
     recipientEmail: record.recipientEmail,
     subject: record.subject,
     body: record.body

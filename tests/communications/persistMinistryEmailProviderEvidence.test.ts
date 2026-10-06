@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import {
+  RESEND_DELIVERY_EVIDENCE_EVENT_TYPES
+} from "../../src/contracts/ministryEmailProviderEvidence.v1";
 import type {
   PersistedMinistryEmailProviderEvidenceV1
 } from "../../src/contracts/ministryEmailProviderEvidencePersistence.v1";
@@ -398,19 +401,134 @@ async function run(): Promise<void> {
     );
   }
 
-  for (const provider of [
-    "resend",
-    "ses"
-  ] as const) {
+  for (
+    const eventType of
+    RESEND_DELIVERY_EVIDENCE_EVENT_TYPES
+  ) {
+    const repository =
+      new MemoryRepository();
+
+    const resendInput = {
+      ...input,
+      eventType,
+      evidence: {
+        ...input.evidence,
+        provider: "resend" as const,
+        evidenceId:
+          `resend-${eventType}`
+      }
+    };
+
+    const result =
+      await persistMinistryEmailProviderEvidence(
+        resendInput,
+        repository
+      );
+
+    assert.equal(
+      result.ok,
+      true,
+      `${eventType} must persist`
+    );
+
+    if (!result.ok) {
+      throw new Error(
+        `expected ${eventType} persistence`
+      );
+    }
+
+    assert.equal(
+      result.status,
+      "persisted"
+    );
+
+    assert.equal(
+      result.record.provider,
+      "resend"
+    );
+
+    assert.equal(
+      result.record.eventType,
+      eventType
+    );
+
+    const replay =
+      await persistMinistryEmailProviderEvidence(
+        resendInput,
+        repository
+      );
+
+    assert.equal(
+      replay.ok,
+      true
+    );
+
+    if (!replay.ok) {
+      throw new Error(
+        `expected ${eventType} replay`
+      );
+    }
+
+    assert.equal(
+      replay.status,
+      "replayed"
+    );
+
+    assert.equal(
+      repository.createCalls,
+      1
+    );
+  }
+
+  {
     const repository =
       new MemoryRepository();
 
     const unsupported = {
       ...input,
-      eventType: "delivered",
+      eventType: "email.opened",
       evidence: {
         ...input.evidence,
-        provider
+        provider: "resend" as const
+      }
+    };
+
+    const result =
+      await persistMinistryEmailProviderEvidence(
+        unsupported,
+        repository
+      );
+
+    assert.deepEqual(
+      result,
+      {
+        ok: false,
+        code:
+          "INVALID_PROVIDER_EVIDENCE"
+      }
+    );
+
+    assert.equal(
+      repository.readCalls,
+      0
+    );
+
+    assert.equal(
+      repository.createCalls,
+      0
+    );
+  }
+
+  {
+    const repository =
+      new MemoryRepository();
+
+    const unsupported = {
+      ...input,
+      eventType: "email.delivered",
+      evidence: {
+        ...input.evidence,
+        provider: "ses" as const
       }
     };
 

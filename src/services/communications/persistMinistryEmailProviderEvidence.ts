@@ -2,6 +2,7 @@ import {
   createHash
 } from "node:crypto";
 import {
+  RESEND_DELIVERY_EVIDENCE_EVENT_TYPES,
   SENDGRID_ACCEPTANCE_EVENT_TYPES
 } from "../../contracts/ministryEmailProviderEvidence.v1";
 import {
@@ -118,6 +119,12 @@ function valid(
   if (evidence.provider === "sendgrid") {
     return (
       SENDGRID_ACCEPTANCE_EVENT_TYPES as readonly string[]
+    ).includes(input.eventType);
+  }
+
+  if (evidence.provider === "resend") {
+    return (
+      RESEND_DELIVERY_EVIDENCE_EVENT_TYPES as readonly string[]
     ).includes(input.eventType);
   }
 

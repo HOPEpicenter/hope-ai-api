@@ -191,6 +191,43 @@ async function run(): Promise<void> {
   {
     const repository = new FakeRepository();
 
+    const resend = acceptedInput(
+      "resolution-resend"
+    );
+
+    resend.evidence = {
+      schemaVersion: 1,
+      kind: "provider_accepted",
+      source: "captured_send_response",
+      deliveryId: resend.deliveryId,
+      dispatchAttemptId: resend.dispatchAttemptId,
+      provider: "resend",
+      evidenceId: "resend-evidence-1",
+      observedAt: "2026-10-03T12:02:00.000Z",
+      providerMessageId:
+        "resend-message-1"
+    };
+
+    const result =
+      await resolveMinistryEmailDispatchRecovery(
+        resend,
+        repository
+      );
+
+    assert(result.ok);
+    assert.equal(
+      repository.record?.provider,
+      "resend"
+    );
+    assert.equal(
+      repository.record?.providerMessageId,
+      "resend-message-1"
+    );
+  }
+
+  {
+    const repository = new FakeRepository();
+
     const mismatched = acceptedInput();
     mismatched.evidence = {
       ...mismatched.evidence,

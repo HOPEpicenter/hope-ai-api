@@ -7,6 +7,9 @@ import type {
 import type {
   PersistedMinistryEmailProviderEvidenceV1
 } from "../contracts/ministryEmailProviderEvidencePersistence.v1";
+import type {
+  MinistryEmailDeliveryProvider
+} from "../domain/communications/ministryEmailDeliveryContracts";
 import {
   MINISTRY_EMAIL_DELIVERIES_PARTITION_KEY,
   MINISTRY_EMAIL_DELIVERIES_TABLE_NAME
@@ -26,7 +29,7 @@ type ProviderEvidenceEntity = {
 
 export interface MinistryEmailProviderEvidenceRepository {
   read(
-    provider: "sendgrid",
+    provider: MinistryEmailDeliveryProvider,
     evidenceId: string
   ): Promise<PersistedMinistryEmailProviderEvidenceV1 | null>;
 
@@ -36,7 +39,7 @@ export interface MinistryEmailProviderEvidenceRepository {
 }
 
 function identityHash(
-  provider: "sendgrid",
+  provider: MinistryEmailDeliveryProvider,
   evidenceId: string
 ): string {
   return createHash("sha256")
@@ -48,7 +51,7 @@ function identityHash(
 }
 
 export function ministryEmailProviderEvidenceRowKey(
-  provider: "sendgrid",
+  provider: MinistryEmailDeliveryProvider,
   evidenceId: string
 ): string {
   return `${ROW_PREFIX}${identityHash(
@@ -101,7 +104,7 @@ function isConflict(
 
 function parse(
   entity: ProviderEvidenceEntity,
-  provider: "sendgrid",
+  provider: MinistryEmailDeliveryProvider,
   evidenceId: string
 ): PersistedMinistryEmailProviderEvidenceV1 {
   const record = JSON.parse(
@@ -141,7 +144,7 @@ implements MinistryEmailProviderEvidenceRepository {
   ) {}
 
   async read(
-    provider: "sendgrid",
+    provider: MinistryEmailDeliveryProvider,
     evidenceId: string
   ): Promise<PersistedMinistryEmailProviderEvidenceV1 | null> {
     const table = await this.tableFactory();

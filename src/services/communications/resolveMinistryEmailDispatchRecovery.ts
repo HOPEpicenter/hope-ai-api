@@ -5,6 +5,9 @@ import type {
   ResolveMinistryEmailDispatchRecoveryInputV1,
   ResolveMinistryEmailDispatchRecoveryResultV1
 } from "../../contracts/ministryEmailDispatchRecovery.v1";
+import {
+  isMinistryEmailDeliveryProvider
+} from "../../domain/communications/ministryEmailDeliveryContracts";
 import type {
   MinistryEmailDeliveryRecord
 } from "../../domain/communications/ministryEmailDeliveryContracts";
@@ -87,7 +90,9 @@ function validate(
   if (
     !evidence ||
     evidence.schemaVersion !== 1 ||
-    evidence.provider !== "sendgrid" ||
+    !isMinistryEmailDeliveryProvider(
+      evidence.provider
+    ) ||
     evidence.deliveryId !== input.deliveryId ||
     evidence.dispatchAttemptId !== input.dispatchAttemptId ||
     !text(evidence.evidenceId, 256) ||

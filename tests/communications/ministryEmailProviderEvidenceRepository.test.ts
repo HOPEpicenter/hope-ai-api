@@ -144,6 +144,44 @@ async function run(): Promise<void> {
     1
   );
 
+  const resendRecord:
+  PersistedMinistryEmailProviderEvidenceV1 = {
+    ...record,
+    provider: "resend",
+    eventType: "email.delivered",
+    evidenceFingerprint:
+      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  };
+
+  const resendRowKey =
+    ministryEmailProviderEvidenceRowKey(
+      "resend",
+      resendRecord.evidenceId
+    );
+
+  assert.notEqual(
+    resendRowKey,
+    rowKey
+  );
+
+  assert.equal(
+    await repository.create(resendRecord),
+    true
+  );
+
+  assert.deepEqual(
+    await repository.read(
+      "resend",
+      resendRecord.evidenceId
+    ),
+    resendRecord
+  );
+
+  assert.equal(
+    table.rows.size,
+    2
+  );
+
   console.log(
     "ministryEmailProviderEvidenceRepository.test.ts passed"
   );

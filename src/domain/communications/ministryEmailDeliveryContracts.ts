@@ -11,7 +11,23 @@ export type MinistryEmailDeliveryState =
   | "provider_accepted"
   | "failed";
 
-export type MinistryEmailDeliveryProvider = "sendgrid";
+export const MINISTRY_EMAIL_DELIVERY_PROVIDERS = [
+  "resend",
+  "sendgrid",
+  "ses"
+] as const;
+
+export type MinistryEmailDeliveryProvider =
+  typeof MINISTRY_EMAIL_DELIVERY_PROVIDERS[number];
+
+export function isMinistryEmailDeliveryProvider(
+  value: unknown
+): value is MinistryEmailDeliveryProvider {
+  return typeof value === "string" &&
+    (
+      MINISTRY_EMAIL_DELIVERY_PROVIDERS as readonly string[]
+    ).includes(value);
+}
 
 export type MinistryEmailDeliveryEligibilitySnapshot = {
   phase5Enabled: true;

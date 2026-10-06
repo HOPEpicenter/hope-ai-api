@@ -47,7 +47,7 @@ export type MinistryCommunicationErrorResponseV1 = {
   message: string;
 };
 
-/** Future staff-initiated email request; recipient and authority are backend-derived. */
+/** Staff-initiated email request; recipient and authority are backend-derived. */
 export type RequestMinistryEmailDeliveryV1 = {
   deliveryId: string;
   communicationId: string;

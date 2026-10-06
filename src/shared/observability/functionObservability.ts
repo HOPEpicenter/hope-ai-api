@@ -39,6 +39,29 @@ export function logFunctionError(
   console.error(JSON.stringify(payload));
 }
 
+export function logFunctionInfo(
+  context: any,
+  operation: string,
+  fields: Record<string, unknown> = {}
+): void {
+  const payload = {
+    level: "info",
+    operation,
+    ...fields
+  };
+
+  const serialized = JSON.stringify(payload);
+
+  if (context?.log?.info) {
+    context.log.info(serialized);
+    return;
+  }
+
+  if (typeof context?.log === "function") {
+    context.log(serialized);
+  }
+}
+
 export function apiErrorBody(
   code: string,
   message: string,

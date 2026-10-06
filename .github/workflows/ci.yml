@@ -95,6 +95,9 @@ jobs:
           npx ts-node tests/followups/deriveSixWeekRetentionSummary.test.ts
           npx ts-node tests/communications/evaluateMinistryCommunicationDeliveryEligibility.test.ts
           npx ts-node tests/communications/phase5CommunicationContracts.test.ts
+          npx ts-node tests/communications/requestMinistryEmailDelivery.test.ts
+          npx ts-node tests/communications/postMinistryEmailDeliveryRequest.test.ts
+          npx ts-node tests/communications/postMinistryEmailDeliveryDispatch.test.ts
           npx ts-node tests/communications/claimMinistryEmailDeliveryDispatch.test.ts
           npx ts-node tests/communications/executeRequestedMinistryEmailDelivery.test.ts
           npx ts-node tests/communications/persistMinistryEmailDeliveryProviderResult.test.ts

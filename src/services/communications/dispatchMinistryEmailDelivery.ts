@@ -61,7 +61,8 @@ export type DispatchMinistryEmailDeliveryDependencies = {
 };
 
 /**
- * Internal orchestration only. No endpoint, credentials, retry, claim expiry,
+ * Core dispatch orchestration. HTTP exposure belongs to a separately
+ * authorized boundary. This service owns no credentials, retry, claim expiry,
  * or communication/Six-Week mutation. Only a newly acquired durable claim
  * authorizes one provider invocation.
  */

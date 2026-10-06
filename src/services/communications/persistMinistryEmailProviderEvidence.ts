@@ -4,6 +4,9 @@ import {
 import {
   SENDGRID_ACCEPTANCE_EVENT_TYPES
 } from "../../contracts/ministryEmailProviderEvidence.v1";
+import {
+  isMinistryEmailDeliveryProvider
+} from "../../domain/communications/ministryEmailDeliveryContracts";
 import type {
   PersistMinistryEmailProviderEvidenceInputV1,
   PersistMinistryEmailProviderEvidenceResultV1,
@@ -72,7 +75,7 @@ function buildRecord(
 
   return {
     schemaVersion: 1,
-    provider: "sendgrid",
+    provider: evidence.provider,
     evidenceId: evidence.evidenceId,
     deliveryId: evidence.deliveryId,
     dispatchAttemptId:
@@ -93,20 +96,32 @@ function valid(
 ): boolean {
   const evidence = input?.evidence;
 
-  return Boolean(evidence) &&
-    evidence.schemaVersion === 1 &&
-    evidence.provider === "sendgrid" &&
-    evidence.kind === "provider_accepted" &&
-    evidence.source ===
-      "verified_provider_event" &&
-    text(evidence.evidenceId, 256) &&
-    text(evidence.deliveryId, 256) &&
-    text(evidence.dispatchAttemptId, 128) &&
-    text(evidence.providerMessageId, 512) &&
-    isIso(evidence.observedAt) &&
-    SENDGRID_ACCEPTANCE_EVENT_TYPES.includes(
-      input.eventType
-    );
+  if (
+    !evidence ||
+    evidence.schemaVersion !== 1 ||
+    !isMinistryEmailDeliveryProvider(
+      evidence.provider
+    ) ||
+    evidence.kind !== "provider_accepted" ||
+    evidence.source !==
+      "verified_provider_event" ||
+    !text(evidence.evidenceId, 256) ||
+    !text(evidence.deliveryId, 256) ||
+    !text(evidence.dispatchAttemptId, 128) ||
+    !text(evidence.providerMessageId, 512) ||
+    !text(input.eventType, 128) ||
+    !isIso(evidence.observedAt)
+  ) {
+    return false;
+  }
+
+  if (evidence.provider === "sendgrid") {
+    return (
+      SENDGRID_ACCEPTANCE_EVENT_TYPES as readonly string[]
+    ).includes(input.eventType);
+  }
+
+  return false;
 }
 
 function sameRecord(

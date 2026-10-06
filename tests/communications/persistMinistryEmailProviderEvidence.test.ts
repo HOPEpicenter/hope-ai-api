@@ -3,6 +3,9 @@ import type {
   PersistedMinistryEmailProviderEvidenceV1
 } from "../../src/contracts/ministryEmailProviderEvidencePersistence.v1";
 import type {
+  MinistryEmailDeliveryProvider
+} from "../../src/domain/communications/ministryEmailDeliveryContracts";
+import type {
   MinistryEmailProviderEvidenceRepository
 } from "../../src/repositories/ministryEmailProviderEvidenceRepository";
 import {
@@ -39,14 +42,14 @@ implements MinistryEmailProviderEvidenceRepository {
   throwOnRead = false;
 
   key(
-    provider: "sendgrid",
+    provider: MinistryEmailDeliveryProvider,
     evidenceId: string
   ): string {
     return `${provider}:${evidenceId}`;
   }
 
   async read(
-    provider: "sendgrid",
+    provider: MinistryEmailDeliveryProvider,
     evidenceId: string
   ): Promise<PersistedMinistryEmailProviderEvidenceV1 | null> {
     this.readCalls += 1;
@@ -372,6 +375,48 @@ async function run(): Promise<void> {
     const result =
       await persistMinistryEmailProviderEvidence(
         invalid,
+        repository
+      );
+
+    assert.deepEqual(
+      result,
+      {
+        ok: false,
+        code:
+          "INVALID_PROVIDER_EVIDENCE"
+      }
+    );
+
+    assert.equal(
+      repository.readCalls,
+      0
+    );
+
+    assert.equal(
+      repository.createCalls,
+      0
+    );
+  }
+
+  for (const provider of [
+    "resend",
+    "ses"
+  ] as const) {
+    const repository =
+      new MemoryRepository();
+
+    const unsupported = {
+      ...input,
+      eventType: "delivered",
+      evidence: {
+        ...input.evidence,
+        provider
+      }
+    };
+
+    const result =
+      await persistMinistryEmailProviderEvidence(
+        unsupported,
         repository
       );
 

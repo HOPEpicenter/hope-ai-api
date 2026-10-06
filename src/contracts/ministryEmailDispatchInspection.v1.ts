@@ -1,4 +1,7 @@
-import type { MinistryEmailDeliveryState } from "../domain/communications/ministryEmailDeliveryContracts";
+import type {
+  MinistryEmailDeliveryProvider,
+  MinistryEmailDeliveryState
+} from "../domain/communications/ministryEmailDeliveryContracts";
 
 /** Internal inspection contract; no HTTP route or recovery authority. */
 export type MinistryEmailDispatchInspectionV1 = {
@@ -10,7 +13,7 @@ export type MinistryEmailDispatchInspectionV1 = {
   dispatchClaimedAt: string | null;
   /** Informational only. Age never grants retry or reclaim authority. */
   claimAgeSeconds: number | null;
-  provider: "sendgrid" | null;
+  provider: MinistryEmailDeliveryProvider | null;
   providerMessageId: string | null;
   providerAcceptedAt: string | null;
   failedAt: string | null;

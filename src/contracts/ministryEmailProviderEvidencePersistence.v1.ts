@@ -2,12 +2,12 @@ import type {
   MinistryEmailDispatchRecoveryEvidence
 } from "./ministryEmailDispatchRecovery.v1";
 import type {
-  SendGridAcceptanceEventType
-} from "./ministryEmailProviderEvidence.v1";
+  MinistryEmailDeliveryProvider
+} from "../domain/communications/ministryEmailDeliveryContracts";
 
 export type PersistedMinistryEmailProviderEvidenceV1 = {
   schemaVersion: 1;
-  provider: "sendgrid";
+  provider: MinistryEmailDeliveryProvider;
   evidenceId: string;
   deliveryId: string;
   dispatchAttemptId: string;
@@ -15,12 +15,12 @@ export type PersistedMinistryEmailProviderEvidenceV1 = {
   source: "verified_provider_event";
   observedAt: string;
   providerMessageId: string;
-  eventType: SendGridAcceptanceEventType;
+  eventType: string;
   evidenceFingerprint: string;
 };
 
 export type PersistMinistryEmailProviderEvidenceInputV1 = {
-  eventType: SendGridAcceptanceEventType;
+  eventType: string;
   evidence: Extract<
     MinistryEmailDispatchRecoveryEvidence,
     {

@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import {
+  isMinistryEmailDeliveryProvider,
+  MINISTRY_EMAIL_DELIVERY_PROVIDERS,
   MINISTRY_EMAIL_DELIVERY_SCHEMA_VERSION,
   type MinistryEmailDeliveryEligibilitySnapshot,
+  type MinistryEmailDeliveryProvider,
   type MinistryEmailDeliveryRecord,
   type MinistryEmailDeliveryState
 } from "../../src/domain/communications/ministryEmailDeliveryContracts";
@@ -21,6 +24,11 @@ type FinalDeliveryIsNotClaimed = AssertFalse<
 type RequestDoesNotChooseRecipient = AssertFalse<
   "recipientEmail" extends keyof RequestMinistryEmailDeliveryV1 ? true : false
 >;
+
+const supportedProviders:
+  MinistryEmailDeliveryProvider[] = [
+    "resend", "sendgrid", "ses"
+  ];
 
 const eligibility: MinistryEmailDeliveryEligibilitySnapshot = {
   phase5Enabled: true,
@@ -66,6 +74,22 @@ assert.equal("leaseExpiresAt" in requested, false);
 assert.equal("retryAfter" in requested, false);
 assert.equal(requested.providerAcceptedAt, null);
 assert.equal(requested.providerMessageId, null);
+assert.deepEqual(
+  MINISTRY_EMAIL_DELIVERY_PROVIDERS,
+  supportedProviders
+);
+assert.deepEqual(supportedProviders, [
+  "resend", "sendgrid", "ses"
+]);
+
+for (const provider of supportedProviders) {
+  assert.equal(
+    isMinistryEmailDeliveryProvider(provider),
+    true
+  );
+}
+assert.equal(isMinistryEmailDeliveryProvider("mailgun"), false);
+assert.equal(isMinistryEmailDeliveryProvider(null), false);
 
 const accepted: MinistryEmailDeliveryRecord = {
   ...requested,

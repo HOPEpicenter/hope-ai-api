@@ -48,6 +48,16 @@ const failed: MinistryEmailDeliveryRecord = {
   failedAt: "2026-10-03T12:02:00.000Z",
   failureCode: "PRIVATE_FAILURE_TEXT"
 };
+const resendAccepted: MinistryEmailDeliveryRecord = {
+  ...accepted,
+  provider: "resend",
+  providerMessageId: "resend-message-1"
+};
+const sesFailed: MinistryEmailDeliveryRecord = {
+  ...failed,
+  provider: "ses",
+  failureCode: "ses_known_rejection"
+};
 
 async function inspect(record: MinistryEmailDeliveryRecord | null) {
   let reads = 0;
@@ -77,7 +87,14 @@ async function inspect(record: MinistryEmailDeliveryRecord | null) {
 }
 
 async function run(): Promise<void> {
-  for (const record of [requested, dispatching, accepted, failed]) {
+  for (const record of [
+    requested,
+    dispatching,
+    accepted,
+    failed,
+    resendAccepted,
+    sesFailed
+  ]) {
     const result = await inspect(structuredClone(record));
     assert(result.ok);
     assert.equal(result.inspection.state, record.state);
@@ -125,6 +142,16 @@ async function run(): Promise<void> {
   assert.deepEqual(await inspect({
     ...failed, failureCode: ""
   }), { ok: false, code: "INVALID_DELIVERY_RECORD" });
+  assert.deepEqual(
+    await inspect({
+      ...accepted,
+      provider: "mailgun"
+    } as unknown as MinistryEmailDeliveryRecord),
+    {
+      ok: false,
+      code: "INVALID_DELIVERY_RECORD"
+    }
+  );
 
   const oldClaim = await inspect({
     ...dispatching, dispatchClaimedAt: "2020-01-01T00:00:00.000Z"

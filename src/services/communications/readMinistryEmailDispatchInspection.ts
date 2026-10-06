@@ -1,4 +1,7 @@
 import type { ReadMinistryEmailDispatchInspectionResultV1 } from "../../contracts/ministryEmailDispatchInspection.v1";
+import {
+  isMinistryEmailDeliveryProvider
+} from "../../domain/communications/ministryEmailDeliveryContracts";
 import { MinistryEmailDeliveriesRepository } from "../../repositories/ministryEmailDeliveriesRepository";
 
 export type MinistryEmailDispatchInspectionRepository = Pick<
@@ -87,13 +90,15 @@ export async function readMinistryEmailDispatchInspection(
     if (!isText(attemptId) || !isIso(claimedAt)) return invalid();
     if (state === "dispatching" && !cleanProvider) return invalid();
     if (state === "provider_accepted" &&
-        (record.provider !== "sendgrid" || !isText(record.providerMessageId) ||
+        (!isMinistryEmailDeliveryProvider(record.provider) ||
+         !isText(record.providerMessageId) ||
          !isIso(record.providerAcceptedAt) || record.failedAt !== null ||
          record.failureCode !== null)) {
       return invalid();
     }
     if (state === "failed" &&
-        (record.provider !== "sendgrid" || !isIso(record.failedAt) ||
+        (!isMinistryEmailDeliveryProvider(record.provider) ||
+         !isIso(record.failedAt) ||
          !isText(record.failureCode) || record.providerMessageId !== null ||
          record.providerAcceptedAt !== null)) {
       return invalid();
@@ -118,7 +123,9 @@ export async function readMinistryEmailDispatchInspection(
       dispatchAttemptId: isText(attemptId) ? attemptId : null,
       dispatchClaimedAt: isIso(claimedAt) ? claimedAt : null,
       claimAgeSeconds,
-      provider: record.provider === "sendgrid" ? "sendgrid" : null,
+      provider:
+        isMinistryEmailDeliveryProvider(record.provider)
+          ? record.provider : null,
       providerMessageId: isText(record.providerMessageId)
         ? record.providerMessageId : null,
       providerAcceptedAt: isIso(record.providerAcceptedAt)

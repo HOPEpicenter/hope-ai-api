@@ -17,6 +17,8 @@ export type MinistryEmailDispatchInspectionV1 = {
   providerMessageId: string | null;
   providerAcceptedAt: string | null;
   failedAt: string | null;
+  /** Only the void time is exposed; actor and reason remain private. */
+  voidedAt?: string | null;
   assessment: "not_claimed" | "execution_unresolved" | "terminal_recorded";
   reconciliationRequired: boolean;
   /** Inspection never authorizes a send, including for requested records. */

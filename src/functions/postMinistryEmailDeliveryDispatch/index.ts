@@ -61,6 +61,13 @@ function failureDescriptor(
         message: "Ministry email delivery not found"
       };
 
+    case "delivery_voided":
+      return {
+        status: 409,
+        code: "MINISTRY_EMAIL_DELIVERY_VOIDED",
+        message: "Ministry email delivery has been voided"
+      };
+
     case "recipient_not_allowed":
       return {
         status: 409,

@@ -71,7 +71,8 @@ export async function readMinistryEmailDispatchInspection(
 
   const state = record.state;
   if (state !== "requested" && state !== "dispatching" &&
-      state !== "provider_accepted" && state !== "failed") {
+      state !== "provider_accepted" && state !== "failed" &&
+      state !== "voided") {
     return invalid();
   }
 
@@ -82,7 +83,13 @@ export async function readMinistryEmailDispatchInspection(
     record.providerMessageId === null && record.providerAcceptedAt === null &&
     record.failedAt === null && record.failureCode === null;
 
-  if (state === "requested") {
+  if (state === "voided") {
+    if (attemptId !== null || claimedAt !== null || !cleanProvider ||
+        !isIso(record.voidedAt) || !isText(record.voidedBy) ||
+        !isText(record.voidReason)) {
+      return invalid();
+    }
+  } else if (state === "requested") {
     if (attemptId !== null || claimedAt !== null || !cleanProvider) {
       return invalid();
     }
@@ -131,6 +138,7 @@ export async function readMinistryEmailDispatchInspection(
       providerAcceptedAt: isIso(record.providerAcceptedAt)
         ? record.providerAcceptedAt : null,
       failedAt: isIso(record.failedAt) ? record.failedAt : null,
+      ...(state === "voided" ? { voidedAt: record.voidedAt as string } : {}),
       assessment: state === "requested" ? "not_claimed"
         : state === "dispatching" ? "execution_unresolved" : "terminal_recorded",
       reconciliationRequired: state === "dispatching",

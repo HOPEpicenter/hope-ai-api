@@ -108,6 +108,11 @@ jobs:
           npx ts-node tests/communications/ministryEmailDispatchRecoveryRepository.test.ts
           npx ts-node tests/communications/resolveMinistryEmailDispatchRecovery.test.ts
           npx ts-node tests/communications/postMinistryEmailDispatchRecovery.test.ts
+          npx ts-node tests/communications/voidMinistryEmailDelivery.test.ts
+          npx ts-node tests/communications/postMinistryEmailDeliveryVoid.test.ts
+          npx ts-node tests/communications/dispatchMinistryEmailDeliveryVoided.test.ts
+          npx ts-node tests/communications/readMinistryEmailDispatchInspectionVoided.test.ts
+          npx ts-node tests/communications/ministryEmailDeliveryVoidContract.test.ts
           npx ts-node tests/communications/normalizeSendGridProviderEvent.test.ts
           npx ts-node tests/communications/ministryEmailProviderEvidenceRepository.test.ts
           npx ts-node tests/communications/persistMinistryEmailProviderEvidence.test.ts

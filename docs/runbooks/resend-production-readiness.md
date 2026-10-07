@@ -135,3 +135,75 @@ Production sending begins only after an explicit approval to enable both
 
 The `all` recipient policy requires separate explicit approval and must not be
 introduced as part of the first-production acceptance window.
+
+
+## Production acceptance checkpoint — 2026-10-07
+
+The first controlled production Resend acceptance completed successfully.
+
+The durable delivery reached `provider_accepted` with exactly one dispatch
+attempt and no reconciliation requirement. Signed Resend evidence was
+persisted for both `email.sent` and `email.delivered`, correlated to the
+same delivery and dispatch attempt.
+
+The send did not create a `MinistryCommunicationOutcome` and did not mutate
+Six-Week follow-up events.
+
+After the acceptance window, production returned to:
+
+- `FEATURE_MINISTRY_EMAIL_PROVIDER_SENDING=false`;
+- `FEATURE_PHASE5_COMMUNICATIONS=false`;
+- `MINISTRY_EMAIL_RECIPIENT_POLICY=deny_all`;
+- an empty recipient allowlist;
+- dispatch recovery false or absent.
+
+The detailed acceptance record is:
+
+`docs/runbooks/resend-production-acceptance-2026-10-07.md`
+
+This checkpoint proves the guarded production path. It does not authorize
+routine or unrestricted ministry-email sending.
+
+## Flex Consumption propagation safeguard
+
+App-setting readback from ARM does not by itself prove that every live Flex
+Consumption worker has consumed the new setting.
+
+Controlled production testing observed requests reaching different worker
+generations during both activation and rollback. Therefore:
+
+- do not treat one successful live probe as convergence;
+- require a sustained consecutive-success window before any approved write or
+  dispatch;
+- reset the success streak whenever a worker reports the previous feature-flag
+  state;
+- perform the same sustained proof after rollback;
+- do not enable provider sending while merely testing Phase-5 propagation.
+
+The first controlled production send used twenty consecutive live
+Phase-5-enabled reads before the single dispatch.
+
+## Limited production rollout after first acceptance
+
+First-production acceptance is complete, but the next stage remains a limited
+pilot rather than unrestricted sending.
+
+Until a separate rollout decision is approved:
+
+1. use exact-address allowlists for explicitly approved recipients only;
+2. revalidate consent, email preference, communication eligibility, recipient
+   policy, and delivery state immediately before dispatch;
+3. dispatch only the exact approved delivery;
+4. never automatically retry after a durable claim, ambiguous provider
+   execution, transport ambiguity, or `dispatching` state;
+5. use canonical dispatch inspection and evidence-backed reconciliation when
+   execution is uncertain;
+6. keep provider acceptance separate from recipient-delivery evidence;
+7. preserve delivery records, dispatch claims, and provider evidence;
+8. verify provider activity does not mutate MinistryCommunicationOutcome or
+   Six-Week state;
+9. return production to fail-closed settings after the approved window unless
+   a continuing limited allowlist is separately authorized.
+
+`MINISTRY_EMAIL_RECIPIENT_POLICY=all` remains unauthorized until a separate
+explicit production decision.

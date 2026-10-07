@@ -207,3 +207,15 @@ Until a separate rollout decision is approved:
 
 `MINISTRY_EMAIL_RECIPIENT_POLICY=all` remains unauthorized until a separate
 explicit production decision.
+
+
+## Limited production pilot runbook
+
+The post-acceptance controlled pilot is governed by:
+
+`docs/runbooks/ministry-email-limited-production-pilot.md`
+
+That runbook defines the approved cohort size, one-delivery-at-a-time dispatch
+rule, sustained Flex Consumption convergence checks, signed evidence
+requirements, immediate stop conditions, mandatory rollback, and the criteria
+that must be met before any proposal for wider rollout.

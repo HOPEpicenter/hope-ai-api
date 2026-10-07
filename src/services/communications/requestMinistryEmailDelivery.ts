@@ -12,6 +12,9 @@ import type { SixWeekFollowupEventsRepository } from "../../repositories/sixWeek
 import { SixWeekFollowupEventsRepository as DefaultSixWeekRepository } from "../../repositories/sixWeekFollowupEventsRepository";
 import { getFeatureFlags } from "../../config/featureFlags";
 import {
+  isMinistryEmailRecipientAllowed
+} from "../../config/ministryEmailRecipientPolicy";
+import {
   getVisitorById,
   type FunctionVisitor
 } from "../../functions/_shared/visitorsRepository";
@@ -45,6 +48,7 @@ export type RequestMinistryEmailDeliveryDependencies = {
   deliveriesRepository?: DeliveryRepository;
   readActor?: (staffId: string) => Promise<StaffIdentity | null>;
   getVisitor?: VisitorReader;
+  recipientAllowed?: (recipientEmail: string) => boolean;
   now?: () => string;
 };
 
@@ -174,6 +178,13 @@ export async function requestMinistryEmailDelivery(
   const recipientEmail = text(visitor.email).toLowerCase();
   if (!recipientEmail) {
     return conflict("CANONICAL_VISITOR_EMAIL_UNAVAILABLE");
+  }
+
+  const recipientAllowed =
+    dependencies.recipientAllowed ??
+    isMinistryEmailRecipientAllowed;
+  if (!recipientAllowed(recipientEmail)) {
+    return conflict("MINISTRY_EMAIL_RECIPIENT_NOT_ALLOWED");
   }
 
   const deliveryRepository = deliveriesRepositoryFor(dependencies);

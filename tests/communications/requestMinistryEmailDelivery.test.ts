@@ -20,6 +20,7 @@ type SetupOptions = {
   visitor?: { visitorId: string; name: string; email?: string; createdAt: string; updatedAt: string } | null;
   phase5Enabled?: boolean;
   preferenceState?: "granted" | "denied" | "unknown" | null;
+  recipientAllowed?: (recipientEmail: string) => boolean;
 };
 
 function intentEvent(overrides: {
@@ -147,6 +148,8 @@ function setupDependencies(
           createdAt: "2026-01-01T00:00:00.000Z",
           updatedAt: "2026-01-01T00:00:00.000Z"
         },
+    recipientAllowed:
+      options.recipientAllowed ?? (() => true),
     communicationRepository: {
       listByVisitor: async id => communicationEvents.filter(event => event.visitorId === id)
     },
@@ -267,6 +270,28 @@ async function run(): Promise<void> {
   const disabledResult = await requestMinistryEmailDelivery(featureDisabled.input, featureDisabled.dependencies);
   assert.equal(disabledResult.accepted, false);
   if (!disabledResult.accepted) assert.equal(disabledResult.status, 503);
+
+  let checkedRecipient = "";
+  const recipientBlocked = setup({
+    recipientAllowed: recipient => {
+      checkedRecipient = recipient;
+      return false;
+    }
+  });
+  const recipientBlockedResult = await requestMinistryEmailDelivery(
+    recipientBlocked.input,
+    recipientBlocked.dependencies
+  );
+  assert.equal(recipientBlockedResult.accepted, false);
+  if (!recipientBlockedResult.accepted) {
+    assert.equal(recipientBlockedResult.status, 409);
+    assert.equal(
+      recipientBlockedResult.error,
+      "MINISTRY_EMAIL_RECIPIENT_NOT_ALLOWED"
+    );
+  }
+  assert.equal(checkedRecipient, "canonical@example.org");
+  assert.equal(recipientBlocked.stored.size, 0);
 
   const valid = setup({
     events: intentEvent({ relatedFollowupPlanId: "six-week-followup:visitor-1" })

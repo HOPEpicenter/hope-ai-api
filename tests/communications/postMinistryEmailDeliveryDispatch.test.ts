@@ -280,6 +280,11 @@ async function run(): Promise<void> {
       code: "MINISTRY_EMAIL_DELIVERY_NOT_FOUND"
     },
     {
+      value: result("recipient_not_allowed"),
+      status: 409,
+      code: "MINISTRY_EMAIL_RECIPIENT_NOT_ALLOWED"
+    },
+    {
       value: result("delivery_read_failed"),
       status: 503,
       code: "MINISTRY_EMAIL_DELIVERY_READ_UNAVAILABLE"

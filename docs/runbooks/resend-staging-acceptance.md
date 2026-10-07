@@ -195,3 +195,9 @@ Production requires a separate review of:
 - observability and audit evidence;
 - rollback procedure;
 - explicit production activation approval.
+
+Before any production activation, follow:
+
+`docs/runbooks/resend-production-readiness.md`
+
+The initial production rollout must use `MINISTRY_EMAIL_RECIPIENT_POLICY=allowlist` with exact approved recipient addresses. Staging acceptance does not authorize the `all` recipient policy.

@@ -102,6 +102,7 @@ function fixture() {
       phase5Communications: true,
       ministryEmailProviderSending: true
     }),
+    recipientAllowed: () => true,
     createDispatchAttemptId: () => "attempt-1",
     now: () => timestamp
   };
@@ -124,6 +125,19 @@ async function run(): Promise<void> {
     assert.equal(f.repository.claims, 0);
     assert.equal(f.provider.calls, 0);
     assert.deepEqual(f.repository.current, requested);
+  }
+
+  {
+    const blocked = fixture();
+    blocked.dependencies.recipientAllowed = () => false;
+
+    const result = await blocked.dispatch();
+
+    assert.equal(result.status, "recipient_not_allowed");
+    assert.equal(blocked.repository.reads, 1);
+    assert.equal(blocked.repository.claims, 0);
+    assert.equal(blocked.provider.calls, 0);
+    assert.deepEqual(blocked.repository.current, requested);
   }
 
   {
@@ -311,6 +325,8 @@ async function run(): Promise<void> {
                 resolvedProvider
             };
           },
+          recipientAllowed:
+            () => true,
           createDispatchAttemptId:
             () => "attempt-resolved-1",
           now:

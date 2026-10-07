@@ -61,6 +61,13 @@ function failureDescriptor(
         message: "Ministry email delivery not found"
       };
 
+    case "recipient_not_allowed":
+      return {
+        status: 409,
+        code: "MINISTRY_EMAIL_RECIPIENT_NOT_ALLOWED",
+        message: "Ministry email recipient is not allowed"
+      };
+
     case "delivery_read_failed":
       return {
         status: 503,

@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { getFeatureFlags } from "../../config/featureFlags";
+import {
+  isMinistryEmailRecipientAllowed
+} from "../../config/ministryEmailRecipientPolicy";
 import { MinistryEmailDeliveriesRepository } from "../../repositories/ministryEmailDeliveriesRepository";
 import {
   claimMinistryEmailDeliveryDispatch,
@@ -30,6 +33,7 @@ export type MinistryEmailDispatchStatus =
   | "provider_sending_disabled"
   | "provider_unavailable"
   | "delivery_not_found"
+  | "recipient_not_allowed"
   | "delivery_read_failed"
   | "already_terminal"
   | "already_dispatching_reconciliation_required"
@@ -56,6 +60,7 @@ export type DispatchMinistryEmailDeliveryDependencies = {
     phase5Communications: boolean;
     ministryEmailProviderSending: boolean;
   };
+  recipientAllowed?: (recipientEmail: string) => boolean;
   createDispatchAttemptId?: () => string;
   now?: () => string;
 };
@@ -131,6 +136,15 @@ export async function dispatchMinistryEmailDelivery(
   if (existing.record.state === "provider_accepted" ||
       existing.record.state === "failed") {
     return outcome("already_terminal");
+  }
+
+  const recipientAllowed =
+    dependencies.recipientAllowed ??
+    isMinistryEmailRecipientAllowed;
+  if (!recipientAllowed(
+    existing.record.recipientEmail
+  )) {
+    return outcome("recipient_not_allowed");
   }
 
   const now = dependencies.now ?? (() => new Date().toISOString());

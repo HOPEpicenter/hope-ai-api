@@ -178,6 +178,51 @@ function Assert-SecretPresent {
   Write-Host "[PASS] $Name is configured; value not printed."
 }
 
+function Assert-ActivatedRecipientAllowlist {
+  param(
+    [Parameter(Mandatory=$true)]
+    [hashtable] $Settings
+  )
+
+  Assert-SettingEquals `
+    -Settings $Settings `
+    -Name "MINISTRY_EMAIL_RECIPIENT_POLICY" `
+    -Expected "allowlist"
+
+  $value = Get-AppSetting `
+    -Settings $Settings `
+    -Name "MINISTRY_EMAIL_ALLOWED_RECIPIENTS"
+
+  if ([string]::IsNullOrWhiteSpace($value)) {
+    throw "MINISTRY_EMAIL_ALLOWED_RECIPIENTS is required for Activated state."
+  }
+
+  $entries = @(
+    $value.Split(",") |
+      ForEach-Object {
+        $_.Trim().ToLowerInvariant()
+      } |
+      Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_)
+      }
+  )
+
+  if ($entries.Count -lt 1) {
+    throw "Activated recipient allowlist must contain at least one exact address."
+  }
+
+  foreach ($entry in $entries) {
+    if (
+      $entry.Contains("*") -or
+      $entry -notmatch '^[^@\s,]+@[^@\s,]+$'
+    ) {
+      throw "Activated recipient allowlist contains an invalid or non-exact entry."
+    }
+  }
+
+  Write-Host "[PASS] Activated recipient policy is exact-address allowlist; values not printed."
+}
+
 Write-Host "=== RESEND STAGING READINESS ==="
 Write-Host "Expected state: $ExpectedState"
 Write-Host "Function App  : $FunctionAppName"
@@ -355,6 +400,9 @@ switch ($ExpectedState) {
     }
 
     Write-Host "[PASS] RESEND_FROM uses the staging sending domain; value not printed."
+
+    Assert-ActivatedRecipientAllowlist `
+      -Settings $settings
   }
 }
 

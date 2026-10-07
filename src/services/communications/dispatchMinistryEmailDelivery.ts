@@ -36,6 +36,7 @@ export type MinistryEmailDispatchStatus =
   | "recipient_not_allowed"
   | "delivery_read_failed"
   | "already_terminal"
+  | "delivery_voided"
   | "already_dispatching_reconciliation_required"
   | "claim_conflict"
   | "claim_persistence_uncertain"
@@ -130,6 +131,7 @@ export async function dispatchMinistryEmailDelivery(
   if (existing.record.deliveryId !== deliveryId) {
     return outcome("claim_conflict");
   }
+  if (existing.record.state === "voided") return outcome("delivery_voided");
   if (existing.record.state === "dispatching") {
     return outcome("already_dispatching_reconciliation_required", true);
   }

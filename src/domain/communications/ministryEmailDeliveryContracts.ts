@@ -9,7 +9,9 @@ export type MinistryEmailDeliveryState =
   | "requested"
   | "dispatching"
   | "provider_accepted"
-  | "failed";
+  | "failed"
+  /** Permanent administrative quarantine; never dispatchable or retryable. */
+  | "voided";
 
 export const MINISTRY_EMAIL_DELIVERY_PROVIDERS = [
   "resend",
@@ -62,4 +64,11 @@ export type MinistryEmailDeliveryRecord = {
   failedAt: string | null;
   /** Provider failures are delivery state, not MinistryCommunicationOutcome values. */
   failureCode: string | null;
+  /**
+   * Void audit metadata. Optional so existing schema-version-1 records remain
+   * valid; present only on voided records.
+   */
+  voidedAt?: string | null;
+  voidedBy?: string | null;
+  voidReason?: string | null;
 };

@@ -1,0 +1,21 @@
+{
+  "bindings": [
+    {
+      "authLevel": "anonymous",
+      "type": "httpTrigger",
+      "direction": "in",
+      "name": "req",
+      "methods": [
+        "post"
+      ],
+      "route": "ministry-email-deliveries/{deliveryId}/void"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ],
+  "scriptFile": "../dist/functions/postMinistryEmailDeliveryVoid/index.js",
+  "entryPoint": "postMinistryEmailDeliveryVoid"
+}

@@ -240,6 +240,26 @@ appears `requested`, do not automatically rerun the dispatch.
 Stop the window and investigate the original request outcome, worker state, and
 canonical evidence before any new action.
 
+## Invalid-content quarantine
+
+If the exact-content preflight fails before any claim or provider execution:
+
+- do not dispatch the delivery;
+- do not delete or manually rewrite the stored delivery;
+- canonically void the requested, unclaimed delivery through the authorized
+  void boundary, `POST /api/ministry-email-deliveries/{deliveryId}/void` with a
+  JSON body `{ "reason": "..." }` (1-240 characters, administrator only; the
+  authenticated administrator is recorded as the voiding actor);
+- verify dispatch inspection reports `state=voided`,
+  `assessment=terminal_recorded`, `reconciliationRequired=false` and
+  `resendAuthorized=false`;
+- create any corrected message using a NEW `deliveryId`;
+- repeat the exact-content preflight before approval.
+
+A voided delivery remains permanent audit evidence. It is never retryable,
+never dispatchable, and is not resurrected to `requested`. Only deliveries that
+are still `requested` with no claim or provider result can be voided; a
+`dispatching`, `provider_accepted` or `failed` delivery is rejected.
 ## Provider evidence
 
 Provider evidence must be authenticated and correlated to:

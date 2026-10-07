@@ -232,6 +232,61 @@ export class MinistryEmailDeliveriesRepository {
     return this.replaceWithVersion(nextRecord, expectedVersion);
   }
 
+  /**
+   * Quarantines a requested, never-claimed delivery. Only the void audit
+   * metadata may differ from the current canonical record.
+   */
+  async voidIfVersion(
+    nextRecord: MinistryEmailDeliveryRecord,
+    expectedVersion: string
+  ): Promise<boolean> {
+    if (!expectedVersion.trim()) return false;
+
+    const table = await this.tableFactory(MINISTRY_EMAIL_DELIVERIES_TABLE_NAME);
+    let currentEntity: MinistryEmailDeliveryEntity;
+    try {
+      currentEntity = await table.getEntity(
+        DELIVERY_ID_PARTITION_KEY,
+        nextRecord.deliveryId
+      );
+    } catch (error) {
+      if (isNotFound(error)) return false;
+      throw error;
+    }
+
+    if (currentEntity.etag !== expectedVersion) return false;
+    const currentRecord = fromEntity(currentEntity);
+    if (
+      currentRecord.state !== "requested" ||
+      nextRecord.state !== "voided" ||
+      currentRecord.dispatchAttemptId !== null ||
+      currentRecord.dispatchClaimedAt !== null ||
+      currentRecord.provider !== null ||
+      currentRecord.providerMessageId !== null ||
+      currentRecord.providerAcceptedAt !== null ||
+      currentRecord.failedAt !== null ||
+      currentRecord.failureCode !== null ||
+      (currentRecord.voidedAt ?? null) !== null ||
+      (currentRecord.voidedBy ?? null) !== null ||
+      (currentRecord.voidReason ?? null) !== null ||
+      nextRecord.dispatchAttemptId !== null ||
+      nextRecord.dispatchClaimedAt !== null ||
+      nextRecord.provider !== null ||
+      nextRecord.providerMessageId !== null ||
+      nextRecord.providerAcceptedAt !== null ||
+      nextRecord.failedAt !== null ||
+      nextRecord.failureCode !== null ||
+      !nextRecord.voidedAt?.trim() ||
+      !nextRecord.voidedBy?.trim() ||
+      !nextRecord.voidReason?.trim() ||
+      !sameRequest(currentRecord, nextRecord)
+    ) {
+      return false;
+    }
+
+    return this.replaceWithVersion(nextRecord, expectedVersion);
+  }
+
   private async replaceWithVersion(
     nextRecord: MinistryEmailDeliveryRecord,
     expectedVersion: string

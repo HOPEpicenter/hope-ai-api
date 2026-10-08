@@ -1,5 +1,8 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
+  resolveSixWeekActorAuthorization
+} from "../_shared/sixWeekStaffActor";
+import {
   startSixWeekVisitorFollowup
 } from "../../services/followups/sixWeekVisitorFollowupCommands";
 import {
@@ -8,9 +11,15 @@ import {
   logFunctionError
 } from "../../shared/observability/functionObservability";
 
+type SixWeekStartHttpDependencies = {
+  resolveActor?: typeof resolveSixWeekActorAuthorization;
+  startFollowup?: typeof startSixWeekVisitorFollowup;
+};
+
 export async function postSixWeekVisitorFollowup(
   context: any,
-  req: any
+  req: any,
+  dependencies: SixWeekStartHttpDependencies = {}
 ): Promise<void> {
   const requestId = getRequestId(req);
 
@@ -26,14 +35,25 @@ export async function postSixWeekVisitorFollowup(
       return;
     }
 
+    const actorAuth = await (dependencies.resolveActor ?? resolveSixWeekActorAuthorization)(req);
+
+    if (!actorAuth.ok) {
+      context.res = {
+        status: actorAuth.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: actorAuth.body
+      };
+      return;
+    }
+
     const body = req?.body ?? {};
-    const result = await startSixWeekVisitorFollowup({
+    const result = await (dependencies.startFollowup ?? startSixWeekVisitorFollowup)({
       visitorId: req?.params?.visitorId,
       firstVisitDate: body.firstVisitDate,
       ownerStaffId: body.ownerStaffId,
       contactConsent: body.contactConsent,
       preferredContactMethod: body.preferredContactMethod,
-      actorId: body.actorId
+      actorId: actorAuth.actorId
     });
 
     context.res = {

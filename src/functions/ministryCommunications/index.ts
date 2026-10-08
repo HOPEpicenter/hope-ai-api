@@ -1,4 +1,4 @@
-import { getFeatureFlags } from "../../config/featureFlags";
+import { isMinistryCommunicationLedgerEnabled } from "../../config/featureFlags";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { requireMinistryCommunicationStaffActor } from "../_shared/ministryCommunicationStaffActor";
 import {
@@ -25,7 +25,7 @@ export async function ministryCommunications(context: any, req: any): Promise<vo
   try {
     const auth = requireApiKeyForFunction(req);
     if (!auth.ok) { context.res = { status: auth.status, headers, body: auth.body }; return; }
-    if (!getFeatureFlags().phase5Communications) {
+    if (!isMinistryCommunicationLedgerEnabled()) {
       context.res = { status: 404, headers, body: { ok: false, requestId, code: "MINISTRY_COMMUNICATION_DISABLED", error: "Ministry communications are not enabled" } }; return;
     }
     const visitorId = String(req?.params?.visitorId ?? "").trim();

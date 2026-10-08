@@ -3,6 +3,7 @@ export type FeatureFlags = {
   phase4Aggregation: boolean;
   morningBriefing: boolean;
   phase5Communications: boolean;
+  ministryCommunicationLedger: boolean;
   ministryEmailProviderSending: boolean;
   ministryEmailDispatchRecovery: boolean;
   ministryEmailEventWebhook: boolean;
@@ -18,6 +19,8 @@ export function getFeatureFlags(): FeatureFlags {
       String(process.env.FEATURE_MORNING_BRIEFING ?? "").trim().toLowerCase() === "true",
     phase5Communications:
       String(process.env.FEATURE_PHASE5_COMMUNICATIONS ?? "").trim().toLowerCase() === "true",
+    ministryCommunicationLedger:
+      String(process.env.FEATURE_MINISTRY_COMMUNICATION_LEDGER ?? "").trim().toLowerCase() === "true",
     ministryEmailProviderSending:
       String(process.env.FEATURE_MINISTRY_EMAIL_PROVIDER_SENDING ?? "").trim().toLowerCase() === "true",
     ministryEmailDispatchRecovery:
@@ -29,4 +32,13 @@ export function getFeatureFlags(): FeatureFlags {
     sixWeekScriptGuidance:
       String(process.env.FEATURE_SIX_WEEK_SCRIPT_GUIDANCE ?? "").trim().toLowerCase() === "true",
   };
+}
+
+export function isMinistryCommunicationLedgerEnabled(
+  flags: Pick<
+    FeatureFlags,
+    "ministryCommunicationLedger" | "phase5Communications"
+  > = getFeatureFlags()
+): boolean {
+  return flags.ministryCommunicationLedger || flags.phase5Communications;
 }

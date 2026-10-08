@@ -3,22 +3,44 @@ import {
   MINISTRY_COMMUNICATION_SCHEMA_VERSION,
   type MinistryCommunicationRecord
 } from "../../src/domain/communications/phase5CommunicationContracts";
-import { getFeatureFlags } from "../../src/config/featureFlags";
+import {
+  getFeatureFlags,
+  isMinistryCommunicationLedgerEnabled
+} from "../../src/config/featureFlags";
 
 function run(): void {
   const original = process.env.FEATURE_PHASE5_COMMUNICATIONS;
+  const originalLedger =
+    process.env.FEATURE_MINISTRY_COMMUNICATION_LEDGER;
   const originalProviderSending =
     process.env.FEATURE_MINISTRY_EMAIL_PROVIDER_SENDING;
 
   try {
     delete process.env.FEATURE_PHASE5_COMMUNICATIONS;
+    delete process.env.FEATURE_MINISTRY_COMMUNICATION_LEDGER;
     delete process.env.FEATURE_MINISTRY_EMAIL_PROVIDER_SENDING;
+
     assert.equal(getFeatureFlags().phase5Communications, false);
+    assert.equal(getFeatureFlags().ministryCommunicationLedger, false);
     assert.equal(getFeatureFlags().ministryEmailProviderSending, false);
+    assert.equal(isMinistryCommunicationLedgerEnabled(), false);
 
     process.env.FEATURE_PHASE5_COMMUNICATIONS = "true";
     assert.equal(getFeatureFlags().phase5Communications, true);
+    assert.equal(isMinistryCommunicationLedgerEnabled(), true);
     assert.equal(getFeatureFlags().ministryEmailProviderSending, false);
+
+    process.env.FEATURE_PHASE5_COMMUNICATIONS = "false";
+    process.env.FEATURE_MINISTRY_COMMUNICATION_LEDGER = "true";
+
+    assert.equal(getFeatureFlags().phase5Communications, false);
+    assert.equal(getFeatureFlags().ministryCommunicationLedger, true);
+    assert.equal(isMinistryCommunicationLedgerEnabled(), true);
+    assert.equal(getFeatureFlags().ministryEmailProviderSending, false);
+
+    process.env.FEATURE_MINISTRY_COMMUNICATION_LEDGER = "false";
+
+    assert.equal(isMinistryCommunicationLedgerEnabled(), false);
 
     process.env.FEATURE_MINISTRY_EMAIL_PROVIDER_SENDING = "true";
     assert.equal(getFeatureFlags().ministryEmailProviderSending, true);
@@ -52,6 +74,13 @@ function run(): void {
     } else {
       process.env.FEATURE_PHASE5_COMMUNICATIONS = original;
     }
+    if (originalLedger === undefined) {
+      delete process.env.FEATURE_MINISTRY_COMMUNICATION_LEDGER;
+    } else {
+      process.env.FEATURE_MINISTRY_COMMUNICATION_LEDGER =
+        originalLedger;
+    }
+
     if (originalProviderSending === undefined) {
       delete process.env.FEATURE_MINISTRY_EMAIL_PROVIDER_SENDING;
     } else {

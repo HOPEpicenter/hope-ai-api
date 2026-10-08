@@ -71,6 +71,8 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           npx ts-node tests/authorization/formationMutationActor.test.ts
+          npx ts-node tests/authorization/oauthCredentialStorage.test.ts
+          npx ts-node tests/authorization/oauthEncryptedEnvelope.test.ts
           npx ts-node tests/authorization/pastoralAuthorization.test.ts
           npx ts-node tests/authorization/highRiskStaffVisibility.test.ts
           npx ts-node tests/authorization/sixWeekPastoralAuthorization.test.ts

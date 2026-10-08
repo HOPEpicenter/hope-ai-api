@@ -11,20 +11,15 @@ function pickHeader(req: Request): string {
   return "";
 }
 
-function isPublicApiKeyBypass(req: Request): boolean {
-  return req.method === "POST" && req.originalUrl === "/api/engagements/events";
-}
-
 export function requireApiKey(req: Request, res: Response, next: NextFunction) {
   try {
-    if (isPublicApiKeyBypass(req)) {
-      return next();
-    }
-
     const expected = (process.env.HOPE_API_KEY ?? "").trim();
+    const provided = pickHeader(req).trim();
+
     console.log("[auth-check]", JSON.stringify({
-      expected,
-      provided: pickHeader(req).trim(),
+      expectedConfigured: Boolean(expected),
+      providedPresent: Boolean(provided),
+      matched: Boolean(expected && provided && provided === expected),
       method: req.method,
       originalUrl: req.originalUrl
     }));
@@ -32,7 +27,6 @@ export function requireApiKey(req: Request, res: Response, next: NextFunction) {
       return res.status(500).json({ ok: false, error: "Server missing HOPE_API_KEY" });
     }
 
-    const provided = pickHeader(req).trim();
     if (!provided) {
       return res.status(401).json({ ok: false, error: "Missing x-api-key" });
     }

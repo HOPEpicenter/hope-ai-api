@@ -15,12 +15,7 @@ export const engagementsRouter = Router();
 
 const timelineService = new EngagementsService(new EngagementEventsRepository());
 
-engagementsRouter.use((req, res, next) => {
-  if (req.path === "/engagements/events") {
-    return next();
-  }
-  return requireApiKey(req, res, next);
-});
+engagementsRouter.use(requireApiKey);
 
 const engagementRepo = new EngagementRepository();
 const engagementSummaryRepo = new EngagementSummaryRepository();

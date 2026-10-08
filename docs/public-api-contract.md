@@ -112,6 +112,8 @@ Supported event types:
 
 ### POST /api/engagements/events
 
+Protected endpoint (`x-api-key` required).
+
 Append engagement event.
 
 ### GET /api/engagements/timeline

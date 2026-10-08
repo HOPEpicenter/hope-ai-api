@@ -9,6 +9,9 @@ import {
   getRequestId,
   logFunctionError
 } from "../../shared/observability/functionObservability";
+import {
+  resolveFormationMutationActorAuthorization
+} from "../../services/authorization/formationMutationActor";
 
 export async function postFormationEvent(context: any, req: any): Promise<void> {
   const requestId = getRequestId(req);
@@ -28,9 +31,29 @@ export async function postFormationEvent(context: any, req: any): Promise<void> 
       return;
     }
 
+    const body = req?.body ?? {};
+
+    const actorAuth =
+      await resolveFormationMutationActorAuthorization(
+        req,
+        body?.type,
+        body?.source?.actorId
+      );
+
+    if (!actorAuth.ok) {
+      context.res = {
+        status: actorAuth.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: {
+          ...actorAuth.body,
+          requestId
+        }
+      };
+      return;
+    }
+
     await ensureFormationTables();
 
-    const body = req?.body ?? {};
     const result = await recordFormationEventV1(body);
 
     context.res = {

@@ -1,5 +1,5 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
-import { resolveSixWeekAdministrativeOverride } from "../_shared/adminStaffActor";
+import { resolveSixWeekActorAuthorization } from "../_shared/sixWeekStaffActor";
 import {
   assignSixWeekFollowupOwner
 } from "../../services/followups/sixWeekVisitorFollowupCommands";
@@ -9,9 +9,15 @@ import {
   logFunctionError
 } from "../../shared/observability/functionObservability";
 
+type SixWeekOwnerHttpDependencies = {
+  resolveActor?: typeof resolveSixWeekActorAuthorization;
+  assignOwner?: typeof assignSixWeekFollowupOwner;
+};
+
 export async function postSixWeekVisitorFollowupOwner(
   context: any,
-  req: any
+  req: any,
+  dependencies: SixWeekOwnerHttpDependencies = {}
 ): Promise<void> {
   const requestId = getRequestId(req);
 
@@ -28,24 +34,25 @@ export async function postSixWeekVisitorFollowupOwner(
     }
 
     const body = req?.body ?? {};
-    const administrativeOverride =
-      await resolveSixWeekAdministrativeOverride(req);
+    const actorAuth = await (
+      dependencies.resolveActor ?? resolveSixWeekActorAuthorization
+    )(req);
 
-    if (!administrativeOverride.ok) {
+    if (!actorAuth.ok) {
       context.res = {
-        status: administrativeOverride.status,
+        status: actorAuth.status,
         headers: { "content-type": "application/json; charset=utf-8" },
-        body: administrativeOverride.body
+        body: actorAuth.body
       };
       return;
     }
 
-    const result = await assignSixWeekFollowupOwner({
+    const result = await (dependencies.assignOwner ?? assignSixWeekFollowupOwner)({
       visitorId: req?.params?.visitorId,
       ownerStaffId: body.ownerStaffId,
-      actorId: administrativeOverride.actorId ?? body.actorId,
+      actorId: actorAuth.actorId,
       administrativeOverrideVerified:
-        administrativeOverride.administrativeOverrideVerified
+        actorAuth.administrativeOverrideVerified
     });
 
     context.res = {

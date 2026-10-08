@@ -129,22 +129,27 @@ Expect-HttpFailure { PostJson "$ApiBase/formation/events" $headers $badV1_noSour
 $badV1_missingAssignee = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_ASSIGNED" -occurredAt $now.AddSeconds(2) -data @{} -sourceSystem "assert-formation-envelope-v1-strict"
 Expect-HttpFailure { PostJson "$ApiBase/formation/events" $headers $badV1_missingAssignee } "v1 FOLLOWUP_ASSIGNED missing data.assigneeId"
 
-# 5) Valid v1 should pass
-$goodV1 = New-FormationEnvelope -visitorId $vid -type "NEXT_STEP_SELECTED" -occurredAt $now.AddSeconds(3) -data @{ nextStep = "JoinGroup" } -sourceSystem "assert-formation-envelope-v1-strict"
-PostJson "$ApiBase/formation/events" $headers $goodV1 | Out-Null
-Write-Host "[OK] v1 envelope accepted" -ForegroundColor Green
+# 5) Next-step staff mutation v1 requires source.actorId
+$badV1_missingNextStepActor = New-FormationEnvelope -visitorId $vid -type "NEXT_STEP_SELECTED" -occurredAt $now.AddSeconds(3) -data @{ nextStep = "JoinGroup" } -sourceSystem "assert-formation-envelope-v1-strict"
+Expect-HttpFailure { PostJson "$ApiBase/formation/events" $headers $badV1_missingNextStepActor } "v1 NEXT_STEP_SELECTED missing source.actorId"
 
-# 6) Operator followup mutation v1 requires source.actorId
-$badV1_missingActor = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_CONTACTED" -occurredAt $now.AddSeconds(4) -data @{} -sourceSystem "assert-formation-envelope-v1-strict"
+# 6) Valid next-step mutation with active canonical Staff actor should pass
+$goodV1 = New-FormationEnvelope -visitorId $vid -type "NEXT_STEP_SELECTED" -occurredAt $now.AddSeconds(4) -data @{ nextStep = "JoinGroup" } -sourceSystem "assert-formation-envelope-v1-strict"
+$goodV1.source.actorId = $activeStaffId
+PostJson "$ApiBase/formation/events" $headers $goodV1 | Out-Null
+Write-Host "[OK] v1 next-step mutation with active canonical Staff source.actorId accepted" -ForegroundColor Green
+
+# 7) Operator followup mutation v1 requires source.actorId
+$badV1_missingActor = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_CONTACTED" -occurredAt $now.AddSeconds(5) -data @{} -sourceSystem "assert-formation-envelope-v1-strict"
 Expect-HttpFailure { PostJson "$ApiBase/formation/events" $headers $badV1_missingActor } "v1 FOLLOWUP_CONTACTED missing source.actorId"
 
-# 7) Operator followup mutation v1 requires a known source.actorId
-$badV1_unknownActor = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_CONTACTED" -occurredAt $now.AddSeconds(5) -data @{} -sourceSystem "assert-formation-envelope-v1-strict"
+# 8) Operator followup mutation v1 requires a known source.actorId
+$badV1_unknownActor = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_CONTACTED" -occurredAt $now.AddSeconds(6) -data @{} -sourceSystem "assert-formation-envelope-v1-strict"
 $badV1_unknownActor.source.actorId = "unknown-operator"
 Expect-HttpFailure { PostJson "$ApiBase/formation/events" $headers $badV1_unknownActor } "v1 FOLLOWUP_CONTACTED unknown Staff source.actorId"
 
-# 8) Operator followup mutation v1 with known source.actorId should pass
-$goodV1WithActor = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_CONTACTED" -occurredAt $now.AddSeconds(6) -data @{} -sourceSystem "assert-formation-envelope-v1-strict"
+# 9) Operator followup mutation v1 with known source.actorId should pass
+$goodV1WithActor = New-FormationEnvelope -visitorId $vid -type "FOLLOWUP_CONTACTED" -occurredAt $now.AddSeconds(7) -data @{} -sourceSystem "assert-formation-envelope-v1-strict"
 $goodV1WithActor.source.actorId = $activeStaffId
 PostJson "$ApiBase/formation/events" $headers $goodV1WithActor | Out-Null
 Write-Host "[OK] v1 followup mutation with active canonical Staff source.actorId accepted" -ForegroundColor Green

@@ -23,8 +23,9 @@ import {
   formationMutationDispatchers
 } from "../../domain/formation/projection/formationMutationDispatchers";
 import {
-  readMutationActorStaffIdentity
-} from "../../services/staff/readCanonicalStaffDirectory";
+  isStaffMutationFormationEventType,
+  requireActiveFormationMutationActor
+} from "../../services/authorization/formationMutationActor";
 import {
   NEXT_STEP_COMPLETION_CORRECTED,
   NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX,
@@ -191,12 +192,6 @@ const SUPPORTED_FORMATION_EVENT_TYPES = new Set([
   "GROUP_LEFT",
 ]);
 
-const OPERATOR_MUTATION_EVENT_TYPES = new Set([
-  "FOLLOWUP_ASSIGNED",
-  "FOLLOWUP_UNASSIGNED",
-  "FOLLOWUP_CONTACTED",
-  "FOLLOWUP_OUTCOME_RECORDED"
-]);
 
 function validateFormationEventEnvelopeV1Strict(body: unknown): {
   v: number;
@@ -228,8 +223,10 @@ function validateFormationEventEnvelopeV1Strict(body: unknown): {
 
   const data = asObject(obj.data);
 
-  if (OPERATOR_MUTATION_EVENT_TYPES.has(type) && !actorId) {
-    throw new Error("source.actorId is required for operator followup mutations");
+  if (isStaffMutationFormationEventType(type) && !actorId) {
+    throw new Error(
+      "source.actorId is required for staff formation mutations"
+    );
   }
 
 
@@ -694,18 +691,10 @@ export async function recordFormationEventV1(body: unknown): Promise<{
   const source = asObject(envelope.source);
   const data = asObject(envelope.data);
 
-  if (OPERATOR_MUTATION_EVENT_TYPES.has(type)) {
-    const actorId = normalizeOptionalActorId(source.actorId);
-    const staffIdentity = actorId
-      ? await readMutationActorStaffIdentity(actorId)
-      : null;
-
-    if (!staffIdentity || staffIdentity.status !== "active") {
-      throw new Error(
-        "source.actorId must reference an active staff identity for followup mutations"
-      );
-    }
-  }
+  await requireActiveFormationMutationActor(
+    type,
+    source.actorId
+  );
 
   const eventsTable = getFormationEventsTableClient();
   const profilesTable = getFormationProfilesTableClient();

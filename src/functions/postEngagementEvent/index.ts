@@ -9,6 +9,9 @@ import {
 } from "../../shared/observability/functionObservability";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { recordFormationEventV1 } from "../_shared/formation";
+import {
+  requireActiveFormationMutationActor
+} from "../../services/authorization/formationMutationActor";
 
 const service = new EngagementsService(new EngagementEventsRepository());
 
@@ -70,7 +73,6 @@ export async function postEngagementEvent(context: any, req: any): Promise<void>
       throw new Error("occurredAt cannot be in the future");
     }
 
-    await service.appendEvent(evt);
 
     const type = String(evt.type ?? "").trim();
 
@@ -80,6 +82,15 @@ export async function postEngagementEvent(context: any, req: any): Promise<void>
       "FOLLOWUP_OUTCOME_RECORDED",
       "FOLLOWUP_UNASSIGNED"
     ];
+
+    if (formationTypes.includes(type)) {
+      await requireActiveFormationMutationActor(
+        type,
+        evt.source.actorId
+      );
+    }
+
+    await service.appendEvent(evt);
 
     if (formationTypes.includes(type)) {
       await recordFormationEventV1({

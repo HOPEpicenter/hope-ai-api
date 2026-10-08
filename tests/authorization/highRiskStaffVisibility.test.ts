@@ -22,7 +22,8 @@ function staff(
     entraTenantId: null,
     entraObjectId: null,
     email: null,
-    phone: null
+    phone: null,
+    ministryAreaId: null
   };
 }
 

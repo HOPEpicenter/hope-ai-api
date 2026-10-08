@@ -102,8 +102,9 @@ foreach ($u in $protectedMinistryReads) {
     Out-Null
 }
 
-# POST formation/events must also require key
+# Staff/event mutation ingestion must require the API key.
 Invoke-ExpectStatus -Method POST -Url "$BaseUrl/formation/events" -Body @{} -ExpectedStatus 401 | Out-Null
+Invoke-ExpectStatus -Method POST -Url "$BaseUrl/engagements/events" -Body @{} -ExpectedStatus 401 | Out-Null
 
 # With key present, we should get *past auth* and reach validation (usually 400)
 # That proves auth is correctly scoped and functioning.
@@ -119,5 +120,6 @@ foreach ($u in $protected) {
 }
 
 Invoke-ExpectStatus -Method POST -Url "$BaseUrl/formation/events" -Headers $h -Body @{} -ExpectedStatus 400 | Out-Null
+Invoke-ExpectStatus -Method POST -Url "$BaseUrl/engagements/events" -Headers $h -Body @{} -ExpectedStatus 400 | Out-Null
 
 Write-Host "OK: Auth scoping assertions passed (public endpoints unaffected; protected endpoints require API key)."

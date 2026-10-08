@@ -373,17 +373,42 @@ Write-Host ("OK: Express is listening on {0}:{1}" -f $HostName, $Port)
 Write-Host ("Running smoke against: {0}" -f $base)
 
 & (Join-Path $PSScriptRoot "ci-smoke-express.ps1") -BaseUrl $base -RetrySeconds $SmokeRetrySeconds
-pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/assert-auth-scoping.ps1 -BaseUrl $base
-pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/assert-integration-legacy.ps1 -ApiBaseUrl $base
+$ciSmokeExit = $LASTEXITCODE
 
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "Express not healthy at assertion time. Dumping logs..."
+if ($ciSmokeExit -ne 0) {
+  Write-Host "CI Express smoke failed (exit=$ciSmokeExit). Dumping logs..."
   Write-Host "==== EXPRESS OUT (tail 200) ===="
   Tail-File -Path $outLog -Lines 200
   Write-Host "==== EXPRESS ERR (tail 200) ===="
   Tail-File -Path $errLog -Lines 200
   try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
-  exit 1
+  exit $ciSmokeExit
+}
+
+pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/assert-auth-scoping.ps1 -BaseUrl $base
+$authScopeExit = $LASTEXITCODE
+
+if ($authScopeExit -ne 0) {
+  Write-Host "Auth scoping assert failed (exit=$authScopeExit). Dumping logs..."
+  Write-Host "==== EXPRESS OUT (tail 200) ===="
+  Tail-File -Path $outLog -Lines 200
+  Write-Host "==== EXPRESS ERR (tail 200) ===="
+  Tail-File -Path $errLog -Lines 200
+  try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
+  exit $authScopeExit
+}
+
+pwsh -NoProfile -ExecutionPolicy Bypass -File ./scripts/assert-integration-legacy.ps1 -ApiBaseUrl $base
+$integrationLegacyExit = $LASTEXITCODE
+
+if ($integrationLegacyExit -ne 0) {
+  Write-Host "Integration/legacy assert failed (exit=$integrationLegacyExit). Dumping logs..."
+  Write-Host "==== EXPRESS OUT (tail 200) ===="
+  Tail-File -Path $outLog -Lines 200
+  Write-Host "==== EXPRESS ERR (tail 200) ===="
+  Tail-File -Path $errLog -Lines 200
+  try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
+  exit $integrationLegacyExit
 }
 
 Write-Host "Running extra assertions (server still running)..."

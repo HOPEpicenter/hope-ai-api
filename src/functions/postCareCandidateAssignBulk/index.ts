@@ -14,16 +14,34 @@ import {
   getRequestId,
   logFunctionError
 } from "../../shared/observability/functionObservability";
-import { readCanonicalStaffIdentity } from "../../services/staff/readCanonicalStaffDirectory";
+import {
+  requireCareOwnerActor,
+  requireCareOwnerAssignee
+} from "../_shared/careOwnerStaffActor";
+
+export type CareBulkAssignDependencies = {
+  requireApiKey?: typeof requireApiKeyForFunction;
+  requireActor?: typeof requireCareOwnerActor;
+  requireAssignee?: typeof requireCareOwnerAssignee;
+  getTable?: typeof getFormationProfilesTableClient;
+  ensureTable?: typeof ensureTable;
+  getVisitor?: typeof getVisitorById;
+  getProfile?: typeof getFormationProfileByVisitorId;
+  createProfile?: typeof createDefaultFormationProfile;
+  upsertProfile?: typeof upsertFormationProfile;
+};
 
 export async function postCareCandidateAssignBulk(
   context: any,
-  req: any
+  req: any,
+  dependencies: CareBulkAssignDependencies = {}
 ): Promise<void> {
   const requestId = getRequestId(req);
 
   try {
-    const auth = requireApiKeyForFunction(req);
+    const auth = (
+      dependencies.requireApiKey ?? requireApiKeyForFunction
+    )(req);
 
     if (!auth.ok) {
       context.res = {
@@ -66,28 +84,46 @@ export async function postCareCandidateAssignBulk(
       return;
     }
 
-    const assigneeIdentity =
-      await readCanonicalStaffIdentity(assignedTo);
+    const actorAuthorization = await (
+      dependencies.requireActor ?? requireCareOwnerActor
+    )(req);
 
-    if (!assigneeIdentity || assigneeIdentity.status !== "active") {
+    if (!actorAuthorization.ok) {
       context.res = {
-        status: 400,
+        status: actorAuthorization.status,
         headers: { "content-type": "application/json; charset=utf-8" },
-        body: {
-          ok: false,
-          error: "assignedTo must reference an active canonical staff identity"
-        }
+        body: actorAuthorization.body
       };
       return;
     }
 
-    const table = getFormationProfilesTableClient();
-    await ensureTable(table);
+    const assigneeAuthorization = await (
+      dependencies.requireAssignee ?? requireCareOwnerAssignee
+    )(assignedTo);
+
+    if (!assigneeAuthorization.ok) {
+      context.res = {
+        status: assigneeAuthorization.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: assigneeAuthorization.body
+      };
+      return;
+    }
+
+    const table = (
+      dependencies.getTable ?? getFormationProfilesTableClient
+    )();
+
+    await (
+      dependencies.ensureTable ?? ensureTable
+    )(table);
 
     const results: any[] = [];
 
     for (const visitorId of visitorIds) {
-      const visitor = await getVisitorById(visitorId);
+      const visitor = await (
+        dependencies.getVisitor ?? getVisitorById
+      )(visitorId);
 
       if (!visitor) {
         results.push({
@@ -98,15 +134,15 @@ export async function postCareCandidateAssignBulk(
         continue;
       }
 
-      const existingProfile =
-        await getFormationProfileByVisitorId(
-          table,
-          visitorId
-        );
+      const existingProfile = await (
+        dependencies.getProfile ?? getFormationProfileByVisitorId
+      )(table, visitorId);
 
       const profile = {
         ...(existingProfile ??
-          createDefaultFormationProfile(visitorId)),
+          (dependencies.createProfile ?? createDefaultFormationProfile)(
+            visitorId
+          )),
         partitionKey: "VISITOR" as const,
         rowKey: visitorId,
         visitorId,
@@ -114,10 +150,9 @@ export async function postCareCandidateAssignBulk(
         updatedAt: new Date().toISOString()
       };
 
-      await upsertFormationProfile(
-        table,
-        profile as any
-      );
+      await (
+        dependencies.upsertProfile ?? upsertFormationProfile
+      )(table, profile as any);
 
       results.push({
         visitorId,

@@ -1,4 +1,5 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
+import { requireCareOwnerActor } from "../_shared/careOwnerStaffActor";
 import {
   ensureTable,
   getFormationProfileByVisitorId,
@@ -15,14 +16,28 @@ import {
   logFunctionError
 } from "../../shared/observability/functionObservability";
 
+export type CareBulkUnassignDependencies = {
+  requireApiKey?: typeof requireApiKeyForFunction;
+  requireActor?: typeof requireCareOwnerActor;
+  getTable?: typeof getFormationProfilesTableClient;
+  ensureTable?: typeof ensureTable;
+  getVisitor?: typeof getVisitorById;
+  getProfile?: typeof getFormationProfileByVisitorId;
+  createProfile?: typeof createDefaultFormationProfile;
+  upsertProfile?: typeof upsertFormationProfile;
+};
+
 export async function postCareCandidateUnassignBulk(
   context: any,
-  req: any
+  req: any,
+  dependencies: CareBulkUnassignDependencies = {}
 ): Promise<void> {
   const requestId = getRequestId(req);
 
   try {
-    const auth = requireApiKeyForFunction(req);
+    const auth = (
+      dependencies.requireApiKey ?? requireApiKeyForFunction
+    )(req);
 
     if (!auth.ok) {
       context.res = {
@@ -51,13 +66,33 @@ if (visitorIds.length === 0) {
       return;
     }
 
-    const table = getFormationProfilesTableClient();
-    await ensureTable(table);
+    const actorAuthorization = await (
+      dependencies.requireActor ?? requireCareOwnerActor
+    )(req);
+
+    if (!actorAuthorization.ok) {
+      context.res = {
+        status: actorAuthorization.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: actorAuthorization.body
+      };
+      return;
+    }
+
+    const table = (
+      dependencies.getTable ?? getFormationProfilesTableClient
+    )();
+
+    await (
+      dependencies.ensureTable ?? ensureTable
+    )(table);
 
     const results: any[] = [];
 
     for (const visitorId of visitorIds) {
-      const visitor = await getVisitorById(visitorId);
+      const visitor = await (
+        dependencies.getVisitor ?? getVisitorById
+      )(visitorId);
 
       if (!visitor) {
         results.push({
@@ -68,15 +103,15 @@ if (visitorIds.length === 0) {
         continue;
       }
 
-      const existingProfile =
-        await getFormationProfileByVisitorId(
-          table,
-          visitorId
-        );
+      const existingProfile = await (
+        dependencies.getProfile ?? getFormationProfileByVisitorId
+      )(table, visitorId);
 
       const profile = {
         ...(existingProfile ??
-          createDefaultFormationProfile(visitorId)),
+          (dependencies.createProfile ?? createDefaultFormationProfile)(
+            visitorId
+          )),
         partitionKey: "VISITOR" as const,
         rowKey: visitorId,
         visitorId,
@@ -84,10 +119,9 @@ if (visitorIds.length === 0) {
         updatedAt: new Date().toISOString()
       };
 
-      await upsertFormationProfile(
-        table,
-        profile as any
-      );
+      await (
+        dependencies.upsertProfile ?? upsertFormationProfile
+      )(table, profile as any);
 
       results.push({
         visitorId,

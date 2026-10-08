@@ -75,6 +75,7 @@ jobs:
           npx ts-node tests/authorization/highRiskStaffVisibility.test.ts
           npx ts-node tests/authorization/sixWeekPastoralAuthorization.test.ts
           npx ts-node tests/authorization/sixWeekStartHttpAuthorization.test.ts
+          npx ts-node tests/authorization/sixWeekOwnerHttpAuthorization.test.ts
 
       - name: Ministry Area foundation regressions
         shell: pwsh

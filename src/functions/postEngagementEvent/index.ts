@@ -10,7 +10,7 @@ import {
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { recordFormationEventV1 } from "../_shared/formation";
 import {
-  requireActiveFormationMutationActor
+  resolveFormationMutationActorAuthorization
 } from "../../services/authorization/formationMutationActor";
 
 const service = new EngagementsService(new EngagementEventsRepository());
@@ -76,19 +76,31 @@ export async function postEngagementEvent(context: any, req: any): Promise<void>
 
     const type = String(evt.type ?? "").trim();
 
+    const actorAuth =
+      await resolveFormationMutationActorAuthorization(
+        req,
+        type,
+        evt.source.actorId
+      );
+
+    if (!actorAuth.ok) {
+      context.res = {
+        status: actorAuth.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: {
+          ...actorAuth.body,
+          requestId
+        }
+      };
+      return;
+    }
+
     const formationTypes = [
       "FOLLOWUP_ASSIGNED",
       "FOLLOWUP_CONTACTED",
       "FOLLOWUP_OUTCOME_RECORDED",
       "FOLLOWUP_UNASSIGNED"
     ];
-
-    if (formationTypes.includes(type)) {
-      await requireActiveFormationMutationActor(
-        type,
-        evt.source.actorId
-      );
-    }
 
     await service.appendEvent(evt);
 

@@ -38,7 +38,7 @@ Azure Functions are configured with `authLevel: anonymous`, but protected routes
 | POST | `/api/visitors/{id}/six-week-followup/owner` | Assign/reassign canonical Staff owner | `HOPE_API_KEY` |
 | POST | `/api/visitors/{id}/six-week-followup/tasks/{weekNumber}/outcome` | Complete/skip weekly staff task | `HOPE_API_KEY` |
 | POST | `/api/visitors/{id}/six-week-followup/status` | Pause/resume/cancel plan | `HOPE_API_KEY` |
-| POST | `/api/formation/events` | Append Formation event | `HOPE_API_KEY` |
+| POST | `/api/formation/events` | Append Formation event | `HOPE_API_KEY`; staff mutations also require matching active canonical `x-hope-staff-actor-id` / `source.actorId` |
 | GET | `/api/formation/timeline` | Formation timeline | `HOPE_API_KEY` |
 | GET | `/api/formation/profiles` | Formation profiles list | `HOPE_API_KEY` |
 | GET | `/api/ministry-areas/{ministryAreaId}/staff` | Administrator-only canonical Staff roster for one Ministry Area | `HOPE_ADMIN_API_KEY` + active configured canonical administrator |
@@ -53,7 +53,7 @@ Azure Functions are configured with `authLevel: anonymous`, but protected routes
 | GET | `/api/visitors/{id}/formation/events` | Visitor Formation events | `HOPE_API_KEY` |
 | GET | `/api/visitors/{id}/formation/profile` | Visitor Formation profile | `HOPE_API_KEY` |
 | POST | `/api/formation/profiles/{id}/rebuild` | Rebuild Formation profile projection | `HOPE_API_KEY` |
-| POST | `/api/engagements/events` | Append Engagement event | `HOPE_API_KEY` |
+| POST | `/api/engagements/events` | Append Engagement event | `HOPE_API_KEY`; staff mutations also require matching active canonical `x-hope-staff-actor-id` / `source.actorId` |
 | GET | `/api/engagements/timeline` | Engagement timeline | `HOPE_API_KEY` |
 | GET | `/api/engagements/score` | Engagement score | `HOPE_API_KEY` |
 | GET | `/api/engagements/status` | Engagement status | `HOPE_API_KEY` |

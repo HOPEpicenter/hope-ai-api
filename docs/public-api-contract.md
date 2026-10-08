@@ -99,12 +99,27 @@ Returns derived formation profile snapshot.
 
 ### POST /api/formation/events
 
-Protected endpoint (`x-api-key` required)
+Protected endpoint (`x-api-key` required).
+
+For staff mutation event types (`FOLLOWUP_ASSIGNED`, `FOLLOWUP_UNASSIGNED`,
+`FOLLOWUP_CONTACTED`, `FOLLOWUP_OUTCOME_RECORDED`, `NEXT_STEP_SELECTED`,
+`NEXT_STEP_COMPLETED`), the request must also include
+`x-hope-staff-actor-id`. The header must reference an active canonical Staff
+identity and must exactly match `source.actorId`.
 
 Supported event types:
+- FOLLOWUP_ASSIGNED
+- FOLLOWUP_UNASSIGNED
+- FOLLOWUP_CONTACTED
+- FOLLOWUP_OUTCOME_RECORDED
+- NEXT_STEP_SELECTED
+- NEXT_STEP_COMPLETED
+- PRAYER_REQUESTED
 - SALVATION_RECORDED
 - BAPTISM_RECORDED
 - MEMBERSHIP_RECORDED
+- GROUP_JOINED
+- GROUP_LEFT
 
 ---
 
@@ -113,6 +128,10 @@ Supported event types:
 ### POST /api/engagements/events
 
 Protected endpoint (`x-api-key` required).
+
+For staff mutation event types, the request must also include
+`x-hope-staff-actor-id`. The header must reference an active canonical Staff
+identity and must exactly match `source.actorId`.
 
 Append engagement event.
 

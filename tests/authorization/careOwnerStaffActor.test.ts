@@ -15,6 +15,7 @@ function staff(
     staffId: "staff-test",
     displayName: "Test Staff",
     roleLabel,
+    ministryAreaId: null,
     status,
     createdAt: "2026-09-27T00:00:00.000Z",
     updatedAt: "2026-09-27T00:00:00.000Z",

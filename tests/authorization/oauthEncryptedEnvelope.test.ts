@@ -129,6 +129,16 @@ const differentCredential = buildOAuthEncryptedAadV1({
 
 assert.notDeepEqual(differentCredential, aad);
 
+for (const [field, changedValue] of [
+  ["tenantId", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"],
+  ["entraObjectId", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],
+  ["canonicalStaffId", "cccccccc-cccc-4ccc-8ccc-cccccccccccc"]
+] as const) {
+  const changedBinding = { ...binding, [field]: changedValue };
+
+  assert.equal(isOAuthEncryptedAadBindingV1(changedBinding), true);
+  assert.notDeepEqual(buildOAuthEncryptedAadV1(changedBinding), aad);
+}
 assert.throws(
   () =>
     buildOAuthEncryptedAadV1({

@@ -274,6 +274,94 @@ async function run(): Promise<void> {
   );
   assert.equal(changingClock.updates, 0);
 
+  // Storage commits before expiry, but the response arrives
+  // after expiry. Consumption remains durable; authorization
+  // must be denied and replay must not become possible.
+  for (const confirmedAt of [EXPIRES, EXPIRES + 1]) {
+    const lateTable = new FakeTable();
+    let reads = 0;
+
+    const late = new OAuthReplayChallengeStorageRepository(
+      lateTable,
+      () => {
+        reads++;
+        return reads <= 2 ? EXPIRES - 1 : confirmedAt;
+      }
+    );
+
+    assert.deepEqual(
+      await consumeOAuthReplayChallenge(
+        request(),
+        { repository: late }
+      ),
+      denied
+    );
+
+    assert.equal(lateTable.updates, 1);
+    assert.equal(lateTable.current()?.revision, 1);
+    assert.equal(
+      lateTable.current()?.consumedAt,
+      new Date(EXPIRES - 1).toISOString()
+    );
+
+    assert.deepEqual(
+      await consumeOAuthReplayChallenge(
+        request(),
+        { repository: late }
+      ),
+      denied
+    );
+    assert.equal(lateTable.updates, 1);
+  }
+
+  // A backwards or invalid trusted clock after a confirmed
+  // write also denies authorization.
+  for (const confirmedAt of [NOW - 1, Number.NaN]) {
+    const candidate = new FakeTable();
+    let reads = 0;
+
+    const adapter = new OAuthReplayChallengeStorageRepository(
+      candidate,
+      () => ++reads <= 2 ? NOW : confirmedAt
+    );
+
+    assert.deepEqual(
+      await consumeOAuthReplayChallenge(
+        request(),
+        { repository: adapter }
+      ),
+      denied
+    );
+
+    assert.equal(candidate.updates, 1);
+    assert.equal(candidate.current()?.revision, 1);
+  }
+
+  // A trusted clock exception after a committed write fails
+  // closed through the consumption service.
+  const failingClockTable = new FakeTable();
+  let successfulReads = 0;
+
+  const failingClock = new OAuthReplayChallengeStorageRepository(
+    failingClockTable,
+    () => {
+      if (++successfulReads === 3) {
+        throw new Error("Synthetic clock failure");
+      }
+      return NOW;
+    }
+  );
+
+  assert.deepEqual(
+    await consumeOAuthReplayChallenge(
+      request(),
+      { repository: failingClock }
+    ),
+    denied
+  );
+
+  assert.equal(failingClockTable.updates, 1);
+  assert.equal(failingClockTable.current()?.revision, 1);
   // Missing, malformed, and previously consumed rows.
   const alteredRecords: Array<Partial<OAuthOperationReplayChallengeV1>> = [
     { consumedAt: new Date(NOW).toISOString() },

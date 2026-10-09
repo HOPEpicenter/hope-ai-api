@@ -89,6 +89,7 @@ jobs:
           npx ts-node tests/authorization/consumeOAuthReplayChallenge.test.ts
           npx ts-node tests/authorization/authorizeOAuthCredentialOperation.test.ts
           npx ts-node tests/authorization/oauthReplayChallengeStorageRepository.test.ts
+          npx ts-node tests/authorization/oauthReplayChallengeV2StorageRepository.test.ts
           npx ts-node tests/authorization/pastoralAuthorization.test.ts
           npx ts-node tests/authorization/highRiskStaffVisibility.test.ts
           npx ts-node tests/authorization/sixWeekPastoralAuthorization.test.ts

@@ -83,6 +83,7 @@ jobs:
           npx ts-node tests/authorization/resolveOAuthSessionEvidence.test.ts
           npx ts-node tests/authorization/establishOAuthTrustedSessionBinding.test.ts
           npx ts-node tests/authorization/establishOAuthAuthenticatedSession.test.ts
+          npx ts-node tests/authorization/oauthSessionPossessionV1.test.ts
           npx ts-node tests/authorization/pastoralAuthorization.test.ts
           npx ts-node tests/authorization/highRiskStaffVisibility.test.ts
           npx ts-node tests/authorization/sixWeekPastoralAuthorization.test.ts

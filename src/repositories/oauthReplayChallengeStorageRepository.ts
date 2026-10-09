@@ -126,8 +126,9 @@ function matches(
  * the storage implementation honors If-Match semantics.
  *
  * ETag alone does not provide a storage-side time predicate.
- * The trusted clock is checked just before the conditional write;
- * this is not an assertion about Azure's precise commit time.
+ * The trusted clock is checked before and after the conditional
+ * write. Expiry during the write denies authorization even when
+ * storage committed. This does not prove Azure's commit timestamp.
  *
  * The request's nowMilliseconds is validated but is NOT trusted
  * as the authority for expiry. This adapter uses its own clock.
@@ -229,7 +230,19 @@ implements OAuthReplayChallengeAtomicRepository {
         { etag: entity.etag }
       );
 
-      // Only a confirmed conditional update is accepted.
+      // The ETag write may complete after challenge expiry.
+      // A confirmed write is not sufficient for authorization.
+      const confirmedAt = this.clock();
+
+      if (
+        !isTrustedClockValue(confirmedAt) ||
+        confirmedAt < commitCheckAt ||
+        confirmedAt >= Date.parse(parsed.expiresAt)
+      ) {
+        return false;
+      }
+
+      // Only a confirmed, still-valid consumption is accepted.
       return true;
     } catch (error) {
       if (isExpectedStorageFailure(error)) return false;

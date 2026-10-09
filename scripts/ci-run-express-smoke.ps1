@@ -358,6 +358,12 @@ if ($LASTEXITCODE -ne 0) {
   throw "OAuth replay Azurite integration test failed"
 }
 
+Write-Host "Running OAuth V2 credential-bound replay integration test against Azurite..."
+npx --no-install ts-node tests/authorization/oauthReplayChallengeV2Azurite.test.ts
+if ($LASTEXITCODE -ne 0) {
+  throw "OAuth V2 replay Azurite integration test failed"
+}
+
 if (Test-Path -LiteralPath ".\package.json") { Write-Host "No BOM detected in package.json" }
 Write-Host "OK: Guard passed (no '@azure/functions' imports under src)."
 
@@ -434,4 +440,3 @@ Write-Host ("Stopping Express (pid={0})" -f $proc.Id)
 try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch { }
 
 exit 0
-

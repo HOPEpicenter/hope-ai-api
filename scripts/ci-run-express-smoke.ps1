@@ -347,6 +347,17 @@ $root = ("http://{0}:{1}" -f $HostName, $Port)
 
 Ensure-AzuriteFromNodeModules -HostName $AzuriteHost -WaitSeconds $AzuriteWaitSeconds | Out-Null
 
+if ($env:STORAGE_CONNECTION_STRING -ne "UseDevelopmentStorage=true") {
+  throw "Replay integration test requires local Azurite storage"
+}
+
+Write-Host "Running OAuth replay ETag integration test against Azurite..."
+npx --no-install ts-node tests/authorization/oauthReplayChallengeAzurite.test.ts
+
+if ($LASTEXITCODE -ne 0) {
+  throw "OAuth replay Azurite integration test failed"
+}
+
 if (Test-Path -LiteralPath ".\package.json") { Write-Host "No BOM detected in package.json" }
 Write-Host "OK: Guard passed (no '@azure/functions' imports under src)."
 

@@ -369,6 +369,11 @@ npx --no-install ts-node tests/authorization/oauthOrderingCoordinationAzurite.te
 if ($LASTEXITCODE -ne 0) {
   throw "OAuth ordering Azurite integration test failed"
 }
+Write-Host "Running OAuth V2 transition receipt integration against Azurite..."
+npx --no-install ts-node tests/authorization/oauthOrderingReceiptAzurite.test.ts
+if ($LASTEXITCODE -ne 0) {
+  throw "OAuth V2 transition receipt Azurite integration test failed"
+}
 
 if (Test-Path -LiteralPath ".\package.json") { Write-Host "No BOM detected in package.json" }
 Write-Host "OK: Guard passed (no '@azure/functions' imports under src)."

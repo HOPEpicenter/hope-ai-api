@@ -14,6 +14,9 @@ import {
   isOAuthOrderingReceiptEnvelope,
   type OAuthOrderingReceiptEnvelope
 } from "../../src/services/authorization/modelOAuthOrderingTransitionReceipts";
+import {
+  OAuthOrderingReceiptReconciliationReader
+} from "../../src/repositories/readOAuthOrderingReceiptReconciliation";
 
 /**
  * Emulator-only test. No connection string from an
@@ -238,6 +241,85 @@ async function main(): Promise<void> {
       [winner, revocationId]
     );
 
+    // Read-only reconciliation against real stored receipts.
+    const reader = new OAuthOrderingReceiptReconciliationReader({
+      getEntity: adapter.getEntity
+    });
+
+    const claimCommand = {
+      kind: "claim" as const,
+      expectedRevision: 0,
+      claimId: "synthetic-worker"
+    };
+
+    const revokeCommand = {
+      kind: "revoke" as const,
+      expectedRevision: 1,
+      source: "staff_deactivation" as const
+    };
+
+    const recordedClaim = await reader.inspect(
+      ID,
+      winner,
+      initial.snapshot,
+      claimCommand
+    );
+
+    assert.equal(recordedClaim.status, "recorded");
+    assert.equal(recordedClaim.retryPermitted, false);
+    assert.equal(recordedClaim.executionPermitted, false);
+
+    const recordedRevocation = await reader.inspect(
+      ID,
+      revocationId,
+      afterClaim.envelope.snapshot,
+      revokeCommand
+    );
+
+    assert.equal(recordedRevocation.status, "recorded");
+    assert.equal(recordedRevocation.retryPermitted, false);
+    assert.equal(recordedRevocation.executionPermitted, false);
+
+    const unrelated = await reader.inspect(
+      ID,
+      randomUUID(),
+      initial.snapshot,
+      claimCommand
+    );
+
+    assert.equal(unrelated.status, "absent_unproven");
+    assert.equal(unrelated.retryPermitted, false);
+    assert.equal(unrelated.executionPermitted, false);
+
+    const conflicting = await reader.inspect(
+      ID,
+      winner,
+      initial.snapshot,
+      {
+        kind: "claim",
+        expectedRevision: 0,
+        claimId: "different-worker"
+      }
+    );
+
+    assert.equal(conflicting.status, "conflicting_evidence");
+    assert.equal(conflicting.retryPermitted, false);
+    assert.equal(conflicting.executionPermitted, false);
+
+    const missingReceiptRow = await reader.inspect(
+      "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      winner,
+      initial.snapshot,
+      claimCommand
+    );
+
+    assert.equal(missingReceiptRow.status, "unresolved");
+    assert.equal(missingReceiptRow.retryPermitted, false);
+    assert.equal(missingReceiptRow.executionPermitted, false);
+
+    console.log(
+      "OAuth V2 read-only receipt reconciliation Azurite tests passed"
+    );
     // No implicit V1 migration or missing-entity creation.
     const missing =
       await new OAuthOrderingReceiptStorageRepository(

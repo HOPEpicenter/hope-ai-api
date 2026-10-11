@@ -97,6 +97,8 @@ jobs:
           npx ts-node tests/authorization/readOAuthOrderingReconciliation.test.ts
           npx ts-node tests/authorization/modelOAuthOrderingTransitionReceipts.test.ts
           npx ts-node tests/authorization/oauthOrderingReceiptStorageRepository.test.ts
+          npx ts-node tests/authorization/inspectOAuthOrderingReceiptReconciliation.test.ts
+          npx ts-node tests/authorization/readOAuthOrderingReceiptReconciliation.test.ts
           npx ts-node tests/authorization/oauthReplayChallengeStorageRepository.test.ts
           npx ts-node tests/authorization/oauthReplayChallengeV2StorageRepository.test.ts
           npx ts-node tests/authorization/pastoralAuthorization.test.ts

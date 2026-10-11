@@ -4,9 +4,12 @@ import {
 
 import {
   isOAuthSessionPossessionVerifierV1,
-  isOAuthReplayChallengeAvailableV1,
   type OAuthSensitiveOperationV1
 } from "../../contracts/oauthSessionPossession.v1";
+
+import {
+  isOAuthReplayChallengeAvailableV2
+} from "../../contracts/oauthOperationReplayChallenge.v2";
 
 import {
   resolveVerifiedEntraStaffIdentity,
@@ -31,9 +34,9 @@ import {
 } from "./oauthCredentialOwnerAuthorization";
 
 import {
-  consumeOAuthReplayChallenge,
-  type OAuthReplayChallengeAtomicRepository
-} from "./consumeOAuthReplayChallenge";
+  consumeOAuthReplayChallengeV2,
+  type OAuthReplayChallengeAtomicRepositoryV2
+} from "./consumeOAuthReplayChallengeV2";
 
 /**
  * Request selectors and proof material. None of these fields
@@ -63,7 +66,7 @@ export interface OAuthCredentialOperationDependencies {
     (credentialId: string) => Promise<readonly unknown[]>;
   readReplayChallenges:
     (challengeId: string) => Promise<readonly unknown[]>;
-  replayRepository: OAuthReplayChallengeAtomicRepository;
+  replayRepository: OAuthReplayChallengeAtomicRepositoryV2;
   clock?: () => number;
 }
 
@@ -138,7 +141,7 @@ function validDependencies(
     typeof deps.readCredentials === "function" &&
     typeof deps.readReplayChallenges === "function" &&
     !!deps.replayRepository &&
-    typeof deps.replayRepository.consumeIfAvailable === "function" &&
+    typeof deps.replayRepository.consumeIfAvailableV2 === "function" &&
     (deps.clock === undefined ||
       typeof deps.clock === "function");
 }
@@ -281,7 +284,7 @@ export async function authorizeOAuthCredentialOperation(
 
     if (!validTime(challengeNow) ||
         challengeNow < ownershipNow ||
-        !isOAuthReplayChallengeAvailableV1(
+        !isOAuthReplayChallengeAvailableV2(
           challenge,
           challengeNow
         )) {
@@ -292,6 +295,7 @@ export async function authorizeOAuthCredentialOperation(
       challenge.challengeId !== input.challengeId ||
       challenge.sessionBindingId !==
         sessionDecision.evidence.sessionBindingId ||
+      challenge.credentialId !== credential.credentialId ||
       challenge.operation !== input.operation
     ) {
       return denied;
@@ -300,10 +304,11 @@ export async function authorizeOAuthCredentialOperation(
     // Consume only after identity, session possession and owner
     // checks have passed. The repository revalidates stored metadata,
     // ETag and trusted expiry at its own commit boundary.
-    const consumption = await consumeOAuthReplayChallenge(
+    const consumption = await consumeOAuthReplayChallengeV2(
       {
         challengeId: challenge.challengeId,
         sessionBindingId: challenge.sessionBindingId,
+        credentialId: credential.credentialId,
         operation: challenge.operation,
         expectedChallengeDigest: challenge.challengeDigest,
         expectedRevision: challenge.revision,

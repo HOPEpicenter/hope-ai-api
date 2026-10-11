@@ -148,9 +148,10 @@ async function main(): Promise<void> {
   };
 
   const validChallenge = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     challengeId: CHALLENGE,
     sessionBindingId: SESSION,
+    credentialId: CREDENTIAL,
     operation: "credential_read",
     challengeDigest: "a".repeat(64),
     issuedAt: CREATED,
@@ -182,6 +183,7 @@ async function main(): Promise<void> {
     clock?: () => number;
     throwReader?: string;
     replayResult?: boolean;
+    replayThrows?: boolean;
   }
 
   function setup(overrides: Overrides = {}) {
@@ -228,15 +230,19 @@ async function main(): Promise<void> {
         return overrides.challenges ?? [validChallenge];
       },
       replayRepository: {
-        async consumeIfAvailable(value) {
+        async consumeIfAvailableV2(value) {
           replayCalls++;
           assert.equal(value.challengeId, CHALLENGE);
           assert.equal(value.sessionBindingId, SESSION);
+          assert.equal(value.credentialId, CREDENTIAL);
           assert.equal(value.operation, "credential_read");
           assert.equal(
             value.expectedChallengeDigest,
             validChallenge.challengeDigest
           );
+          if (overrides.replayThrows) {
+            throw new Error("Synthetic atomic repository failure");
+          }
           return overrides.replayResult ?? true;
         }
       },
@@ -384,6 +390,44 @@ async function main(): Promise<void> {
 
   // No success from replay rejection or storage uncertainty.
   await assertDenied(request(), { replayResult: false }, 1);
+  await assertDenied(request(), { replayThrows: true }, 1);
+
+  // V1 cannot be downgraded into a V2 authorization decision.
+  await assertDenied(request(), {
+    challenges: [{
+      schemaVersion: 1,
+      challengeId: CHALLENGE,
+      sessionBindingId: SESSION,
+      operation: "credential_read",
+      challengeDigest: validChallenge.challengeDigest,
+      issuedAt: CREATED,
+      expiresAt: EXPIRES,
+      consumedAt: null,
+      revision: 0
+    }]
+  });
+
+  // The replay challenge must bind the validated stored credential.
+  await assertDenied(request(), {
+    challenges: [{
+      ...validChallenge,
+      credentialId: OTHER
+    }]
+  });
+  await assertDenied(request(), {
+    challenges: [{
+      ...validChallenge,
+      credentialId: undefined
+    }]
+  });
+
+  // Duplicate and mixed-version evidence fails closed.
+  await assertDenied(request(), {
+    challenges: [
+      validChallenge,
+      { ...validChallenge, schemaVersion: 1 }
+    ]
+  });
 
   for (const throwReader of [
     "sessions",

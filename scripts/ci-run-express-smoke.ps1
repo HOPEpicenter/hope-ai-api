@@ -364,6 +364,12 @@ if ($LASTEXITCODE -ne 0) {
   throw "OAuth V2 replay Azurite integration test failed"
 }
 
+Write-Host "Running OAuth ordering atomic-commit integration test against Azurite..."
+npx --no-install ts-node tests/authorization/oauthOrderingCoordinationAzurite.test.ts
+if ($LASTEXITCODE -ne 0) {
+  throw "OAuth ordering Azurite integration test failed"
+}
+
 if (Test-Path -LiteralPath ".\package.json") { Write-Host "No BOM detected in package.json" }
 Write-Host "OK: Guard passed (no '@azure/functions' imports under src)."
 

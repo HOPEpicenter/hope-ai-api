@@ -435,6 +435,142 @@ async function main(): Promise<void> {
       "Ambiguous acknowledgement durable inspection passed"
     );
 
+    // Simulate a batch that is rejected, after which
+    // its acknowledgement is lost to the caller.
+    // Durable evidence must show no partial commit.
+    const beforeRejected = await readHead(bindingPartition);
+    const eventsBeforeRejected = await readEvents(bindingPartition);
+    const rejectedId = randomUUID();
+    let rejectedByStorage = false;
+    let rejectedAcknowledgementUncertain = false;
+
+    try {
+      await table.submitTransaction([
+        [
+          "update",
+          {
+            partitionKey: bindingPartition,
+            rowKey: headRow,
+            revision: beforeRejected.revision + 1,
+            state: "invalid_reassignment"
+          },
+          "Replace",
+          { etag: beforeRejected.etag }
+        ],
+        [
+          "create",
+          {
+            partitionKey: bindingPartition,
+            rowKey: bindingRow,
+            staffId: randomUUID(),
+            bindingKey: "synthetic-entra-binding"
+          }
+        ],
+        eventCreate(
+          bindingPartition,
+          rejectedId,
+          winners[0],
+          "staff.rejected_attempt"
+        )
+      ]);
+    } catch (error) {
+      const status = (error as {
+        statusCode?: number;
+      }).statusCode;
+
+      rejectedByStorage = status === 409 || status === 412;
+      if (!rejectedByStorage) throw error;
+
+      // Synthetic caller loses the rejection acknowledgement.
+      rejectedAcknowledgementUncertain = true;
+    }
+
+    assert.equal(rejectedByStorage, true);
+    assert.equal(rejectedAcknowledgementUncertain, true);
+
+    const afterRejected = await readHead(bindingPartition);
+    const eventsAfterRejected = await readEvents(bindingPartition);
+
+    assert.equal(afterRejected.revision, beforeRejected.revision);
+    assert.equal(afterRejected.etag, beforeRejected.etag);
+    assert.equal(eventsAfterRejected.length, eventsBeforeRejected.length);
+    assert.equal(
+      eventsAfterRejected.some(event => event.eventId === rejectedId),
+      false
+    );
+    assert.equal(
+      (
+        await table.getEntity<{ staffId: string }>(
+          bindingPartition,
+          bindingRow
+        )
+      ).staffId,
+      winners[0]
+    );
+    assert.equal(executionPermitted, false);
+    assert.equal(retryPermitted, false);
+
+    console.log(
+      "Failed batch uncertain acknowledgement inspection passed"
+    );
+
+    // A committed attempt ID cannot be replayed into a
+    // second staff event even using the latest head ETag.
+    const beforeReplay = await readHead(bindingPartition);
+    const replayEventsBefore = await readEvents(bindingPartition);
+
+    let replayRejected = false;
+
+    try {
+      await table.submitTransaction([
+        [
+          "update",
+          {
+            partitionKey: bindingPartition,
+            rowKey: headRow,
+            revision: beforeReplay.revision + 1,
+            state: "replayed_attempt"
+          },
+          "Replace",
+          { etag: beforeReplay.etag }
+        ],
+        eventCreate(
+          bindingPartition,
+          uncertainId,
+          winners[0],
+          "staff.synthetic_inspection"
+        )
+      ]);
+    } catch (error) {
+      const status = (error as {
+        statusCode?: number;
+      }).statusCode;
+
+      replayRejected = status === 409 || status === 412;
+      if (!replayRejected) throw error;
+    }
+
+    assert.equal(replayRejected, true);
+
+    const afterReplay = await readHead(bindingPartition);
+    const replayEventsAfter = await readEvents(bindingPartition);
+
+    assert.equal(afterReplay.revision, beforeReplay.revision);
+    assert.equal(afterReplay.etag, beforeReplay.etag);
+    assert.equal(replayEventsAfter.length, replayEventsBefore.length);
+    assert.equal(
+      replayEventsAfter.filter(
+        event => event.eventId === uncertainId
+      ).length,
+      1
+    );
+    assert.equal(executionPermitted, false);
+    assert.equal(retryPermitted, false);
+
+    console.log(
+      "Replayed attempt identity transactional rollback passed"
+    );
+
     console.log(
       "OAuth staff writer participation Azurite proof passed"
     );

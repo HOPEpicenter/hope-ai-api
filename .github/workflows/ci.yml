@@ -258,6 +258,12 @@ jobs:
               throw "OAuth staff writer participation Azurite proof failed"
             }
 
+            npx --no-install ts-node tests/authorization/oauthIntegratedTopologyAzurite.test.ts
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Integrated OAuth topology Azurite proof failed"
+            }
+
             Write-Host "[PASS] OAuth staff writer participation Azurite proof"
           }
           finally {

@@ -175,6 +175,92 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           ./scripts/assert-regression-target-normalization.ps1
+      - name: OAuth single-partition atomicity Azurite proof
+        shell: pwsh
+        env:
+          STORAGE_CONNECTION_STRING: UseDevelopmentStorage=true
+          HOPE_OAUTH_AZURITE_TABLE_PORT: "11002"
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+
+          if ($env:STORAGE_CONNECTION_STRING -ne "UseDevelopmentStorage=true") {
+            throw "Emulator-only storage required"
+          }
+
+          $azJs = Join-Path (Get-Location).Path "node_modules/azurite/dist/src/azurite.js"
+          if (-not (Test-Path -LiteralPath $azJs)) {
+            throw "Azurite dependency missing"
+          }
+
+          $dataDir = Join-Path $env:RUNNER_TEMP ("oauth-atomicity-" + [guid]::NewGuid().ToString("N"))
+          New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
+
+          $stdout = Join-Path $dataDir "stdout.log"
+          $stderr = Join-Path $dataDir "stderr.log"
+          $azProcess = $null
+
+          try {
+            $azProcess = Start-Process -FilePath "node" -ArgumentList @(
+              $azJs,
+              "--silent",
+              "--location", $dataDir,
+              "--blobHost", "127.0.0.1",
+              "--blobPort", "11000",
+              "--queueHost", "127.0.0.1",
+              "--queuePort", "11001",
+              "--tableHost", "127.0.0.1",
+              "--tablePort", "11002"
+            ) -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+
+            $ready = $false
+            $deadline = (Get-Date).AddSeconds(30)
+
+            while ((Get-Date) -lt $deadline) {
+              if ($azProcess.HasExited) {
+                throw "Dedicated Azurite exited before readiness"
+              }
+
+              $client = [System.Net.Sockets.TcpClient]::new()
+              try {
+                $connection = $client.BeginConnect("127.0.0.1", 11002, $null, $null)
+                if ($connection.AsyncWaitHandle.WaitOne(300)) {
+                  $client.EndConnect($connection)
+                  $ready = $true
+                  break
+                }
+              }
+              catch {
+              }
+              finally {
+                $client.Dispose()
+              }
+
+              Start-Sleep -Milliseconds 250
+            }
+
+            if (-not $ready) {
+              throw "Dedicated Azurite did not become ready"
+            }
+
+            npx --no-install ts-node tests/authorization/oauthSinglePartitionAtomicityAzurite.test.ts
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "OAuth atomicity Azurite proof failed"
+            }
+
+            Write-Host "[PASS] OAuth single-partition atomicity proof"
+          }
+          finally {
+            if ($null -ne $azProcess -and -not $azProcess.HasExited) {
+              Stop-Process -Id $azProcess.Id -ErrorAction SilentlyContinue
+              Write-Host "[CLEANUP] Dedicated CI Azurite stopped"
+            }
+            if (Test-Path -LiteralPath $stderr) {
+              Get-Content -LiteralPath $stderr -Tail 30 -ErrorAction SilentlyContinue
+            }
+          }
+
       - name: Express smoke (Azurite owned by script)
         shell: pwsh
         env:

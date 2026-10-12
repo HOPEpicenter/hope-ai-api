@@ -250,6 +250,14 @@ jobs:
             }
 
             Write-Host "[PASS] OAuth single-partition atomicity proof"
+
+            npx --no-install ts-node tests/authorization/oauthStaffWriterParticipationAzurite.test.ts
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "OAuth staff writer participation Azurite proof failed"
+            }
+
+            Write-Host "[PASS] OAuth staff writer participation Azurite proof"
           }
           finally {
             if ($null -ne $azProcess -and -not $azProcess.HasExited) {

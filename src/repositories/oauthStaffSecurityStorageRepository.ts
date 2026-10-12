@@ -2,6 +2,7 @@ import {
   type TableClient,
   type TransactionAction
 } from "@azure/data-tables";
+import { normalizeEntraStaffBinding } from "../domain/staff/projectStaffDirectory";
 
 /**
  * Non-authorizing staff security storage foundation.
@@ -23,12 +24,34 @@ export const STAFF_SECURITY_HEAD_ROW =
 type StoredHead = {
   revision: number;
   state: string;
+  etag?: string;
 };
+
+type StoredBinding = {
+  staffId: string;
+  tenantId: string;
+  objectId: string;
+  operationId: string;
+  ownershipState?: string;
+  releasedByStaffId?: string;
+  releaseOperationId?: string;
+  releaseRevision?: number;
+  etag?: string;
+};
+
+type BindingState = "active" | "released";
 
 export type BindingReservationRequest = Readonly<{
   tenantId: string;
   objectId: string;
   staffId: string;
+  operationId: string;
+}>;
+
+export type BindingOwnershipReleaseRequest = Readonly<{
+  tenantId: string;
+  objectId: string;
+  expectedStaffId: string;
   operationId: string;
 }>;
 
@@ -49,23 +72,27 @@ export type BindingReservationResult =
       retryPermitted: false;
     }>;
 
+export type BindingOwnershipReleaseResult =
+  BindingReservationResult;
+
 const nonAuthorizing = {
   executionPermitted: false,
   retryPermitted: false
 } as const;
 
-function normalizedGuid(value: string): string | null {
-  const text = String(value ?? "").trim().toLowerCase();
+function normalizedGuid(value: unknown): string | null {
+  const normalized = normalizeEntraStaffBinding(value, value);
+  return normalized?.entraTenantId ?? null;
+}
 
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
-      text
-    )
-  ) {
-    return null;
-  }
+function normalizedStaffId(value: unknown): string | null {
+  const staffId = String(value ?? "").trim();
 
-  return text;
+  return staffId &&
+    staffId.length <= 128 &&
+    /^[a-zA-Z0-9_-]+$/.test(staffId)
+    ? staffId
+    : null;
 }
 
 function storageStatus(error: unknown): number {
@@ -82,6 +109,56 @@ function storageStatus(error: unknown): number {
     : 0;
 }
 
+function isValidETag(etag: unknown): etag is string {
+  return typeof etag === "string" && Boolean(etag) && etag !== "*";
+}
+
+function isValidHead(head: StoredHead): boolean {
+  return Number.isSafeInteger(head.revision) &&
+    head.revision >= 0 &&
+    (head.state === "active" || head.state === "revoked") &&
+    isValidETag(head.etag);
+}
+
+function canTransition(head: StoredHead): boolean {
+  return isValidHead(head) &&
+    head.state === "active" &&
+    head.revision < Number.MAX_SAFE_INTEGER;
+}
+
+function isValidBinding(
+  binding: StoredBinding,
+  tenantId: string,
+  objectId: string
+): boolean {
+  return normalizedGuid(binding.tenantId) === tenantId &&
+    normalizedGuid(binding.objectId) === objectId &&
+    binding.tenantId === tenantId &&
+    binding.objectId === objectId &&
+    normalizedStaffId(binding.staffId) === binding.staffId &&
+    normalizedGuid(binding.operationId) === binding.operationId &&
+    (binding.ownershipState === undefined ||
+      binding.ownershipState === "active" ||
+      binding.ownershipState === "released") &&
+    (binding.ownershipState === "released"
+      ? normalizedStaffId(binding.releasedByStaffId) ===
+        binding.releasedByStaffId &&
+        normalizedGuid(binding.releaseOperationId) ===
+          binding.releaseOperationId &&
+        Number.isSafeInteger(binding.releaseRevision) &&
+        (binding.releaseRevision ?? 0) > 0
+      : binding.releasedByStaffId === undefined &&
+        binding.releaseOperationId === undefined &&
+        binding.releaseRevision === undefined) &&
+    isValidETag(binding.etag);
+}
+
+function bindingState(binding: StoredBinding): BindingState {
+  return binding.ownershipState === "released"
+    ? "released"
+    : "active";
+}
+
 function unavailable(): BindingReservationResult {
   return {
     status: "unavailable",
@@ -89,149 +166,63 @@ function unavailable(): BindingReservationResult {
   };
 }
 
-export type ReservationEvidence = Readonly<{
-  status: "observed_consistent" | "absent_or_unavailable" | "inconsistent";
-  executionPermitted: false;
-  retryPermitted: false;
-}>;
+function conflict(): BindingReservationResult {
+  return {
+    status: "conflict",
+    ...nonAuthorizing
+  };
+}
 
-export class OAuthStaffSecurityStorageRepository {
-  constructor(private readonly table: TableClient) {}
+function invalidInput(): BindingReservationResult {
+  return {
+    status: "invalid_input",
+    ...nonAuthorizing
+  };
+}
 
-  /**
-   * Read-only evidence inspection. Never authorizes execution,
-   * retries, recovery writes, or a staff security decision.
-   *
-   * A consistent read is not an atomic multi-entity snapshot.
-   * It must not be used as a production authorization fence.
-   */
-  async inspectReservation(
-    request: BindingReservationRequest
-  ): Promise<ReservationEvidence> {
-    const tenantId = normalizedGuid(request.tenantId);
-    const objectId = normalizedGuid(request.objectId);
-    const operationId = normalizedGuid(request.operationId);
-    const staffId = String(request.staffId ?? "").trim();
+function uncertain(): BindingReservationResult {
+  return {
+    status: "uncertain",
+    ...nonAuthorizing
+  };
+}
 
-    if (
-      !tenantId ||
-      !objectId ||
-      !operationId ||
-      !staffId ||
-      staffId.length > 128 ||
-      !/^[a-zA-Z0-9_-]+$/.test(staffId)
-    ) {
-      return {
-        status: "inconsistent",
-        ...nonAuthorizing
-      };
-    }
+function validRequest(
+  request: BindingReservationRequest | BindingOwnershipReleaseRequest
+): {
+  tenantId: string;
+  objectId: string;
+  staffId: string;
+  operationId: string;
+} | null {
+  const tenantId = normalizedGuid(request.tenantId);
+  const objectId = normalizedGuid(request.objectId);
+  const operationId = normalizedGuid(request.operationId);
+  const rawStaffId = "staffId" in request
+    ? request.staffId
+    : request.expectedStaffId;
+  const staffId = normalizedStaffId(rawStaffId);
 
-    try {
-      const receipt = await this.table.getEntity<{
-        operationId: string;
-        staffId: string;
-        kind: string;
-        revision: number;
-      }>(
-        STAFF_SECURITY_PROTOTYPE_PARTITION,
-        `operation-${operationId}`
-      );
-
-      const binding = await this.table.getEntity<{
-        staffId: string;
-        tenantId: string;
-        objectId: string;
-        operationId: string;
-      }>(
-        STAFF_SECURITY_PROTOTYPE_PARTITION,
-        `binding-${tenantId}-${objectId}`
-      );
-
-      const head = await this.table.getEntity<StoredHead>(
-        STAFF_SECURITY_PROTOTYPE_PARTITION,
-        STAFF_SECURITY_HEAD_ROW
-      );
-
-      const consistent =
-        receipt.operationId === operationId &&
-        receipt.staffId === staffId &&
-        receipt.kind === "binding.reserved" &&
-        Number.isSafeInteger(receipt.revision) &&
-        receipt.revision > 0 &&
-        binding.staffId === staffId &&
-        binding.tenantId === tenantId &&
-        binding.objectId === objectId &&
-        binding.operationId === operationId &&
-        Number.isSafeInteger(head.revision) &&
-        head.revision >= receipt.revision;
-
-      return {
-        status: consistent
-          ? "observed_consistent"
-          : "inconsistent",
-        ...nonAuthorizing
-      };
-    } catch {
-      // Includes missing records and read failures.
-      // Never infer that the operation did not commit.
-      return {
-        status: "absent_or_unavailable",
-        ...nonAuthorizing
-      };
-    }
+  if (!tenantId || !objectId || !operationId || !staffId) {
+    return null;
   }
 
-  async reserveBinding(
-    request: BindingReservationRequest
-  ): Promise<BindingReservationResult> {
-    const tenantId = normalizedGuid(request.tenantId);
-    const objectId = normalizedGuid(request.objectId);
-    const operationId = normalizedGuid(request.operationId);
-    const staffId = String(request.staffId ?? "").trim();
+  return { tenantId, objectId, staffId, operationId };
+}
 
-    if (
-      !tenantId ||
-      !objectId ||
-      !operationId ||
-      !staffId ||
-      staffId.length > 128 ||
-      !/^[a-zA-Z0-9_-]+$/.test(staffId)
-    ) {
-      return {
-        status: "invalid_input",
-        ...nonAuthorizing
-      };
-    }
+function transactionActions(
+  head: StoredHead,
+  actions: TransactionAction[]
+): { actions: TransactionAction[]; revision: number } | null {
+  if (!canTransition(head)) {
+    return null;
+  }
 
-    let head;
+  const nextRevision = head.revision + 1;
 
-    try {
-      head = await this.table.getEntity<StoredHead>(
-        STAFF_SECURITY_PROTOTYPE_PARTITION,
-        STAFF_SECURITY_HEAD_ROW
-      );
-    } catch {
-      return unavailable();
-    }
-
-    if (
-      !Number.isSafeInteger(head.revision) ||
-      head.revision < 0 ||
-      head.state !== "active" ||
-      !head.etag ||
-      head.etag === "*"
-    ) {
-      return unavailable();
-    }
-
-    if (head.revision === Number.MAX_SAFE_INTEGER) {
-      return unavailable();
-    }
-
-    const nextRevision = head.revision + 1;
-
-    const actions: TransactionAction[] = [
+  return {
+    revision: nextRevision,
+    actions: [
       [
         "update",
         {
@@ -243,54 +234,358 @@ export class OAuthStaffSecurityStorageRepository {
         "Replace",
         { etag: head.etag }
       ],
-      [
-        "create",
+      ...actions
+    ]
+  };
+}
+
+export type ReservationEvidence = Readonly<{
+  status:
+    | "observed_consistent"
+    | "observed_historical"
+    | "absent_or_unavailable"
+    | "inconsistent";
+  executionPermitted: false;
+  retryPermitted: false;
+}>;
+
+export class OAuthStaffSecurityStorageRepository {
+  constructor(private readonly table: TableClient) {}
+
+  /**
+   * Read-only historical evidence inspection. It never
+   * authorizes execution, retries, recovery writes, or a staff
+   * security decision. A historical receipt does not prove
+   * current binding ownership.
+   *
+   * A consistent read is not an atomic multi-entity snapshot.
+   * It must not be used as a production authorization fence.
+   */
+  async inspectReservation(
+    request: BindingReservationRequest
+  ): Promise<ReservationEvidence> {
+    const parsed = validRequest(request);
+
+    if (!parsed) {
+      return {
+        status: "inconsistent",
+        ...nonAuthorizing
+      };
+    }
+
+    const { tenantId, objectId, staffId, operationId } = parsed;
+    let receipt: {
+      operationId: string;
+      staffId: string;
+      tenantId?: string;
+      objectId?: string;
+      kind: string;
+      revision: number;
+    };
+
+    try {
+      receipt = await this.table.getEntity(
+        STAFF_SECURITY_PROTOTYPE_PARTITION,
+        `operation-${operationId}`
+      );
+    } catch {
+      return {
+        status: "absent_or_unavailable",
+        ...nonAuthorizing
+      };
+    }
+
+    let head: StoredHead;
+
+    try {
+      head = await this.table.getEntity<StoredHead>(
+        STAFF_SECURITY_PROTOTYPE_PARTITION,
+        STAFF_SECURITY_HEAD_ROW
+      );
+    } catch {
+      return {
+        status: "absent_or_unavailable",
+        ...nonAuthorizing
+      };
+    }
+
+    const validReceipt =
+      receipt.operationId === operationId &&
+      receipt.staffId === staffId &&
+      (receipt.tenantId === undefined || receipt.tenantId === tenantId) &&
+      (receipt.objectId === undefined || receipt.objectId === objectId) &&
+      receipt.kind === "binding.reserved" &&
+      Number.isSafeInteger(receipt.revision) &&
+      receipt.revision > 0;
+
+    if (
+      !validReceipt ||
+      !isValidHead(head) ||
+      head.revision < receipt.revision
+    ) {
+      return {
+        status: "inconsistent",
+        ...nonAuthorizing
+      };
+    }
+
+    let binding: StoredBinding;
+
+    try {
+      binding = await this.table.getEntity<StoredBinding>(
+        STAFF_SECURITY_PROTOTYPE_PARTITION,
+        `binding-${tenantId}-${objectId}`
+      );
+    } catch (error) {
+      if (storageStatus(error) === 404) {
+        return {
+          status: "observed_historical",
+          ...nonAuthorizing
+        };
+      }
+
+      return {
+        status: "absent_or_unavailable",
+        ...nonAuthorizing
+      };
+    }
+
+    if (!isValidBinding(binding, tenantId, objectId)) {
+      return {
+        status: "inconsistent",
+        ...nonAuthorizing
+      };
+    }
+
+    return {
+      status:
+        bindingState(binding) === "active" &&
+        binding.staffId === staffId &&
+        binding.operationId === operationId
+          ? "observed_consistent"
+          : "observed_historical",
+      ...nonAuthorizing
+    };
+  }
+
+  async reserveBinding(
+    request: BindingReservationRequest
+  ): Promise<BindingReservationResult> {
+    const parsed = validRequest(request);
+
+    if (!parsed) {
+      return invalidInput();
+    }
+
+    const { tenantId, objectId, staffId, operationId } = parsed;
+    const bindingRow = `binding-${tenantId}-${objectId}`;
+    let head: StoredHead;
+
+    try {
+      head = await this.table.getEntity<StoredHead>(
+        STAFF_SECURITY_PROTOTYPE_PARTITION,
+        STAFF_SECURITY_HEAD_ROW
+      );
+    } catch {
+      return unavailable();
+    }
+
+    if (!canTransition(head)) {
+      return unavailable();
+    }
+
+    let existingBinding: StoredBinding | null = null;
+
+    try {
+      existingBinding = await this.table.getEntity<StoredBinding>(
+        STAFF_SECURITY_PROTOTYPE_PARTITION,
+        bindingRow
+      );
+    } catch (error) {
+      if (storageStatus(error) !== 404) {
+        return unavailable();
+      }
+    }
+
+    let bindingAction: TransactionAction;
+    if (existingBinding) {
+      if (!isValidBinding(existingBinding, tenantId, objectId)) {
+        return unavailable();
+      }
+
+      if (bindingState(existingBinding) === "active") {
+        return conflict();
+      }
+
+      bindingAction = [
+        "update",
         {
           partitionKey: STAFF_SECURITY_PROTOTYPE_PARTITION,
-          rowKey: `binding-${tenantId}-${objectId}`,
+          rowKey: bindingRow,
           staffId,
           tenantId,
           objectId,
-          operationId
-        }
-      ],
-      [
+          operationId,
+          ownershipState: "active"
+        },
+        "Replace",
+        { etag: existingBinding.etag }
+      ];
+    } else {
+      bindingAction = [
         "create",
         {
           partitionKey: STAFF_SECURITY_PROTOTYPE_PARTITION,
-          rowKey: `operation-${operationId}`,
-          operationId,
+          rowKey: bindingRow,
           staffId,
-          kind: "binding.reserved",
-          revision: nextRevision
+          tenantId,
+          objectId,
+          operationId,
+          ownershipState: "active"
         }
-      ]
-    ];
+      ];
+    }
 
+    const transition = transactionActions(head, [bindingAction]);
+
+    if (!transition) {
+      return unavailable();
+    }
+
+    transition.actions.push([
+      "create",
+      {
+        partitionKey: STAFF_SECURITY_PROTOTYPE_PARTITION,
+        rowKey: `operation-${operationId}`,
+        operationId,
+        staffId,
+        tenantId,
+        objectId,
+        kind: "binding.reserved",
+        revision: transition.revision
+      }
+    ]);
+
+    return this.submitTransition(transition.actions, transition.revision);
+  }
+
+  /**
+   * Releases a binding only while the stored owner still matches
+   * expectedStaffId. The head and binding ETags fence concurrent
+   * transitions; the immutable receipt is committed atomically.
+   */
+  async releaseBindingOwnership(
+    request: BindingOwnershipReleaseRequest
+  ): Promise<BindingOwnershipReleaseResult> {
+    const parsed = validRequest(request);
+
+    if (!parsed) {
+      return invalidInput();
+    }
+
+    const { tenantId, objectId, staffId, operationId } = parsed;
+    const bindingRow = `binding-${tenantId}-${objectId}`;
+    let head: StoredHead;
+
+    try {
+      head = await this.table.getEntity<StoredHead>(
+        STAFF_SECURITY_PROTOTYPE_PARTITION,
+        STAFF_SECURITY_HEAD_ROW
+      );
+    } catch {
+      return unavailable();
+    }
+
+    if (!canTransition(head)) {
+      return unavailable();
+    }
+
+    let binding: StoredBinding;
+
+    try {
+      binding = await this.table.getEntity<StoredBinding>(
+        STAFF_SECURITY_PROTOTYPE_PARTITION,
+        bindingRow
+      );
+    } catch (error) {
+      return storageStatus(error) === 404 ? conflict() : unavailable();
+    }
+
+    if (!isValidBinding(binding, tenantId, objectId)) {
+      return unavailable();
+    }
+
+    if (
+      binding.staffId !== staffId ||
+      bindingState(binding) !== "active"
+    ) {
+      return conflict();
+    }
+
+    const updateBindingAction: TransactionAction = [
+      "update",
+      {
+        partitionKey: STAFF_SECURITY_PROTOTYPE_PARTITION,
+        rowKey: bindingRow,
+        staffId: binding.staffId,
+        tenantId,
+        objectId,
+        operationId: binding.operationId,
+        ownershipState: "released",
+        releasedByStaffId: staffId,
+        releaseOperationId: operationId,
+        releaseRevision: head.revision + 1
+      },
+      "Replace",
+      { etag: binding.etag }
+    ];
+    const transition = transactionActions(head, [
+      updateBindingAction
+    ]);
+
+    if (!transition) {
+      return unavailable();
+    }
+
+    transition.actions.push([
+      "create",
+      {
+        partitionKey: STAFF_SECURITY_PROTOTYPE_PARTITION,
+        rowKey: `operation-${operationId}`,
+        operationId,
+        staffId,
+        tenantId,
+        objectId,
+        kind: "binding.released",
+        revision: transition.revision
+      }
+    ]);
+
+    return this.submitTransition(transition.actions, transition.revision);
+  }
+
+  private async submitTransition(
+    actions: TransactionAction[],
+    revision: number
+  ): Promise<BindingReservationResult> {
     try {
       await this.table.submitTransaction(actions);
 
       return {
         status: "committed",
-        revision: nextRevision,
+        revision,
         ...nonAuthorizing
       };
     } catch (error) {
       const status = storageStatus(error);
 
       if (status === 409 || status === 412) {
-        return {
-          status: "conflict",
-          ...nonAuthorizing
-        };
+        return conflict();
       }
 
-      // Unknown acknowledgements are not automatically
-      // retried or interpreted as successful operations.
-      return {
-        status: "uncertain",
-        ...nonAuthorizing
-      };
+      // Unknown acknowledgements are never retried or inferred
+      // as successful operations.
+      return uncertain();
     }
   }
 }

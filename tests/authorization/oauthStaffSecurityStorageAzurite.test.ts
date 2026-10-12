@@ -66,7 +66,664 @@ async function headRevision(table: TableClient): Promise<number> {
   return entity.revision;
 }
 
+function assertNonAuthorizing(result: {
+  executionPermitted: false;
+  retryPermitted: false;
+}): void {
+  assert.equal(result.executionPermitted, false);
+  assert.equal(result.retryPermitted, false);
+}
+
+async function verifyOwnershipTransitions(): Promise<void> {
+  const table = newTable();
+  await table.createTable();
+
+  try {
+    await createHead(table);
+    const repository = new OAuthStaffSecurityStorageRepository(table);
+
+    const legacyObjectId =
+      "88888888-8888-4888-8888-888888888888";
+    await table.createEntity({
+      partitionKey: STAFF_SECURITY_PROTOTYPE_PARTITION,
+      rowKey: `binding-${tenantId}-${legacyObjectId}`,
+      staffId: "legacy-active-owner",
+      tenantId,
+      objectId: legacyObjectId,
+      operationId: randomUUID()
+    });
+    const legacyBindingAttempt = await repository.reserveBinding({
+      tenantId,
+      objectId: legacyObjectId,
+      staffId: "legacy-competitor",
+      operationId: randomUUID()
+    });
+    assert.equal(legacyBindingAttempt.status, "conflict");
+    assertNonAuthorizing(legacyBindingAttempt);
+    assert.equal(await headRevision(table), 0);
+
+    const initialReservation = {
+      tenantId,
+      objectId,
+      staffId: "owner-one",
+      operationId: randomUUID()
+    };
+
+    const initial = await repository.reserveBinding(initialReservation);
+    assert.equal(initial.status, "committed");
+    assert.equal(initial.revision, 1);
+    assertNonAuthorizing(initial);
+
+    const replay = await repository.reserveBinding(initialReservation);
+    assert.equal(replay.status, "conflict");
+    assertNonAuthorizing(replay);
+    assert.equal(await headRevision(table), 1);
+
+    const competitor = await repository.reserveBinding({
+      ...initialReservation,
+      staffId: "owner-two",
+      operationId: randomUUID()
+    });
+    assert.equal(competitor.status, "conflict");
+    assertNonAuthorizing(competitor);
+    assert.equal(await headRevision(table), 1);
+
+    const releaseOperationId = randomUUID();
+    const release = await repository.releaseBindingOwnership({
+      tenantId,
+      objectId,
+      expectedStaffId: "owner-one",
+      operationId: releaseOperationId
+    });
+    assert.equal(release.status, "committed");
+    assert.equal(release.revision, 2);
+    assertNonAuthorizing(release);
+
+    const releaseReplay =
+      await repository.releaseBindingOwnership({
+        tenantId,
+        objectId,
+        expectedStaffId: "owner-one",
+        operationId: releaseOperationId
+      });
+    assert.equal(releaseReplay.status, "conflict");
+    assertNonAuthorizing(releaseReplay);
+    assert.equal(await headRevision(table), 2);
+
+    const releasedBinding = await table.getEntity<{
+      staffId: string;
+      ownershipState: string;
+      releasedByStaffId: string;
+      releaseOperationId: string;
+      releaseRevision: number;
+    }>(
+      STAFF_SECURITY_PROTOTYPE_PARTITION,
+      `binding-${tenantId}-${objectId}`
+    );
+    assert.equal(releasedBinding.staffId, "owner-one");
+    assert.equal(releasedBinding.ownershipState, "released");
+    assert.equal(releasedBinding.releasedByStaffId, "owner-one");
+    assert.equal(releasedBinding.releaseOperationId, releaseOperationId);
+    assert.equal(releasedBinding.releaseRevision, 2);
+
+    const releaseReceipt = await table.getEntity<{
+      staffId: string;
+      kind: string;
+      operationId: string;
+      revision: number;
+    }>(
+      STAFF_SECURITY_PROTOTYPE_PARTITION,
+      `operation-${releaseOperationId}`
+    );
+    assert.equal(releaseReceipt.staffId, "owner-one");
+    assert.equal(releaseReceipt.kind, "binding.released");
+    assert.equal(releaseReceipt.operationId, releaseOperationId);
+    assert.equal(releaseReceipt.revision, 2);
+
+    const releasedEvidence =
+      await repository.inspectReservation(initialReservation);
+    assert.equal(releasedEvidence.status, "observed_historical");
+    assertNonAuthorizing(releasedEvidence);
+
+    const successorReservation = {
+      tenantId,
+      objectId,
+      staffId: "owner-two",
+      operationId: randomUUID()
+    };
+    const successor =
+      await repository.reserveBinding(successorReservation);
+    assert.equal(successor.status, "committed");
+    assert.equal(successor.revision, 3);
+    assertNonAuthorizing(successor);
+
+    const formerOwnerRelease =
+      await repository.releaseBindingOwnership({
+        tenantId,
+        objectId,
+        expectedStaffId: "owner-one",
+        operationId: randomUUID()
+      });
+    assert.equal(formerOwnerRelease.status, "conflict");
+    assertNonAuthorizing(formerOwnerRelease);
+    assert.equal(await headRevision(table), 3);
+
+    const duplicateReceiptRelease =
+      await repository.releaseBindingOwnership({
+        tenantId,
+        objectId,
+        expectedStaffId: "owner-two",
+        operationId: successorReservation.operationId
+      });
+    assert.equal(duplicateReceiptRelease.status, "conflict");
+    assertNonAuthorizing(duplicateReceiptRelease);
+    assert.equal(await headRevision(table), 3);
+
+    const retainedBinding = await table.getEntity<{
+      staffId: string;
+      operationId: string;
+      ownershipState: string;
+    }>(
+      STAFF_SECURITY_PROTOTYPE_PARTITION,
+      `binding-${tenantId}-${objectId}`
+    );
+    assert.equal(retainedBinding.staffId, "owner-two");
+    assert.equal(retainedBinding.ownershipState, "active");
+    assert.equal(
+      retainedBinding.operationId,
+      successorReservation.operationId
+    );
+
+    const retainedReceipt = await table.getEntity<{
+      staffId: string;
+      kind: string;
+    }>(
+      STAFF_SECURITY_PROTOTYPE_PARTITION,
+      `operation-${successorReservation.operationId}`
+    );
+    assert.equal(retainedReceipt.staffId, "owner-two");
+    assert.equal(retainedReceipt.kind, "binding.reserved");
+
+    const concurrentObjectId =
+      "33333333-3333-4333-8333-333333333333";
+    const concurrentOwnerReservation = await repository.reserveBinding({
+      tenantId,
+      objectId: concurrentObjectId,
+      staffId: "concurrent-owner",
+      operationId: randomUUID()
+    });
+    assert.equal(concurrentOwnerReservation.status, "committed");
+    assertNonAuthorizing(concurrentOwnerReservation);
+
+    const [concurrentRelease, concurrentReservation] =
+      await Promise.all([
+        repository.releaseBindingOwnership({
+          tenantId,
+          objectId: concurrentObjectId,
+          expectedStaffId: "concurrent-owner",
+          operationId: randomUUID()
+        }),
+        repository.reserveBinding({
+          tenantId,
+          objectId: concurrentObjectId,
+          staffId: "concurrent-successor",
+          operationId: randomUUID()
+        })
+      ]);
+    assertNonAuthorizing(concurrentRelease);
+    assertNonAuthorizing(concurrentReservation);
+    assert.ok(
+      concurrentRelease.status === "committed" ||
+      concurrentRelease.status === "conflict"
+    );
+    assert.ok(
+      concurrentReservation.status === "committed" ||
+      concurrentReservation.status === "conflict"
+    );
+    if (
+      concurrentRelease.status === "committed" &&
+      concurrentReservation.status === "committed"
+    ) {
+      assert.notEqual(
+        concurrentRelease.revision,
+        concurrentReservation.revision
+      );
+    }
+
+    let concurrentBinding: {
+      staffId: string;
+      ownershipState: string;
+    } | null = null;
+    try {
+      concurrentBinding = await table.getEntity<{
+        staffId: string;
+        ownershipState: string;
+      }>(
+        STAFF_SECURITY_PROTOTYPE_PARTITION,
+        `binding-${tenantId}-${concurrentObjectId}`
+      );
+    } catch (error) {
+      assert.equal(
+        (error as { statusCode?: number }).statusCode,
+        404
+      );
+    }
+    if (concurrentReservation.status === "committed") {
+      assert.equal(
+        concurrentBinding?.staffId,
+        "concurrent-successor"
+      );
+      assert.equal(concurrentBinding?.ownershipState, "active");
+    } else if (concurrentRelease.status === "committed") {
+      assert.equal(concurrentBinding?.ownershipState, "released");
+      const reacquired = await repository.reserveBinding({
+        tenantId,
+        objectId: concurrentObjectId,
+        staffId: "concurrent-successor",
+        operationId: randomUUID()
+      });
+      assert.equal(reacquired.status, "committed");
+      assertNonAuthorizing(reacquired);
+    } else {
+      assert.equal(concurrentBinding?.staffId, "concurrent-owner");
+    }
+
+    const versionlessGuid = await repository.reserveBinding({
+      tenantId: "00000000-0000-0000-0000-000000000000",
+      objectId,
+      staffId: "invalid-guid-owner",
+      operationId: randomUUID()
+    });
+    assert.equal(versionlessGuid.status, "invalid_input");
+    assertNonAuthorizing(versionlessGuid);
+
+    const beforeRevocation = await table.getEntity<{
+      revision: number;
+      state: string;
+    }>(
+      STAFF_SECURITY_PROTOTYPE_PARTITION,
+      STAFF_SECURITY_HEAD_ROW
+    );
+    await table.updateEntity(
+      {
+        partitionKey: STAFF_SECURITY_PROTOTYPE_PARTITION,
+        rowKey: STAFF_SECURITY_HEAD_ROW,
+        revision: beforeRevocation.revision + 1,
+        state: "revoked"
+      },
+      "Replace",
+      { etag: beforeRevocation.etag }
+    );
+
+    const blockedReservation = await repository.reserveBinding({
+      tenantId,
+      objectId: "44444444-4444-4444-8444-444444444444",
+      staffId: "after-revocation",
+      operationId: randomUUID()
+    });
+    assert.equal(blockedReservation.status, "unavailable");
+    assertNonAuthorizing(blockedReservation);
+
+    const blockedRelease =
+      await repository.releaseBindingOwnership({
+        tenantId,
+        objectId,
+        expectedStaffId: "owner-two",
+        operationId: randomUUID()
+      });
+    assert.equal(blockedRelease.status, "unavailable");
+    assertNonAuthorizing(blockedRelease);
+
+    const afterRevocationBinding = await table.getEntity<{
+      staffId: string;
+      ownershipState: string;
+    }>(
+      STAFF_SECURITY_PROTOTYPE_PARTITION,
+      `binding-${tenantId}-${objectId}`
+    );
+    assert.equal(afterRevocationBinding.staffId, "owner-two");
+    assert.equal(afterRevocationBinding.ownershipState, "active");
+
+    console.log(
+      "Ownership transitions, immutable receipts, stale-owner fencing, and concurrent reassignment verified"
+    );
+  } finally {
+    await table.deleteTable();
+  }
+}
+
+async function verifyStaleReleaseRollback(): Promise<void> {
+  const table = newTable();
+  await table.createTable();
+
+  try {
+    await createHead(table);
+    const repository = new OAuthStaffSecurityStorageRepository(table);
+    const objectIdForTest =
+      "55555555-5555-4555-8555-555555555555";
+    const reserved = await repository.reserveBinding({
+      tenantId,
+      objectId: objectIdForTest,
+      staffId: "stale-owner",
+      operationId: randomUUID()
+    });
+    assert.equal(reserved.status, "committed");
+
+    const operationId = randomUUID();
+    const staleEtagTable = new Proxy(table, {
+      get(target, property) {
+        if (property === "submitTransaction") {
+          return async (actions: TransactionAction[]) => {
+            const currentHead = await target.getEntity<{
+              revision: number;
+              state: string;
+            }>(
+              STAFF_SECURITY_PROTOTYPE_PARTITION,
+              STAFF_SECURITY_HEAD_ROW
+            );
+            await target.updateEntity(
+              {
+                partitionKey: STAFF_SECURITY_PROTOTYPE_PARTITION,
+                rowKey: STAFF_SECURITY_HEAD_ROW,
+                revision: currentHead.revision + 1,
+                state: currentHead.state
+              },
+              "Replace",
+              { etag: currentHead.etag }
+            );
+            return target.submitTransaction(actions);
+          };
+        }
+
+        const value = Reflect.get(target, property, target);
+        return typeof value === "function"
+          ? value.bind(target)
+          : value;
+      }
+    });
+
+    const staleRepository =
+      new OAuthStaffSecurityStorageRepository(staleEtagTable);
+    const staleRelease =
+      await staleRepository.releaseBindingOwnership({
+        tenantId,
+        objectId: objectIdForTest,
+        expectedStaffId: "stale-owner",
+        operationId
+      });
+    assert.equal(staleRelease.status, "conflict");
+    assertNonAuthorizing(staleRelease);
+    assert.equal(await headRevision(table), 2);
+
+    const survivingBinding = await table.getEntity<{
+      staffId: string;
+    }>(
+      STAFF_SECURITY_PROTOTYPE_PARTITION,
+      `binding-${tenantId}-${objectIdForTest}`
+    );
+    assert.equal(survivingBinding.staffId, "stale-owner");
+
+    await assert.rejects(
+      table.getEntity(
+        STAFF_SECURITY_PROTOTYPE_PARTITION,
+        `operation-${operationId}`
+      ),
+      (error: unknown) =>
+        (error as { statusCode?: number }).statusCode === 404
+    );
+    console.log("Stale release ETag atomically preserves binding and receipt");
+  } finally {
+    await table.deleteTable();
+  }
+}
+
+async function verifyReleaseAcknowledgementLoss(): Promise<void> {
+  const table = newTable();
+  await table.createTable();
+
+  try {
+    await createHead(table);
+    const repository = new OAuthStaffSecurityStorageRepository(table);
+    const reservation = {
+      tenantId,
+      objectId,
+      staffId: "ack-loss-owner",
+      operationId: randomUUID()
+    };
+    const acquired = await repository.reserveBinding(reservation);
+    assert.equal(acquired.status, "committed");
+
+    const operationId = randomUUID();
+    const lostAcknowledgementTable = new Proxy(table, {
+      get(target, property) {
+        if (property === "submitTransaction") {
+          return async (actions: TransactionAction[]) => {
+            await target.submitTransaction(actions);
+            throw new Error("simulated acknowledgement loss");
+          };
+        }
+
+        const value = Reflect.get(target, property, target);
+        return typeof value === "function"
+          ? value.bind(target)
+          : value;
+      }
+    });
+    const uncertainRepository =
+      new OAuthStaffSecurityStorageRepository(
+        lostAcknowledgementTable
+      );
+
+    const uncertain =
+      await uncertainRepository.releaseBindingOwnership({
+        tenantId,
+        objectId,
+        expectedStaffId: reservation.staffId,
+        operationId
+      });
+    assert.equal(uncertain.status, "uncertain");
+    assertNonAuthorizing(uncertain);
+    assert.equal(await headRevision(table), 2);
+
+    const durableReceipt = await table.getEntity<{
+      operationId: string;
+      staffId: string;
+      kind: string;
+    }>(
+      STAFF_SECURITY_PROTOTYPE_PARTITION,
+      `operation-${operationId}`
+    );
+    assert.equal(durableReceipt.operationId, operationId);
+    assert.equal(durableReceipt.staffId, reservation.staffId);
+    assert.equal(durableReceipt.kind, "binding.released");
+
+    const releasedBinding = await table.getEntity<{
+      ownershipState: string;
+      releaseOperationId: string;
+    }>(
+      STAFF_SECURITY_PROTOTYPE_PARTITION,
+      `binding-${tenantId}-${objectId}`
+    );
+    assert.equal(releasedBinding.ownershipState, "released");
+    assert.equal(releasedBinding.releaseOperationId, operationId);
+    console.log("Lost release acknowledgement remains uncertain without retry");
+  } finally {
+    await table.deleteTable();
+  }
+}
+
+async function verifyOutOfBandBindingModificationRollback(): Promise<void> {
+  const table = newTable();
+  await table.createTable();
+
+  try {
+    await createHead(table);
+    const repository = new OAuthStaffSecurityStorageRepository(table);
+    const releaseObjectId =
+      "66666666-6666-4666-8666-666666666666";
+    const initialReservation = {
+      tenantId,
+      objectId: releaseObjectId,
+      staffId: "out-of-band-owner",
+      operationId: randomUUID()
+    };
+    const initial = await repository.reserveBinding(initialReservation);
+    assert.equal(initial.status, "committed");
+
+    const staleReleaseOperationId = randomUUID();
+    const releaseTable = new Proxy(table, {
+      get(target, property) {
+        if (property === "submitTransaction") {
+          return async (actions: TransactionAction[]) => {
+            await target.updateEntity(
+              {
+                partitionKey: STAFF_SECURITY_PROTOTYPE_PARTITION,
+                rowKey: `binding-${tenantId}-${releaseObjectId}`,
+                staffId: "out-of-band-modification",
+                tenantId,
+                objectId: releaseObjectId,
+                operationId: initialReservation.operationId,
+                ownershipState: "active"
+              },
+              "Replace"
+            );
+            return target.submitTransaction(actions);
+          };
+        }
+
+        const value = Reflect.get(target, property, target);
+        return typeof value === "function"
+          ? value.bind(target)
+          : value;
+      }
+    });
+    const staleReleaseRepository =
+      new OAuthStaffSecurityStorageRepository(releaseTable);
+    const staleRelease =
+      await staleReleaseRepository.releaseBindingOwnership({
+        tenantId,
+        objectId: releaseObjectId,
+        expectedStaffId: "out-of-band-owner",
+        operationId: staleReleaseOperationId
+      });
+    assert.equal(staleRelease.status, "conflict");
+    assertNonAuthorizing(staleRelease);
+    assert.equal(await headRevision(table), 1);
+
+    const changedOwnerBinding = await table.getEntity<{
+      staffId: string;
+      ownershipState: string;
+    }>(
+      STAFF_SECURITY_PROTOTYPE_PARTITION,
+      `binding-${tenantId}-${releaseObjectId}`
+    );
+    assert.equal(changedOwnerBinding.staffId, "out-of-band-modification");
+    assert.equal(changedOwnerBinding.ownershipState, "active");
+    await assert.rejects(
+      table.getEntity(
+        STAFF_SECURITY_PROTOTYPE_PARTITION,
+        `operation-${staleReleaseOperationId}`
+      ),
+      (error: unknown) =>
+        (error as { statusCode?: number }).statusCode === 404
+    );
+
+    const acquisitionObjectId =
+      "77777777-7777-4777-8777-777777777777";
+    const acquisitionOwner = {
+      tenantId,
+      objectId: acquisitionObjectId,
+      staffId: "released-owner",
+      operationId: randomUUID()
+    };
+    const acquired = await repository.reserveBinding(acquisitionOwner);
+    assert.equal(acquired.status, "committed");
+    const releaseOperationId = randomUUID();
+    const released = await repository.releaseBindingOwnership({
+      tenantId,
+      objectId: acquisitionObjectId,
+      expectedStaffId: acquisitionOwner.staffId,
+      operationId: releaseOperationId
+    });
+    assert.equal(released.status, "committed");
+
+    const acquisitionOperationId = randomUUID();
+    const acquisitionTable = new Proxy(table, {
+      get(target, property) {
+        if (property === "submitTransaction") {
+          return async (actions: TransactionAction[]) => {
+            await target.updateEntity(
+              {
+                partitionKey: STAFF_SECURITY_PROTOTYPE_PARTITION,
+                rowKey: `binding-${tenantId}-${acquisitionObjectId}`,
+                staffId: acquisitionOwner.staffId,
+                tenantId,
+                objectId: acquisitionObjectId,
+                operationId: acquisitionOwner.operationId,
+                ownershipState: "released",
+                releasedByStaffId: acquisitionOwner.staffId,
+                releaseOperationId: randomUUID(),
+                releaseRevision: released.revision
+              },
+              "Replace"
+            );
+            return target.submitTransaction(actions);
+          };
+        }
+
+        const value = Reflect.get(target, property, target);
+        return typeof value === "function"
+          ? value.bind(target)
+          : value;
+      }
+    });
+    const staleAcquisitionRepository =
+      new OAuthStaffSecurityStorageRepository(acquisitionTable);
+    const staleAcquisition =
+      await staleAcquisitionRepository.reserveBinding({
+        tenantId,
+        objectId: acquisitionObjectId,
+        staffId: "successor-owner",
+        operationId: acquisitionOperationId
+      });
+    assert.equal(staleAcquisition.status, "conflict");
+    assertNonAuthorizing(staleAcquisition);
+    assert.equal(await headRevision(table), 3);
+
+    const changedReleasedBinding = await table.getEntity<{
+      staffId: string;
+      ownershipState: string;
+      releaseOperationId: string;
+    }>(
+      STAFF_SECURITY_PROTOTYPE_PARTITION,
+      `binding-${tenantId}-${acquisitionObjectId}`
+    );
+    assert.equal(changedReleasedBinding.staffId, "released-owner");
+    assert.equal(changedReleasedBinding.ownershipState, "released");
+    assert.notEqual(changedReleasedBinding.releaseOperationId, releaseOperationId);
+    await assert.rejects(
+      table.getEntity(
+        STAFF_SECURITY_PROTOTYPE_PARTITION,
+        `operation-${acquisitionOperationId}`
+      ),
+      (error: unknown) =>
+        (error as { statusCode?: number }).statusCode === 404
+    );
+
+    console.log(
+      "Out-of-band binding modifications cause atomic stale release and acquisition rollback"
+    );
+  } finally {
+    await table.deleteTable();
+  }
+}
+
 async function main(): Promise<void> {
+  await verifyOwnershipTransitions();
+  await verifyStaleReleaseRollback();
+  await verifyReleaseAcknowledgementLoss();
+  await verifyOutOfBandBindingModificationRollback();
+
   const table = newTable();
   await table.createTable();
 

@@ -301,6 +301,14 @@ jobs:
 
             Write-Host "[PASS] Staff operation correlation prototype Azurite test"
 
+            npx --no-install ts-node tests/authorization/staffOperationCorrelationTableReconciliationAzurite.test.ts
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Staff operation correlation table reconciliation Azurite test failed"
+            }
+
+            Write-Host "[PASS] Staff operation correlation table reconciliation Azurite test"
+
             Write-Host "[PASS] OAuth staff writer participation Azurite proof"
           }
           finally {

@@ -321,6 +321,14 @@ jobs:
 
             Write-Host "[PASS] StaffEvents correlation storage Azurite test"
 
+            npx --no-install ts-node tests/authorization/staffEventCorrelationReconciliationAzurite.test.ts
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "StaffEvents correlation reconciliation Azurite test failed"
+            }
+
+            Write-Host "[PASS] StaffEvents correlation reconciliation Azurite test"
+
             Write-Host "[PASS] OAuth staff writer participation Azurite proof"
           }
           finally {

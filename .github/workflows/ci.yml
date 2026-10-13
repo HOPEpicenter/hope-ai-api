@@ -119,6 +119,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Staff operation correlation contract tests failed"
           }
+          npx ts-node tests/authorization/staffOperationCorrelationPersistenceDesign.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff operation correlation persistence design tests failed"
+          }
           npx ts-node tests/authorization/staffRevocationAtomicityRequirements.test.ts
           npx ts-node tests/authorization/oauthReplayChallengeStorageRepository.test.ts
           npx ts-node tests/authorization/oauthReplayChallengeV2StorageRepository.test.ts

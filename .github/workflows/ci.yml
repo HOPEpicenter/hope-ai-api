@@ -293,6 +293,14 @@ jobs:
 
             Write-Host "[PASS] OAuth staff security repository Azurite test"
 
+            npx --no-install ts-node tests/authorization/staffOperationCorrelationPrototypeAzurite.test.ts
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Staff operation correlation prototype Azurite test failed"
+            }
+
+            Write-Host "[PASS] Staff operation correlation prototype Azurite test"
+
             Write-Host "[PASS] OAuth staff writer participation Azurite proof"
           }
           finally {

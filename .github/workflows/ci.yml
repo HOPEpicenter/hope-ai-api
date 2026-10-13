@@ -123,6 +123,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "StaffEvents correlation evidence contract tests failed"
           }
+          npx ts-node tests/authorization/staffWriterParticipationSafetyProof.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff writer participation safety proof tests failed"
+          }
           npx ts-node tests/authorization/staffOperationCorrelationPersistenceDesign.test.ts
           if ($LASTEXITCODE -ne 0) {
             throw "Staff operation correlation persistence design tests failed"

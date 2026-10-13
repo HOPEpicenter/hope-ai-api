@@ -107,6 +107,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Staff security mutation classifier tests failed"
           }
+          npx ts-node tests/authorization/staffWriterCoordinationContract.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff writer coordination contract tests failed"
+          }
           npx ts-node tests/authorization/staffRevocationAtomicityRequirements.test.ts
           npx ts-node tests/authorization/oauthReplayChallengeStorageRepository.test.ts
           npx ts-node tests/authorization/oauthReplayChallengeV2StorageRepository.test.ts

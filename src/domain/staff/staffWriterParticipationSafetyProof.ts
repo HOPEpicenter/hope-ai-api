@@ -140,7 +140,13 @@ function parseHazards(
     if (!Array.isArray(hazards)) return null;
     const known = new Set<string>(STAFF_WRITER_PARTICIPATION_HAZARDS);
     const seen = new Set<string>();
-    for (const value of hazards) {
+    // Inspect actual indexed contents, not a caller-controlled iterator.
+    // Reject holes rather than treating them as absent observations.
+    for (let index = 0; index < hazards.length; index += 1) {
+      if (!Object.prototype.hasOwnProperty.call(hazards, index)) {
+        return null;
+      }
+      const value = hazards[index];
       if (typeof value !== "string" || !known.has(value)) return null;
       seen.add(value);
     }

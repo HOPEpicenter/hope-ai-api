@@ -270,6 +270,52 @@ for (const [req, ev] of [
   assert.equal(a.inputRejected, true);
 }
 
+// Sparse arrays must be rejected rather than silently accepted.
+{
+  const sparse = new Array(2);
+  sparse[1] = "duplicate_event_observed";
+  const a = assess("profile_update", undefined, sparse);
+  assert.equal(a.inputRejected, true);
+  assert.equal(a.status, "contradictory");
+  assert.deepEqual(a.hazards, []);
+  assert.equal(a.reconciliationRequired, true);
+  assert.equal(a.manualInterventionRequired, true);
+}
+
+// A substituted iterator must not hide an invalid indexed hazard.
+{
+  const hiddenInvalid = ["unknown_hazard"] as unknown[];
+  Object.defineProperty(hiddenInvalid, Symbol.iterator, {
+    value: function* () {
+      // Deliberately conceal the actual indexed element.
+    },
+    configurable: true
+  });
+  const a = assess("profile_update", undefined, hiddenInvalid);
+  assert.equal(a.inputRejected, true);
+  assert.equal(a.status, "contradictory");
+  assert.deepEqual(a.hazards, []);
+  assert.equal(a.executionPermitted, false);
+  assert.equal(a.retryPermitted, false);
+}
+
+// A substituted iterator must not conceal a known blocking hazard.
+{
+  const hiddenBlocking = ["duplicate_operation_observed"] as unknown[];
+  Object.defineProperty(hiddenBlocking, Symbol.iterator, {
+    value: function* () {
+      // Yield nothing while the indexed hazard remains present.
+    },
+    configurable: true
+  });
+  const a = assess("profile_update", undefined, hiddenBlocking);
+  assert.equal(a.inputRejected, false);
+  assert.deepEqual(a.hazards, ["duplicate_operation_observed"]);
+  assert.equal(a.status, "blocked");
+  assert.equal(a.reconciliationRequired, true);
+  assert.equal(a.manualInterventionRequired, true);
+}
+
 // Hostile hazard collections fail closed without throwing.
 {
   const throwingIterator: unknown[] = ["duplicate_operation_observed"];
@@ -290,7 +336,18 @@ for (const [req, ev] of [
       return Reflect.get(target, prop, receiver);
     }
   });
-  for (const hostile of [indexedThrows, throwingIterator, inspectionThrows]) {
+  // The throwing iterator is ignored; actual indexed evidence is authoritative
+  // for this synthetic classification.
+  const iteratorIgnored = assess("profile_update", undefined, throwingIterator);
+  assert.equal(iteratorIgnored.status, "blocked");
+  assert.equal(iteratorIgnored.inputRejected, false);
+  assert.deepEqual(iteratorIgnored.hazards, ["duplicate_operation_observed"]);
+  assert.equal(iteratorIgnored.reconciliationRequired, true);
+  assert.equal(iteratorIgnored.manualInterventionRequired, true);
+  assertSafe(iteratorIgnored);
+
+  // Throwing indexed access or array inspection must still fail closed.
+  for (const hostile of [indexedThrows, inspectionThrows]) {
     const a = assess("profile_update", undefined, hostile);
     assert.equal(a.status, "contradictory");
     assert.equal(a.inputRejected, true);
@@ -300,6 +357,7 @@ for (const [req, ev] of [
     assert.ok(a.diagnostics.includes("hazard_input_invalid_fail_closed"));
     assert.ok(!JSON.stringify(a.diagnostics).includes("secret"));
     assert.ok(a.diagnostics.every(d => /^[a-z_:]+$/.test(d)));
+    assertSafe(a);
   }
 }
 

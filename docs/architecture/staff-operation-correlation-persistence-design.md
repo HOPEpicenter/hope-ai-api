@@ -77,14 +77,21 @@ back the whole transaction.
   per-property access control, so any real use needs encryption at rest
   review, restricted table access, log redaction, and a retention/deletion
   policy, which immutability complicates. This is a blocker for production.
-- Legacy: operations without the row stay valid. `inspectOperation` reports
-  `appendIntentEvidence` as `recorded`, `not_recorded` (ambiguous: legacy or missing intent),
-  `contradictory`, `unavailable`, or `not_observed`. The receipt and obligation
-  schemas are unchanged, and an intent without a pending obligation, or with
-  mismatched identity, revision, state, binding, or content, is contradictory.
-  A missing intent row cannot establish legitimate legacy status because
-  the immutable receipt does not record whether intent was required.
-  Neither `not_recorded` nor `recorded` authorizes an append, retry, or recovery.
+- Receipt expectation: new create-only receipts carry `appendIntentRequirement`
+  (`required` or `not_required`) in the same transaction. A required intent
+  that is missing, or an unexpected intent for `not_required`, is contradictory.
+  A historical receipt with no marker remains `legacy_unclassified` when
+  the row is missing; it is never silently treated as definitely legacy.
+- Compatibility: `inspectOperation` distinguishes `recorded`, `not_required`,
+  `legacy_unclassified`, `contradictory`, `unavailable`, and `not_observed`.
+  `not_recorded` remains part of the inspection type for compatibility but
+  missing rows are classified using the receipt's expectation marker.
+  A historical receipt without a marker and without an intent is
+  `legacy_unclassified`, not proof that an intent was never required.
+  Unknown markers, a missing required intent, an unexpected not-required
+  intent, and mismatched identity, revision, state, binding, or content
+  are contradictory. Receipts and obligations remain create-only.
+  None of these inspection outcomes authorizes append, retry, or recovery.
 - Non-goals: `recorded` is only a stored plan. It is not evidence that
   StaffEvents was written, and it does not authorize, dispatch, or retry
   anything. Uncertain acknowledgements are never retried. The remaining gaps

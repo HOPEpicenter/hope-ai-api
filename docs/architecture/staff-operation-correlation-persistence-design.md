@@ -50,6 +50,47 @@ appends StaffEvents from the obligation. It is not proof that an event was
 written, is not wired to production, and does not change the OAuth readiness
 gates.
 
+#### Optional append-intent row (prototype)
+
+When a request carries `appendIntent`, the same transaction also creates one
+more row, `staff-event-append-intent-{operationId}`, in the same partition
+(single `submitTransaction`, at most six actions against the 100-action limit).
+Fields: `schemaVersion` (1), `source` (`staff-event-append-intent-record-v1`),
+`operationId`, `eventId`, `staffId`, `mutationCategory`,
+`resultingSecurityRevision`, and `intentJson` (the validated, frozen
+`StaffEventAppendIntentV1` serialized once). There is no status field and no
+update path: the row is create-only and immutable, and a duplicate key rolls
+back the whole transaction.
+
+- Validation: `validateStaffEventAppendIntent()` runs before any storage read
+  or write against the identity and `expectedRevision + 1`; the intent's
+  expected revision, previous/resulting staff state, and binding must also
+  match the request. Failures return `invalid_input` with nothing submitted.
+  Caller claims are not trusted; head/ETag, staff, and binding checks are
+  unchanged.
+- Size: the contract allows 32 KiB of UTF-8 JSON, but one Azure Table string
+  property holds at most 64 KiB (32,768 UTF-16 characters), the entity 1 MiB,
+  and a batch 4 MiB. The repository therefore applies a stricter 16,384
+  character cap to `intentJson`, leaving margin for the other properties.
+- Privacy: `intentJson` is a full event payload and may contain email, phone,
+  and Entra identifiers. Tests use synthetic data only. Table storage has no
+  per-property access control, so any real use needs encryption at rest
+  review, restricted table access, log redaction, and a retention/deletion
+  policy, which immutability complicates. This is a blocker for production.
+- Legacy: operations without the row stay valid. `inspectOperation` reports
+  `appendIntentEvidence` as `recorded`, `not_recorded` (ambiguous: legacy or missing intent),
+  `contradictory`, `unavailable`, or `not_observed`. The receipt and obligation
+  schemas are unchanged, and an intent without a pending obligation, or with
+  mismatched identity, revision, state, binding, or content, is contradictory.
+  A missing intent row cannot establish legitimate legacy status because
+  the immutable receipt does not record whether intent was required.
+  Neither `not_recorded` nor `recorded` authorizes an append, retry, or recovery.
+- Non-goals: `recorded` is only a stored plan. It is not evidence that
+  StaffEvents was written, and it does not authorize, dispatch, or retry
+  anything. Uncertain acknowledgements are never retried. The remaining gaps
+  are the independently verified append protocol, obligation completion,
+  reconciliation of the intent against StaffEvents, and retention rules.
+
 The binding-storage Azurite integration test creates random tables with the
 `OauthSecurityIT` prefix; the operation-correlation test uses random
 `StaffCorr*` tables. Both are test-only naming, not production table names.

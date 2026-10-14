@@ -10,6 +10,7 @@ import {
   type StaffWriterMutationCategory
 } from "../domain/staff/staffWriterCoordinationContract";
 import { normalizeEntraStaffBinding } from "../domain/staff/projectStaffDirectory";
+import { validateStaffEventAppendIntent } from "../contracts/staffEventAppendIntent.v1";
 
 export const STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION =
   "staff-operation-correlation-prototype-v1";
@@ -21,6 +22,12 @@ export const STAFF_OPERATION_CORRELATION_PROTOTYPE_SCHEMA_VERSION = 1;
 export const STAFF_EVENTS_APPEND_OBLIGATION_SOURCE =
   "staff-events-append-obligation-v1";
 export const STAFF_EVENTS_APPEND_OBLIGATION_SCHEMA_VERSION = 1;
+export const STAFF_EVENT_APPEND_INTENT_RECORD_SOURCE =
+  "staff-event-append-intent-record-v1";
+export const STAFF_EVENT_APPEND_INTENT_RECORD_SCHEMA_VERSION = 1;
+// Azure Table string properties hold 64 KiB (32,768 UTF-16 characters) and an
+// entity 1 MiB; this persistence cap is deliberately below both.
+export const STAFF_EVENT_APPEND_INTENT_RECORD_MAX_JSON_CHARS = 16384;
 
 type StoredHead = {
   revision: number;
@@ -81,6 +88,11 @@ export type StaffOperationCorrelationPrototypeRequest = Readonly<{
     entraObjectId: string;
   }> | null;
   bindingTransition?: StaffOperationBindingTransition;
+  /**
+   * Optional StaffEvent append intent. Validated by the append-intent contract
+   * and persisted create-only; absent means a legacy metadata-only operation.
+   */
+  appendIntent?: unknown;
 }>;
 
 export type StaffOperationCorrelationPrototypeResult = Readonly<{
@@ -119,6 +131,12 @@ export type StaffOperationCorrelationPrototypeInspection = Readonly<{
     | "not_observed"
     | "pending"
     | "missing"
+    | "contradictory"
+    | "unavailable";
+  appendIntentEvidence:
+    | "not_observed"
+    | "recorded"
+    | "not_recorded"
     | "contradictory"
     | "unavailable";
   currentBindingEvidence:
@@ -192,6 +210,51 @@ export function staffEventsAppendObligationRowKey(
   operationId: string
 ): string {
   return rowKey("staff-events-append-obligation", operationId);
+}
+
+export function staffEventAppendIntentRowKey(operationId: string): string {
+  return rowKey("staff-event-append-intent", operationId);
+}
+
+type PreparedIntent = Readonly<{ intentJson: string }>;
+
+// Validates the intent against this proposed transition before any I/O.
+function prepareIntent(
+  value: unknown,
+  parsed: ParsedRequest
+): PreparedIntent | null {
+  const checked = validateStaffEventAppendIntent(value, {
+    operationId: parsed.operationId,
+    eventId: parsed.eventId,
+    staffId: parsed.staffId,
+    mutationCategory: parsed.mutationCategory,
+    resultingSecurityRevision: parsed.expectedRevision + 1
+  });
+  const intent = checked.status === "valid" ? checked.intent : undefined;
+  if (!intent) return null;
+  const c = intent.correlation;
+  const binding = c.binding;
+  if (
+    c.expectedSecurityRevision !== parsed.expectedRevision ||
+    c.previousStaffState !== parsed.expectedStaffState ||
+    c.resultingStaffState !== parsed.resultingStaffState ||
+    (binding === undefined) !== (parsed.bindingIdentity === null) ||
+    (binding !== undefined && (
+      binding.identity.entraTenantId !== parsed.bindingIdentity?.entraTenantId ||
+      binding.identity.entraObjectId !== parsed.bindingIdentity?.entraObjectId ||
+      binding.transition !== parsed.bindingTransition?.kind ||
+      binding.expectedOwnerStaffId !==
+        (parsed.bindingTransition?.kind === "release"
+          ? parsed.bindingTransition.expectedOwnerStaffId
+          : undefined)
+    ))
+  ) {
+    return null;
+  }
+  const intentJson = JSON.stringify(intent);
+  return intentJson.length > STAFF_EVENT_APPEND_INTENT_RECORD_MAX_JSON_CHARS
+    ? null
+    : { intentJson };
 }
 
 function statusCode(error: unknown): number {
@@ -387,6 +450,7 @@ function invalidInspection(): StaffOperationCorrelationPrototypeInspection {
     status: "invalid_input",
     operationEvidence: "missing",
     appendObligationEvidence: "not_observed",
+    appendIntentEvidence: "not_observed",
     currentBindingEvidence: "not_applicable",
     staffEventEvidence: "not_independently_read",
     projectionEvidence: "not_persisted",
@@ -422,6 +486,12 @@ export class StaffOperationCorrelationPrototypeRepository {
   ): Promise<StaffOperationCorrelationPrototypeResult> {
     const parsed = parseRequest(request);
     if (!parsed) return result("invalid_input", "invalid_input");
+    // Omitted intent is legacy; an own property explicitly set to undefined is invalid.
+    const hasIntent = Object.prototype.hasOwnProperty.call(request, "appendIntent");
+    const intent = hasIntent ? prepareIntent(request.appendIntent, parsed) : null;
+    if (hasIntent && !intent) {
+      return result("invalid_input", "invalid_input");
+    }
 
     const partitionKey = STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION;
     let head: StoredHead;
@@ -632,6 +702,23 @@ export class StaffOperationCorrelationPrototypeRepository {
         status: "pending"
       }
     ]);
+    if (intent) {
+      actions.push([
+        "create",
+        {
+          partitionKey,
+          rowKey: staffEventAppendIntentRowKey(parsed.operationId),
+          schemaVersion: STAFF_EVENT_APPEND_INTENT_RECORD_SCHEMA_VERSION,
+          source: STAFF_EVENT_APPEND_INTENT_RECORD_SOURCE,
+          operationId: parsed.operationId,
+          eventId: parsed.eventId,
+          staffId: parsed.staffId,
+          mutationCategory: parsed.mutationCategory,
+          resultingSecurityRevision: nextRevision,
+          intentJson: intent.intentJson
+        }
+      ]);
+    }
 
     try {
       await this.table.submitTransaction(actions);
@@ -681,6 +768,7 @@ export class StaffOperationCorrelationPrototypeRepository {
         status: status === 404 ? "missing" : "unavailable",
         operationEvidence: status === 404 ? "missing" : "unavailable",
         appendObligationEvidence: "not_observed",
+        appendIntentEvidence: "not_observed",
         currentBindingEvidence: "not_applicable",
         staffEventEvidence: "not_independently_read",
         projectionEvidence: "not_persisted",
@@ -749,6 +837,7 @@ export class StaffOperationCorrelationPrototypeRepository {
         status: "contradictory",
         operationEvidence: "verified",
         appendObligationEvidence: "not_observed",
+        appendIntentEvidence: "not_observed",
         currentBindingEvidence: "not_applicable",
         staffEventEvidence: "not_independently_read",
         projectionEvidence: "not_persisted",
@@ -767,6 +856,7 @@ export class StaffOperationCorrelationPrototypeRepository {
         status: "contradictory",
         operationEvidence: "verified",
         appendObligationEvidence: "not_observed",
+        appendIntentEvidence: "not_observed",
         currentBindingEvidence: "not_applicable",
         staffEventEvidence: "not_independently_read",
         projectionEvidence: "not_persisted",
@@ -796,6 +886,7 @@ export class StaffOperationCorrelationPrototypeRepository {
           status: "unavailable",
           operationEvidence: "verified",
           appendObligationEvidence: "unavailable",
+          appendIntentEvidence: "not_observed",
           currentBindingEvidence: "unavailable",
           staffEventEvidence: "not_independently_read",
           projectionEvidence: "not_persisted",
@@ -827,6 +918,40 @@ export class StaffOperationCorrelationPrototypeRepository {
         status: "contradictory",
         operationEvidence: "verified",
         appendObligationEvidence: "contradictory",
+        appendIntentEvidence: "not_observed",
+        currentBindingEvidence: "not_applicable",
+        staffEventEvidence: "not_independently_read",
+        projectionEvidence: "not_persisted",
+        receipt,
+        ...nonAuthorizing
+      };
+    }
+
+    const intentRead = await this.readIntentEvidence(receipt);
+    const appendIntentEvidence = intentRead;
+    if (intentRead === "unavailable") {
+      return {
+        status: "unavailable",
+        operationEvidence: "verified",
+        appendObligationEvidence,
+        appendIntentEvidence,
+        currentBindingEvidence: "unavailable",
+        staffEventEvidence: "not_independently_read",
+        projectionEvidence: "not_persisted",
+        receipt,
+        ...nonAuthorizing
+      };
+    }
+    // An intent without a pending obligation (or a malformed one) is inconsistent.
+    if (
+      intentRead === "contradictory" ||
+      (intentRead === "recorded" && appendObligationEvidence !== "pending")
+    ) {
+      return {
+        status: "contradictory",
+        operationEvidence: "verified",
+        appendObligationEvidence,
+        appendIntentEvidence: "contradictory",
         currentBindingEvidence: "not_applicable",
         staffEventEvidence: "not_independently_read",
         projectionEvidence: "not_persisted",
@@ -851,6 +976,7 @@ export class StaffOperationCorrelationPrototypeRepository {
         status: "unavailable",
         operationEvidence: "verified",
         appendObligationEvidence,
+        appendIntentEvidence,
         currentBindingEvidence: "unavailable",
         staffEventEvidence: "not_independently_read",
         projectionEvidence: "not_persisted",
@@ -867,6 +993,7 @@ export class StaffOperationCorrelationPrototypeRepository {
         status: "contradictory",
         operationEvidence: "verified",
         appendObligationEvidence,
+        appendIntentEvidence,
         currentBindingEvidence: "not_applicable",
         staffEventEvidence: "not_independently_read",
         projectionEvidence: "not_persisted",
@@ -895,6 +1022,7 @@ export class StaffOperationCorrelationPrototypeRepository {
             : "historical",
           operationEvidence: "verified",
           appendObligationEvidence,
+          appendIntentEvidence,
           currentBindingEvidence: bindingEvidence,
           staffEventEvidence: "not_independently_read",
           projectionEvidence: "not_persisted",
@@ -907,6 +1035,7 @@ export class StaffOperationCorrelationPrototypeRepository {
           status: "contradictory",
           operationEvidence: "verified",
           appendObligationEvidence,
+          appendIntentEvidence,
           currentBindingEvidence: "unavailable",
           staffEventEvidence: "not_independently_read",
           projectionEvidence: "not_persisted",
@@ -932,11 +1061,76 @@ export class StaffOperationCorrelationPrototypeRepository {
       status: historical ? "historical" : "incomplete",
       operationEvidence: "verified",
       appendObligationEvidence,
+      appendIntentEvidence,
       currentBindingEvidence: bindingEvidence,
       staffEventEvidence: "not_independently_read",
       projectionEvidence: "not_persisted",
       receipt,
       ...nonAuthorizing
     };
+  }
+
+  /**
+   * Reads the immutable intent row. A recorded intent is only a stored plan:
+   * it is never evidence that StaffEvents was appended, and an absent row is
+   * a legacy metadata-only operation, not a persistence success or failure.
+   */
+  private async readIntentEvidence(
+    receipt: NonNullable<StaffOperationCorrelationPrototypeInspection["receipt"]>
+  ): Promise<"recorded" | "not_recorded" | "contradictory" | "unavailable"> {
+    const key = staffEventAppendIntentRowKey(receipt.operationId);
+    let entity: Record<string, unknown>;
+    try {
+      entity = await this.table.getEntity(
+        STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+        key
+      );
+    } catch (error) {
+      return statusCode(error) === 404 ? "not_recorded" : "unavailable";
+    }
+    if (
+      entity.partitionKey !== STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION ||
+      entity.rowKey !== key ||
+      entity.schemaVersion !== STAFF_EVENT_APPEND_INTENT_RECORD_SCHEMA_VERSION ||
+      entity.source !== STAFF_EVENT_APPEND_INTENT_RECORD_SOURCE ||
+      entity.operationId !== receipt.operationId ||
+      entity.eventId !== receipt.eventId ||
+      entity.staffId !== receipt.staffId ||
+      entity.mutationCategory !== receipt.mutationCategory ||
+      entity.resultingSecurityRevision !== receipt.resultingRevision ||
+      typeof entity.intentJson !== "string" ||
+      entity.intentJson.length > STAFF_EVENT_APPEND_INTENT_RECORD_MAX_JSON_CHARS
+    ) {
+      return "contradictory";
+    }
+    let stored: unknown;
+    try {
+      stored = JSON.parse(entity.intentJson);
+    } catch {
+      return "contradictory";
+    }
+    const checked = validateStaffEventAppendIntent(stored, {
+      operationId: receipt.operationId,
+      eventId: receipt.eventId,
+      staffId: receipt.staffId,
+      mutationCategory: receipt.mutationCategory,
+      resultingSecurityRevision: receipt.resultingRevision
+    });
+    if (checked.status !== "valid" || !checked.intent) return "contradictory";
+    const correlation = checked.intent.correlation;
+    const binding = correlation.binding;
+    if (
+      correlation.expectedSecurityRevision !== receipt.expectedRevision ||
+      correlation.previousStaffState !== receipt.previousStaffState ||
+      correlation.resultingStaffState !== receipt.resultingStaffState ||
+      (binding === undefined) !== (receipt.bindingIdentity === null) ||
+      (binding !== undefined && (
+        binding.identity.entraTenantId !== receipt.bindingIdentity?.entraTenantId ||
+        binding.identity.entraObjectId !== receipt.bindingIdentity?.entraObjectId ||
+        binding.transition !== receipt.bindingTransition ||
+        binding.expectedOwnerStaffId !== receipt.expectedOwnerStaffId
+      ))
+    ) return "contradictory";
+    return "recorded";
   }
 }

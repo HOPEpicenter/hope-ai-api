@@ -5,6 +5,18 @@ import {
   type TransactionAction
 } from "@azure/data-tables";
 import {
+  STAFF_EVENT_APPEND_INTENT_SCHEMA_VERSION,
+  STAFF_EVENT_APPEND_INTENT_SOURCE
+} from "../../src/contracts/staffEventAppendIntent.v1";
+import {
+  STAFF_EVENT_CORRELATION_EVIDENCE_SCHEMA_VERSION,
+  STAFF_EVENT_CORRELATION_EVIDENCE_SOURCE
+} from "../../src/contracts/staffEventCorrelationEvidence.v1";
+import {
+  STAFF_EVENT_APPEND_INTENT_RECORD_MAX_JSON_CHARS,
+  STAFF_EVENT_APPEND_INTENT_RECORD_SCHEMA_VERSION,
+  STAFF_EVENT_APPEND_INTENT_RECORD_SOURCE,
+  staffEventAppendIntentRowKey,
   STAFF_OPERATION_CORRELATION_PROTOTYPE_HEAD_ROW,
   STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
   STAFF_EVENTS_APPEND_OBLIGATION_SCHEMA_VERSION,
@@ -720,9 +732,355 @@ async function main(): Promise<void> {
       "not_independently_read"
     );
     nonAuthorizing(malformedEvidence);
+
+    await intentScenarios();
   } finally {
     await eventsTable.deleteTable();
     await table.deleteTable();
+  }
+}
+
+function intentFor(
+  operationId: string,
+  staffId: string,
+  expectedRevision: number,
+  overrides: Record<string, unknown> = {},
+  correlationOverrides: Record<string, unknown> = {}
+): Record<string, unknown> {
+  return {
+    schemaVersion: STAFF_EVENT_APPEND_INTENT_SCHEMA_VERSION,
+    sourceIdentity: STAFF_EVENT_APPEND_INTENT_SOURCE,
+    event: {
+      eventId: `event-${operationId}`,
+      staffId,
+      type: "staff.created",
+      occurredAt: "2026-10-15T12:00:00.000Z",
+      actorId: "synthetic-actor",
+      data: { displayName: "Synthetic Staff" }
+    },
+    correlation: {
+      schemaVersion: STAFF_EVENT_CORRELATION_EVIDENCE_SCHEMA_VERSION,
+      sourceIdentity: STAFF_EVENT_CORRELATION_EVIDENCE_SOURCE,
+      evidenceProvenance: "writer_supplied_metadata",
+      operationId,
+      eventId: `event-${operationId}`,
+      staffId,
+      mutationCategory: "identity_creation",
+      expectedSecurityRevision: expectedRevision,
+      resultingSecurityRevision: expectedRevision + 1,
+      previousStaffState: "absent",
+      resultingStaffState: "active",
+      ...correlationOverrides
+    },
+    ...overrides
+  };
+}
+
+async function intentScenarios(): Promise<void> {
+  const t = newTable("StaffCorrIntentIT");
+  await t.createTable();
+  try {
+    let submits = 0;
+    let lastBatch: TransactionAction[] = [];
+    let beforeSubmit: (() => Promise<void>) | null = null;
+    const repo = new StaffOperationCorrelationPrototypeRepository(
+      transactionProxy(t, async (actions, submit) => {
+        submits++;
+        lastBatch = actions;
+        if (beforeSubmit) await beforeSubmit();
+        return submit(actions);
+      })
+    );
+    const plain = new StaffOperationCorrelationPrototypeRepository(t);
+    assert.equal(await repo.initializeAuthorityHead(), "initialized");
+    const missing = async (rk: string): Promise<boolean> => {
+      try {
+        await t.getEntity(STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION, rk);
+        return false;
+      } catch (error) {
+        return (error as { statusCode?: number }).statusCode === 404;
+      }
+    };
+    const noRows = async (operationId: string): Promise<void> => {
+      assert.ok(await missing(`operation-${operationId}`));
+      assert.ok(await missing(staffEventsAppendObligationRowKey(operationId)));
+      assert.ok(await missing(staffEventAppendIntentRowKey(operationId)));
+    };
+    const intentOp = (
+      operationId: string,
+      staffId: string,
+      expected: number,
+      intent: unknown
+    ) => op({
+      operationId,
+      eventId: `event-${operationId}`,
+      staffId,
+      expectedRevision: expected,
+      appendIntent: intent
+    });
+
+    // Atomic creation of receipt, obligation, and immutable intent.
+    const rev0 = await revision(t);
+    const okIntent = intentFor("intent-ok", "synthetic-intent-a", rev0);
+    const ok = await repo.commitOperation(
+      intentOp("intent-ok", "synthetic-intent-a", rev0, okIntent)
+    );
+    assert.equal(ok.status, "committed");
+    nonAuthorizing(ok);
+    assert.equal(submits, 1);
+    assert.ok(lastBatch.length <= 100);
+    assert.ok(lastBatch.every(a =>
+      a[1].partitionKey === STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION));
+    assert.equal(lastBatch.filter(a =>
+      a[0] === "create" && a[1].rowKey === staffEventAppendIntentRowKey("intent-ok")
+    ).length, 1);
+    const stored = await t.getEntity<Record<string, unknown>>(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      staffEventAppendIntentRowKey("intent-ok")
+    );
+    assert.equal(stored.operationId, "intent-ok");
+    assert.equal(stored.eventId, "event-intent-ok");
+    assert.equal(stored.staffId, "synthetic-intent-a");
+    assert.equal(stored.mutationCategory, "identity_creation");
+    assert.equal(stored.resultingSecurityRevision, rev0 + 1);
+    assert.equal(stored.schemaVersion, STAFF_EVENT_APPEND_INTENT_RECORD_SCHEMA_VERSION);
+    assert.equal(stored.source, STAFF_EVENT_APPEND_INTENT_RECORD_SOURCE);
+    assert.equal("status" in stored, false);
+    const storedIntent = JSON.parse(String(stored.intentJson)) as {
+      event: unknown;
+      correlation: { operationId: string };
+    };
+    assert.deepEqual(storedIntent.event, (okIntent as { event: unknown }).event);
+    assert.equal(storedIntent.correlation.operationId, "intent-ok");
+    assert.ok(String(stored.intentJson).length <=
+      STAFF_EVENT_APPEND_INTENT_RECORD_MAX_JSON_CHARS);
+
+    const okInspection = await plain.inspectOperation({ operationId: "intent-ok" });
+    assert.equal(okInspection.appendIntentEvidence, "recorded");
+    assert.equal(okInspection.appendObligationEvidence, "pending");
+    assert.equal(okInspection.status, "incomplete");
+    assert.equal(okInspection.staffEventEvidence, "not_independently_read");
+    nonAuthorizing(okInspection);
+
+    // An explicit undefined intent cannot silently become a legacy operation.
+    const beforeUndefined = submits;
+    const rejectedUndefined = await repo.commitOperation(op({
+      operationId: "intent-explicit-undefined",
+      eventId: "event-intent-explicit-undefined",
+      staffId: "synthetic-intent-undefined",
+      expectedRevision: await revision(t),
+      appendIntent: undefined
+    }));
+    assert.equal(rejectedUndefined.status, "invalid_input");
+    assert.equal(submits, beforeUndefined);
+    await noRows("intent-explicit-undefined");
+
+    // Legacy metadata-only operation stays recognizable; absence is not success.
+    const legacy = await plain.commitOperation(op({
+      operationId: "intent-legacy",
+      eventId: "event-intent-legacy",
+      staffId: "synthetic-intent-legacy",
+      expectedRevision: await revision(t)
+    }));
+    assert.equal(legacy.status, "committed");
+    assert.ok(await missing(staffEventAppendIntentRowKey("intent-legacy")));
+    const legacyInspection = await plain.inspectOperation({ operationId: "intent-legacy" });
+    assert.equal(legacyInspection.appendIntentEvidence, "not_recorded");
+    assert.equal(legacyInspection.appendObligationEvidence, "pending");
+    assert.equal(legacyInspection.staffEventEvidence, "not_independently_read");
+
+    // Invalid, mismatched, oversized, and hostile intents never reach storage.
+    const base = await revision(t);
+    const submitsBefore = submits;
+    const bad: Array<[string, unknown]> = [
+      ["bad-event", intentFor("bad-event", "synthetic-bad", base, {
+        event: { ...(intentFor("bad-event", "synthetic-bad", base).event as object), eventId: "other-event" }
+      })],
+      ["bad-staff", intentFor("bad-staff", "other-staff", base)],
+      ["bad-rev", intentFor("bad-rev", "synthetic-bad", base + 5, {}, {
+        expectedSecurityRevision: base + 5, resultingSecurityRevision: base + 6
+      })],
+      ["bad-state", intentFor("bad-state", "synthetic-bad", base, {}, { previousStaffState: "active" })],
+      ["bad-binding", intentFor("bad-binding", "synthetic-bad", base, {}, {
+        binding: { identity: bindingIdentity, transition: "acquire" }
+      })],
+      ["bad-category", intentFor("bad-category", "synthetic-bad", base, {}, { mutationCategory: "profile_update" })],
+      ["bad-schema", intentFor("bad-schema", "synthetic-bad", base, { schemaVersion: 2 })],
+      ["bad-oversized", intentFor("bad-oversized", "synthetic-bad", base, {
+        event: {
+          ...(intentFor("bad-oversized", "synthetic-bad", base).event as object),
+          data: { displayName: "x".repeat(20000) }
+        }
+      })],
+      ["bad-null", null],
+      ["bad-getter", Object.defineProperty({}, "schemaVersion", {
+        enumerable: true, get() { throw new Error("boom"); }
+      })]
+    ];
+    for (const [id, intent] of bad) {
+      const r = await repo.commitOperation(intentOp(id, "synthetic-bad", base, intent));
+      assert.equal(r.status, "invalid_input", id);
+      assert.equal(r.reason, "invalid_input", id);
+      nonAuthorizing(r);
+      await noRows(id);
+    }
+    assert.equal(submits, submitsBefore);
+    assert.equal(await revision(t), base);
+
+    // Stale ETag: the whole batch, including the intent, rolls back.
+    beforeSubmit = async () => {
+      const head = await t.getEntity<{ etag: string }>(
+        STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+        STAFF_OPERATION_CORRELATION_PROTOTYPE_HEAD_ROW
+      );
+      await t.updateEntity({
+        partitionKey: STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+        rowKey: STAFF_OPERATION_CORRELATION_PROTOTYPE_HEAD_ROW,
+        revision: base,
+        state: "active"
+      }, "Replace", { etag: head.etag });
+    };
+    const stale = await repo.commitOperation(
+      intentOp("intent-stale", "synthetic-stale", base, intentFor("intent-stale", "synthetic-stale", base))
+    );
+    beforeSubmit = null;
+    assert.equal(stale.status, "conflict");
+    assert.equal(stale.reason, "transaction_conflict");
+    await noRows("intent-stale");
+    assert.ok(await missing("staff-synthetic-stale"));
+
+    // Duplicate intent key rejects the complete transaction.
+    await t.createEntity({
+      partitionKey: STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      rowKey: staffEventAppendIntentRowKey("intent-dup"),
+      marker: "preexisting"
+    });
+    const dupBase = await revision(t);
+    const dup = await repo.commitOperation(
+      intentOp("intent-dup", "synthetic-dup", dupBase, intentFor("intent-dup", "synthetic-dup", dupBase))
+    );
+    assert.equal(dup.status, "conflict");
+    assert.ok(await missing("operation-intent-dup"));
+    assert.ok(await missing(staffEventsAppendObligationRowKey("intent-dup")));
+    assert.ok(await missing("staff-synthetic-dup"));
+    assert.equal(await revision(t), dupBase);
+    assert.equal(
+      (await t.getEntity<{ marker: string }>(
+        STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+        staffEventAppendIntentRowKey("intent-dup")
+      )).marker,
+      "preexisting"
+    );
+
+    // Replay of an operation ID with a different intent cannot alter the original.
+    const replayBase = await revision(t);
+    const replay = await repo.commitOperation(intentOp(
+      "intent-ok", "synthetic-intent-a2", replayBase,
+      intentFor("intent-ok", "synthetic-intent-a2", replayBase, {
+        event: {
+          ...(intentFor("intent-ok", "synthetic-intent-a2", replayBase).event as object),
+          data: { displayName: "Changed" }
+        }
+      })
+    ));
+    assert.equal(replay.status, "conflict");
+    assert.equal(await revision(t), replayBase);
+    const afterReplay = await t.getEntity<Record<string, unknown>>(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      staffEventAppendIntentRowKey("intent-ok")
+    );
+    assert.equal(afterReplay.intentJson, stored.intentJson);
+    // No public update/delete path for intents exists on the repository.
+    const methods = Object.getOwnPropertyNames(
+      StaffOperationCorrelationPrototypeRepository.prototype
+    );
+    assert.ok(!methods.some(m => /update|delete|complete|dispatch|retry/i.test(m)));
+
+    // Lost acknowledgement: exactly one submit, no retry, still non-authorizing.
+    const lostRepo = new StaffOperationCorrelationPrototypeRepository(
+      transactionProxy(t, async (actions, submit) => {
+        submits++;
+        await submit(actions);
+        throw new Error("simulated lost acknowledgement");
+      })
+    );
+    const lostBase = await revision(t);
+    const submitsBeforeLost = submits;
+    const lost = await lostRepo.commitOperation(
+      intentOp("intent-lost", "synthetic-lost", lostBase, intentFor("intent-lost", "synthetic-lost", lostBase))
+    );
+    assert.equal(lost.status, "uncertain");
+    assert.equal(lost.retryPermitted, false);
+    assert.equal(submits, submitsBeforeLost + 1);
+    assert.equal(
+      (await plain.inspectOperation({ operationId: "intent-lost" })).appendIntentEvidence,
+      "recorded"
+    );
+
+    // Missing rows and read failures never read as persisted events.
+    await t.deleteEntity(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      staffEventAppendIntentRowKey("intent-lost")
+    );
+    const removed = await plain.inspectOperation({ operationId: "intent-lost" });
+    assert.equal(removed.appendIntentEvidence, "not_recorded");
+    assert.equal(removed.staffEventEvidence, "not_independently_read");
+
+    const failing = new StaffOperationCorrelationPrototypeRepository(
+      new Proxy(t, {
+        get(target, property) {
+          if (property === "getEntity") {
+            return async (pk: string, rk: string) => {
+              if (rk === staffEventAppendIntentRowKey("intent-ok")) {
+                throw Object.assign(new Error("outage"), { statusCode: 500 });
+              }
+              return target.getEntity(pk, rk);
+            };
+          }
+          const value = Reflect.get(target, property, target) as unknown;
+          return typeof value === "function" ? value.bind(target) : value;
+        }
+      })
+    );
+    const failed = await failing.inspectOperation({ operationId: "intent-ok" });
+    assert.equal(failed.status, "unavailable");
+    assert.equal(failed.appendIntentEvidence, "unavailable");
+
+    // Tampered or non-conforming intent rows are contradictory, not recorded.
+    const tamper = async (
+      changes: Record<string, unknown>
+    ): Promise<string> => {
+      const row = await t.getEntity<Record<string, unknown> & { etag: string }>(
+        STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+        staffEventAppendIntentRowKey("intent-ok")
+      );
+      const { etag, timestamp: _ts, ...rest } = row as Record<string, unknown> & { etag: string; timestamp?: unknown };
+      await t.updateEntity({ ...rest, ...changes } as never, "Replace", { etag });
+      return (await plain.inspectOperation({ operationId: "intent-ok" })).appendIntentEvidence;
+    };
+    assert.equal(await tamper({ eventId: "tampered" }), "contradictory");
+    assert.equal(await tamper({ eventId: "event-intent-ok", intentJson: "{not json" }), "contradictory");
+    assert.equal(await tamper({ intentJson: String(stored.intentJson), source: "other" }), "contradictory");
+    const originalIntent = JSON.parse(String(stored.intentJson)) as Record<string, unknown>;
+    const alteredStates = JSON.parse(JSON.stringify(originalIntent)) as { correlation: Record<string, unknown> };
+    alteredStates.correlation.previousStaffState = "active";
+    assert.equal(await tamper({ intentJson: JSON.stringify(alteredStates) }), "contradictory");
+    const alteredResult = JSON.parse(JSON.stringify(originalIntent)) as { correlation: Record<string, unknown> };
+    alteredResult.correlation.resultingStaffState = "revoked";
+    assert.equal(await tamper({ intentJson: JSON.stringify(alteredResult) }), "contradictory");
+    assert.equal(await tamper({ source: STAFF_EVENT_APPEND_INTENT_RECORD_SOURCE, intentJson: String(stored.intentJson) }), "recorded");
+
+    // An intent without its pending obligation is inconsistent.
+    await t.deleteEntity(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      staffEventsAppendObligationRowKey("intent-ok")
+    );
+    const orphan = await plain.inspectOperation({ operationId: "intent-ok" });
+    assert.equal(orphan.status, "contradictory");
+    assert.equal(orphan.appendIntentEvidence, "contradictory");
+    nonAuthorizing(orphan);
+  } finally {
+    await t.deleteTable();
   }
 }
 

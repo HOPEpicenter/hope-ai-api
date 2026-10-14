@@ -857,10 +857,63 @@ async function intentScenarios(): Promise<void> {
 
     const okInspection = await plain.inspectOperation({ operationId: "intent-ok" });
     assert.equal(okInspection.appendIntentEvidence, "recorded");
+    assert.equal(okInspection.receipt?.appendIntentRequirement, "required");
     assert.equal(okInspection.appendObligationEvidence, "pending");
     assert.equal(okInspection.status, "incomplete");
     assert.equal(okInspection.staffEventEvidence, "not_independently_read");
     nonAuthorizing(okInspection);
+
+    // Synthetic receipt tampering: only the expectation marker changes.
+    const rewriteReceiptRequirement = async (
+      operationId: string,
+      requirement: string | null
+    ): Promise<void> => {
+      const row = await t.getEntity<Record<string, unknown> & { etag: string }>(
+        STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+        `operation-${operationId}`
+      );
+      const {
+        etag,
+        timestamp: _timestamp,
+        appendIntentRequirement: _previousRequirement,
+        ...fields
+      } = row;
+      await t.updateEntity(
+        {
+          ...fields,
+          ...(requirement === null
+            ? {}
+            : { appendIntentRequirement: requirement })
+        } as never,
+        "Replace",
+        { etag }
+      );
+    };
+
+    // A stored intent contradicts an explicit not-required receipt.
+    await rewriteReceiptRequirement("intent-ok", "not_required");
+    const unexpectedIntent = await plain.inspectOperation({
+      operationId: "intent-ok"
+    });
+    assert.equal(unexpectedIntent.status, "contradictory");
+    assert.equal(unexpectedIntent.appendIntentEvidence, "contradictory");
+    nonAuthorizing(unexpectedIntent);
+
+    // Unknown markers are rejected, never interpreted as legacy.
+    await rewriteReceiptRequirement("intent-ok", "unsupported-marker");
+    const malformedRequirement = await plain.inspectOperation({
+      operationId: "intent-ok"
+    });
+    assert.equal(malformedRequirement.status, "contradictory");
+    nonAuthorizing(malformedRequirement);
+
+    // Restore the genuine receipt expectation for subsequent scenarios.
+    await rewriteReceiptRequirement("intent-ok", "required");
+    const restoredRequirement = await plain.inspectOperation({
+      operationId: "intent-ok"
+    });
+    assert.equal(restoredRequirement.appendIntentEvidence, "recorded");
+    nonAuthorizing(restoredRequirement);
 
     // An explicit undefined intent cannot silently become a legacy operation.
     const beforeUndefined = submits;
@@ -885,9 +938,20 @@ async function intentScenarios(): Promise<void> {
     assert.equal(legacy.status, "committed");
     assert.ok(await missing(staffEventAppendIntentRowKey("intent-legacy")));
     const legacyInspection = await plain.inspectOperation({ operationId: "intent-legacy" });
-    assert.equal(legacyInspection.appendIntentEvidence, "not_recorded");
+    assert.equal(legacyInspection.appendIntentEvidence, "not_required");
+    assert.equal(legacyInspection.receipt?.appendIntentRequirement, "not_required");
     assert.equal(legacyInspection.appendObligationEvidence, "pending");
     assert.equal(legacyInspection.staffEventEvidence, "not_independently_read");
+
+    // Simulate a historical receipt that predates the expectation marker.
+    await rewriteReceiptRequirement("intent-legacy", null);
+    const historical = await plain.inspectOperation({
+      operationId: "intent-legacy"
+    });
+    assert.equal(historical.receipt?.appendIntentRequirement, undefined);
+    assert.equal(historical.appendIntentEvidence, "legacy_unclassified");
+    assert.equal(historical.staffEventEvidence, "not_independently_read");
+    nonAuthorizing(historical);
 
     // Invalid, mismatched, oversized, and hostile intents never reach storage.
     const base = await revision(t);
@@ -1023,7 +1087,8 @@ async function intentScenarios(): Promise<void> {
       staffEventAppendIntentRowKey("intent-lost")
     );
     const removed = await plain.inspectOperation({ operationId: "intent-lost" });
-    assert.equal(removed.appendIntentEvidence, "not_recorded");
+    assert.equal(removed.appendIntentEvidence, "contradictory");
+    assert.equal(removed.status, "contradictory");
     assert.equal(removed.staffEventEvidence, "not_independently_read");
 
     const failing = new StaffOperationCorrelationPrototypeRepository(

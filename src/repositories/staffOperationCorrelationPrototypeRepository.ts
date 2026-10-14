@@ -137,6 +137,8 @@ export type StaffOperationCorrelationPrototypeInspection = Readonly<{
     | "not_observed"
     | "recorded"
     | "not_recorded"
+    | "legacy_unclassified"
+    | "not_required"
     | "contradictory"
     | "unavailable";
   currentBindingEvidence:
@@ -165,6 +167,7 @@ export type StaffOperationCorrelationPrototypeInspection = Readonly<{
     }> | null;
     bindingTransition: "acquire" | "release" | null;
     expectedOwnerStaffId?: string;
+    appendIntentRequirement?: "required" | "not_required";
   }>;
   authoritative: false;
   executionPermitted: false;
@@ -684,6 +687,7 @@ export class StaffOperationCorrelationPrototypeRepository {
               : {})
           }
         : {}),
+      appendIntentRequirement: intent ? "required" : "not_required",
       outcome: "committed"
     };
     actions.push(["create", receipt]);
@@ -793,6 +797,9 @@ export class StaffOperationCorrelationPrototypeRepository {
       resultingRevision: entity.resultingRevision,
       previousStaffState: entity.previousStaffState,
       resultingStaffState: entity.resultingStaffState,
+      ...(entity.appendIntentRequirement !== undefined
+        ? { appendIntentRequirement: entity.appendIntentRequirement }
+        : {}),
       bindingIdentity: storedBinding,
       bindingTransition:
         storedTransition === "acquire" || storedTransition === "release"
@@ -831,6 +838,9 @@ export class StaffOperationCorrelationPrototypeRepository {
         receipt.expectedOwnerStaffId !== receipt.staffId) ||
       (storedTransition !== "release" &&
         entity.expectedOwnerStaffId !== undefined) ||
+      (entity.appendIntentRequirement !== undefined &&
+        entity.appendIntentRequirement !== "required" &&
+        entity.appendIntentRequirement !== "not_required") ||
       entity.outcome !== "committed"
     ) {
       return {
@@ -928,7 +938,13 @@ export class StaffOperationCorrelationPrototypeRepository {
     }
 
     const intentRead = await this.readIntentEvidence(receipt);
-    const appendIntentEvidence = intentRead;
+    const appendIntentEvidence =
+      intentRead === "unavailable" ? "unavailable" :
+      receipt.appendIntentRequirement === "required" && intentRead === "not_recorded" ? "contradictory" :
+      receipt.appendIntentRequirement === "not_required" && intentRead === "recorded" ? "contradictory" :
+      receipt.appendIntentRequirement === "not_required" && intentRead === "not_recorded" ? "not_required" :
+      receipt.appendIntentRequirement === undefined && intentRead === "not_recorded" ? "legacy_unclassified" :
+      intentRead;
     if (intentRead === "unavailable") {
       return {
         status: "unavailable",
@@ -942,9 +958,9 @@ export class StaffOperationCorrelationPrototypeRepository {
         ...nonAuthorizing
       };
     }
-    // An intent without a pending obligation (or a malformed one) is inconsistent.
+    // Receipt expectation and stored intent must agree; malformed intent is inconsistent.
     if (
-      intentRead === "contradictory" ||
+      appendIntentEvidence === "contradictory" ||
       (intentRead === "recorded" && appendObligationEvidence !== "pending")
     ) {
       return {

@@ -7,7 +7,10 @@ import {
 import {
   STAFF_OPERATION_CORRELATION_PROTOTYPE_HEAD_ROW,
   STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+  STAFF_EVENTS_APPEND_OBLIGATION_SCHEMA_VERSION,
+  STAFF_EVENTS_APPEND_OBLIGATION_SOURCE,
   StaffOperationCorrelationPrototypeRepository,
+  staffEventsAppendObligationRowKey,
   type StaffOperationCorrelationPrototypeRequest
 } from "../../src/repositories/staffOperationCorrelationPrototypeRepository";
 
@@ -102,7 +105,13 @@ async function main(): Promise<void> {
   await table.createTable();
   await eventsTable.createTable();
   try {
-    const repository = new StaffOperationCorrelationPrototypeRepository(table);
+    let creationBatch: TransactionAction[] = [];
+    const repository = new StaffOperationCorrelationPrototypeRepository(
+      transactionProxy(table, async (actions, submit) => {
+        if (creationBatch.length === 0) creationBatch = actions;
+        return submit(actions);
+      })
+    );
     assert.equal(await repository.initializeAuthorityHead(), "initialized");
     assert.equal(await repository.initializeAuthorityHead(), "conflict");
 
@@ -115,6 +124,13 @@ async function main(): Promise<void> {
     const created = await repository.commitOperation(createA);
     assert.equal(created.status, "committed");
     assert.equal(created.revision, 1);
+    assert.ok(creationBatch.some(action =>
+      action[0] === "create" &&
+      action[1].rowKey === staffEventsAppendObligationRowKey(createA.operationId)
+    ));
+    assert.ok(creationBatch.every(action =>
+      action[1].partitionKey === STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION
+    ));
     nonAuthorizing(created);
     const createReceipt = await table.getEntity<{
       eventId: string;
@@ -133,6 +149,29 @@ async function main(): Promise<void> {
     assert.equal(createReceipt.resultingRevision, 1);
     assert.equal(createReceipt.schemaVersion, 1);
     assert.equal(createReceipt.source, "staff-operation-correlation-prototype-v1");
+    const createObligation =
+      await table.getEntity<{
+        schemaVersion: number;
+        source: string;
+        operationId: string;
+        eventId: string;
+        staffId: string;
+        mutationCategory: string;
+        resultingSecurityRevision: number;
+        status: string;
+      }>(
+        STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+        staffEventsAppendObligationRowKey(createA.operationId)
+      );
+    assert.equal(createObligation.schemaVersion,
+      STAFF_EVENTS_APPEND_OBLIGATION_SCHEMA_VERSION);
+    assert.equal(createObligation.source, STAFF_EVENTS_APPEND_OBLIGATION_SOURCE);
+    assert.equal(createObligation.operationId, createA.operationId);
+    assert.equal(createObligation.eventId, createA.eventId);
+    assert.equal(createObligation.staffId, staffA);
+    assert.equal(createObligation.mutationCategory, "identity_creation");
+    assert.equal(createObligation.resultingSecurityRevision, 1);
+    assert.equal(createObligation.status, "pending");
 
     const missingHeadTable = newTable("StaffCorrMissingIT");
     await missingHeadTable.createTable();
@@ -168,6 +207,13 @@ async function main(): Promise<void> {
       )).eventId,
       createA.eventId
     );
+    assert.equal(
+      (await table.getEntity<{ eventId: string }>(
+        STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+        staffEventsAppendObligationRowKey(createA.operationId)
+      )).eventId,
+      createA.eventId
+    );
     nonAuthorizing(duplicateReceipt);
 
     const stale = await repository.commitOperation(op({
@@ -186,7 +232,54 @@ async function main(): Promise<void> {
       STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
       "operation-stale-operation"
     ));
+    await assert.rejects(table.getEntity(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      staffEventsAppendObligationRowKey("stale-operation")
+    ));
     nonAuthorizing(stale);
+
+    const duplicateObligationOperation = "duplicate-obligation-operation";
+    const duplicateObligationEvent = "duplicate-obligation-event";
+    const duplicateObligationStaff = "synthetic-duplicate-obligation";
+    await table.createEntity({
+      partitionKey: STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      rowKey: staffEventsAppendObligationRowKey(
+        duplicateObligationOperation
+      ),
+      schemaVersion: STAFF_EVENTS_APPEND_OBLIGATION_SCHEMA_VERSION,
+      source: STAFF_EVENTS_APPEND_OBLIGATION_SOURCE,
+      operationId: duplicateObligationOperation,
+      eventId: duplicateObligationEvent,
+      staffId: duplicateObligationStaff,
+      mutationCategory: "identity_creation",
+      resultingSecurityRevision: 2,
+      status: "pending"
+    });
+    const beforeDuplicateObligation = await revision(table);
+    const duplicateObligation = await repository.commitOperation(op({
+      operationId: duplicateObligationOperation,
+      eventId: duplicateObligationEvent,
+      staffId: duplicateObligationStaff,
+      expectedRevision: beforeDuplicateObligation
+    }));
+    assert.equal(duplicateObligation.status, "conflict");
+    assert.equal(await revision(table), beforeDuplicateObligation);
+    await assert.rejects(table.getEntity(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      `staff-${duplicateObligationStaff}`
+    ));
+    await assert.rejects(table.getEntity(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      `operation-${duplicateObligationOperation}`
+    ));
+    assert.equal(
+      (await table.getEntity<{ status: string }>(
+        STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+        staffEventsAppendObligationRowKey(duplicateObligationOperation)
+      )).status,
+      "pending"
+    );
+    nonAuthorizing(duplicateObligation);
 
     const invalidGuid = await repository.commitOperation(op({
       operationId: "invalid-guid-operation",
@@ -275,6 +368,25 @@ async function main(): Promise<void> {
     );
     concurrent.forEach(nonAuthorizing);
     assert.equal(await revision(table), concurrentRevision + 1);
+    for (const [index, operationId] of [
+      "concurrent-acquire-c",
+      "concurrent-acquire-d"
+    ].entries()) {
+      if (concurrent[index].status === "committed") {
+        assert.equal(
+          (await table.getEntity<{ status: string }>(
+            STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+            staffEventsAppendObligationRowKey(operationId)
+          )).status,
+          "pending"
+        );
+      } else {
+        await assert.rejects(table.getEntity(
+          STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+          staffEventsAppendObligationRowKey(operationId)
+        ));
+      }
+    }
     const competingOwner = await table.getEntity<{ staffId: string }>(
       STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
       "binding-33333333-3333-4333-8333-333333333333-44444444-4444-4444-8444-444444444444"
@@ -319,6 +431,10 @@ async function main(): Promise<void> {
       STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
       "operation-etag-rollback-operation"
     ));
+    await assert.rejects(table.getEntity(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      staffEventsAppendObligationRowKey("etag-rollback-operation")
+    ));
     nonAuthorizing(staleBatch);
 
     const releaseRevision = await revision(table);
@@ -339,12 +455,17 @@ async function main(): Promise<void> {
     assert.equal(release.status, "committed");
     nonAuthorizing(release);
 
+    await table.deleteEntity(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      staffEventsAppendObligationRowKey("binding-acquire-a")
+    );
     const releasedEvidence = await repository.inspectOperation({
       operationId: "binding-acquire-a",
       eventId: "binding-acquire-event-a",
       staffId: staffA
     });
     assert.equal(releasedEvidence.status, "historical");
+    assert.equal(releasedEvidence.appendObligationEvidence, "missing");
     assert.equal(releasedEvidence.currentBindingEvidence, "released");
     nonAuthorizing(releasedEvidence);
 
@@ -429,7 +550,9 @@ async function main(): Promise<void> {
     });
     assert.equal(successorEvidence.status, "incomplete");
     assert.equal(successorEvidence.operationEvidence, "verified");
+    assert.equal(successorEvidence.appendObligationEvidence, "pending");
     assert.equal(successorEvidence.currentBindingEvidence, "current");
+    assert.equal(successorEvidence.staffEventEvidence, "not_independently_read");
     nonAuthorizing(successorEvidence);
 
     const eventId = "separately-persisted-event";
@@ -547,7 +670,56 @@ async function main(): Promise<void> {
     });
     assert.equal(lostAckInspection.status, "incomplete");
     assert.equal(lostAckInspection.operationEvidence, "verified");
+    assert.equal(lostAckInspection.appendObligationEvidence, "pending");
+    assert.equal(lostAckInspection.staffEventEvidence, "not_independently_read");
     nonAuthorizing(lostAckInspection);
+
+    const malformedObligation =
+      await table.getEntity<{
+        partitionKey: string;
+        rowKey: string;
+        schemaVersion: number;
+        source: string;
+        operationId: string;
+        eventId: string;
+        staffId: string;
+        mutationCategory: string;
+        resultingSecurityRevision: number;
+        status: string;
+        etag?: string;
+      }>(
+        STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+        staffEventsAppendObligationRowKey("lost-ack-operation")
+      );
+    await table.updateEntity(
+      {
+        partitionKey: malformedObligation.partitionKey,
+        rowKey: malformedObligation.rowKey,
+        schemaVersion: malformedObligation.schemaVersion,
+        source: malformedObligation.source,
+        operationId: malformedObligation.operationId,
+        eventId: malformedObligation.eventId,
+        staffId: malformedObligation.staffId,
+        mutationCategory: malformedObligation.mutationCategory,
+        resultingSecurityRevision:
+          malformedObligation.resultingSecurityRevision,
+        status: "appended"
+      },
+      "Replace",
+      { etag: malformedObligation.etag }
+    );
+    const malformedEvidence = await repository.inspectOperation({
+      operationId: "lost-ack-operation",
+      eventId: "lost-ack-event",
+      staffId: "synthetic-staff-b"
+    });
+    assert.equal(malformedEvidence.status, "contradictory");
+    assert.equal(malformedEvidence.appendObligationEvidence, "contradictory");
+    assert.equal(
+      malformedEvidence.staffEventEvidence,
+      "not_independently_read"
+    );
+    nonAuthorizing(malformedEvidence);
   } finally {
     await eventsTable.deleteTable();
     await table.deleteTable();

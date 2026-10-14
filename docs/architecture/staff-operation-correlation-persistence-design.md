@@ -38,19 +38,32 @@ create conflict or stale conditional update aborts that same-partition batch.
 Unknown transaction acknowledgements return uncertain and are not retried.
 This prototype is isolated, requires an existing active head, and is not wired
 to production staff writers or OAuth execution.
-The Azurite integration test creates random tables with the `OauthSecurityIT`
-prefix; this is test-only naming, not a production table name. Earlier active
-binding rows may omit `ownershipState`; the repository interprets that legacy
-shape as active when validating it. A missing ownership marker is therefore a
-compatibility case in this prototype, not a durable cross-store correlation
-field.
 
-These records do **not** persist a StaffEvents event ID, staff mutation
-category, expected revision, or previous/resulting staff security state.
-Existing receipt kinds describe binding reservation/release, not complete
-staff-writer coordination. A binding's acquisition operation ID does not
-prove that the binding is still current; release and later acquisition change
-ownership state and operation identity.
+The separate `StaffOperationCorrelationPrototypeRepository` is also isolated.
+For each successful security transition it creates the head/staff/optional
+binding changes, operation receipt, and a create-only StaffEvents
+append-obligation row in one transaction in its own injected table and shared
+prototype partition. The obligation uses the receipt's existing operation ID
+and stores the event ID, staff ID, mutation category, resulting security
+revision, and a fixed `pending` status. No code advances that status or
+appends StaffEvents from the obligation. It is not proof that an event was
+written, is not wired to production, and does not change the OAuth readiness
+gates.
+
+The binding-storage Azurite integration test creates random tables with the
+`OauthSecurityIT` prefix; the operation-correlation test uses random
+`StaffCorr*` tables. Both are test-only naming, not production table names.
+Earlier active binding rows may omit `ownershipState`; the repository
+interprets that legacy shape as active when validating it. A missing ownership
+marker is therefore a compatibility case in this prototype, not a durable
+cross-store correlation field.
+
+The binding-storage records above do **not** persist a StaffEvents event ID,
+staff mutation category, expected revision, or previous/resulting staff
+security state. Existing receipt kinds describe binding reservation/release,
+not complete staff-writer coordination. A binding's acquisition operation ID
+does not prove that the binding is still current; release and later
+acquisition change ownership state and operation identity.
 
 ### StaffEvents
 
@@ -110,8 +123,11 @@ StaffEvents.
 
 Therefore:
 
-1. A security head + binding + security receipt transaction is demonstrated
-   only for the isolated same-table, same-partition prototype.
+1. The isolated operation-correlation prototype demonstrates a security
+   head/staff/optional binding + receipt + append-obligation transaction only
+   within its injected same-table, same-partition test boundary. The separate
+   binding-storage prototype's head/binding/receipt transaction has no
+   StaffEvents append obligation.
 2. A StaffEvents append is a separate single-entity write in `StaffEvents`.
 3. The current code does not combine the security batch and StaffEvents
    append. If their future physical tables or partition keys differ, Azure
@@ -168,20 +184,27 @@ canonical projection alone answer none of the latter two questions.
 This is a staged protocol, not a distributed transaction:
 
 1. **Prepare identity:** allocate stable operation/event IDs and expected
-   revision. Validate canonical staff and Entra identities. Persisting a
-   durable intent record is a future requirement; no current writer does so.
+   revision. Validate canonical staff and Entra identities. The isolated
+   operation-correlation prototype accepts these IDs and persists an append
+   obligation only when the security transition commits; it does not persist
+   a separate pre-commit intent or participate in production writers.
 2. **Commit security decision:** in the chosen authoritative security
    partition, compare-and-swap the authority head and conditionally transition
    binding ownership as needed. In that same Azure Table transaction, create
    an immutable receipt containing operation ID, event ID, staff ID,
    mutation category, expected/resulting revision, previous/resulting state,
-   binding identity, and outcome. A rejection is recorded as a distinct
+   binding identity, and outcome. The isolated prototype also creates a
+   separate immutable append-obligation row in this transaction, with the same
+   operation ID and status `pending`. A rejection is recorded as a distinct
    result and must not be represented as a successful transition.
-3. **Append StaffEvents:** after a confirmed security commit, independently
-   create the event with the same operation ID and resulting security
-   revision in explicitly versioned correlation fields. Existing event
-   schema does not contain those fields. Failure or unknown acknowledgement
-   leaves an incomplete/uncertain operation, not a rollback of security state.
+3. **Append StaffEvents:** this step remains unimplemented. A separately
+   designed and independently verified protocol would be required to consume
+   an obligation and create the event with the same operation ID and resulting
+   security revision in explicitly versioned correlation fields. The
+   obligation remains pending and is never evidence that StaffEvents was
+   appended. Existing event schema does not contain those fields. Failure or
+   unknown acknowledgement leaves an incomplete/uncertain operation, not a
+   rollback of security state.
 4. **Apply projection:** projection processing must durably record the exact
    event ID, operation ID, staff ID, resulting security revision, and
    projection generation/checkpoint that it applied. If a stored projection
@@ -195,15 +218,14 @@ This is a staged protocol, not a distributed transaction:
    must be read independently and treated as time-bounded evidence, not a
    capability.
 
-The current code does not place steps 2 and 3 in one transaction. If their
-future physical tables or partition keys differ, Azure Tables cannot combine
-them in one entity-group transaction; current code does not prove matching
-placement even if table names and keys happen to coincide. A future design
-could place a durable intent/outbox in the security partition to make the
-security commit and the obligation to append an event atomic. It still cannot
-make the StaffEvents append atomic with that security commit. Such an outbox
-is a design option requiring a separate review, not an existing record or
-approved implementation.
+The current code does not place steps 2 and 3 in one transaction. The isolated
+prototype makes only the security commit and the obligation to append an event
+atomic; it does not implement an outbox worker or the StaffEvents append. If
+their future physical tables or partition keys differ, Azure Tables cannot
+combine them in one entity-group transaction; current code does not prove
+matching placement even if table names and keys happen to coincide. The
+obligation prototype is not a production protocol or approval to dispatch,
+retry, or interpret an obligation as an appended event.
 
 ## 5. Binding ownership and historical evidence
 

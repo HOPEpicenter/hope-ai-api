@@ -18,6 +18,9 @@ export const STAFF_OPERATION_CORRELATION_PROTOTYPE_HEAD_ROW =
 export const STAFF_OPERATION_CORRELATION_PROTOTYPE_SOURCE =
   "staff-operation-correlation-prototype-v1";
 export const STAFF_OPERATION_CORRELATION_PROTOTYPE_SCHEMA_VERSION = 1;
+export const STAFF_EVENTS_APPEND_OBLIGATION_SOURCE =
+  "staff-events-append-obligation-v1";
+export const STAFF_EVENTS_APPEND_OBLIGATION_SCHEMA_VERSION = 1;
 
 type StoredHead = {
   revision: number;
@@ -44,6 +47,20 @@ type StoredBinding = {
   releasedByStaffId?: string;
   releaseOperationId?: string;
   releaseRevision?: number;
+  etag?: string;
+};
+
+type StoredStaffEventsAppendObligation = {
+  partitionKey: string;
+  rowKey: string;
+  schemaVersion: number;
+  source: string;
+  operationId: string;
+  eventId: string;
+  staffId: string;
+  mutationCategory: string;
+  resultingSecurityRevision: number;
+  status: string;
   etag?: string;
 };
 
@@ -98,6 +115,12 @@ export type StaffOperationCorrelationPrototypeInspection = Readonly<{
     | "unavailable"
     | "invalid_input";
   operationEvidence: "verified" | "missing" | "unavailable";
+  appendObligationEvidence:
+    | "not_observed"
+    | "pending"
+    | "missing"
+    | "contradictory"
+    | "unavailable";
   currentBindingEvidence:
     | "current"
     | "released"
@@ -163,6 +186,12 @@ function rowKey(prefix: string, value: string): string {
 
 function bindingRowKey(binding: NormalizedBinding): string {
   return `binding-${binding.entraTenantId}-${binding.entraObjectId}`;
+}
+
+export function staffEventsAppendObligationRowKey(
+  operationId: string
+): string {
+  return rowKey("staff-events-append-obligation", operationId);
 }
 
 function statusCode(error: unknown): number {
@@ -357,6 +386,7 @@ function invalidInspection(): StaffOperationCorrelationPrototypeInspection {
   return {
     status: "invalid_input",
     operationEvidence: "missing",
+    appendObligationEvidence: "not_observed",
     currentBindingEvidence: "not_applicable",
     staffEventEvidence: "not_independently_read",
     projectionEvidence: "not_persisted",
@@ -587,6 +617,21 @@ export class StaffOperationCorrelationPrototypeRepository {
       outcome: "committed"
     };
     actions.push(["create", receipt]);
+    actions.push([
+      "create",
+      {
+        partitionKey,
+        rowKey: staffEventsAppendObligationRowKey(parsed.operationId),
+        schemaVersion: STAFF_EVENTS_APPEND_OBLIGATION_SCHEMA_VERSION,
+        source: STAFF_EVENTS_APPEND_OBLIGATION_SOURCE,
+        operationId: parsed.operationId,
+        eventId: parsed.eventId,
+        staffId: parsed.staffId,
+        mutationCategory: parsed.mutationCategory,
+        resultingSecurityRevision: nextRevision,
+        status: "pending"
+      }
+    ]);
 
     try {
       await this.table.submitTransaction(actions);
@@ -635,6 +680,7 @@ export class StaffOperationCorrelationPrototypeRepository {
       return {
         status: status === 404 ? "missing" : "unavailable",
         operationEvidence: status === 404 ? "missing" : "unavailable",
+        appendObligationEvidence: "not_observed",
         currentBindingEvidence: "not_applicable",
         staffEventEvidence: "not_independently_read",
         projectionEvidence: "not_persisted",
@@ -702,6 +748,7 @@ export class StaffOperationCorrelationPrototypeRepository {
       return {
         status: "contradictory",
         operationEvidence: "verified",
+        appendObligationEvidence: "not_observed",
         currentBindingEvidence: "not_applicable",
         staffEventEvidence: "not_independently_read",
         projectionEvidence: "not_persisted",
@@ -719,6 +766,67 @@ export class StaffOperationCorrelationPrototypeRepository {
       return {
         status: "contradictory",
         operationEvidence: "verified",
+        appendObligationEvidence: "not_observed",
+        currentBindingEvidence: "not_applicable",
+        staffEventEvidence: "not_independently_read",
+        projectionEvidence: "not_persisted",
+        receipt,
+        ...nonAuthorizing
+      };
+    }
+
+    let appendObligationEvidence:
+      StaffOperationCorrelationPrototypeInspection[
+        "appendObligationEvidence"
+      ];
+    let appendObligation: StoredStaffEventsAppendObligation | undefined;
+    try {
+      appendObligation =
+        await this.table.getEntity<StoredStaffEventsAppendObligation>(
+          partitionKey,
+          staffEventsAppendObligationRowKey(receipt.operationId)
+        );
+      appendObligationEvidence = "pending";
+    } catch (error) {
+      const status = statusCode(error);
+      if (status === 404) {
+        appendObligationEvidence = "missing";
+      } else {
+        return {
+          status: "unavailable",
+          operationEvidence: "verified",
+          appendObligationEvidence: "unavailable",
+          currentBindingEvidence: "unavailable",
+          staffEventEvidence: "not_independently_read",
+          projectionEvidence: "not_persisted",
+          receipt,
+          ...nonAuthorizing
+        };
+      }
+    }
+    if (
+      appendObligationEvidence === "pending" &&
+      (
+        !appendObligation ||
+        appendObligation.partitionKey !== partitionKey ||
+        appendObligation.rowKey !==
+          staffEventsAppendObligationRowKey(receipt.operationId) ||
+        appendObligation.schemaVersion !==
+          STAFF_EVENTS_APPEND_OBLIGATION_SCHEMA_VERSION ||
+        appendObligation.source !== STAFF_EVENTS_APPEND_OBLIGATION_SOURCE ||
+        appendObligation.operationId !== receipt.operationId ||
+        appendObligation.eventId !== receipt.eventId ||
+        appendObligation.staffId !== receipt.staffId ||
+        appendObligation.mutationCategory !== receipt.mutationCategory ||
+        appendObligation.resultingSecurityRevision !==
+          receipt.resultingRevision ||
+        appendObligation.status !== "pending"
+      )
+    ) {
+      return {
+        status: "contradictory",
+        operationEvidence: "verified",
+        appendObligationEvidence: "contradictory",
         currentBindingEvidence: "not_applicable",
         staffEventEvidence: "not_independently_read",
         projectionEvidence: "not_persisted",
@@ -742,6 +850,7 @@ export class StaffOperationCorrelationPrototypeRepository {
       return {
         status: "unavailable",
         operationEvidence: "verified",
+        appendObligationEvidence,
         currentBindingEvidence: "unavailable",
         staffEventEvidence: "not_independently_read",
         projectionEvidence: "not_persisted",
@@ -757,6 +866,7 @@ export class StaffOperationCorrelationPrototypeRepository {
       return {
         status: "contradictory",
         operationEvidence: "verified",
+        appendObligationEvidence,
         currentBindingEvidence: "not_applicable",
         staffEventEvidence: "not_independently_read",
         projectionEvidence: "not_persisted",
@@ -784,6 +894,7 @@ export class StaffOperationCorrelationPrototypeRepository {
             ? "unavailable"
             : "historical",
           operationEvidence: "verified",
+          appendObligationEvidence,
           currentBindingEvidence: bindingEvidence,
           staffEventEvidence: "not_independently_read",
           projectionEvidence: "not_persisted",
@@ -795,6 +906,7 @@ export class StaffOperationCorrelationPrototypeRepository {
         return {
           status: "contradictory",
           operationEvidence: "verified",
+          appendObligationEvidence,
           currentBindingEvidence: "unavailable",
           staffEventEvidence: "not_independently_read",
           projectionEvidence: "not_persisted",
@@ -819,6 +931,7 @@ export class StaffOperationCorrelationPrototypeRepository {
     return {
       status: historical ? "historical" : "incomplete",
       operationEvidence: "verified",
+      appendObligationEvidence,
       currentBindingEvidence: bindingEvidence,
       staffEventEvidence: "not_independently_read",
       projectionEvidence: "not_persisted",

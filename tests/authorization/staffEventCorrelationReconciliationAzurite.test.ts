@@ -12,10 +12,13 @@ import {
   staffEventCorrelationRowKey
 } from "../../src/repositories/staffEventCorrelationStoragePrototype";
 import {
+  STAFF_EVENTS_APPEND_OBLIGATION_SCHEMA_VERSION,
+  STAFF_EVENTS_APPEND_OBLIGATION_SOURCE,
   STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
   STAFF_OPERATION_CORRELATION_PROTOTYPE_SCHEMA_VERSION,
   STAFF_OPERATION_CORRELATION_PROTOTYPE_SOURCE,
-  StaffOperationCorrelationPrototypeRepository
+  StaffOperationCorrelationPrototypeRepository,
+  staffEventsAppendObligationRowKey
 } from "../../src/repositories/staffOperationCorrelationPrototypeRepository";
 import {
   inspectStaffEventCorrelationReconciliation,
@@ -411,6 +414,126 @@ async function main(): Promise<void> {
   );
   assert.equal(badId.status, "invalid_request");
   assertSafe(badId);
+
+  // 17b: append obligation evidence is separate, opt-in, and non-authorizing.
+  const obligationFor = (
+    id: string,
+    overrides: Record<string, unknown> = {}
+  ): Record<string, unknown> => ({
+    partitionKey: STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+    rowKey: staffEventsAppendObligationRowKey(`op-${id}`),
+    schemaVersion: STAFF_EVENTS_APPEND_OBLIGATION_SCHEMA_VERSION,
+    source: STAFF_EVENTS_APPEND_OBLIGATION_SOURCE,
+    operationId: `op-${id}`,
+    eventId: `ev-${id}`,
+    staffId: `staff-${id}`,
+    mutationCategory: "profile_update",
+    resultingSecurityRevision: 2,
+    status: "pending",
+    ...overrides
+  });
+  const withObligation = async (
+    id: string,
+    security: { getEntity: TableClient["getEntity"] } = securityTable
+  ) => {
+    const result = await inspectStaffEventCorrelationReconciliation(
+      {
+        operationId: `op-${id}`,
+        eventId: `ev-${id}`,
+        staffId: `staff-${id}`,
+        occurredAt
+      },
+      { getEntity: (pk, rk) => security.getEntity(pk, rk) },
+      {
+        tableName: eventsTable.tableName,
+        getEntity: (pk, rk) => eventsTable.getEntity(pk, rk)
+      },
+      { inspectAppendObligation: true }
+    );
+    assertSafe(result);
+    return result;
+  };
+
+  // Legacy/omitted option: not inspected, behavior unchanged.
+  await seed("obl-legacy", "profile");
+  const legacy = await reconcile("obl-legacy");
+  assert.equal(legacy.status, "consistent_observed_evidence");
+  assert.equal(legacy.appendObligation.status, "not_inspected");
+  // Receipt without obligation: missing, and the top-level status is unchanged.
+  const legacyOpted = await withObligation("obl-legacy");
+  assert.equal(legacyOpted.status, "consistent_observed_evidence");
+  assert.equal(legacyOpted.appendObligation.status, "missing");
+
+  // Pending obligation with no StaffEvents row is not append proof.
+  await seed("obl-pending", "profile", {}, null);
+  await securityTable.createEntity(obligationFor("obl-pending") as never);
+  const pendingOnly = await withObligation("obl-pending");
+  assert.equal(pendingOnly.appendObligation.status, "observed_pending");
+  assert.equal(pendingOnly.status, "missing_staff_event");
+  assert.equal(pendingOnly.staffEventsAppendVerified, false);
+
+  // Pending obligation alongside matching evidence.
+  await seed("obl-ok", "profile");
+  await securityTable.createEntity(obligationFor("obl-ok") as never);
+  const okOblig = await withObligation("obl-ok");
+  assert.equal(okOblig.appendObligation.status, "observed_pending");
+  assert.equal(okOblig.status, "consistent_observed_evidence");
+
+  const badObligations: Array<[string, Record<string, unknown>, string, string[]]> = [
+    ["oschema", { schemaVersion: undefined }, "malformed", []],
+    ["over", { schemaVersion: 2 }, "malformed", []],
+    ["osrc", { source: "other" }, "malformed", []],
+    ["ocat", { mutationCategory: "nonsense" }, "malformed", []],
+    ["orev", { resultingSecurityRevision: "2" }, "malformed", []],
+    ["ostatus", { status: "complete" }, "contradictory", []],
+    ["oop", { operationId: "op-other" }, "contradictory", ["operationId"]],
+    ["oev", { eventId: "ev-other" }, "contradictory", ["eventId"]],
+    ["ostaff", { staffId: "staff-other" }, "contradictory", ["staffId"]],
+    ["ocatmis", { mutationCategory: "binding_change" }, "contradictory", ["mutationCategory"]],
+    ["orevmis", { resultingSecurityRevision: 9 }, "contradictory", ["resultingSecurityRevision"]],
+    ["okeys", { partitionKey: "wrong-partition" }, "missing", []]
+  ];
+  for (const [id, override, expected, fields] of badObligations) {
+    await seed(id, "profile");
+    await securityTable.createEntity(obligationFor(id, override) as never);
+    const r = await withObligation(id);
+    assert.equal(r.appendObligation.status, expected, id);
+    assert.deepEqual([...r.appendObligation.mismatchedFields].sort(), fields, id);
+    assert.equal(r.status, "consistent_observed_evidence", id);
+  }
+
+  // A returned row with tampered keys is contradictory.
+  await seed("otamper", "profile");
+  await securityTable.createEntity(obligationFor("otamper") as never);
+  const tamperedObl = await withObligation("otamper", {
+    getEntity: (async (pk: string, rk: string) => {
+      const e = await securityTable.getEntity(pk, rk);
+      return rk.startsWith("staff-events-append-obligation-")
+        ? { ...e, rowKey: "obligation-tampered" }
+        : e;
+    }) as TableClient["getEntity"]
+  });
+  assert.equal(tamperedObl.appendObligation.status, "contradictory");
+
+  // Obligation read failures are unavailable, never missing.
+  await seed("ofail", "profile");
+  const oblFail = await withObligation("ofail", {
+    getEntity: (async (pk: string, rk: string) => {
+      if (rk.startsWith("staff-events-append-obligation-")) {
+        throw Object.assign(new Error("simulated outage"), { statusCode: 500 });
+      }
+      return securityTable.getEntity(pk, rk);
+    }) as TableClient["getEntity"]
+  });
+  assert.equal(oblFail.appendObligation.status, "unavailable");
+  assert.equal(oblFail.status, "consistent_observed_evidence");
+  const oblGhost = await withObligation("ofail", ghostSecurity);
+  assert.equal(oblGhost.appendObligation.status, "unavailable");
+
+  // Obligation read never mutates storage.
+  const beforeOblig = await snapshot(securityTable, eventsTable);
+  await withObligation("obl-ok");
+  assert.equal(await snapshot(securityTable, eventsTable), beforeOblig);
 
   // 18: lost acknowledgement is never promoted to verified success.
   const ackSecurity = newTable("StaffEventCorrelationReconAck");

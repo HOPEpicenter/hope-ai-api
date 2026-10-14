@@ -9,9 +9,12 @@ import {
 } from "../../domain/staff/staffWriterCoordinationContract";
 import { normalizeEntraStaffBinding } from "../../domain/staff/projectStaffDirectory";
 import {
+  STAFF_EVENTS_APPEND_OBLIGATION_SCHEMA_VERSION,
+  STAFF_EVENTS_APPEND_OBLIGATION_SOURCE,
   STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
   STAFF_OPERATION_CORRELATION_PROTOTYPE_SCHEMA_VERSION,
-  STAFF_OPERATION_CORRELATION_PROTOTYPE_SOURCE
+  STAFF_OPERATION_CORRELATION_PROTOTYPE_SOURCE,
+  staffEventsAppendObligationRowKey
 } from "../../repositories/staffOperationCorrelationPrototypeRepository";
 import {
   StaffEventCorrelationStoragePrototype,
@@ -65,6 +68,29 @@ export type ReconciliationSourceStatus =
   | "unsupported_schema_version"
   | "unavailable";
 
+export type StaffEventCorrelationReconciliationOptions = Readonly<{
+  /** Opt in to reading the append obligation from the security port. */
+  inspectAppendObligation?: boolean;
+}>;
+
+/**
+ * Describes only the obligation row. `observed_pending` means a pending
+ * obligation exists; it never indicates that StaffEvents was appended.
+ */
+export type StaffEventsAppendObligationEvidenceStatus =
+  | "not_inspected"
+  | "observed_pending"
+  | "missing"
+  | "malformed"
+  | "contradictory"
+  | "unavailable";
+
+export type StaffEventsAppendObligationEvidence = Readonly<{
+  status: StaffEventsAppendObligationEvidenceStatus;
+  diagnostic: string;
+  mismatchedFields: readonly string[];
+}>;
+
 export type StaffEventCorrelationReconciliationResult = Readonly<{
   status: StaffEventCorrelationReconciliationStatus;
   diagnostics: readonly string[];
@@ -73,6 +99,7 @@ export type StaffEventCorrelationReconciliationResult = Readonly<{
     securityReceipt: ReconciliationSourceStatus;
     staffEvent: ReconciliationSourceStatus;
   }>;
+  appendObligation: StaffEventsAppendObligationEvidence;
   authoritative: false;
   executionPermitted: false;
   retryPermitted: false;
@@ -139,18 +166,119 @@ function readGuard(port: ReconciliationReadPort): ReconciliationReadPort {
   };
 }
 
+const notInspected: StaffEventsAppendObligationEvidence = {
+  status: "not_inspected",
+  diagnostic: "append_obligation_not_inspected",
+  mismatchedFields: []
+};
+
+function obligationEvidence(
+  status: StaffEventsAppendObligationEvidenceStatus,
+  diagnostic: string,
+  mismatchedFields: string[] = []
+): StaffEventsAppendObligationEvidence {
+  return { status, diagnostic, mismatchedFields };
+}
+
+async function readAppendObligation(
+  port: ReconciliationReadPort,
+  request: StaffEventCorrelationReconciliationRequest,
+  receipt: ReceiptView | undefined
+): Promise<StaffEventsAppendObligationEvidence> {
+  const rowKey = staffEventsAppendObligationRowKey(request.operationId);
+  let entity: Record<string, unknown>;
+  try {
+    entity = await port.getEntity(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      rowKey
+    );
+  } catch (error) {
+    return httpStatus(error) === 404
+      ? obligationEvidence("missing", "append_obligation_not_found")
+      : obligationEvidence("unavailable", "append_obligation_read_failed");
+  }
+
+  if (
+    entity.partitionKey !== STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION ||
+    entity.rowKey !== rowKey
+  ) {
+    return obligationEvidence("contradictory", "append_obligation_key_mismatch");
+  }
+  if (
+    entity.schemaVersion !== STAFF_EVENTS_APPEND_OBLIGATION_SCHEMA_VERSION ||
+    entity.source !== STAFF_EVENTS_APPEND_OBLIGATION_SOURCE
+  ) {
+    return obligationEvidence("malformed", "append_obligation_schema_or_source_invalid");
+  }
+  const {
+    operationId, eventId, staffId, mutationCategory,
+    resultingSecurityRevision, status
+  } = entity;
+  if (
+    typeof operationId !== "string" || !identifiers.test(operationId) ||
+    typeof eventId !== "string" || !identifiers.test(eventId) ||
+    typeof staffId !== "string" || !identifiers.test(staffId) ||
+    typeof mutationCategory !== "string" || !categories.has(mutationCategory) ||
+    typeof resultingSecurityRevision !== "number" ||
+    !Number.isSafeInteger(resultingSecurityRevision) ||
+    resultingSecurityRevision < 1 ||
+    typeof status !== "string"
+  ) {
+    return obligationEvidence("malformed", "append_obligation_fields_invalid");
+  }
+
+  const mismatched: string[] = [];
+  if (operationId !== request.operationId) mismatched.push("operationId");
+  if (eventId !== request.eventId) mismatched.push("eventId");
+  if (staffId !== request.staffId) mismatched.push("staffId");
+  // Category and revision are comparable only against an observed receipt.
+  if (receipt) {
+    if (operationId !== receipt.operationId && !mismatched.includes("operationId")) {
+      mismatched.push("operationId");
+    }
+    if (eventId !== receipt.eventId && !mismatched.includes("eventId")) {
+      mismatched.push("eventId");
+    }
+    if (staffId !== receipt.staffId && !mismatched.includes("staffId")) {
+      mismatched.push("staffId");
+    }
+    if (mutationCategory !== receipt.mutationCategory) {
+      mismatched.push("mutationCategory");
+    }
+    if (resultingSecurityRevision !== receipt.resultingRevision) {
+      mismatched.push("resultingSecurityRevision");
+    }
+  }
+  if (mismatched.length > 0) {
+    return obligationEvidence(
+      "contradictory",
+      "append_obligation_differs_from_security_evidence",
+      mismatched
+    );
+  }
+  if (status !== "pending") {
+    return obligationEvidence("contradictory", "append_obligation_status_not_pending");
+  }
+  return obligationEvidence(
+    "observed_pending",
+    "append_obligation_pending_not_proof_of_staff_events_append"
+  );
+}
+
 function build(
   status: StaffEventCorrelationReconciliationStatus,
   securityReceipt: ReconciliationSourceStatus,
   staffEvent: ReconciliationSourceStatus,
   diagnostics: string[],
-  mismatchedFields: string[] = []
+  mismatchedFields: string[] = [],
+  appendObligation: StaffEventsAppendObligationEvidence = notInspected
 ): StaffEventCorrelationReconciliationResult {
   return {
     status,
     diagnostics,
     mismatchedFields,
     sources: { securityReceipt, staffEvent },
+    appendObligation,
     authoritative: false,
     executionPermitted: false,
     retryPermitted: false,
@@ -387,7 +515,8 @@ function compare(
 export async function inspectStaffEventCorrelationReconciliation(
   request: StaffEventCorrelationReconciliationRequest,
   securityTable: ReconciliationReadPort,
-  staffEventsTable: ReconciliationStaffEventsPort
+  staffEventsTable: ReconciliationStaffEventsPort,
+  options?: StaffEventCorrelationReconciliationOptions
 ): Promise<StaffEventCorrelationReconciliationResult> {
   if (
     !request ||
@@ -414,14 +543,23 @@ export async function inspectStaffEventCorrelationReconciliation(
     return build("invalid_request", "unavailable", "unavailable", ["isolated_proof_table_required"]);
   }
 
+  const guardedSecurity = readGuard(securityTable);
   const [receiptRead, eventRead] = await Promise.all([
-    readReceipt(readGuard(securityTable), request),
+    readReceipt(guardedSecurity, request),
     reader.read({
       staffId: request.staffId,
       eventId: request.eventId,
       occurredAt: request.occurredAt
     })
   ]);
+  // Informational only: never changes the top-level status.
+  const appendObligation = options?.inspectAppendObligation === true
+    ? await readAppendObligation(
+        guardedSecurity,
+        request,
+        receiptRead.status === "observed" ? receiptRead.receipt : undefined
+      )
+    : notInspected;
   const security = receiptRead.status;
   const event = eventSource(eventRead).status;
   const diagnostics = [
@@ -431,7 +569,7 @@ export async function inspectStaffEventCorrelationReconciliation(
   const done = (
     status: StaffEventCorrelationReconciliationStatus,
     mismatched: string[] = []
-  ) => build(status, security, event, diagnostics, mismatched);
+  ) => build(status, security, event, diagnostics, mismatched, appendObligation);
 
   if (security === "unavailable" && event === "unavailable") {
     return done("storage_unavailable");

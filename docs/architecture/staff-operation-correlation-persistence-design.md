@@ -305,6 +305,29 @@ operation IDs, revisions, outcomes, or Graph results during backfill. Retain
 their current read/audit behavior, classify them as legacy/un-correlated, and
 never use them as proof of a newly coordinated transition.
 
+### Append-intent contract v1 (validation only)
+
+`src/contracts/staffEventAppendIntent.v1.ts` defines an immutable
+`StaffEventAppendIntentV1`: the canonical `StaffEvent` plus the existing
+`StaffEventCorrelationEvidenceV1`, validated against a committed operation's
+operation ID, event ID, Staff ID, mutation category, and resulting revision.
+It reuses the existing classifier and adds no second operation identity.
+
+- Pure validation: no reads, writes, dispatch, retry, or authorization. A
+  `valid` result is not proof of a security commit or a StaffEvents append;
+  all non-authorizing flags remain `false`.
+- Nothing is inferred: event ID, timestamp, actor, and data must be supplied
+  and are preserved exactly. Output is a frozen, detached JSON copy.
+- Privacy: event data may carry email, phone, and Entra identifiers. The
+  contract is not persisted yet; any future storage must treat the payload as
+  sensitive and keep it out of logs and diagnostics (results never echo it).
+- Size: serialized event plus correlation is limited to 32 KiB, below the
+  64 KiB Azure Table string-property limit and the 1 MiB entity limit.
+- Compatibility: the existing obligation schema and rows are unchanged. Legacy
+  obligations carry no intent and remain valid pending records; an absent
+  intent must be read as not-recorded, never as an empty or inferred event.
+  Persisting an intent needs a new obligation schema version and review.
+
 Before a migration, inventory all writers and readers; define an explicit
 versioned schema and reader compatibility period; validate collisions and
 binding ownership; and create only factual migration metadata that can be

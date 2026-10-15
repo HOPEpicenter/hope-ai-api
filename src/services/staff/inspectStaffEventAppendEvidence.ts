@@ -160,6 +160,46 @@ export async function inspectStaffEventAppendEvidence(
     return result("contradictory");
   }
 
+  // This record is inside the synthetic security transaction, not
+  // canonical StaffEvents. Historical operations may lack the record.
+  const syntheticKey = `staff-atomic-event-${event.eventId}`;
+  let synthetic: Record<string, unknown>;
+
+  try {
+    synthetic = await securityTable.getEntity<Record<string, unknown>>(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      syntheticKey
+    );
+  } catch (error) {
+    return result(missing(error) ? "unclassified" : "unavailable");
+  }
+
+  if (
+    synthetic.partitionKey !== STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION ||
+    synthetic.rowKey !== syntheticKey ||
+    synthetic.schemaVersion !== 1 ||
+    synthetic.source !== "staff-atomic-event-in-security-transaction-v1" ||
+    synthetic.operationId !== receipt.operationId ||
+    synthetic.eventId !== receipt.eventId ||
+    synthetic.staffId !== receipt.staffId ||
+    synthetic.mutationCategory !== receipt.mutationCategory ||
+    synthetic.resultingSecurityRevision !== receipt.resultingRevision ||
+    typeof synthetic.eventJson !== "string" ||
+    synthetic.eventJson.length > STAFF_EVENT_APPEND_INTENT_RECORD_MAX_JSON_CHARS
+  ) {
+    return result("contradictory");
+  }
+
+  let syntheticEvent: unknown;
+  try {
+    syntheticEvent = JSON.parse(synthetic.eventJson);
+  } catch {
+    return result("contradictory");
+  }
+
+  if (!isDeepStrictEqual(syntheticEvent, event)) {
+    return result("contradictory");
+  }
   const eventKey = `${event.occurredAt}__${event.eventId}`;
   let observed: Record<string, unknown>;
 
@@ -200,11 +240,16 @@ export async function inspectStaffEventAppendEvidence(
   // evidence after observing StaffEvents and reject visible changes.
   let finalInspection;
   let finalIntent: Record<string, unknown>;
+  let finalSynthetic: Record<string, unknown>;
   try {
     finalInspection = await security.inspectOperation({ operationId });
     finalIntent = await securityTable.getEntity<Record<string, unknown>>(
       STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
       intentKey
+    );
+    finalSynthetic = await securityTable.getEntity<Record<string, unknown>>(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      syntheticKey
     );
   } catch {
     return result("unavailable");
@@ -219,7 +264,8 @@ export async function inspectStaffEventAppendEvidence(
 
   if (
     !isDeepStrictEqual(finalInspection, inspection) ||
-    !isDeepStrictEqual(finalIntent, stored)
+    !isDeepStrictEqual(finalIntent, stored) ||
+    !isDeepStrictEqual(finalSynthetic, synthetic)
   ) {
     return result("contradictory");
   }

@@ -317,6 +317,14 @@ jobs:
 
             Write-Host "[PASS] Staff operation correlation prototype Azurite test"
 
+            npx --no-install ts-node tests/authorization/inspectStaffEventAppendEvidenceAzurite.test.ts
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Independent StaffEvent append evidence Azurite test failed"
+            }
+
+            Write-Host "[PASS] Independent StaffEvent append evidence Azurite test"
+
             npx --no-install ts-node tests/authorization/staffOperationCorrelationTableReconciliationAzurite.test.ts
 
             if ($LASTEXITCODE -ne 0) {

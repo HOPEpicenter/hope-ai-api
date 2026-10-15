@@ -341,6 +341,14 @@ jobs:
 
             Write-Host "[PASS] StaffEvents correlation reconciliation Azurite test"
 
+            npx --no-install ts-node tests/authorization/staffAtomicEventTransitionPrototypeAzurite.test.ts
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Atomic StaffEvent transition prototype Azurite test failed"
+            }
+
+            Write-Host "[PASS] Atomic StaffEvent transition prototype Azurite test"
+
             Write-Host "[PASS] OAuth staff writer participation Azurite proof"
           }
           finally {

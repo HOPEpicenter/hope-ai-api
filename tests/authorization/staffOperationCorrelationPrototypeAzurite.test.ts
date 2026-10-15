@@ -228,6 +228,45 @@ async function main(): Promise<void> {
     );
     nonAuthorizing(duplicateReceipt);
 
+    // An operation ID cannot be reused by a different staff identity.
+    // The failed batch must not advance the global security head or
+    // create the second staff's security state.
+    const secondStaff = "synthetic-cross-staff-replay";
+    const crossStaffRevision = await revision(table);
+    const crossStaffReplay = await repository.commitOperation(op({
+      operationId: createA.operationId,
+      eventId: "event-cross-staff-replay",
+      staffId: secondStaff,
+      expectedRevision: crossStaffRevision,
+      expectedStaffState: "absent",
+      resultingStaffState: "active"
+    }));
+    assert.equal(crossStaffReplay.status, "conflict");
+    assert.equal(await revision(table), crossStaffRevision);
+    await assert.rejects(table.getEntity(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      `staff-${secondStaff}`
+    ));
+    const originalCrossStaffReceipt = await table.getEntity<{
+      eventId: string;
+      staffId: string;
+    }>(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      `operation-${createA.operationId}`
+    );
+    assert.equal(originalCrossStaffReceipt.staffId, staffA);
+    assert.equal(originalCrossStaffReceipt.eventId, createA.eventId);
+    const originalCrossStaffObligation = await table.getEntity<{
+      eventId: string;
+      staffId: string;
+    }>(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      staffEventsAppendObligationRowKey(createA.operationId)
+    );
+    assert.equal(originalCrossStaffObligation.staffId, staffA);
+    assert.equal(originalCrossStaffObligation.eventId, createA.eventId);
+    nonAuthorizing(crossStaffReplay);
+
     const stale = await repository.commitOperation(op({
       operationId: "stale-operation",
       eventId: "stale-event",

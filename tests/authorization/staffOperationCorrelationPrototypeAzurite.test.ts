@@ -844,6 +844,7 @@ async function intentScenarios(): Promise<void> {
       assert.ok(await missing(`operation-${operationId}`));
       assert.ok(await missing(staffEventsAppendObligationRowKey(operationId)));
       assert.ok(await missing(staffEventAppendIntentRowKey(operationId)));
+      assert.ok(await missing(`staff-atomic-event-event-${operationId}`));
     };
     const intentOp = (
       operationId: string,
@@ -890,6 +891,41 @@ async function intentScenarios(): Promise<void> {
       correlation: { operationId: string };
     };
     assert.deepEqual(storedIntent.event, (okIntent as { event: unknown }).event);
+
+    const storedAtomicEvent = await t.getEntity<{
+      schemaVersion: number;
+      source: string;
+      operationId: string;
+      eventId: string;
+      staffId: string;
+      mutationCategory: string;
+      resultingSecurityRevision: number;
+      eventJson: string;
+    }>(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      "staff-atomic-event-event-intent-ok"
+    );
+    assert.equal(storedAtomicEvent.schemaVersion, 1);
+    assert.equal(
+      storedAtomicEvent.source,
+      "staff-atomic-event-in-security-transaction-v1"
+    );
+    assert.equal(storedAtomicEvent.operationId, "intent-ok");
+    assert.equal(storedAtomicEvent.eventId, "event-intent-ok");
+    assert.equal(storedAtomicEvent.staffId, "synthetic-intent-a");
+    assert.equal(storedAtomicEvent.mutationCategory, "identity_creation");
+    assert.equal(storedAtomicEvent.resultingSecurityRevision, rev0 + 1);
+    assert.deepEqual(
+      JSON.parse(storedAtomicEvent.eventJson),
+      (okIntent as { event: unknown }).event
+    );
+    assert.equal(
+      lastBatch.filter(a =>
+        a[0] === "create" &&
+        a[1].rowKey === "staff-atomic-event-event-intent-ok"
+      ).length,
+      1
+    );
     assert.equal(storedIntent.correlation.operationId, "intent-ok");
     assert.ok(String(stored.intentJson).length <=
       STAFF_EVENT_APPEND_INTENT_RECORD_MAX_JSON_CHARS);
@@ -976,6 +1012,7 @@ async function intentScenarios(): Promise<void> {
     }));
     assert.equal(legacy.status, "committed");
     assert.ok(await missing(staffEventAppendIntentRowKey("intent-legacy")));
+    assert.ok(await missing("staff-atomic-event-event-intent-legacy"));
     const legacyInspection = await plain.inspectOperation({ operationId: "intent-legacy" });
     assert.equal(legacyInspection.appendIntentEvidence, "not_required");
     assert.equal(legacyInspection.receipt?.appendIntentRequirement, "not_required");
@@ -1075,6 +1112,36 @@ async function intentScenarios(): Promise<void> {
       "preexisting"
     );
 
+    // Duplicate event identity rejects the entire security transaction.
+    const eventCollisionBase = await revision(t);
+    await t.createEntity({
+      partitionKey: STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      rowKey: "staff-atomic-event-event-collision",
+      marker: "existing-synthetic-event"
+    });
+    const eventCollision = await repo.commitOperation(
+      intentOp(
+        "collision",
+        "synthetic-collision",
+        eventCollisionBase,
+        intentFor("collision", "synthetic-collision", eventCollisionBase)
+      )
+    );
+    assert.equal(eventCollision.status, "conflict");
+    nonAuthorizing(eventCollision);
+    assert.equal(await revision(t), eventCollisionBase);
+    assert.ok(await missing("operation-collision"));
+    assert.ok(await missing("staff-synthetic-collision"));
+    assert.ok(await missing(staffEventAppendIntentRowKey("collision")));
+    assert.ok(await missing(staffEventsAppendObligationRowKey("collision")));
+    assert.equal(
+      (await t.getEntity<{ marker: string }>(
+        STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+        "staff-atomic-event-event-collision"
+      )).marker,
+      "existing-synthetic-event"
+    );
+
     // Replay of an operation ID with a different intent cannot alter the original.
     const replayBase = await revision(t);
     const replay = await repo.commitOperation(intentOp(
@@ -1119,6 +1186,13 @@ async function intentScenarios(): Promise<void> {
       (await plain.inspectOperation({ operationId: "intent-lost" })).appendIntentEvidence,
       "recorded"
     );
+    const lostAtomicEvent = await t.getEntity<{ eventId: string; operationId: string }>(
+      STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+      "staff-atomic-event-event-intent-lost"
+    );
+    assert.equal(lostAtomicEvent.eventId, "event-intent-lost");
+    assert.equal(lostAtomicEvent.operationId, "intent-lost");
+    nonAuthorizing(lost);
 
     // Missing rows and read failures never read as persisted events.
     await t.deleteEntity(

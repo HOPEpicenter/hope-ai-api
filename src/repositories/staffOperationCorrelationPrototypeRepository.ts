@@ -219,7 +219,7 @@ export function staffEventAppendIntentRowKey(operationId: string): string {
   return rowKey("staff-event-append-intent", operationId);
 }
 
-type PreparedIntent = Readonly<{ intentJson: string }>;
+type PreparedIntent = Readonly<{ intentJson: string; eventJson: string }>;
 
 // Validates the intent against this proposed transition before any I/O.
 function prepareIntent(
@@ -255,9 +255,10 @@ function prepareIntent(
     return null;
   }
   const intentJson = JSON.stringify(intent);
+  const eventJson = JSON.stringify(intent.event);
   return intentJson.length > STAFF_EVENT_APPEND_INTENT_RECORD_MAX_JSON_CHARS
     ? null
-    : { intentJson };
+    : { intentJson, eventJson };
 }
 
 function statusCode(error: unknown): number {
@@ -706,6 +707,23 @@ export class StaffOperationCorrelationPrototypeRepository {
         status: "pending"
       }
     ]);
+    if (intent) {
+      actions.push([
+        "create",
+        {
+          partitionKey,
+          rowKey: `staff-atomic-event-${parsed.eventId}`,
+          schemaVersion: 1,
+          source: "staff-atomic-event-in-security-transaction-v1",
+          operationId: parsed.operationId,
+          eventId: parsed.eventId,
+          staffId: parsed.staffId,
+          mutationCategory: parsed.mutationCategory,
+          resultingSecurityRevision: nextRevision,
+          eventJson: intent.eventJson
+        }
+      ]);
+    }
     if (intent) {
       actions.push([
         "create",

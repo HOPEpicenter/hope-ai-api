@@ -324,6 +324,13 @@ jobs:
             }
 
             Write-Host "[PASS] Independent StaffEvent append evidence Azurite test"
+            npx --no-install ts-node tests/authorization/staffEventsCanonicalAppendAzurite.test.ts
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Canonical StaffEvents append Azurite regression failed"
+            }
+
+            Write-Host "[PASS] Canonical StaffEvents append Azurite regression"
 
             npx --no-install ts-node tests/authorization/staffOperationCorrelationTableReconciliationAzurite.test.ts
 

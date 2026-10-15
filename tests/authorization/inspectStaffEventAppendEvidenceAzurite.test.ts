@@ -150,6 +150,84 @@ async function main(): Promise<void> {
       assert.equal(matching.status, "verified_match");
       nonAuthorizing(matching);
 
+      const syntheticKey = `staff-atomic-event-${eventId}`;
+
+      const syntheticRow = await securityTable.getEntity<
+        Record<string, unknown> & { eventJson: string }
+      >(
+        STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+        syntheticKey
+      );
+
+      assert.equal(syntheticRow.eventJson, JSON.stringify(event));
+
+      // A missing transaction-owned event must never be verified.
+      await securityTable.deleteEntity(
+        STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+        syntheticKey
+      );
+
+      const missingSynthetic = await inspect();
+      assert.equal(missingSynthetic.status, "unclassified");
+      nonAuthorizing(missingSynthetic);
+
+      await securityTable.createEntity({
+        partitionKey: STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+        rowKey: syntheticKey,
+        schemaVersion: 1,
+        source: "staff-atomic-event-in-security-transaction-v1",
+        operationId,
+        eventId,
+        staffId,
+        mutationCategory: "identity_creation",
+        resultingSecurityRevision: head.revision + 1,
+        eventJson: syntheticRow.eventJson
+      });
+
+      assert.equal((await inspect()).status, "verified_match");
+
+      // A conflicting synthetic event body must fail closed.
+      await securityTable.updateEntity(
+        {
+          partitionKey: STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+          rowKey: syntheticKey,
+          eventJson: JSON.stringify({
+            ...event,
+            actorId: "different-actor"
+          })
+        },
+        "Merge"
+      );
+
+      const conflictingSynthetic = await inspect();
+      assert.equal(conflictingSynthetic.status, "contradictory");
+      nonAuthorizing(conflictingSynthetic);
+
+      // Malformed JSON is also contradictory.
+      await securityTable.updateEntity(
+        {
+          partitionKey: STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+          rowKey: syntheticKey,
+          eventJson: "{invalid-json"
+        },
+        "Merge"
+      );
+
+      const malformedSynthetic = await inspect();
+      assert.equal(malformedSynthetic.status, "contradictory");
+      nonAuthorizing(malformedSynthetic);
+
+      await securityTable.updateEntity(
+        {
+          partitionKey: STAFF_OPERATION_CORRELATION_PROTOTYPE_PARTITION,
+          rowKey: syntheticKey,
+          eventJson: syntheticRow.eventJson
+        },
+        "Merge"
+      );
+
+      assert.equal((await inspect()).status, "verified_match");
+
       // Change security evidence during the independent StaffEvents read.
       // The final inspection must detect the disagreement.
       const checkConcurrentChange = async (
@@ -222,6 +300,14 @@ async function main(): Promise<void> {
         "intentJson",
         "{invalid-json",
         storedIntentRow.intentJson
+      );
+
+      // A concurrent change to the synthetic event must be detected.
+      await checkConcurrentChange(
+        syntheticKey,
+        "eventJson",
+        "{concurrent-change",
+        syntheticRow.eventJson
       );
 
       // A failed final security read cannot yield verified_match.

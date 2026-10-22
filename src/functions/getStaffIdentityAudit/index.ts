@@ -7,17 +7,48 @@ import {
   logFunctionError
 } from "../../shared/observability/functionObservability";
 import {
-  requireAdminStaffActorForFunction
-} from "../_shared/adminStaffActor";
+  getEntraStaffAuthorizationConfiguration
+} from "../../config/entraStaffAuthorization";
+import {
+  requireAuthenticatedAdminStaffActorForFunction
+} from "../_shared/authenticatedAdminStaffActor";
 
+export type GetStaffIdentityAuditDependencies = {
+  authorizeActor?: typeof requireAuthenticatedAdminStaffActorForFunction;
+  readAudit?: typeof readStaffIdentityAudit;
+};
+
+/** Trusted test dependencies; never populated from HTTP request data. */
 export async function getStaffIdentityAudit(
   context: any,
   req: any
 ): Promise<void> {
+  return executeGetStaffIdentityAudit(context, req, {});
+}
+
+/** Trusted test dependencies must never come from an HTTP request. */
+export function createGetStaffIdentityAuditHandler(
+  dependencies: GetStaffIdentityAuditDependencies
+): (context: any, req: any) => Promise<void> {
+  return (context, req) =>
+    executeGetStaffIdentityAudit(context, req, dependencies);
+}
+
+async function executeGetStaffIdentityAudit(
+  context: any,
+  req: any,
+  dependencies: GetStaffIdentityAuditDependencies
+): Promise<void> {
   const requestId = getRequestId(req);
 
   try {
-    const auth = await requireAdminStaffActorForFunction(req);
+    const authorizeActor =
+      dependencies.authorizeActor ??
+      requireAuthenticatedAdminStaffActorForFunction;
+    const auth = await authorizeActor(
+      req,
+      getEntraStaffAuthorizationConfiguration()
+    );
 
     if (!auth.ok) {
       context.res = {
@@ -53,7 +84,8 @@ export async function getStaffIdentityAudit(
       return;
     }
 
-    const items = await readStaffIdentityAudit(staffId);
+    const readAudit = dependencies.readAudit ?? readStaffIdentityAudit;
+    const items = await readAudit(staffId);
 
     if (items.length === 0) {
       context.res = {

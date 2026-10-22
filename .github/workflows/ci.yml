@@ -147,6 +147,10 @@ jobs:
           npx ts-node tests/authorization/sixWeekPastoralAuthorization.test.ts
           npx ts-node tests/authorization/sixWeekStartHttpAuthorization.test.ts
           npx ts-node tests/authorization/sixWeekOwnerHttpAuthorization.test.ts
+          npx --no-install ts-node tests/authorization/authenticatedAdminStaffActor.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install ts-node tests/authorization/getStaffIdentityAuditAuthenticated.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Ministry Area foundation regressions
         shell: pwsh

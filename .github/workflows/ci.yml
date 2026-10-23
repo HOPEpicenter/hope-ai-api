@@ -155,6 +155,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx --no-install ts-node tests/authorization/getStaffIdentityAuditAuthenticated.test.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install ts-node tests/authorization/authorizeStaffInvitationActivation.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install ts-node tests/authorization/entraStaffActivationAuthorization.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install ts-node tests/authorization/postStaffInvitationActivationAuthorization.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Ministry Area foundation regressions
         shell: pwsh

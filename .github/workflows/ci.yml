@@ -72,6 +72,8 @@ jobs:
           $ErrorActionPreference = "Stop"
           npx ts-node tests/authorization/formationMutationActor.test.ts
           npx --no-install ts-node tests/authorization/formationAssignmentLedgerContract.test.ts
+          npx --no-install ts-node tests/authorization/formationAssignmentWriterParticipationContract.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Formation assignment writer participation tests failed" }
           npx ts-node tests/authorization/oauthCredentialStorage.test.ts
           npx ts-node tests/authorization/oauthEncryptedEnvelope.test.ts
           npx ts-node tests/authorization/oauthLocalAesGcm.test.ts

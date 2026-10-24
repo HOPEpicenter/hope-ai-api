@@ -71,6 +71,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           npx ts-node tests/authorization/formationMutationActor.test.ts
+          npx --no-install ts-node tests/authorization/formationAssignmentLedgerContract.test.ts
           npx ts-node tests/authorization/oauthCredentialStorage.test.ts
           npx ts-node tests/authorization/oauthEncryptedEnvelope.test.ts
           npx ts-node tests/authorization/oauthLocalAesGcm.test.ts
@@ -377,6 +378,13 @@ jobs:
             }
 
             Write-Host "[PASS] Atomic StaffEvent transition prototype Azurite test"
+
+            $env:HOPE_ASSIGNMENT_AZURITE_TABLE_PORT = "11002"
+            npx --no-install ts-node tests/authorization/formationAssignmentLedgerStorageAzurite.test.ts
+            if ($LASTEXITCODE -ne 0) {
+              throw "Formation assignment ledger Azurite test failed"
+            }
+            Write-Host "[PASS] Formation assignment ledger Azurite proof"
 
             Write-Host "[PASS] OAuth staff writer participation Azurite proof"
           }

@@ -74,6 +74,10 @@ jobs:
           npx --no-install ts-node tests/authorization/formationAssignmentLedgerContract.test.ts
           npx --no-install ts-node tests/authorization/formationAssignmentWriterParticipationContract.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Formation assignment writer participation tests failed" }
+          npx --no-install ts-node tests/authorization/careBulkStaffAuthorization.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Care bulk authorization regressions failed" }
+          npx --no-install ts-node tests/authorization/careBulkPartialFailureSafety.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Care bulk partial-failure safety regressions failed" }
           npx ts-node tests/authorization/oauthCredentialStorage.test.ts
           npx ts-node tests/authorization/oauthEncryptedEnvelope.test.ts
           npx ts-node tests/authorization/oauthLocalAesGcm.test.ts

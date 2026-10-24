@@ -239,4 +239,27 @@ assert.deepEqual(
   "Scope must be sorted deterministically"
 );
 
+const largeHistoryEvents: TrustedFormationAssignmentEvent[] =
+  Array.from({ length: 150000 }, (_, index) => ({
+    visitorId: "synthetic-large-history",
+    type: "FOLLOWUP_ASSIGNED",
+    occurredAt: DAY1,
+    eventId: `large-event-${index}`,
+    data: { assigneeId: STAFF }
+  }));
+
+assert.deepEqual(
+  scope(largeHistoryEvents),
+  [],
+  "Large same-timestamp history must deny ambiguity without throwing"
+);
+
+assert.deepEqual(
+  scope([
+    ...largeHistoryEvents,
+    assigned("synthetic-large-history", DAY2, "large-event-latest")
+  ]),
+  ["synthetic-large-history"],
+  "Large history with unique latest assignment must resolve safely"
+);
 console.log("resolveTrustedStaffVisitorAssignmentScope.test.ts passed");

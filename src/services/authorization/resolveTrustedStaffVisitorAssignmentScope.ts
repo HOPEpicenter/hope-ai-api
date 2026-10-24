@@ -136,7 +136,12 @@ export function resolveTrustedStaffVisitorAssignmentScope(
       continue;
     }
 
-    const newest = Math.max(...records.map(record => record.at));
+    let newest = -Infinity;
+    for (const record of records) {
+      if (record.at > newest) {
+        newest = record.at;
+      }
+    }
     const latest = records.filter(record => record.at === newest);
 
     // Timestamp collisions are ambiguous, regardless of event-ID ordering.

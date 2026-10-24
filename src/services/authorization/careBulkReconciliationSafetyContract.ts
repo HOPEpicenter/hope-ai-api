@@ -134,6 +134,19 @@ export function assessCareBulkReconciliation(
       return blocked();
     }
 
+    // Reject sparse evidence arrays before interpreting observations.
+    for (let i = 0; i < visitorIds.length; i++) {
+      if (!Object.prototype.hasOwnProperty.call(visitorIds, i)) {
+        return blocked();
+      }
+    }
+
+    for (let i = 0; i < operations.length; i++) {
+      if (!Object.prototype.hasOwnProperty.call(operations, i)) {
+        return blocked();
+      }
+    }
+
     const intended = new Set<string>();
 
     for (const visitorId of visitorIds) {
@@ -213,7 +226,7 @@ export function assessCareBulkReconciliation(
         "historical_completeness_not_verified"
       ],
       reconciliationRequired: true,
-      manualInterventionRequired: !fullyObserved,
+      manualInterventionRequired: true,
       ...nonAuthorizing
     };
   } catch {

@@ -22,6 +22,7 @@ function assertNeverAuthorizes(input: unknown): void {
   const result = assessCareBulkReconciliation(input);
 
   assert.equal(result.reconciliationRequired, true);
+  assert.equal(result.manualInterventionRequired, true);
   assert.equal(result.advisoryOnly, true);
   assert.equal(result.authoritative, false);
   assert.equal(result.complete, false);
@@ -93,7 +94,12 @@ function run(): void {
   assert.equal(contradictory.manualInterventionRequired, true);
   assertNeverAuthorizes(inconsistent);
 
+  const sparseVisitors = new Array(1);
+  const sparseOperations = new Array(1);
+
   const invalidCases: unknown[] = [
+    evidence(sparseVisitors, []),
+    evidence(["visitor-a"], sparseOperations),
     null,
     undefined,
     {},

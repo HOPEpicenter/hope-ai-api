@@ -86,6 +86,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Care bulk request membership tests failed" }
           npx --no-install ts-node tests/authorization/careBulkWriterParticipationEvidenceContract.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Care bulk writer participation evidence tests failed" }
+          npx --no-install ts-node tests/authorization/careBulkPerVisitorReceiptContract.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Care bulk per-visitor receipt tests failed" }
           npx ts-node tests/authorization/oauthCredentialStorage.test.ts
           npx ts-node tests/authorization/oauthEncryptedEnvelope.test.ts
           npx ts-node tests/authorization/oauthLocalAesGcm.test.ts

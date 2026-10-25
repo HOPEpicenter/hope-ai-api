@@ -1,5 +1,6 @@
 import type { TableClient } from "@azure/data-tables";
 import {
+  compareCareBulkMembershipIntent,
   parseCareBulkMembershipIntent,
   type CareBulkMembershipIntent
 } from "../services/authorization/careBulkRequestMembershipContract";
@@ -73,6 +74,19 @@ function serialize(intent: CareBulkMembershipIntent): string {
   });
 }
 
+/**
+ * Persisted membership comparison is evidence only.
+ * Even a match does not establish complete history or safe replay.
+ */
+export type CareBulkStoredMembershipComparison = Readonly<{
+  status: "matching_evidence" | "conflict" | "invalid_input" | "uncertain";
+  durableMembershipVerified: false;
+  authorizationPermitted: false;
+  executionPermitted: false;
+  retryPermitted: false;
+  automaticRecoveryPermitted: false;
+  productionRolloutPermitted: false;
+}>;
 /**
  * This is a create-only evidence writer.
  *
@@ -157,6 +171,64 @@ export class CareBulkMembershipStorageRepository {
     } catch {
       // Missing, malformed, or unreadable evidence never authorizes.
       return result("uncertain");
+    }
+  }
+  /**
+   * Inspect exact stored membership without executing or replaying it.
+   * A matching record is not evidence of writer participation or
+   * historical completeness.
+   */
+  async compareStoredIntent(
+    expectedInput: unknown
+  ): Promise<CareBulkStoredMembershipComparison> {
+    const outcome = (
+      status: CareBulkStoredMembershipComparison["status"]
+    ): CareBulkStoredMembershipComparison => ({ status, ...safety });
+
+    const expected = parseCareBulkMembershipIntent(expectedInput);
+    if (!expected.intent) return outcome("invalid_input");
+
+    try {
+      const entity = await this.table.getEntity(
+        CARE_BULK_MEMBERSHIP_PARTITION,
+        expected.intent.requestId
+      );
+
+      if (entity.partitionKey !== CARE_BULK_MEMBERSHIP_PARTITION ||
+          entity.rowKey !== expected.intent.requestId ||
+          entity.requestId !== expected.intent.requestId ||
+          entity.schemaVersion !== 1 ||
+          typeof entity.membershipJson !== "string" ||
+          Buffer.byteLength(entity.membershipJson, "utf8") >
+            MAX_PAYLOAD_BYTES) {
+        return outcome("conflict");
+      }
+
+      const stored = JSON.parse(entity.membershipJson);
+      const parsed = parseCareBulkMembershipIntent(stored);
+
+      if (!parsed.intent ||
+          serialize(parsed.intent) !== entity.membershipJson) {
+        return outcome("conflict");
+      }
+
+      const comparison = compareCareBulkMembershipIntent(
+        parsed.intent,
+        expected.intent
+      );
+
+      if (comparison.status === "invalid_input") {
+        return outcome("conflict");
+      }
+
+      return outcome(
+        comparison.status === "same_intent_not_durable"
+          ? "matching_evidence"
+          : "conflict"
+      );
+    } catch {
+      // Unavailable or unreadable evidence must never permit replay.
+      return outcome("uncertain");
     }
   }
 }

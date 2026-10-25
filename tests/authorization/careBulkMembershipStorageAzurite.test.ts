@@ -202,6 +202,94 @@ async function run(): Promise<void> {
     safe(malformed);
 
     console.log("[PASS] Malformed evidence rejected");
+    // Read-only membership comparison: matching is evidence, not authority.
+    const expected = intent("first-request");
+    const matching = await repository.compareStoredIntent(expected);
+    assert.equal(matching.status, "matching_evidence");
+    safe(matching);
+
+    const reordered = await repository.compareStoredIntent({
+      ...expected,
+      visitorIds: [...expected.visitorIds].reverse()
+    });
+    assert.equal(reordered.status, "conflict");
+    safe(reordered);
+
+    const changedAssignee = await repository.compareStoredIntent({
+      ...expected,
+      assigneeId: "staff-b"
+    });
+    assert.equal(changedAssignee.status, "conflict");
+    safe(changedAssignee);
+
+    const changedKind = await repository.compareStoredIntent({
+      ...expected,
+      kind: "unassign",
+      assigneeId: null
+    });
+    assert.equal(changedKind.status, "conflict");
+    safe(changedKind);
+
+    const missing = await repository.compareStoredIntent(
+      intent("never-recorded-request")
+    );
+    assert.equal(missing.status, "uncertain");
+    safe(missing);
+
+    const invalidComparison = await repository.compareStoredIntent({
+      ...expected,
+      visitorIds: ["visitor-a", "visitor-a"]
+    });
+    assert.equal(invalidComparison.status, "invalid_input");
+    safe(invalidComparison);
+
+    // Malformed persisted membership must not be treated as a match.
+    const malformedComparison = await repository.compareStoredIntent(
+      intent("malformed-request")
+    );
+    assert.equal(malformedComparison.status, "conflict");
+    safe(malformedComparison);
+
+    // A failed storage read is uncertain, never matching evidence.
+    const failingReadClient = {
+      getEntity: async () => {
+        throw new Error("synthetic_read_failure");
+      }
+    } as unknown as TableClient;
+
+    const failingReadRepository =
+      new CareBulkMembershipStorageRepository(failingReadClient);
+
+    const failedRead = await failingReadRepository.compareStoredIntent(
+      expected
+    );
+    assert.equal(failedRead.status, "uncertain");
+    safe(failedRead);
+
+    // Accessor-based caller input must fail closed before storage I/O.
+    const hostileInput = { ...expected };
+    Object.defineProperty(hostileInput, "requestId", {
+      enumerable: true,
+      get() {
+        throw new Error("synthetic_hostile_accessor");
+      }
+    });
+
+    const hostileComparison = await repository.compareStoredIntent(
+      hostileInput
+    );
+    assert.equal(hostileComparison.status, "invalid_input");
+    safe(hostileComparison);
+
+    console.log("[PASS] Adversarial reconciliation remains fail-closed");
+    // Inspection must not mutate existing membership.
+    const unchanged = await table.getEntity(
+      CARE_BULK_MEMBERSHIP_PARTITION,
+      expected.requestId
+    );
+    assert.equal(unchanged.membershipJson, JSON.stringify(expected));
+
+    console.log("[PASS] Read-only membership comparison is fail-closed");
     console.log("[PASS] All Bulk Care membership storage proofs passed");
   } finally {
     await table.deleteTable();

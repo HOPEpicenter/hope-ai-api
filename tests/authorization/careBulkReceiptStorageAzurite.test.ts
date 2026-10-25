@@ -260,6 +260,147 @@ async function main() {
     assert.equal(persisted.receiptId, "lost-ack-receipt");
     console.log("[PASS] Lost acknowledgment never authorizes replay");
 
+    // Readback scenarios are advisory and read-only.
+    const readbackRequestId = `readback-${randomUUID()}`;
+    const readbackMembership = {
+      requestId: readbackRequestId,
+      kind: "assign" as const,
+      assigneeId: "synthetic-readback-staff",
+      visitorIds: ["synthetic-readback-visitor"]
+    };
+    const expectedReadback = {
+      receiptId: "synthetic-readback-receipt",
+      requestId: readbackRequestId,
+      visitorId: "synthetic-readback-visitor",
+      kind: "assign" as const,
+      assigneeId: "synthetic-readback-staff",
+      observation: "observed"
+    };
+
+    const createdReadback = await repository.recordReceipt(
+      readbackMembership,
+      expectedReadback
+    );
+    assert.equal(createdReadback.status, "recorded_unverified");
+    safe(createdReadback);
+
+    const matching = await repository.compareStoredReceipt(
+      readbackMembership,
+      expectedReadback
+    );
+    assert.equal(matching.status, "matching_evidence");
+    safe(matching);
+    console.log("[PASS] Matching receipt is advisory only");
+
+    const changedObservation = await repository.compareStoredReceipt(
+      readbackMembership,
+      { ...expectedReadback, observation: "failed" }
+    );
+    assert.equal(changedObservation.status, "conflict");
+    safe(changedObservation);
+    console.log("[PASS] Changed expected observation is conflict");
+
+    const absentMembership = {
+      ...readbackMembership,
+      requestId: `absent-${randomUUID()}`
+    };
+    const absent = await repository.compareStoredReceipt(
+      absentMembership,
+      {
+        ...expectedReadback,
+        requestId: absentMembership.requestId
+      }
+    );
+    assert.equal(absent.status, "uncertain");
+    safe(absent);
+    console.log("[PASS] Missing receipt remains uncertain");
+
+    const badMembership = {
+      ...readbackMembership,
+      visitorIds: ["synthetic-different-visitor"]
+    };
+    const invalidReadback = await repository.compareStoredReceipt(
+      badMembership,
+      expectedReadback
+    );
+    assert.equal(invalidReadback.status, "invalid_input");
+    safe(invalidReadback);
+    console.log("[PASS] Invalid expected evidence rejected");
+
+    const malformedRequestId = `malformed-${randomUUID()}`;
+    await client.createEntity({
+      partitionKey: malformedRequestId,
+      rowKey: "synthetic-readback-visitor",
+      requestId: malformedRequestId,
+      visitorId: "synthetic-readback-visitor",
+      receiptId: expectedReadback.receiptId,
+      schemaVersion: 1,
+      receiptJson: "{not-valid-json"
+    });
+    const malformedMembership = {
+      ...readbackMembership,
+      requestId: malformedRequestId
+    };
+    const malformed = await repository.compareStoredReceipt(
+      malformedMembership,
+      {
+        ...expectedReadback,
+        requestId: malformedRequestId
+      }
+    );
+    assert.equal(malformed.status, "conflict");
+    safe(malformed);
+    console.log("[PASS] Malformed stored JSON is conflict");
+
+    const mismatchedRequestId = `mismatch-${randomUUID()}`;
+    const mismatchedExpected = {
+      ...expectedReadback,
+      requestId: mismatchedRequestId
+    };
+    await client.createEntity({
+      partitionKey: mismatchedRequestId,
+      rowKey: mismatchedExpected.visitorId,
+      requestId: mismatchedRequestId,
+      visitorId: mismatchedExpected.visitorId,
+      receiptId: "unexpected-receipt-id",
+      schemaVersion: 1,
+      receiptJson: JSON.stringify(mismatchedExpected)
+    });
+    const mismatchedStored = await repository.compareStoredReceipt(
+      {
+        ...readbackMembership,
+        requestId: mismatchedRequestId
+      },
+      mismatchedExpected
+    );
+    assert.equal(mismatchedStored.status, "conflict");
+    safe(mismatchedStored);
+    console.log("[PASS] Stored identity mismatch is conflict");
+
+    let unexpectedReadbackWrites = 0;
+    const readOnlyClient = {
+      getEntity: async () => {
+        throw new Error("synthetic_read_failure");
+      },
+      createEntity: async () => {
+        unexpectedReadbackWrites++;
+        throw new Error("readback_must_never_write");
+      }
+    } as unknown as TableClient;
+    const readOnlyRepository =
+      new CareBulkReceiptStorageRepository(readOnlyClient);
+
+    const unreadable = await readOnlyRepository.compareStoredReceipt(
+      readbackMembership,
+      expectedReadback
+    );
+    assert.equal(unreadable.status, "uncertain");
+    safe(unreadable);
+    assert.equal(unexpectedReadbackWrites, 0);
+    console.log("[PASS] Read failure is uncertain with zero writes");
+
+    console.log("[PASS] All readback scenarios are advisory and read-only");
+
     console.log("[PASS] All create-only receipt storage proofs passed");
   } finally {
     if (created) {

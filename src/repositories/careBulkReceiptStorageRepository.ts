@@ -83,6 +83,26 @@ function serialize(receipt: CareBulkPerVisitorReceipt): string {
  * A 409 is a conflict even if existing content might match.
  * An ambiguous storage failure remains uncertain; never retry here.
  */
+export type CareBulkReceiptReadbackStatus =
+  | "matching_evidence"
+  | "conflict"
+  | "uncertain"
+  | "invalid_input";
+
+export type CareBulkReceiptReadbackResult = Readonly<
+  Omit<CareBulkReceiptStorageResult, "status"> & {
+    status: CareBulkReceiptReadbackStatus;
+  }
+>;
+
+function readbackResult(
+  status: CareBulkReceiptReadbackStatus
+): CareBulkReceiptReadbackResult {
+  return Object.freeze({
+    ...result("uncertain"),
+    status
+  });
+}
 export class CareBulkReceiptStorageRepository {
   constructor(private readonly table: TableClient) {}
 
@@ -120,6 +140,71 @@ export class CareBulkReceiptStorageRepository {
         return result("conflict");
       }
       return result("uncertain");
+    }
+  }
+
+  /**
+   * Read back one advisory receipt by request + visitor.
+   * Caller-supplied membership and expected receipt are not authenticated.
+   * A matching row never proves writer execution or permits replay.
+   */
+  async compareStoredReceipt(
+    membership: unknown,
+    expectedReceipt: unknown
+  ): Promise<CareBulkReceiptReadbackResult> {
+    const expected = assessCareBulkPerVisitorReceipts({
+      membership,
+      receipts: [expectedReceipt]
+    });
+
+    if (expected.inputRejected ||
+        expected.receipts.length !== 1 ||
+        expected.requestId === null) {
+      return readbackResult("invalid_input");
+    }
+
+    const receipt = expected.receipts[0];
+    let entity: Record<string, unknown>;
+
+    try {
+      entity = await this.table.getEntity(
+        receipt.requestId,
+        receipt.visitorId
+      );
+    } catch {
+      // Includes 404, authorization failures and transport uncertainty.
+      return readbackResult("uncertain");
+    }
+
+    try {
+      if (entity.partitionKey !== receipt.requestId ||
+          entity.rowKey !== receipt.visitorId ||
+          entity.schemaVersion !== 1 ||
+          entity.requestId !== receipt.requestId ||
+          entity.visitorId !== receipt.visitorId ||
+          entity.receiptId !== receipt.receiptId ||
+          typeof entity.receiptJson !== "string" ||
+          Buffer.byteLength(entity.receiptJson, "utf8") > 8192) {
+        return readbackResult("conflict");
+      }
+
+      const stored = JSON.parse(entity.receiptJson);
+      const assessment = assessCareBulkPerVisitorReceipts({
+        membership,
+        receipts: [stored]
+      });
+
+      if (assessment.inputRejected ||
+          assessment.receipts.length !== 1 ||
+          serialize(assessment.receipts[0]) !== entity.receiptJson ||
+          serialize(assessment.receipts[0]) !== serialize(receipt)) {
+        return readbackResult("conflict");
+      }
+
+      return readbackResult("matching_evidence");
+    } catch {
+      // Malformed persisted evidence is a conflict, not completion.
+      return readbackResult("conflict");
     }
   }
 }

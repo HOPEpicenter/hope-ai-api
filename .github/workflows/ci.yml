@@ -406,6 +406,11 @@ jobs:
               throw "Bulk Care membership storage Azurite test failed"
             }
             Write-Host "[PASS] Bulk Care membership storage Azurite proof"
+            npx --no-install ts-node tests/authorization/careBulkReceiptStorageAzurite.test.ts
+            if ($LASTEXITCODE -ne 0) {
+              throw "Bulk Care receipt storage Azurite test failed"
+            }
+            Write-Host "[PASS] Bulk Care receipt storage Azurite proof"
 
             Write-Host "[PASS] OAuth staff writer participation Azurite proof"
           }

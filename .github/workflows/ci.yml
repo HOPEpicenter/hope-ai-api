@@ -397,6 +397,11 @@ jobs:
               throw "Formation assignment ledger Azurite test failed"
             }
             Write-Host "[PASS] Formation assignment ledger Azurite proof"
+            npx --no-install ts-node tests/authorization/careBulkMembershipStorageAzurite.test.ts
+            if ($LASTEXITCODE -ne 0) {
+              throw "Bulk Care membership storage Azurite test failed"
+            }
+            Write-Host "[PASS] Bulk Care membership storage Azurite proof"
 
             Write-Host "[PASS] OAuth staff writer participation Azurite proof"
           }

@@ -82,6 +82,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Formation assignment bulk consistency tests failed" }
           npx --no-install ts-node tests/authorization/careBulkReconciliationSafetyContract.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Care bulk reconciliation safety tests failed" }
+          npx --no-install ts-node tests/authorization/careBulkRequestMembershipContract.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Care bulk request membership tests failed" }
           npx ts-node tests/authorization/oauthCredentialStorage.test.ts
           npx ts-node tests/authorization/oauthEncryptedEnvelope.test.ts
           npx ts-node tests/authorization/oauthLocalAesGcm.test.ts

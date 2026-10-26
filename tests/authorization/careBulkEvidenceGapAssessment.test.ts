@@ -394,4 +394,166 @@ assert.ok(explicitContradiction.diagnostics.includes(
 safe(explicitContradiction);
 console.log("[PASS] Explicit contradiction remains fail-closed");
 
+// Validation-to-use observation stability regression.
+// A proxy changes a valid observation after the validator reads it.
+// The first validated value must remain authoritative for diagnostics.
+function changingObservation(
+  first: "observed" | "failed",
+  second: "observed" | "failed"
+): {
+  result: CareBulkEvidenceGapAssessment;
+  reads: number;
+} {
+  let reads = 0;
+
+  const entry = new Proxy(
+    {
+      visitorId: "synthetic_visitor_a",
+      observation: first
+    },
+    {
+      getOwnPropertyDescriptor(target, key) {
+        const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+
+        if (key === "observation" && descriptor) {
+          reads++;
+          return {
+            ...descriptor,
+            value: reads === 1 ? first : second
+          };
+        }
+
+        return descriptor;
+      }
+    }
+  );
+
+  const result = assess({
+    observations: [entry, observations[1]]
+  });
+
+  return { result, reads };
+}
+
+const changedFromFailure = changingObservation("failed", "observed");
+
+assert.equal(
+  changedFromFailure.reads,
+  1,
+  "Writer observation must be captured exactly once"
+);
+assert.equal(changedFromFailure.result.status, "contradictory");
+assert.equal(changedFromFailure.result.inputRejected, false);
+assert.ok(changedFromFailure.result.diagnostics.includes(
+  "cross_source_observation_disagreement"
+));
+assert.deepEqual(changedFromFailure.result.unresolvedVisitorIds, [
+  "synthetic_visitor_a"
+]);
+safe(changedFromFailure.result);
+
+const changedIntoFailure = changingObservation("observed", "failed");
+
+assert.equal(
+  changedIntoFailure.reads,
+  1,
+  "Writer observation must be captured exactly once"
+);
+assert.equal(
+  changedIntoFailure.result.status,
+  "observations_consistent_not_complete"
+);
+assert.equal(changedIntoFailure.result.inputRejected, false);
+assert.deepEqual(changedIntoFailure.result.unresolvedVisitorIds, []);
+assert.equal(
+  changedIntoFailure.result.diagnostics.includes(
+    "cross_source_observation_disagreement"
+  ),
+  false
+);
+safe(changedIntoFailure.result);
+
+console.log("[PASS] Validation-to-use observation stability regression");
+
+// Ledger single-read snapshot regressions.
+// A changing caller proxy must not alter the validated ledger value.
+function changingLedgerObservation(
+  first: "observed_current" | "inconsistent",
+  second: "observed_current" | "inconsistent"
+): {
+  result: CareBulkEvidenceGapAssessment;
+  reads: number;
+} {
+  let reads = 0;
+
+  const entry = new Proxy(
+    {
+      visitorId: "synthetic_visitor_a",
+      operationId: "synthetic_operation_a",
+      ledgerObservation: first
+    },
+    {
+      getOwnPropertyDescriptor(target, key) {
+        const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+
+        if (key === "ledgerObservation" && descriptor) {
+          reads++;
+          return {
+            ...descriptor,
+            value: reads === 1 ? first : second
+          };
+        }
+
+        return descriptor;
+      }
+    }
+  );
+
+  return {
+    result: assess({ operations: [entry, operations[1]] }),
+    reads
+  };
+}
+
+const ledgerChangedIntoInconsistent = changingLedgerObservation(
+  "observed_current", "inconsistent"
+);
+
+assert.equal(
+  ledgerChangedIntoInconsistent.reads,
+  1,
+  "Ledger observation must be captured exactly once"
+);
+assert.equal(
+  ledgerChangedIntoInconsistent.result.status,
+  "observations_consistent_not_complete"
+);
+assert.equal(ledgerChangedIntoInconsistent.result.inputRejected, false);
+assert.deepEqual(
+  ledgerChangedIntoInconsistent.result.unresolvedVisitorIds, []
+);
+safe(ledgerChangedIntoInconsistent.result);
+
+const ledgerChangedFromInconsistent = changingLedgerObservation(
+  "inconsistent", "observed_current"
+);
+
+assert.equal(
+  ledgerChangedFromInconsistent.reads,
+  1,
+  "Ledger observation must be captured exactly once"
+);
+assert.equal(
+  ledgerChangedFromInconsistent.result.status,
+  "contradictory"
+);
+assert.equal(ledgerChangedFromInconsistent.result.inputRejected, false);
+assert.deepEqual(
+  ledgerChangedFromInconsistent.result.unresolvedVisitorIds,
+  ["synthetic_visitor_a"]
+);
+safe(ledgerChangedFromInconsistent.result);
+
+console.log("[PASS] Ledger single-read snapshot regressions");
+
 console.log("[PASS] All Bulk Care evidence-gap assessment tests passed");

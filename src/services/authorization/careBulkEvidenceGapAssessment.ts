@@ -128,6 +128,41 @@ function exactKeys(value: object, expected: readonly string[]): boolean {
  * `operations` uses the existing reconciliation contract's operation
  * shape. Membership supplies the canonical intended visitor IDs.
  */
+function snapshotEvidenceEntries(
+  input: unknown,
+  keys: readonly string[]
+): readonly Readonly<Record<string, unknown>>[] {
+  if (!Array.isArray(input) || input.length > 1000) {
+    throw new Error("invalid_evidence_array");
+  }
+
+  const snapshot: Readonly<Record<string, unknown>>[] = [];
+
+  for (let i = 0; i < input.length; i++) {
+    if (!Object.prototype.hasOwnProperty.call(input, i)) {
+      throw new Error("sparse_evidence_array");
+    }
+
+    const entry = ownData(input, String(i));
+
+    if (entry === null ||
+        typeof entry !== "object" ||
+        Array.isArray(entry) ||
+        !exactKeys(entry, keys)) {
+      throw new Error("invalid_evidence_entry");
+    }
+
+    const copy: Record<string, unknown> = Object.create(null);
+
+    for (const key of keys) {
+      copy[key] = ownData(entry, key);
+    }
+
+    snapshot.push(Object.freeze(copy));
+  }
+
+  return Object.freeze(snapshot);
+}
 export function assessCareBulkEvidenceGaps(
   input: unknown
 ): CareBulkEvidenceGapAssessment {
@@ -157,6 +192,14 @@ export function assessCareBulkEvidenceGaps(
     if (!parsed.intent) return invalid();
 
     const membership = parsed.intent;
+    // Capture caller values exactly once. Validators and comparison
+    // must consume the same immutable, in-memory evidence.
+    const writerSnapshot = snapshotEvidenceEntries(
+      observationsInput, ["visitorId", "observation"]
+    );
+    const ledgerSnapshot = snapshotEvidenceEntries(
+      operationsInput, ["visitorId", "operationId", "ledgerObservation"]
+    );
     const receipts = assessCareBulkPerVisitorReceipts({
       membership,
       receipts: receiptsInput
@@ -164,11 +207,11 @@ export function assessCareBulkEvidenceGaps(
     const writers = assessCareBulkWriterParticipationEvidence({
       membership,
       writerPath,
-      observations: observationsInput
+      observations: writerSnapshot
     });
     const reconciliation = assessCareBulkReconciliation({
       visitorIds: [...membership.visitorIds],
-      operations: operationsInput
+      operations: ledgerSnapshot
     });
 
     if (receipts.inputRejected ||
@@ -206,19 +249,17 @@ export function assessCareBulkEvidenceGaps(
 
     // The existing validators rejected malformed, accessor-backed,
     // duplicate and unlisted entries before reaching this inspection.
-    for (let i = 0; i < (observationsInput as unknown[]).length; i++) {
-      const entry = ownData(observationsInput as object, String(i)) as object;
+    for (const entry of writerSnapshot) {
       note(
-        ownData(entry, "visitorId") as string,
-        ownData(entry, "observation") as string
+        entry.visitorId as string,
+        entry.observation as string
       );
     }
 
-    for (let i = 0; i < (operationsInput as unknown[]).length; i++) {
-      const entry = ownData(operationsInput as object, String(i)) as object;
-      const ledgerObservation = ownData(entry, "ledgerObservation") as string;
+    for (const entry of ledgerSnapshot) {
+      const ledgerObservation = entry.ledgerObservation as string;
       note(
-        ownData(entry, "visitorId") as string,
+        entry.visitorId as string,
         ledgerObservation === "observed_current" ||
           ledgerObservation === "observed_historical"
           ? "observed"

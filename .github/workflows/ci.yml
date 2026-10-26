@@ -78,6 +78,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Care bulk authorization regressions failed" }
           npx --no-install ts-node tests/authorization/careBulkPartialFailureSafety.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Care bulk partial-failure safety regressions failed" }
+          npx --no-install ts-node tests/authorization/formationProfileWriteBoundary.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Formation profile write-boundary tests failed" }
           npx --no-install ts-node tests/authorization/formationAssignmentBulkConsistency.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Formation assignment bulk consistency tests failed" }
           npx --no-install ts-node tests/authorization/careBulkReconciliationSafetyContract.test.ts

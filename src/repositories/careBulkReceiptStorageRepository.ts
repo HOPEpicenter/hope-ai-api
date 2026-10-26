@@ -1,5 +1,8 @@
 import type { TableClient } from "@azure/data-tables";
 import {
+  parseCareBulkMembershipIntent
+} from "../services/authorization/careBulkRequestMembershipContract";
+import {
   assessCareBulkPerVisitorReceipts,
   type CareBulkPerVisitorReceipt
 } from "../services/authorization/careBulkPerVisitorReceiptContract";
@@ -152,8 +155,15 @@ export class CareBulkReceiptStorageRepository {
     membership: unknown,
     expectedReceipt: unknown
   ): Promise<CareBulkReceiptReadbackResult> {
+    // Capture caller membership before any receipt validation or await.
+    const membershipSnapshot = parseCareBulkMembershipIntent(membership);
+    if (!membershipSnapshot.intent) {
+      return readbackResult("invalid_input");
+    }
+    const stableMembership = membershipSnapshot.intent;
+
     const expected = assessCareBulkPerVisitorReceipts({
-      membership,
+      membership: stableMembership,
       receipts: [expectedReceipt]
     });
 
@@ -190,7 +200,7 @@ export class CareBulkReceiptStorageRepository {
 
       const stored = JSON.parse(entity.receiptJson);
       const assessment = assessCareBulkPerVisitorReceipts({
-        membership,
+        membership: stableMembership,
         receipts: [stored]
       });
 

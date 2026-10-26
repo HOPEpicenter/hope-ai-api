@@ -86,6 +86,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Care bulk request membership tests failed" }
           npx --no-install ts-node tests/authorization/careBulkOperationIdentityBoundary.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Care bulk operation identity boundary tests failed" }
+          npx --no-install ts-node tests/authorization/careBulkIdentityMembershipConsistency.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Care bulk identity/membership consistency tests failed" }
           npx --no-install ts-node tests/authorization/careBulkWriterParticipationEvidenceContract.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Care bulk writer participation evidence tests failed" }
           npx --no-install ts-node tests/authorization/careBulkPerVisitorReceiptContract.test.ts

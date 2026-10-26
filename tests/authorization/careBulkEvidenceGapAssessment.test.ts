@@ -261,4 +261,137 @@ assert.equal(unassign.requestId, unassignMembership.requestId);
 safe(unassign);
 console.log("[PASS] Unassign observations remain advisory");
 
+// Cross-source observed-versus-failed regressions.
+// These are conflicting caller observations, not authenticated facts.
+const receiptFailedWriterObserved = assess({
+  receipts: [
+    { ...receipts[0], observation: "failed" },
+    receipts[1]
+  ]
+});
+assert.equal(receiptFailedWriterObserved.status, "contradictory");
+assert.deepEqual(receiptFailedWriterObserved.unresolvedVisitorIds, [
+  "synthetic_visitor_a"
+]);
+assert.ok(receiptFailedWriterObserved.diagnostics.includes(
+  "cross_source_observation_disagreement"
+));
+safe(receiptFailedWriterObserved);
+console.log("[PASS] Failed receipt versus observed writer is contradictory");
+
+const writerFailedReceiptObserved = assess({
+  observations: [
+    { ...observations[0], observation: "failed" },
+    observations[1]
+  ]
+});
+assert.equal(writerFailedReceiptObserved.status, "contradictory");
+assert.deepEqual(writerFailedReceiptObserved.unresolvedVisitorIds, [
+  "synthetic_visitor_a"
+]);
+assert.ok(writerFailedReceiptObserved.diagnostics.includes(
+  "cross_source_observation_disagreement"
+));
+safe(writerFailedReceiptObserved);
+console.log("[PASS] Failed writer versus observed receipt is contradictory");
+
+const observedLedgerAgainstFailures = assess({
+  receipts: [
+    { ...receipts[0], observation: "failed" },
+    receipts[1]
+  ],
+  observations: [
+    { ...observations[0], observation: "failed" },
+    observations[1]
+  ]
+});
+assert.equal(observedLedgerAgainstFailures.status, "contradictory");
+assert.ok(observedLedgerAgainstFailures.diagnostics.includes(
+  "cross_source_observation_disagreement"
+));
+safe(observedLedgerAgainstFailures);
+console.log("[PASS] Observed ledger versus failed evidence is contradictory");
+
+const failedWithoutObserved = assess({
+  receipts: [
+    { ...receipts[0], observation: "failed" },
+    receipts[1]
+  ],
+  observations: [
+    { ...observations[0], observation: "failed" },
+    observations[1]
+  ],
+  operations: [operations[1]]
+});
+assert.equal(failedWithoutObserved.status, "requires_reconciliation");
+assert.deepEqual(failedWithoutObserved.unresolvedVisitorIds, [
+  "synthetic_visitor_a"
+]);
+assert.equal(
+  failedWithoutObserved.diagnostics.includes(
+    "cross_source_observation_disagreement"
+  ),
+  false
+);
+safe(failedWithoutObserved);
+console.log("[PASS] Failed evidence without observed counterclaim remains unresolved");
+
+const uncertainWriter = assess({
+  observations: [
+    { ...observations[0], observation: "uncertain" },
+    observations[1]
+  ]
+});
+assert.equal(uncertainWriter.status, "requires_reconciliation");
+assert.equal(
+  uncertainWriter.diagnostics.includes(
+    "cross_source_observation_disagreement"
+  ),
+  false
+);
+safe(uncertainWriter);
+console.log("[PASS] Uncertain observation is not a contradiction");
+
+const missingReceiptEvidence = assess({
+  receipts: [receipts[1]]
+});
+assert.equal(missingReceiptEvidence.status, "requires_reconciliation");
+assert.equal(
+  missingReceiptEvidence.diagnostics.includes(
+    "cross_source_observation_disagreement"
+  ),
+  false
+);
+safe(missingReceiptEvidence);
+console.log("[PASS] Absent receipt is not a contradiction");
+
+const notInspectedLedger = assess({
+  operations: [
+    { ...operations[0], ledgerObservation: "not_inspected" },
+    operations[1]
+  ]
+});
+assert.equal(notInspectedLedger.status, "requires_reconciliation");
+assert.equal(
+  notInspectedLedger.diagnostics.includes(
+    "cross_source_observation_disagreement"
+  ),
+  false
+);
+safe(notInspectedLedger);
+console.log("[PASS] Not-inspected ledger remains unresolved");
+
+const explicitContradiction = assess({
+  receipts: [
+    { ...receipts[0], observation: "contradictory" },
+    receipts[1]
+  ]
+});
+assert.equal(explicitContradiction.status, "contradictory");
+assert.ok(explicitContradiction.diagnostics.includes(
+  "contradictory_caller_evidence"
+));
+safe(explicitContradiction);
+console.log("[PASS] Explicit contradiction remains fail-closed");
+
 console.log("[PASS] All Bulk Care evidence-gap assessment tests passed");

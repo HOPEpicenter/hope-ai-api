@@ -189,10 +189,55 @@ export function assessCareBulkEvidenceGaps(
       visitorId => unresolved.has(visitorId)
     );
 
+    // Compare only validated caller observations. An explicit "failed"
+    // versus "observed" is a disagreement, never execution proof.
+    // Missing/uncertain evidence alone is not a contradiction.
+    const evidenceByVisitor = new Map<string, string[]>();
+
+    const note = (visitorId: string, observation: string): void => {
+      const existing = evidenceByVisitor.get(visitorId) ?? [];
+      existing.push(observation);
+      evidenceByVisitor.set(visitorId, existing);
+    };
+
+    for (const receipt of receipts.receipts) {
+      note(receipt.visitorId, receipt.observation);
+    }
+
+    // The existing validators rejected malformed, accessor-backed,
+    // duplicate and unlisted entries before reaching this inspection.
+    for (let i = 0; i < (observationsInput as unknown[]).length; i++) {
+      const entry = ownData(observationsInput as object, String(i)) as object;
+      note(
+        ownData(entry, "visitorId") as string,
+        ownData(entry, "observation") as string
+      );
+    }
+
+    for (let i = 0; i < (operationsInput as unknown[]).length; i++) {
+      const entry = ownData(operationsInput as object, String(i)) as object;
+      const ledgerObservation = ownData(entry, "ledgerObservation") as string;
+      note(
+        ownData(entry, "visitorId") as string,
+        ledgerObservation === "observed_current" ||
+          ledgerObservation === "observed_historical"
+          ? "observed"
+          : ledgerObservation === "inconsistent"
+            ? "contradictory"
+            : "unresolved"
+      );
+    }
+
+    const crossSourceDisagreement = membership.visitorIds.some(visitorId => {
+      const evidence = evidenceByVisitor.get(visitorId) ?? [];
+      return evidence.includes("observed") && evidence.includes("failed");
+    });
+
     const contradictory =
       receipts.status === "contradictory" ||
       writers.status === "contradictory" ||
-      reconciliation.status === "contradictory";
+      reconciliation.status === "contradictory" ||
+      crossSourceDisagreement;
 
     const status: CareBulkEvidenceGapStatus = contradictory
       ? "contradictory"
@@ -206,7 +251,12 @@ export function assessCareBulkEvidenceGaps(
       membership.visitorIds.length,
       unresolvedVisitorIds,
       contradictory
-        ? ["contradictory_caller_evidence"]
+        ? [
+            "contradictory_caller_evidence",
+            ...(crossSourceDisagreement
+              ? ["cross_source_observation_disagreement"]
+              : [])
+          ]
         : unresolvedVisitorIds.length > 0
           ? ["unresolved_visitor_evidence"]
           : ["consistent_observations_still_not_proof"]

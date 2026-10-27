@@ -38,9 +38,20 @@ import { resolveMutationSource } from "../../services/events/resolveMutationSour
  *    lastEventType, lastEventAt, updatedAt
  */
 
+export type RecordFormationEventRuntime = {
+  getFormationEventsTableClient: typeof getFormationEventsTableClient;
+  getFormationProfilesTableClient: typeof getFormationProfilesTableClient;
+  ensureTableExists: typeof ensureTableExists;
+  getFormationProfile: typeof getFormationProfile;
+  insertFormationEvent: typeof insertFormationEvent;
+  appendGlobalTimeline: GlobalTimelineRepository["append"];
+  upsertFormationProfile: typeof upsertFormationProfile;
+};
+
 export type RecordFormationEventDeps = {
   storageConnectionString: string;
   ensureVisitorExists?: (visitorId: string) => Promise<void>;
+  runtime?: RecordFormationEventRuntime;
 };
 
 export type RecordFormationEventResult = {
@@ -295,12 +306,21 @@ export async function recordFormationEvent(
   const recordedAt = nowIso();
   const defaults = applyFormationDefaults(input);
 
-  const eventsTable = getFormationEventsTableClient(deps.storageConnectionString);
-  const profilesTable = getFormationProfilesTableClient(deps.storageConnectionString);
-  await ensureTableExists(eventsTable);
-  await ensureTableExists(profilesTable);
+  const runtime = deps.runtime;
+  const eventsTable = runtime
+    ? runtime.getFormationEventsTableClient(deps.storageConnectionString)
+    : getFormationEventsTableClient(deps.storageConnectionString);
+  const profilesTable = runtime
+    ? runtime.getFormationProfilesTableClient(deps.storageConnectionString)
+    : getFormationProfilesTableClient(deps.storageConnectionString);
+  const ensureRuntimeTableExists = runtime?.ensureTableExists ?? ensureTableExists;
+  await ensureRuntimeTableExists(eventsTable);
+  await ensureRuntimeTableExists(profilesTable);
 
-  let profile = await getFormationProfile(profilesTable, input.visitorId);
+  let profile = await (runtime?.getFormationProfile ?? getFormationProfile)(
+    profilesTable,
+    input.visitorId
+  );
   if (!profile) {
     profile = createDefaultFormationProfile(input.visitorId);
   }
@@ -340,13 +360,15 @@ export async function recordFormationEvent(
       return { eventRowKey: existingRowKey || rowKey, profile };
     }
   }
-  await insertFormationEvent(eventsTable, eventEntity);
+  if (runtime) {
+    await runtime.insertFormationEvent(eventsTable, eventEntity);
+  } else {
+    await insertFormationEvent(eventsTable, eventEntity);
+  }
 
 // --- Global Timeline Write (formation) ---
 try {
-  const globalTimelineRepo = new GlobalTimelineRepository();
-
-  await globalTimelineRepo.append({
+  const timelineEvent: Parameters<GlobalTimelineRepository["append"]>[0] = {
     eventId,
     visitorId: input.visitorId,
     stream: "formation",
@@ -355,7 +377,14 @@ try {
     summary: null,
     source: resolveMutationSource({ system: input.channel }).system,
     raw: eventEntity
-  });
+  };
+
+  if (runtime) {
+    await runtime.appendGlobalTimeline(timelineEvent);
+  } else {
+    const globalTimelineRepo = new GlobalTimelineRepository();
+    await globalTimelineRepo.append({ ...timelineEvent });
+  }
 } catch (err: any) {
   console.error("globalTimeline append failed", err);
   throw new Error(`globalTimeline append failed: ${String(err?.message ?? err)}`);
@@ -408,11 +437,14 @@ try {
   (profile as any).updatedAt = recordedAt;
 
   // Write snapshot (Merge semantics are handled in repo)
-  await upsertFormationProfile(profilesTable, profile);
+  if (runtime) {
+    await runtime.upsertFormationProfile(profilesTable, profile);
+  } else {
+    await upsertFormationProfile(profilesTable, profile);
+  }
 
   return { eventRowKey: rowKey, profile };
 }
-
 
 
 

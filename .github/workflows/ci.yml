@@ -86,6 +86,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Formation event runtime failure tests failed" }
           npx --no-install ts-node tests/formation/assessFormationEventConsistencyEvidence.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Formation event consistency evidence assessment tests failed" }
+          npx --no-install ts-node tests/timeline/globalTimelineRowKey.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Global Timeline row-key parity tests failed" }
           npx --no-install ts-node tests/authorization/formationAssignmentBulkConsistency.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Formation assignment bulk consistency tests failed" }
           npx --no-install ts-node tests/authorization/careBulkReconciliationSafetyContract.test.ts

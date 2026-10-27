@@ -1,4 +1,5 @@
 import { paginateRowKeyItems } from "../shared/timeline/rowKeyPaginator";
+import { buildRowKey } from "../shared/timeline/globalTimelineRowKey";
 import { getTableClient } from "../storage/tableClient";
 import { ensureTableExists } from "../shared/storage/ensureTableExists";
 
@@ -28,23 +29,6 @@ const GLOBAL_PARTITION_KEY = "global";
 function clampLimit(limit: number): number {
   if (!Number.isFinite(limit)) return 50;
   return Math.max(1, Math.min(200, Math.floor(limit)));
-}
-
-function toTicksDescending(iso: string): string {
-  const ms = Date.parse(iso);
-  const safeMs = Number.isFinite(ms) ? ms : 0;
-
-  const max = 9999999999999;
-  const desc = Math.max(0, max - safeMs);
-
-  return String(desc).padStart(13, "0");
-}
-
-function buildRowKey(item: {
-  occurredAt: string;
-  eventId: string;
-}): string {
-  return `${toTicksDescending(item.occurredAt)}|${item.eventId}`;
 }
 
 export class GlobalTimelineRepository {

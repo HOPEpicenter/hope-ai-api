@@ -82,6 +82,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Formation profile write-boundary tests failed" }
           npx --no-install ts-node tests/authorization/formationEventPartialFailureContract.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Formation event partial-failure contract tests failed" }
+          npx --no-install ts-node tests/authorization/formationEventRuntimeFailure.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Formation event runtime failure tests failed" }
           npx --no-install ts-node tests/authorization/formationAssignmentBulkConsistency.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Formation assignment bulk consistency tests failed" }
           npx --no-install ts-node tests/authorization/careBulkReconciliationSafetyContract.test.ts

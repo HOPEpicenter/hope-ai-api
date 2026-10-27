@@ -23,6 +23,7 @@ import {
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
 import { GlobalTimelineRepository } from "../../repositories/globalTimelineRepository";
 import { resolveMutationSource } from "../../services/events/resolveMutationSource";
+import { makeFormationEventRowKey } from "./formationEventRowKey";
 
 /**
  * Formation event recorder (Phase 3)
@@ -61,15 +62,6 @@ export type RecordFormationEventResult = {
 
 function nowIso(): string {
   return new Date().toISOString();
-}
-
-function makeRowKey(occurredAtIso: string, eventId?: string): string {
-  // Stable RowKey when client supplies an id/idempotencyKey
-  const stable = String(eventId ?? "").trim();
-  if (stable) return `${occurredAtIso}__${stable}`;
-
-  const suffix = crypto.randomBytes(6).toString("hex");
-  return `${occurredAtIso}__${suffix}`;
 }
 
 function stringifyMetadata(metadata: unknown): string | undefined {
@@ -330,7 +322,7 @@ export async function recordFormationEvent(
 
     const clientId = String((input as any).id ?? (input as any).idempotencyKey ?? (input as any).idempotency_key ?? "").trim();
   const eventId = clientId || crypto.randomUUID();
-  const rowKey = makeRowKey(occurredAt, eventId);
+  const rowKey = makeFormationEventRowKey(occurredAt, eventId);
 
   const eventEntity: FormationEventEntity = {
     partitionKey: input.visitorId,

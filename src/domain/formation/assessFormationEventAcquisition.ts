@@ -9,9 +9,10 @@ import { makeDeterministicFormationEventRowKey } from "./formationEventRowKey";
 const IDENTITY_KEYS = ["visitorId", "eventId", "occurredAt"] as const;
 const INPUT_KEYS = ["identity", "observation"] as const;
 const OBSERVATION_KEYS = ["availability", "record"] as const;
-const RECORD_REQUIRED_KEYS = ["partitionKey", "rowKey", "visitorId", "id", "occurredAt"] as const;
+const RECORD_REQUIRED_KEYS = ["partitionKey", "rowKey", "visitorId", "occurredAt"] as const;
 const RECORD_ALLOWED_KEYS = [
   ...RECORD_REQUIRED_KEYS,
+  "id",
   "type",
   "recordedAt",
   "channel",
@@ -187,13 +188,17 @@ function assess(input: unknown): Assessment {
   const partitionKey = property(record, "partitionKey");
   const rowKey = property(record, "rowKey");
   const observedVisitorId = property(record, "visitorId");
-  const observedEventId = property(record, "id");
   const observedOccurredAt = property(record, "occurredAt");
+  // V1 writers persist the event ID as idempotencyKey; legacy records use id. Every present identifier must be valid and match.
+  const observedEventIds = (["id", "idempotencyKey"] as const)
+    .filter(key => Object.prototype.hasOwnProperty.call(record, key))
+    .map(key => property(record, key));
   if (
-    !validIdentifier(partitionKey)
+    observedEventIds.length === 0
+    || !observedEventIds.every(validIdentifier)
+    || !validIdentifier(partitionKey)
     || !validIdentifier(rowKey)
     || !validIdentifier(observedVisitorId)
-    || !validIdentifier(observedEventId)
     || !validOccurrenceTimestamp(observedOccurredAt)
     || !validTableKey(partitionKey)
     || !validTableKey(rowKey)
@@ -204,7 +209,7 @@ function assess(input: unknown): Assessment {
   if (partitionKey !== visitorId) return ambiguous("partition_key_mismatch", candidateRowKey);
   if (rowKey !== candidateRowKey) return ambiguous("row_key_mismatch", candidateRowKey);
   if (observedVisitorId !== visitorId) return ambiguous("visitor_id_mismatch", candidateRowKey);
-  if (observedEventId !== eventId) return ambiguous("event_id_mismatch", candidateRowKey);
+  if (observedEventIds.some(observedEventId => observedEventId !== eventId)) return ambiguous("event_id_mismatch", candidateRowKey);
   if (observedOccurredAt !== occurredAt) return ambiguous("occurred_at_mismatch", candidateRowKey);
 
   return {

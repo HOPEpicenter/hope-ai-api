@@ -316,6 +316,99 @@ async function main(): Promise<void> {
     }
   });
 
+  await test("actual V1 persisted records identify the event by idempotencyKey without id", async () => {
+    // Shape persisted by recordFormationEventV1: no explicit id property.
+    const v1Record = (overrides: Record<string, unknown> = {}): Record<string, unknown> => {
+      const persisted: Record<string, unknown> = {
+        partitionKey: VISITOR,
+        rowKey: ROW_KEY,
+        visitorId: VISITOR,
+        idempotencyKey: EVENT_ID,
+        occurredAt: AT,
+        ...overrides
+      };
+      return persisted;
+    };
+    const matching = "record_matches_trusted_identity";
+
+    assert.equal("id" in v1Record(), false);
+    await expect(identity(), port(async () => v1Record()), "matching_evidence", matching);
+    await expect(identity(), port(async () => record({ idempotencyKey: undefined })), "ambiguous", "record_malformed");
+    const legacy = record();
+    delete legacy.idempotencyKey;
+    await expect(identity(), port(async () => legacy), "matching_evidence", matching);
+    await expect(identity(), port(async () => record()), "matching_evidence", matching);
+
+    const neither = v1Record();
+    delete neither.idempotencyKey;
+    await expect(identity(), port(async () => neither), "ambiguous", "record_malformed");
+
+    await expect(identity(), port(async () => v1Record({ idempotencyKey: "synthetic-other-event" })), "ambiguous", "event_id_mismatch");
+    const legacyOther = record({ id: "synthetic-other-event" });
+    delete legacyOther.idempotencyKey;
+    await expect(identity(), port(async () => legacyOther), "ambiguous", "event_id_mismatch");
+    await expect(identity(), port(async () => record({ idempotencyKey: "synthetic-other-event" })), "ambiguous", "event_id_mismatch");
+    await expect(identity(), port(async () => record({ id: "synthetic-other-event" })), "ambiguous", "event_id_mismatch");
+
+    for (const invalid of [undefined, null, "", "   ", ` ${EVENT_ID}`, 42, {}, [], true]) {
+      await expect(identity(), port(async () => v1Record({ idempotencyKey: invalid })), "ambiguous", "record_malformed");
+      await expect(identity(), port(async () => record({ id: invalid })), "ambiguous", "record_malformed");
+      await expect(identity(), port(async () => record({ idempotencyKey: invalid })), "ambiguous", "record_malformed");
+      const legacyInvalid = record({ id: invalid });
+      delete legacyInvalid.idempotencyKey;
+      await expect(identity(), port(async () => legacyInvalid), "ambiguous", "record_malformed");
+    }
+
+    for (const key of ["id", "idempotencyKey"]) {
+      const accessorRecord = v1Record();
+      delete accessorRecord.idempotencyKey;
+      Object.defineProperty(accessorRecord, key, { enumerable: true, get() { return EVENT_ID; } });
+      await expect(identity(), port(async () => accessorRecord), "ambiguous", "record_malformed");
+      const withBoth = record();
+      Object.defineProperty(withBoth, key, { enumerable: true, get() { return EVENT_ID; } });
+      await expect(identity(), port(async () => withBoth), "ambiguous", "record_malformed");
+    }
+
+    const nonIdentity: Array<[Record<string, unknown>, string]> = [
+      [{ visitorId: "synthetic-other-visitor" }, "visitor_id_mismatch"],
+      [{ rowKey: "synthetic-other-row" }, "row_key_mismatch"],
+      [{ partitionKey: "synthetic-other-partition" }, "partition_key_mismatch"],
+      [{ occurredAt: OTHER_AT }, "occurred_at_mismatch"]
+    ];
+    for (const [override, reasonCode] of nonIdentity) {
+      await expect(
+        identity(),
+        port(async () => v1Record(override)),
+        "ambiguous",
+        reasonCode as FormationEventEvidenceAcquisitionResultV1["reasonCode"]
+      );
+    }
+
+    for (const invalidIdentity of [{ eventId: "" }, { eventId: "   " }, { visitorId: undefined }, { occurredAt: "nope" }]) {
+      let calls = 0;
+      await expect(
+        identity(invalidIdentity),
+        port(async () => { calls++; return v1Record(); }),
+        "ambiguous",
+        (Object.keys(invalidIdentity)[0] === "eventId"
+          ? "identity_event_id_malformed"
+          : Object.keys(invalidIdentity)[0] === "visitorId"
+            ? "identity_visitor_id_malformed"
+            : "identity_occurred_at_invalid")
+      );
+      assert.equal(calls, 0);
+    }
+
+    const marker = "synthetic-private-v1-content";
+    const content = await readFormationEventAcquisition(
+      identity(),
+      port(async () => v1Record({ summary: marker, metadata: marker }))
+    );
+    assertSafety(content);
+    assert.equal(content.status, "matching_evidence");
+    assert.doesNotMatch(JSON.stringify(content), new RegExp(marker));
+  });
+
   await test("hostile error getters and proxies fail closed", async () => {
     const getterError = {
       statusCode: 404,

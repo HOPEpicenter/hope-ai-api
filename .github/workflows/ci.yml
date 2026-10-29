@@ -255,6 +255,15 @@ jobs:
           npx ts-node tests/communications/postMinistryEmailEventWebhook.test.ts
           npx ts-node tests/followups/confirmHistoricalSixWeekCareOutcome.test.ts
 
+      - name: Visitor provenance regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npx --no-install ts-node tests/visitors/visitorProvenancePersistence.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install ts-node tests/visitors/isSyntheticVisitorRecord.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Dashboard visitor identity regression
         shell: pwsh
         run: |

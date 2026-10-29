@@ -1,5 +1,7 @@
 import { types as utilTypes } from "util";
-import { getFormationEventV1TableClient } from "../../functions/_shared/formationEventV1TableClient";
+import {
+  createFormationEventReadOnlyCredentialBoundary
+} from "./createFormationEventReadOnlyCredentialBoundary";
 import type { FormationEventEvidenceReadPort } from "./readFormationEventAcquisition";
 
 type SyntheticGetEntity = (
@@ -23,17 +25,12 @@ function createReadPort(
 }
 
 /**
- * Creates a production-facing narrow reader from the backend-owned FormationEvent
- * V1 table factory. Constructing the Azure client performs no storage operation.
- * This adapter grants no authorization and does not imply credential-level
- * read-only permissions; configure those independently in trusted infrastructure.
+ * Creates the narrow FormationEvent reader from the dedicated, server-owned
+ * managed-identity credential boundary. This adapter grants no authorization.
  */
 export function createFormationEventV1BackendReadPort(): FormationEventEvidenceReadPort {
-  const client = getFormationEventV1TableClient();
-  return createReadPort(
-    (partitionKey, rowKey) => client.getEntity(partitionKey, rowKey),
-    client
-  );
+  const readPort = createFormationEventReadOnlyCredentialBoundary();
+  return createReadPort(readPort.getEntity, readPort);
 }
 
 /**

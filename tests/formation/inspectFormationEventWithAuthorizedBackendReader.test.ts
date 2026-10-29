@@ -32,6 +32,9 @@ const FEATURE_SETTING = "FEATURE_FORMATION_EVENT_EVIDENCE_INSPECTION";
 const AUTHORIZATION_PATH = require.resolve(
   "../../src/services/authorization/authorizeAuthenticatedStaffAction"
 );
+const READ_ONLY_BOUNDARY_PATH = require.resolve(
+  "../../src/services/formation/createFormationEventReadOnlyCredentialBoundary"
+);
 const STORAGE_CLIENT_PATH = require.resolve("../../src/storage/tableClient");
 const AZURE_TABLES_PATH = require.resolve("@azure/data-tables");
 const READER_FACTORY_PATH = require.resolve(
@@ -249,6 +252,21 @@ function loadService(): ServiceModule["inspectFormationEventWithAuthorizedBacken
   ).inspectFormationEventWithAuthorizedBackendReader;
 }
 
+function installSyntheticReadiness(ready: boolean): () => void {
+  const previous = require.cache[READ_ONLY_BOUNDARY_PATH];
+  const syntheticModule = new nodeModule.Module(READ_ONLY_BOUNDARY_PATH);
+  syntheticModule.filename = READ_ONLY_BOUNDARY_PATH;
+  syntheticModule.loaded = true;
+  syntheticModule.exports = {
+    FORMATION_EVENT_READ_ONLY_CREDENTIAL_BOUNDARY_READY: ready
+  };
+  require.cache[READ_ONLY_BOUNDARY_PATH] = syntheticModule;
+  return () => {
+    if (previous) require.cache[READ_ONLY_BOUNDARY_PATH] = previous;
+    else delete require.cache[READ_ONLY_BOUNDARY_PATH];
+  };
+}
+
 function assertSafeResult(result: FormationEventEvidenceAcquisitionResultV1): void {
   assert.equal(result.contractVersion, "formation_event_evidence_acquisition.v1");
   assert.equal(result.advisoryOnly, true);
@@ -331,10 +349,30 @@ async function main(): Promise<void> {
       authorizationHarness.markEvent("reader_constructed");
     }
   );
-  const inspect = loadService();
+  const restoreSyntheticReadiness = installSyntheticReadiness(true);
+  let inspect = loadService();
   const restoreEnvironment = setEnvironment(environment());
 
   try {
+    await test("hard-coded disabled readiness gate prevents authorization and reader construction", async () => {
+      const restoreDisabledReadiness = installSyntheticReadiness(false);
+      try {
+        const disabledInspect = loadService();
+        authorizationHarness.reset();
+        readerHarness.reset();
+        readCalls = 0;
+        const result = await disabledInspect(identity(), token);
+        assert.equal(result.status, "unavailable");
+        assert.equal(authorizationHarness.calls(), 0);
+        assert.equal(readerHarness.constructions(), 0);
+        assert.equal(readCalls, 0);
+        assertSafeResult(result);
+      } finally {
+        restoreDisabledReadiness();
+        inspect = loadService();
+      }
+    });
+
     await test("disabled feature prevents authorization and reader construction", async () => {
       const restoreDisabled = setEnvironment(environment({ [FEATURE_SETTING]: "false" }));
       try {
@@ -629,6 +667,7 @@ async function main(): Promise<void> {
     console.log(`Passed ${passed} authorized backend-reader composition tests.`);
   } finally {
     restoreEnvironment();
+    restoreSyntheticReadiness();
     readerHarness.restore();
     authorizationHarness.restore();
     delete require.cache[SERVICE_PATH];

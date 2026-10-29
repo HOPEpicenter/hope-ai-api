@@ -11,6 +11,9 @@ import { assessFormationEventAcquisition } from "../../domain/formation/assessFo
 import type {
   AuthenticatedStaffActionDecision
 } from "../authorization/authorizeAuthenticatedStaffAction";
+import {
+  FORMATION_EVENT_READ_ONLY_CREDENTIAL_BOUNDARY_READY
+} from "./createFormationEventReadOnlyCredentialBoundary";
 
 const IDENTITY_KEYS = ["visitorId", "eventId", "occurredAt"] as const;
 const COMPACT_BEARER_TOKEN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
@@ -126,6 +129,8 @@ export async function inspectFormationEventWithAuthorizedBackendReader(
   ) {
     return preflight;
   }
+
+  if (!FORMATION_EVENT_READ_ONLY_CREDENTIAL_BOUNDARY_READY) return preflight;
 
   let configuration;
   try {

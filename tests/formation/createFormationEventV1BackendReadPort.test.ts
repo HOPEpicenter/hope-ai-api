@@ -16,15 +16,24 @@ import {
 
 type IsolatedTableClientFactory = typeof import("../../src/functions/_shared/formationEventV1TableClient");
 type ReadPortFactories = typeof import("../../src/services/formation/createFormationEventV1BackendReadPort");
+type NodeModule = typeof import("module");
 
 const VISITOR_ID = "synthetic-v1-adapter-visitor-001";
 const EVENT_ID = "synthetic-v1-adapter-event-001";
 const OCCURRED_AT = "2030-02-03T04:05:06.000Z";
 const ROW_KEY = makeDeterministicFormationEventRowKey(OCCURRED_AT, EVENT_ID);
+const READ_ONLY_BOUNDARY_PATH = require.resolve(
+  "../../src/services/formation/createFormationEventReadOnlyCredentialBoundary"
+);
+const nodeModule = require("module") as NodeModule;
 
 let getFormationEventV1TableClient: IsolatedTableClientFactory["getFormationEventV1TableClient"];
 let createFormationEventV1BackendReadPort: ReadPortFactories["createFormationEventV1BackendReadPort"];
 let createSyntheticFormationEventV1BackendReadPort: ReadPortFactories["createSyntheticFormationEventV1BackendReadPort"];
+let dedicatedBoundaryClient: { getEntity: (partitionKey: string, rowKey: string) => Promise<unknown> } = {
+  getEntity: async () => eventRecord()
+};
+let dedicatedBoundaryConstructions = 0;
 
 function identity(overrides: Record<string, unknown> = {}): FormationEventEvidenceAcquisitionIdentityV1 {
   return {
@@ -75,14 +84,29 @@ function setEnvironment(values: Record<string, string | undefined>): () => void 
 function loadIsolatedModules(): void {
   const tableFactoryPath = require.resolve("../../src/functions/_shared/formationEventV1TableClient");
   const adapterPath = require.resolve("../../src/services/formation/createFormationEventV1BackendReadPort");
+  const previousBoundary = require.cache[READ_ONLY_BOUNDARY_PATH];
   delete require.cache[tableFactoryPath];
   delete require.cache[adapterPath];
+
+  const boundaryModule = new nodeModule.Module(READ_ONLY_BOUNDARY_PATH);
+  boundaryModule.filename = READ_ONLY_BOUNDARY_PATH;
+  boundaryModule.loaded = true;
+  boundaryModule.exports = {
+    createFormationEventReadOnlyCredentialBoundary: () => {
+      dedicatedBoundaryConstructions++;
+      return dedicatedBoundaryClient;
+    }
+  };
+  require.cache[READ_ONLY_BOUNDARY_PATH] = boundaryModule;
 
   const tableFactory = require(tableFactoryPath) as IsolatedTableClientFactory;
   const adapter = require(adapterPath) as ReadPortFactories;
   getFormationEventV1TableClient = tableFactory.getFormationEventV1TableClient;
   createFormationEventV1BackendReadPort = adapter.createFormationEventV1BackendReadPort;
   createSyntheticFormationEventV1BackendReadPort = adapter.createSyntheticFormationEventV1BackendReadPort;
+  if (previousBoundary && previousBoundary === boundaryModule) {
+    throw new Error("Synthetic boundary module isolation failed");
+  }
 }
 
 let passed = 0;
@@ -215,7 +239,7 @@ async function main(): Promise<void> {
     }
   });
 
-  await test("production factory takes no caller-controlled arguments and construction performs no reads or writes", () => {
+  await test("inspection reader uses only the dedicated boundary and construction performs no reads or writes", () => {
     const restoreEnvironment = setEnvironment({
       STORAGE_CONNECTION_STRING: "synthetic-storage-only",
       AzureWebJobsStorage: undefined,
@@ -237,11 +261,13 @@ async function main(): Promise<void> {
 
     try {
       loadIsolatedModules();
+      dedicatedBoundaryClient = syntheticClient;
+      dedicatedBoundaryConstructions = 0;
       Object.defineProperty(TableClient, "fromConnectionString", {
         configurable: true,
         value: (...args: unknown[]) => {
           factoryCalls.push(args);
-          return syntheticClient;
+          throw new Error("Shared connection-string factory must not be used");
         }
       });
 
@@ -253,7 +279,8 @@ async function main(): Promise<void> {
       assert.notEqual(readPort.getEntity, syntheticClient.getEntity);
       assert.equal(entityReads, 0);
       assert.equal(writes, 0);
-      assert.deepEqual(factoryCalls, [["synthetic-storage-only", "synthetic-production-factory"]]);
+      assert.equal(dedicatedBoundaryConstructions, 1);
+      assert.deepEqual(factoryCalls, []);
     } finally {
       if (originalDescriptor) Object.defineProperty(TableClient, "fromConnectionString", originalDescriptor);
       restoreEnvironment();

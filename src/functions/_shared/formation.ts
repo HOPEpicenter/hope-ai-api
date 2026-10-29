@@ -1,5 +1,6 @@
 import { compareTimelineNewestFirst } from "../../shared/timeline/timelineOrdering";
 import { TableClient } from "@azure/data-tables";
+import { getFormationEventV1TableClient } from "./formationEventV1TableClient";
 import { GlobalTimelineRepository } from "../../repositories/globalTimelineRepository";
 import { logFunctionError } from "../../shared/observability/functionObservability";
 import { getConnString } from "./tableClient";
@@ -88,7 +89,6 @@ export type FunctionFormationProfileEntity = {
   [k: string]: any;
 };
 
-const FORMATION_EVENTS_TABLE = process.env.FORMATION_EVENTS_TABLE || "devFormationEvents";
 const FORMATION_PROFILES_TABLE = process.env.FORMATION_PROFILES_TABLE || "devFormationProfiles";
 const MAX_CORRECTION_REPLAY_EVENTS = 10000;
 
@@ -313,11 +313,7 @@ export function toFormationHttpError(error: any, fallbackStatus = 400): number {
 }
 
 export function getFormationEventsTableClient(): TableClient {
-  const conn = getConnString();
-  if (!conn) {
-    throw new Error("Missing STORAGE_CONNECTION_STRING (or AzureWebJobsStorage).");
-  }
-  return TableClient.fromConnectionString(conn, FORMATION_EVENTS_TABLE);
+  return getFormationEventV1TableClient();
 }
 
 export function getFormationProfilesTableClient(): TableClient {

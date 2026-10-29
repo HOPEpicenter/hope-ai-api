@@ -1,4 +1,3 @@
-import type { HttpRequest, HttpResponseInit } from "@azure/functions";
 import type {
   FormationEventEvidenceAcquisitionIdentityV1,
   FormationEventEvidenceAcquisitionInputV1,
@@ -14,6 +13,21 @@ import type {
 import {
   FORMATION_EVENT_READ_ONLY_CREDENTIAL_BOUNDARY_READY
 } from "../../services/formation/createFormationEventReadOnlyCredentialBoundary";
+
+interface FormationEventInspectionHttpRequest {
+  readonly method: string;
+  readonly headers: {
+    get(name: string): string | null;
+  };
+  readonly rawHeaders?: readonly string[];
+  json(): Promise<unknown>;
+}
+
+interface FormationEventInspectionHttpResponse {
+  readonly status: number;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly jsonBody: unknown;
+}
 
 const IDENTITY_KEYS = ["visitorId", "eventId", "occurredAt"] as const;
 const BEARER_TOKEN_PATTERN =
@@ -37,7 +51,7 @@ const JSON_HEADERS = Object.freeze({
   "cache-control": "no-store"
 });
 
-function response(status: number, error: string): HttpResponseInit {
+function response(status: number, error: string): FormationEventInspectionHttpResponse {
   return {
     status,
     headers: JSON_HEADERS,
@@ -232,8 +246,8 @@ function denialStatus(value: unknown): number {
  * boundary is implemented and independently approved.
  */
 export async function handleFormationEventInspectionHttpRequest(
-  request: HttpRequest
-): Promise<HttpResponseInit> {
+  request: FormationEventInspectionHttpRequest
+): Promise<FormationEventInspectionHttpResponse> {
   let method: unknown;
   try {
     method = Reflect.get(request, "method");

@@ -131,6 +131,24 @@ test("canonical stored id is accepted and eventId-only records are rejected", ()
   expect(eventIdOnly, "ambiguous", "record_malformed");
 });
 
+test("V1 idempotencyKey and legacy id are independently accepted while conflicting identifiers fail closed", () => {
+  const v1Record = build();
+  const v1StoredRecord = (v1Record.observation as { record: Record<string, unknown> }).record;
+  delete v1StoredRecord.id;
+  expect(v1Record, "matching_evidence", "record_matches_trusted_identity");
+
+  const legacyRecord = build();
+  const legacyStoredRecord = (legacyRecord.observation as { record: Record<string, unknown> }).record;
+  delete legacyStoredRecord.idempotencyKey;
+  expect(legacyRecord, "matching_evidence", "record_matches_trusted_identity");
+
+  expect(
+    build({ record: { idempotencyKey: "synthetic-conflicting-event-101" } }),
+    "ambiguous",
+    "event_id_mismatch"
+  );
+});
+
 test("occurrence timestamp mismatch", () => {
   expect(
     build({ record: { occurredAt: OTHER_AT } }),
@@ -160,6 +178,7 @@ test("partial and malformed records are rejected", () => {
   const missingCanonicalId = build();
   const missingIdRecord = (missingCanonicalId.observation as { record: Record<string, unknown> }).record;
   delete missingIdRecord.id;
+  delete missingIdRecord.idempotencyKey;
   expect(missingCanonicalId, "ambiguous", "record_malformed");
   expect(
     { identity: { visitorId: VISITOR, eventId: EVENT_ID, occurredAt: AT }, observation: { availability: "available", record: null } },

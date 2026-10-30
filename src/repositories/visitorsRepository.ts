@@ -1,5 +1,12 @@
-import { getTableClient } from "../storage/tableClient";
+import type { TableClient } from "@azure/data-tables";
 import { randomUUID } from "crypto";
+import {
+  createOperationalVisitorProvenance,
+  createOperationalVisitorUpsertProvenance,
+  parseVisitorProvenance,
+  serializeVisitorProvenance,
+  type VisitorProvenance
+} from "../contracts/visitorProvenance.v1";
 
 export type VisitorEntity = {
   partitionKey: "VISITOR";
@@ -9,6 +16,7 @@ export type VisitorEntity = {
   emailLower?: string; // canonical lowercase for consistency
   phone?: string;
   phoneCanonical?: string;
+  provenanceJson?: string;
   createdAt: string; // ISO
   updatedAt: string; // ISO
 };
@@ -32,6 +40,7 @@ export type Visitor = {
   name: string;
   email?: string;
   phone?: string;
+  provenance?: VisitorProvenance;
   createdAt: string;
   updatedAt: string;
 };
@@ -50,15 +59,72 @@ export interface VisitorsRepository {
   upsert(visitor: Visitor): Promise<Visitor>;
 }
 
+export type AzureTableVisitorsRepositoryDependencies = {
+  getTableClient?: (tableName: string) => Promise<TableClient> | TableClient;
+  now?: () => string;
+  newVisitorId?: () => string;
+};
+
 const TABLE = "Visitors";
 const PK: VisitorEntity["partitionKey"] = "VISITOR";
 
+class VisitorUpsertCreateConflictError extends Error {
+  readonly code = "VISITOR_UPSERT_CREATE_CONFLICT";
+
+  constructor(
+    readonly reason:
+      | "winner_missing_after_create_conflict"
+      | "winner_changed_before_merge"
+  ) {
+    super(`Visitor upsert create conflict: ${reason}`);
+    this.name = "VisitorUpsertCreateConflictError";
+  }
+}
+
+function storageErrorDetails(error: unknown): {
+  code: string;
+  status: number;
+} {
+  if (!error || typeof error !== "object") {
+    return { code: "", status: 0 };
+  }
+
+  const value = error as {
+    code?: unknown;
+    statusCode?: unknown;
+    status?: unknown;
+  };
+  return {
+    code: String(value.code ?? ""),
+    status: Number(value.statusCode ?? value.status ?? 0)
+  };
+}
+
+function isStorageNotFound(error: unknown): boolean {
+  const details = storageErrorDetails(error);
+  return details.code === "ResourceNotFound" || details.status === 404;
+}
+
+function isStorageAlreadyExists(error: unknown): boolean {
+  const details = storageErrorDetails(error);
+  return details.code === "EntityAlreadyExists" || details.status === 409;
+}
+
+function isStorageUpdateConflict(error: unknown): boolean {
+  const details = storageErrorDetails(error);
+  return details.code === "UpdateConditionNotSatisfied" ||
+    details.status === 404 ||
+    details.status === 412;
+}
+
 function toVisitor(e: VisitorEntity): Visitor {
+  const provenance = parseVisitorProvenance(e.provenanceJson);
   return {
     visitorId: e.rowKey,
     name: e.name,
     email: e.email,
     phone: e.phone,
+    ...(provenance ? { provenance } : {}),
     createdAt: e.createdAt,
     updatedAt: e.updatedAt,
   };
@@ -135,10 +201,25 @@ function nowIso(): string {
 }
 
 export class AzureTableVisitorsRepository implements VisitorsRepository {
+  constructor(
+    private readonly dependencies: AzureTableVisitorsRepositoryDependencies = {}
+  ) {}
+
+  private async getTable(): Promise<TableClient> {
+    const getTableClient =
+      this.dependencies.getTableClient ??
+      (await import("../storage/tableClient")).getTableClient;
+    return getTableClient(TABLE);
+  }
+
+  private now(): string {
+    return (this.dependencies.now ?? nowIso)();
+  }
+
   async create(input: { name: string; email?: string; phone?: string }): Promise<CreateVisitorResult> {
-    const table = await getTableClient(TABLE);
-    const id = randomUUID();
-    const now = nowIso();
+    const table = await this.getTable();
+    const id = (this.dependencies.newVisitorId ?? randomUUID)();
+    const now = this.now();
 
     const emailTrim = typeof input.email === "string" ? input.email.trim() : undefined;
     const emailLower = emailTrim ? emailTrim.toLowerCase() : undefined;
@@ -214,6 +295,9 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
       emailLower: emailLower,
       phone: phoneTrim,
       phoneCanonical,
+      provenanceJson: serializeVisitorProvenance(
+        createOperationalVisitorProvenance(now)
+      ),
       createdAt: now,
       updatedAt: now,
     };
@@ -240,7 +324,7 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     canonical: string,
     now: string
   ): Promise<{ visitorId: string } | null> {
-    const table = await getTableClient(TABLE);
+    const table = await this.getTable();
     try {
       const index = await table.getEntity<EmailIndexEntity | PhoneIndexEntity>(partitionKey, rowKey);
       const visitorId = (index as any).visitorId as string | undefined;
@@ -277,7 +361,7 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
     visitorId: string,
     now: string
   ): Promise<{ visitorId?: string; created: boolean }> {
-    const table = await getTableClient(TABLE);
+    const table = await this.getTable();
     try {
       await table.createEntity({ partitionKey, rowKey, visitorId, createdAt: now });
       return { created: true };
@@ -291,14 +375,14 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
   }
 
   private async removeReservations(reservations: Array<{ partitionKey: "EMAIL" | "PHONE"; rowKey: string }>): Promise<void> {
-    const table = await getTableClient(TABLE);
+    const table = await this.getTable();
     for (const reservation of reservations) {
       try { await table.deleteEntity(reservation.partitionKey, reservation.rowKey); } catch { }
     }
   }
 
   async getById(visitorId: string): Promise<Visitor | null> {
-    const table = await getTableClient(TABLE);
+    const table = await this.getTable();
     try {
       const e = await table.getEntity<VisitorEntity>(PK, visitorId);
       return toVisitor(e);
@@ -311,7 +395,7 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
   }
 
   async getByEmail(email: string): Promise<Visitor | null> {
-    const table = await getTableClient(TABLE);
+    const table = await this.getTable();
     const raw = (email ?? "").trim();
     if (!raw) return null;
 
@@ -332,7 +416,7 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
   }
 
   async getByPhone(phone: string): Promise<Visitor | null> {
-    const table = await getTableClient(TABLE);
+    const table = await this.getTable();
     const canonical = normalizePhoneIdentifier(phone ?? "");
     if (!canonical) return null;
 
@@ -349,7 +433,7 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
   }
 
   async list(input: { limit: number }): Promise<{ items: Visitor[]; count: number }> {
-    const table = await getTableClient(TABLE);
+    const table = await this.getTable();
     const limit = Math.max(1, Math.min(input?.limit ?? 5, 200));
 
     // NOTE: Azure Table iteration order is not guaranteed. Make results deterministic.
@@ -382,24 +466,80 @@ export class AzureTableVisitorsRepository implements VisitorsRepository {
   }
 
   async upsert(visitor: Visitor): Promise<Visitor> {
-    const table = await getTableClient(TABLE);
-    const now = nowIso();
+    const table = await this.getTable();
+    const now = this.now();
 
     const emailTrim = typeof visitor.email === "string" ? visitor.email.trim() : undefined;
     const emailLower = emailTrim ? emailTrim.toLowerCase() : undefined;
 
-    const entity: VisitorEntity = {
+    let existingEntity: VisitorEntity | undefined;
+    try {
+      existingEntity = await table.getEntity<VisitorEntity>(PK, visitor.visitorId);
+    } catch (error: any) {
+      const code = String(error?.code ?? "");
+      const status = Number(error?.statusCode ?? error?.status ?? 0);
+      if (code !== "ResourceNotFound" && status !== 404) throw error;
+    }
+
+    const profileEntity: Omit<VisitorEntity, "provenanceJson"> = {
       partitionKey: PK,
       rowKey: visitor.visitorId,
       name: visitor.name,
       email: emailTrim,
       emailLower: emailLower,
-      createdAt: visitor.createdAt ?? now,
+      createdAt: existingEntity?.createdAt ?? visitor.createdAt ?? now,
       updatedAt: now,
     };
 
-    await table.upsertEntity(entity as any, "Merge");
-    return toVisitor(entity);
+    if (existingEntity) {
+      await table.upsertEntity(profileEntity as any, "Merge");
+      return toVisitor({ ...existingEntity, ...profileEntity });
+    }
+
+    const newEntity: VisitorEntity = {
+      ...profileEntity,
+      provenanceJson: serializeVisitorProvenance(
+        createOperationalVisitorUpsertProvenance(now)
+      )
+    };
+
+    try {
+      await table.createEntity(newEntity as any);
+      return toVisitor(newEntity);
+    } catch (error) {
+      if (!isStorageAlreadyExists(error)) throw error;
+    }
+
+    let winner: VisitorEntity & { etag: string };
+    try {
+      winner = await table.getEntity<VisitorEntity>(PK, visitor.visitorId);
+    } catch (error) {
+      if (isStorageNotFound(error)) {
+        throw new VisitorUpsertCreateConflictError(
+          "winner_missing_after_create_conflict"
+        );
+      }
+      throw error;
+    }
+
+    const racedProfileEntity: Omit<VisitorEntity, "provenanceJson"> = {
+      ...profileEntity,
+      createdAt: winner.createdAt ?? profileEntity.createdAt
+    };
+
+    try {
+      await table.updateEntity(racedProfileEntity as any, "Merge", {
+        etag: winner.etag
+      });
+    } catch (error) {
+      if (isStorageUpdateConflict(error)) {
+        throw new VisitorUpsertCreateConflictError(
+          "winner_changed_before_merge"
+        );
+      }
+      throw error;
+    }
+
+    return toVisitor({ ...winner, ...racedProfileEntity });
   }
 }
-

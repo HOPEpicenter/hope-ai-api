@@ -1,6 +1,13 @@
 import { randomUUID } from "crypto";
+import type { TableClient } from "@azure/data-tables";
 import { getTableClient } from "./tableClient";
 import { ensureTableExists } from "../../shared/storage/ensureTableExists";
+import {
+  createOperationalVisitorProvenance,
+  parseVisitorProvenance,
+  serializeVisitorProvenance,
+  type VisitorProvenance
+} from "../../contracts/visitorProvenance.v1";
 
 export type FunctionVisitor = {
   visitorId: string;
@@ -13,8 +20,16 @@ export type FunctionVisitor = {
   state?: string;
   postalCode?: string;
   birthday?: string;
+  provenance?: VisitorProvenance;
   createdAt: string;
   updatedAt: string;
+};
+
+export type FunctionVisitorRepositoryDependencies = {
+  getTableClient?: (tableName: string) => TableClient;
+  ensureTableExists?: (table: TableClient) => Promise<void>;
+  now?: () => string;
+  newVisitorId?: () => string;
 };
 
 export type FunctionCreateVisitorResult = {
@@ -36,6 +51,7 @@ type VisitorEntity = {
   state?: string;
   postalCode?: string;
   birthday?: string;
+  provenanceJson?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -62,6 +78,7 @@ function nowIso(): string {
 }
 
 function toVisitor(entity: VisitorEntity): FunctionVisitor {
+  const provenance = parseVisitorProvenance(entity.provenanceJson);
   return {
     visitorId: entity.rowKey,
     name: entity.name,
@@ -73,6 +90,7 @@ function toVisitor(entity: VisitorEntity): FunctionVisitor {
     state: entity.state,
     postalCode: entity.postalCode,
     birthday: entity.birthday,
+    ...(provenance ? { provenance } : {}),
     createdAt: entity.createdAt,
     updatedAt: entity.updatedAt
   };
@@ -223,9 +241,19 @@ async function removeReservations(
   }
 }
 
-export async function getVisitorById(visitorId: string): Promise<FunctionVisitor | null> {
-  const table = getTableClient(TABLE);
-  await ensureTableExists(table);
+export async function getVisitorById(
+  visitorId: string,
+  dependencies: FunctionVisitorRepositoryDependencies = {}
+): Promise<FunctionVisitor | null> {
+  return getVisitorByIdWithDependencies(visitorId, dependencies);
+}
+
+async function getVisitorByIdWithDependencies(
+  visitorId: string,
+  dependencies: FunctionVisitorRepositoryDependencies = {}
+): Promise<FunctionVisitor | null> {
+  const table = (dependencies.getTableClient ?? getTableClient)(TABLE);
+  await (dependencies.ensureTableExists ?? ensureTableExists)(table);
 
   try {
     const entity = await table.getEntity<VisitorEntity>(VISITOR_PK, visitorId);
@@ -240,9 +268,12 @@ export async function getVisitorById(visitorId: string): Promise<FunctionVisitor
   }
 }
 
-export async function listVisitorsRecords(input: { limit: number }): Promise<{ items: FunctionVisitor[]; count: number }> {
-  const table = getTableClient(TABLE);
-  await ensureTableExists(table);
+export async function listVisitorsRecords(
+  input: { limit: number },
+  dependencies: FunctionVisitorRepositoryDependencies = {}
+): Promise<{ items: FunctionVisitor[]; count: number }> {
+  const table = (dependencies.getTableClient ?? getTableClient)(TABLE);
+  await (dependencies.ensureTableExists ?? ensureTableExists)(table);
   const limit = Math.max(1, Math.min(input?.limit ?? 25, 200));
   const scanCap = 500;
 
@@ -283,11 +314,11 @@ export async function createVisitorRecord(input: {
   state?: string;
   postalCode?: string;
   birthday?: string;
-}): Promise<FunctionCreateVisitorResult> {
-  const table = getTableClient(TABLE);
-  await ensureTableExists(table);
-  const id = randomUUID();
-  const now = nowIso();
+}, dependencies: FunctionVisitorRepositoryDependencies = {}): Promise<FunctionCreateVisitorResult> {
+  const table = (dependencies.getTableClient ?? getTableClient)(TABLE);
+  await (dependencies.ensureTableExists ?? ensureTableExists)(table);
+  const id = (dependencies.newVisitorId ?? randomUUID)();
+  const now = (dependencies.now ?? nowIso)();
 
   const emailTrim = typeof input.email === "string" ? input.email.trim() : undefined;
   const emailLower = emailTrim ? emailTrim.toLowerCase() : undefined;
@@ -380,6 +411,9 @@ export async function createVisitorRecord(input: {
     state: stateTrim,
     postalCode: postalCodeTrim,
     birthday: birthdayTrim,
+    provenanceJson: serializeVisitorProvenance(
+      createOperationalVisitorProvenance(now)
+    ),
     createdAt: now,
     updatedAt: now
   };
@@ -411,16 +445,17 @@ export async function updateVisitorRecord(
     state?: string;
     postalCode?: string;
     birthday?: string;
-  }
+  },
+  dependencies: FunctionVisitorRepositoryDependencies = {}
 ): Promise<FunctionVisitor | null> {
-  const table = getTableClient(TABLE);
-  await ensureTableExists(table);
+  const table = (dependencies.getTableClient ?? getTableClient)(TABLE);
+  await (dependencies.ensureTableExists ?? ensureTableExists)(table);
 
-  const visitor = await getVisitorById(visitorId);
+  const visitor = await getVisitorByIdWithDependencies(visitorId, dependencies);
   if (!visitor) return null;
 
   const entity = await table.getEntity<VisitorEntity>(VISITOR_PK, visitorId);
-  const now = nowIso();
+  const now = (dependencies.now ?? nowIso)();
 
   const nextName = typeof input.name === "string" ? input.name.trim() : entity.name;
   const nextEmail = typeof input.email === "string" ? input.email.trim() : entity.email;
@@ -455,4 +490,3 @@ export async function updateVisitorRecord(
 
   return toVisitor(updated);
 }
-

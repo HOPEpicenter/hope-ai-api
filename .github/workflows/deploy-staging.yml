@@ -6,16 +6,36 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify source commit
+        shell: pwsh
+        env:
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $checkedOutSha = (git rev-parse HEAD).Trim()
+          if (
+            $env:TARGET_SHA -cnotmatch '^[0-9a-f]{40}$' -or
+            $LASTEXITCODE -ne 0 -or
+            $checkedOutSha -cne $env:TARGET_SHA
+          ) {
+            throw 'The staging source checkout does not match the workflow target SHA.'
+          }
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -183,3 +203,64 @@ jobs:
           if (-not $ok) {
             throw "Post-deploy health check failed after retries."
           }
+
+  record-staging-evidence:
+    needs: build-and-deploy
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: Preview
+    permissions: {}
+    steps:
+      - name: Record verified staging deployment evidence
+        shell: pwsh
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+          TARGET_SHA: ${{ github.sha }}
+          TARGET_REF: ${{ github.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if (
+            $env:EVENT_NAME -cne 'push' -or
+            $env:TARGET_REF -cne 'refs/heads/main' -or
+            $env:TARGET_SHA -cnotmatch '^[0-9a-f]{40}$' -or
+            $env:WORKFLOW_REF -cne "$($env:REPOSITORY)/.github/workflows/deploy-staging.yml@refs/heads/main"
+          ) {
+            throw 'Staging evidence is only valid for a main-branch push of a full commit SHA.'
+          }
+
+          $manifest = @{
+            schema = 'hope-ai-api-staging-evidence/v1'
+            repository_id = [long]$env:REPOSITORY_ID
+            workflow_id = 240733052
+            workflow_ref = $env:WORKFLOW_REF
+            workflow_sha = $env:WORKFLOW_SHA
+            run_id = [long]$env:RUN_ID
+            run_attempt = [int]$env:RUN_ATTEMPT
+            event = $env:EVENT_NAME
+            ref = $env:TARGET_REF
+            head_sha = $env:TARGET_SHA
+            github_environment = 'Preview'
+            azure_environment = 'staging'
+            deployment_app = 'hope-ai-api-staging'
+            version_endpoint = 'https://hope-ai-api-staging.azurewebsites.net/api/version'
+            version_status = 200
+            result = 'success'
+          } | ConvertTo-Json -Compress
+
+          $manifestPath = Join-Path $env:RUNNER_TEMP 'hope-ai-api-staging-evidence.json'
+          Set-Content -LiteralPath $manifestPath -Value $manifest -Encoding utf8NoBOM
+
+      - name: Upload verified staging deployment evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hope-ai-api-staging-evidence-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/hope-ai-api-staging-evidence.json
+          if-no-files-found: error
+          retention-days: 90

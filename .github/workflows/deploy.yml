@@ -84,6 +84,7 @@ jobs:
           $trustedCiBlobs = @(
             '905a2f388a4656ed2f18b7f4ffe996f7b19a665b'
             '66d44a65abe091fb8290bb96a957b985e8d90044'
+            '1522cd48e3fd69479efa5f062e657628e8a298fd'
           )
           if ($ciBlob -cnotin $trustedCiBlobs) {
             throw 'The target commit does not contain an approved CI workflow definition.'

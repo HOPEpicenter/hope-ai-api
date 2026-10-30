@@ -1,4 +1,5 @@
 import { createVisitorRecord, normalizePhoneIdentifier } from "../_shared/visitorsRepository";
+import { requireApiKeyForFunction } from "../_shared/apiKey";
 
 type CreateVisitorBody = {
   name?: string;
@@ -19,8 +20,26 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-export async function createVisitor(context: any, req: any): Promise<void> {
+type CreateVisitorDependencies = {
+  createRecord?: typeof createVisitorRecord;
+};
+
+export async function createVisitor(
+  context: any,
+  req: any,
+  dependencies: CreateVisitorDependencies = {}
+): Promise<void> {
   try {
+    const auth = requireApiKeyForFunction(req);
+    if (!auth.ok) {
+      context.res = {
+        status: auth.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: auth.body
+      };
+      return;
+    }
+
     const body = (req?.body ?? {}) as CreateVisitorBody;
 
     const first = typeof body.firstName === "string" ? body.firstName.trim() : "";
@@ -69,7 +88,7 @@ export async function createVisitor(context: any, req: any): Promise<void> {
       return;
     }
 
-    const result = await createVisitorRecord({
+    const result = await (dependencies.createRecord ?? createVisitorRecord)({
       name,
       email: emailRaw,
       phone: phoneRaw,

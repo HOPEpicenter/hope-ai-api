@@ -1,7 +1,26 @@
 import { getVisitorById } from "../_shared/visitorsRepository";
+import { requireApiKeyForFunction } from "../_shared/apiKey";
 
-export async function getVisitor(context: any, req: any): Promise<void> {
+type GetVisitorDependencies = {
+  getRecord?: typeof getVisitorById;
+};
+
+export async function getVisitor(
+  context: any,
+  req: any,
+  dependencies: GetVisitorDependencies = {}
+): Promise<void> {
   try {
+    const auth = requireApiKeyForFunction(req);
+    if (!auth.ok) {
+      context.res = {
+        status: auth.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: auth.body
+      };
+      return;
+    }
+
     const visitorId = (req?.params?.visitorId ?? "").trim();
 
     if (!visitorId) {
@@ -13,7 +32,7 @@ export async function getVisitor(context: any, req: any): Promise<void> {
       return;
     }
 
-    const visitor = await getVisitorById(visitorId);
+    const visitor = await (dependencies.getRecord ?? getVisitorById)(visitorId);
 
     if (!visitor) {
       context.res = {

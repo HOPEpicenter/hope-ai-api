@@ -37,14 +37,15 @@ jobs:
             throw 'Unexpected production Azure authentication identity.'
           }
           Write-Host '[PASS] Production OIDC authentication succeeded.'
-          $app = az functionapp show `
-            --resource-group rg-hope-ai-api-prod `
-            --name hope-ai-api-prod `
-            --query '{name:name,state:state}' `
+          $resourceId = '/subscriptions/fbafd6e4-21ad-41d9-8f98-091c3c73ded2/resourceGroups/rg-hope-ai-api-prod/providers/Microsoft.Web/sites/hope-ai-api-prod'
+          $app = az resource show `
+            --ids $resourceId `
+            --api-version '2024-04-01' `
             --output json | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0 -or
-              $app.name -cne 'hope-ai-api-prod' -or
-              $app.state -cne 'Running') {
+              $app.id -cne $resourceId -or
+              $app.properties.state -cne 'Running' -or
+              $app.properties.enabled -ne $true) {
             throw 'Expected production Function App is unavailable.'
           }
           Write-Host '[PASS] Expected production Function App is running.'

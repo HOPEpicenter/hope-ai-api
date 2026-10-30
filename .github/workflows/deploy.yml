@@ -1,9 +1,12 @@
 name: Deploy hope-ai-api-prod to Azure Functions
 
 on:
-  push:
-    branches: ["main"]
   workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Full commit SHA on main that passed CI and staging
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -13,10 +16,340 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  validate-release:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      validated_sha: ${{ steps.verify-staging-evidence.outputs.validated_sha }}
+    permissions:
+      actions: read
+      contents: read
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout dispatch workflow revision
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release evidence
+        id: validate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+          DISPATCH_SHA: ${{ github.sha }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $false
+
+          if ($env:TARGET_SHA -cnotmatch '^[0-9a-f]{40}$') {
+            throw 'target_sha must be a full 40-character lowercase commit SHA.'
+          }
+          if ($env:DISPATCH_SHA -cnotmatch '^[0-9a-f]{40}$') {
+            throw 'The workflow dispatch revision is not a full commit SHA.'
+          }
+          if ($env:REPOSITORY_ID -cne '1119797704') {
+            throw 'The workflow is running in an unexpected repository.'
+          }
+
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Unable to fetch main for release validation.'
+          }
+
+          $mainSha = (git rev-parse origin/main).Trim()
+          if ($LASTEXITCODE -ne 0 -or $mainSha -cne $env:DISPATCH_SHA) {
+            throw 'Dispatch must use the current main commit so stale workflow revisions cannot authorize release.'
+          }
+
+          git cat-file -e "$($env:TARGET_SHA)^{commit}"
+          if ($LASTEXITCODE -ne 0) {
+            throw 'target_sha does not identify a commit available from main.'
+          }
+          git merge-base --is-ancestor $env:TARGET_SHA origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw 'target_sha is not an ancestor of current main.'
+          }
+
+          $ciBlob = (git rev-parse "$($env:TARGET_SHA):.github/workflows/ci.yml").Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw 'The target commit is missing the trusted CI workflow.'
+          }
+          $trustedCiBlobs = @(
+            '905a2f388a4656ed2f18b7f4ffe996f7b19a665b'
+            '66d44a65abe091fb8290bb96a957b985e8d90044'
+          )
+          if ($ciBlob -cnotin $trustedCiBlobs) {
+            throw 'The target commit does not contain an approved CI workflow definition.'
+          }
+
+          $stagingBlob = (git rev-parse "$($env:TARGET_SHA):.github/workflows/deploy-staging.yml").Trim()
+          if ($LASTEXITCODE -ne 0 -or $stagingBlob -cne '5ad2a92535f4d89a8cfd7ec8b35666c1e871d896') {
+            throw 'The target commit does not contain the approved staging workflow definition.'
+          }
+
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          $api = "https://api.github.com/repos/$env:REPOSITORY"
+
+          function Invoke-GitHubApiJson {
+            param(
+              [Parameter(Mandatory)][string]$Uri,
+              [switch]$AllowPagination
+            )
+
+            $responseHeaders = $null
+            $body = Invoke-RestMethod `
+              -Method Get `
+              -Uri $Uri `
+              -Headers $headers `
+              -ResponseHeadersVariable responseHeaders
+            $linkHeader = [string]$responseHeaders['Link']
+            if (-not $AllowPagination -and $linkHeader -match 'rel="?next"?') {
+              throw 'GitHub API response was paginated; evidence is incomplete.'
+            }
+            return ,$body
+          }
+
+          function Assert-WorkflowIdentity {
+            param(
+              [long]$WorkflowId,
+              [string]$ExpectedPath
+            )
+
+            $workflow = Invoke-GitHubApiJson "$api/actions/workflows/$WorkflowId"
+            if (
+              [long]$workflow.id -ne $WorkflowId -or
+              $workflow.path -cne $ExpectedPath -or
+              $workflow.state -cne 'active'
+            ) {
+              throw "Workflow identity is missing or inconsistent for $ExpectedPath."
+            }
+          }
+
+          function Get-VerifiedRun {
+            param(
+              [long]$WorkflowId,
+              [string]$WorkflowPath,
+              [string[]]$ExpectedJobs
+            )
+
+            Assert-WorkflowIdentity -WorkflowId $WorkflowId -ExpectedPath $WorkflowPath
+            $runsUri = "$api/actions/workflows/$WorkflowId/runs?branch=main&event=push&head_sha=$($env:TARGET_SHA)&per_page=100&page=1"
+            $runPage = Invoke-GitHubApiJson $runsUri
+            $runs = @($runPage.workflow_runs)
+            if ([int]$runPage.total_count -ne 1 -or $runs.Count -ne 1) {
+              throw "Expected exactly one push run for $WorkflowPath at target_sha."
+            }
+
+            $run = $runs[0]
+            if (
+              [long]$run.workflow_id -ne $WorkflowId -or
+              $run.path -cne $WorkflowPath -or
+              $run.event -cne 'push' -or
+              $run.head_branch -cne 'main' -or
+              $run.head_sha -cne $env:TARGET_SHA -or
+              [long]$run.repository.id -ne [long]$env:REPOSITORY_ID -or
+              $run.status -cne 'completed' -or
+              $run.conclusion -cne 'success' -or
+              [int]$run.run_attempt -lt 1
+            ) {
+              throw "Workflow run evidence is incomplete or inconsistent for $WorkflowPath."
+            }
+
+            $jobsUri = "$api/actions/runs/$($run.id)/jobs?per_page=100&page=1"
+            $jobPage = Invoke-GitHubApiJson $jobsUri
+            $jobs = @($jobPage.jobs)
+            if ([int]$jobPage.total_count -ne $ExpectedJobs.Count -or $jobs.Count -ne $ExpectedJobs.Count) {
+              throw "The job evidence set is incomplete or unexpected for $WorkflowPath."
+            }
+            foreach ($expectedJob in $ExpectedJobs) {
+              if (@($jobs | Where-Object { $_.name -ceq $expectedJob }).Count -ne 1) {
+                throw "Expected exactly one $expectedJob job for $WorkflowPath."
+              }
+            }
+
+            foreach ($job in $jobs) {
+              if (
+                $job.name -cnotin $ExpectedJobs -or
+                [long]$job.run_id -ne [long]$run.id -or
+                [int]$job.run_attempt -ne [int]$run.run_attempt -or
+                $job.head_sha -cne $env:TARGET_SHA -or
+                $job.head_branch -cne 'main' -or
+                $job.status -cne 'completed' -or
+                $job.conclusion -cne 'success' -or
+                [string]::IsNullOrWhiteSpace($job.started_at) -or
+                [string]::IsNullOrWhiteSpace($job.completed_at)
+              ) {
+                throw "A required job is missing, skipped, failed, or inconsistent for $WorkflowPath."
+              }
+            }
+            return $run
+          }
+
+          $ciRun = Get-VerifiedRun `
+            -WorkflowId 223378627 `
+            -WorkflowPath '.github/workflows/ci.yml' `
+            -ExpectedJobs @('build-and-smoke')
+          $stagingRun = Get-VerifiedRun `
+            -WorkflowId 240733052 `
+            -WorkflowPath '.github/workflows/deploy-staging.yml' `
+            -ExpectedJobs @('build-and-deploy', 'record-staging-evidence')
+
+          $latestStagingPage = Invoke-GitHubApiJson `
+            "$api/actions/workflows/240733052/runs?per_page=1&page=1" `
+            -AllowPagination
+          $latestStagingRuns = @($latestStagingPage.workflow_runs)
+          if (
+            $latestStagingRuns.Count -ne 1 -or
+            [long]$latestStagingRuns[0].id -ne [long]$stagingRun.id -or
+            [long]$latestStagingRuns[0].run_attempt -ne [long]$stagingRun.run_attempt -or
+            $latestStagingRuns[0].event -cne 'push' -or
+            $latestStagingRuns[0].head_branch -cne 'main' -or
+            $latestStagingRuns[0].head_sha -cne $env:TARGET_SHA -or
+            $latestStagingRuns[0].status -cne 'completed' -or
+            $latestStagingRuns[0].conclusion -cne 'success'
+          ) {
+            throw 'The target staging run is not the latest successful staging activity.'
+          }
+
+          $artifactsUri = "$api/actions/runs/$($stagingRun.id)/artifacts?per_page=100&page=1"
+          $artifactPage = Invoke-GitHubApiJson $artifactsUri
+          $artifacts = @($artifactPage.artifacts)
+          if ([int]$artifactPage.total_count -ne $artifacts.Count) {
+            throw 'Staging artifact metadata is incomplete or paginated.'
+          }
+
+          $artifactName = "hope-ai-api-staging-evidence-$($stagingRun.run_attempt)"
+          $matchingArtifacts = @(
+            $artifacts |
+              Where-Object { $_.name -ceq $artifactName }
+          )
+          if ($matchingArtifacts.Count -ne 1) {
+            throw 'Expected exactly one staging evidence artifact for the verified run attempt.'
+          }
+
+          $artifact = $matchingArtifacts[0]
+          if (
+            $artifact.expired -ne $false -or
+            [long]$artifact.size_in_bytes -lt 1 -or
+            [long]$artifact.workflow_run.id -ne [long]$stagingRun.id -or
+            [long]$artifact.workflow_run.repository_id -ne [long]$env:REPOSITORY_ID -or
+            $artifact.workflow_run.head_branch -cne 'main' -or
+            $artifact.workflow_run.head_sha -cne $env:TARGET_SHA -or
+            [DateTimeOffset]$artifact.created_at -lt [DateTimeOffset]$stagingRun.run_started_at
+          ) {
+            throw 'Staging evidence artifact metadata does not match the verified run and target SHA.'
+          }
+
+          $productionEnvironment = Invoke-GitHubApiJson "$api/environments/Production"
+          $reviewRules = @(
+            $productionEnvironment.protection_rules |
+              Where-Object { $_.type -ceq 'required_reviewers' }
+          )
+          if (
+            $productionEnvironment.name -cne 'Production' -or
+            $productionEnvironment.can_admins_bypass -ne $false -or
+            $reviewRules.Count -ne 1 -or
+            @($reviewRules[0].reviewers).Count -lt 1 -or
+            $reviewRules[0].prevent_self_review -ne $true
+          ) {
+            throw 'Production requires non-bypassable reviewers with self-review prevention.'
+          }
+
+          $branchPolicy = $productionEnvironment.deployment_branch_policy
+          if (
+            $null -eq $branchPolicy -or
+            $branchPolicy.protected_branches -ne $false -or
+            $branchPolicy.custom_branch_policies -ne $true
+          ) {
+            throw 'Production must restrict deployments to the explicit main branch policy.'
+          }
+          $branchPolicies = Invoke-GitHubApiJson "$api/environments/Production/deployment-branch-policies?per_page=100&page=1"
+          $policies = @($branchPolicies.branch_policies)
+          if (
+            [int]$branchPolicies.total_count -ne 1 -or
+            $policies.Count -ne 1 -or
+            $policies[0].name -cne 'main' -or
+            $policies[0].type -cne 'branch'
+          ) {
+            throw 'Production deployment branch policy must allow only main.'
+          }
+
+          "staging_run_id=$($stagingRun.id)" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "staging_run_attempt=$($stagingRun.run_attempt)" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "artifact_name=$artifactName" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Release validation passed for $($env:TARGET_SHA)."
+
+      - name: Download verified staging evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.validate.outputs.artifact_name }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.validate.outputs.staging_run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/staging-release-evidence
+
+      - name: Verify staging evidence manifest
+        id: verify-staging-evidence
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+          STAGING_RUN_ID: ${{ steps.validate.outputs.staging_run_id }}
+          STAGING_RUN_ATTEMPT: ${{ steps.validate.outputs.staging_run_attempt }}
+          ARTIFACT_PATH: ${{ runner.temp }}/staging-release-evidence
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifestPath = Join-Path $env:ARTIFACT_PATH 'hope-ai-api-staging-evidence.json'
+          if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+            throw 'The staging evidence artifact did not contain its required manifest.'
+          }
+
+          $manifest = Get-Content -LiteralPath $manifestPath -Raw |
+            ConvertFrom-Json
+          if (
+            $manifest.schema -cne 'hope-ai-api-staging-evidence/v1' -or
+            [long]$manifest.repository_id -ne [long]$env:REPOSITORY_ID -or
+            [long]$manifest.workflow_id -ne 240733052 -or
+            $manifest.workflow_ref -cne "$($env:REPOSITORY)/.github/workflows/deploy-staging.yml@refs/heads/main" -or
+            $manifest.workflow_sha -cne $env:TARGET_SHA -or
+            [long]$manifest.run_id -ne [long]$env:STAGING_RUN_ID -or
+            [int]$manifest.run_attempt -ne [int]$env:STAGING_RUN_ATTEMPT -or
+            $manifest.event -cne 'push' -or
+            $manifest.ref -cne 'refs/heads/main' -or
+            $manifest.head_sha -cne $env:TARGET_SHA -or
+            $manifest.github_environment -cne 'Preview' -or
+            $manifest.azure_environment -cne 'staging' -or
+            $manifest.deployment_app -cne 'hope-ai-api-staging' -or
+            $manifest.version_endpoint -cne 'https://hope-ai-api-staging.azurewebsites.net/api/version' -or
+            [int]$manifest.version_status -ne 200 -or
+            $manifest.result -cne 'success'
+          ) {
+            throw 'The staging evidence manifest is missing, unsuccessful, or inconsistent.'
+          }
+
+          "validated_sha=$($env:TARGET_SHA)" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+  production-deploy:
+    needs: validate-release
+    if: needs.validate-release.result == 'success' && needs.validate-release.outputs.validated_sha != ''
+    runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment: Production
     permissions:
       contents: read
       id-token: write
@@ -25,8 +358,25 @@ jobs:
         shell: pwsh
 
     steps:
-      - name: Checkout
+      - name: Checkout validated production commit
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate-release.outputs.validated_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify checked-out production commit
+        env:
+          TARGET_SHA: ${{ needs.validate-release.outputs.validated_sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:TARGET_SHA -cnotmatch '^[0-9a-f]{40}$') {
+            throw 'Validated production SHA is missing or malformed.'
+          }
+          $checkedOutSha = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $checkedOutSha -cne $env:TARGET_SHA) {
+            throw 'Checked-out production code does not match the validated target SHA.'
+          }
 
       - name: Setup Node
         uses: actions/setup-node@v6

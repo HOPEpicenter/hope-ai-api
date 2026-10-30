@@ -1,0 +1,51 @@
+name: Verify production Azure OIDC authentication
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-production-oidc:
+    name: Verify production Azure OIDC only
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: Production
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Authenticate using protected Production identity
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_PROD_CLIENT_ID }}
+          tenant-id: 783ef4b1-7e96-4a71-80dd-06865b015da9
+          subscription-id: fbafd6e4-21ad-41d9-8f98-091c3c73ded2
+
+      - name: Verify Azure identity and production resource
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expectedSubscription = 'fbafd6e4-21ad-41d9-8f98-091c3c73ded2'
+          $expectedClientId = '72c213a6-9a9a-49fa-b6a3-0dd75528c609'
+          $account = az account show --output json | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or
+              $account.id -cne $expectedSubscription -or
+              $account.user.name -cne $expectedClientId) {
+            throw 'Unexpected production Azure authentication identity.'
+          }
+          Write-Host '[PASS] Production OIDC authentication succeeded.'
+          $app = az functionapp show `
+            --resource-group rg-hope-ai-api-prod `
+            --name hope-ai-api-prod `
+            --query '{name:name,state:state}' `
+            --output json | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or
+              $app.name -cne 'hope-ai-api-prod' -or
+              $app.state -cne 'Running') {
+            throw 'Expected production Function App is unavailable.'
+          }
+          Write-Host '[PASS] Expected production Function App is running.'
+          Write-Host '[SAFE] No production deployment performed.'

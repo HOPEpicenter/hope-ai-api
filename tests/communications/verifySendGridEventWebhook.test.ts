@@ -143,6 +143,28 @@ async function run(): Promise<void> {
     }
   );
 
+  // SG-WH-01: Characterize the current signature-only timestamp policy.
+  // A valid historical signature passes until a freshness policy is adopted.
+  const historicalTimestamp = "1600112502";
+  const historicalSigner = createSign("SHA256");
+  historicalSigner.update(historicalTimestamp);
+  historicalSigner.update(raw);
+  historicalSigner.end();
+  const historicalSignature = historicalSigner
+    .sign(privateKey)
+    .toString("base64");
+
+  assert.deepEqual(
+    verifySendGridEventWebhook({
+      rawBody: raw,
+      signature: historicalSignature,
+      timestamp: historicalTimestamp,
+      publicKey: publicKeyPem
+    }),
+    { ok: true, signatureVerified: true },
+    "Historical signed request currently passes verification"
+  );
+
   assert.equal(
     Buffer.from(raw, "utf8").toString("utf8"),
     raw

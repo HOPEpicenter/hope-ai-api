@@ -135,6 +135,46 @@ async function run(): Promise<void> {
   assert.equal(syntheticAppends, 1);
   assert.deepEqual(await failingRepository.listAll(), []);
 
+  // Characterize an invalid Entra binding after synthetic external success.
+  let invalidBindingSends = 0;
+  let invalidBindingAppends = 0;
+
+  const invalidBindingRepository = {
+    async listAll(): Promise<StaffEvent[]> {
+      return [];
+    },
+    async append(_event: StaffEvent): Promise<void> {
+      invalidBindingAppends += 1;
+    }
+  };
+
+  const invalidBindingResult = await createStaffInvitation(
+    {
+      displayName: "Synthetic Invalid Binding",
+      email: "invalid-binding@example.invalid",
+      actorId: "synthetic-admin"
+    },
+    {
+      repository: invalidBindingRepository as any,
+      sendInvitation: async () => {
+        invalidBindingSends += 1;
+        return {
+          entraTenantId: "SYNTHETIC_INVALID_ENTRA_BINDING",
+          entraObjectId: "not-a-valid-object-id"
+        };
+      }
+    }
+  );
+
+  assert.deepEqual(invalidBindingResult, {
+    accepted: false,
+    status: 502,
+    error: "Microsoft invitation returned an invalid Staff identity"
+  });
+  assert.equal(invalidBindingSends, 1);
+  assert.equal(invalidBindingAppends, 0);
+  assert.deepEqual(await invalidBindingRepository.listAll(), []);
+
   console.log("createStaffInvitation.test.ts passed");
 }
 

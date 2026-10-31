@@ -12,7 +12,10 @@ import {
 export async function handlePhase4AggregationRead(
   context: any,
   req: any,
-  select: (aggregate: any) => Record<string, unknown>
+  select: (aggregate: any) => Record<string, unknown>,
+  dependencies: {
+    readAggregate?: typeof readPhase4Aggregate;
+  } = {}
 ): Promise<void> {
   const requestId = getRequestId(req);
 
@@ -37,7 +40,7 @@ export async function handlePhase4AggregationRead(
       return;
     }
 
-    const aggregate = await readPhase4Aggregate(visitorId);
+    const aggregate = await (dependencies.readAggregate ?? readPhase4Aggregate)(visitorId);
 
     context.res = {
       status: 200,

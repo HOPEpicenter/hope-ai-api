@@ -255,6 +255,12 @@ jobs:
           npx ts-node tests/communications/postMinistryEmailEventWebhook.test.ts
           npx ts-node tests/followups/confirmHistoricalSixWeekCareOutcome.test.ts
 
+      - name: Person 360 HTTP authorization regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npx --no-install ts-node tests/authorization/person360HttpAuthorization.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Public health/version security regressions
         shell: pwsh
         run: |

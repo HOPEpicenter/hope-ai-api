@@ -255,6 +255,13 @@ jobs:
           npx ts-node tests/communications/postMinistryEmailEventWebhook.test.ts
           npx ts-node tests/followups/confirmHistoricalSixWeekCareOutcome.test.ts
 
+      - name: Public health/version security regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npx --no-install ts-node tests/authorization/publicHealthVersionHttpContract.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Visitor provenance regressions
         shell: pwsh
         run: |

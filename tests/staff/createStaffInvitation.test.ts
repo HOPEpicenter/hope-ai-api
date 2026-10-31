@@ -175,6 +175,64 @@ async function run(): Promise<void> {
   assert.equal(invalidBindingAppends, 0);
   assert.deepEqual(await invalidBindingRepository.listAll(), []);
 
+  // Characterize external success followed by an existing Entra binding.
+  const conflictTenantId = "783ef4b1-7e96-4a71-80dd-06865b015da9";
+  const conflictObjectId = "c1717a19-c719-4ed2-8b72-e013800095de";
+  const conflictExistingEvent: StaffEvent = {
+    eventId: "synthetic-existing-event",
+    staffId: "synthetic-existing-staff",
+    type: "staff.created",
+    occurredAt: "2026-10-31T12:00:00.000Z",
+    actorId: "synthetic-admin",
+    data: {
+      displayName: "Synthetic Existing Staff",
+      status: "active",
+      entraTenantId: conflictTenantId,
+      entraObjectId: conflictObjectId
+    }
+  };
+  const conflictEvents: StaffEvent[] = [conflictExistingEvent];
+  let conflictSends = 0;
+  let conflictAppends = 0;
+
+  const conflictRepository = {
+    async listAll(): Promise<StaffEvent[]> {
+      return [...conflictEvents];
+    },
+    async append(event: StaffEvent): Promise<void> {
+      conflictAppends += 1;
+      conflictEvents.push(event);
+    }
+  };
+
+  const conflictBefore = await conflictRepository.listAll();
+  const conflictResult = await createStaffInvitation(
+    {
+      displayName: "SYNTHETIC_EXISTING_BINDING_CONFLICT",
+      email: "existing-conflict@example.invalid",
+      actorId: "synthetic-admin"
+    },
+    {
+      repository: conflictRepository as any,
+      sendInvitation: async () => {
+        conflictSends += 1;
+        return {
+          entraTenantId: conflictTenantId.toUpperCase(),
+          entraObjectId: conflictObjectId.toUpperCase()
+        };
+      }
+    }
+  );
+
+  assert.deepEqual(conflictResult, {
+    accepted: false,
+    status: 409,
+    error: "Microsoft identity is already bound to a Staff identity"
+  });
+  assert.equal(conflictSends, 1);
+  assert.equal(conflictAppends, 0);
+  assert.deepEqual(await conflictRepository.listAll(), conflictBefore);
+
   console.log("createStaffInvitation.test.ts passed");
 }
 

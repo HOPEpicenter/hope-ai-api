@@ -93,6 +93,48 @@ async function run(): Promise<void> {
   });
   assert.equal(senderCalled, false);
 
+  // Characterize external success followed by a failed canonical append.
+  let syntheticSends = 0;
+  let syntheticAppends = 0;
+
+  const failingRepository = {
+    async listAll(): Promise<StaffEvent[]> {
+      return [];
+    },
+    async append(_event: StaffEvent): Promise<void> {
+      syntheticAppends += 1;
+      throw new Error("SYNTHETIC_STAFF_APPEND_FAILURE");
+    }
+  };
+
+  await assert.rejects(
+    createStaffInvitation(
+      {
+        displayName: "Synthetic Invitee",
+        email: "synthetic@example.invalid",
+        actorId: "synthetic-admin"
+      },
+      {
+        repository: failingRepository as any,
+        sendInvitation: async () => {
+          syntheticSends += 1;
+          return {
+            entraTenantId: "783ef4b1-7e96-4a71-80dd-06865b015da9",
+            entraObjectId: "c1717a19-c719-4ed2-8b72-e013800095de"
+          };
+        },
+        newStaffId: () => "synthetic-staff",
+        newEventId: () => "synthetic-event",
+        now: () => "2026-10-31T12:00:00.000Z"
+      }
+    ),
+    /SYNTHETIC_STAFF_APPEND_FAILURE/
+  );
+
+  assert.equal(syntheticSends, 1);
+  assert.equal(syntheticAppends, 1);
+  assert.deepEqual(await failingRepository.listAll(), []);
+
   console.log("createStaffInvitation.test.ts passed");
 }
 

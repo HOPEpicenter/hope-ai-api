@@ -315,6 +315,7 @@ async function run(): Promise<void> {
   {
     const c = context();
     let normalizes = 0;
+    let persists = 0;
 
     await postMinistryEmailResendEventWebhook(
       c.value,
@@ -348,6 +349,10 @@ async function run(): Promise<void> {
               "INVALID_WEBHOOK_SIGNATURE"
           };
         },
+        persist: async () => {
+          persists += 1;
+          throw new Error("invalid signature must not persist");
+        },
         normalize: () => {
           normalizes += 1;
           throw new Error(
@@ -359,6 +364,7 @@ async function run(): Promise<void> {
 
     assert.equal(c.value.res.status, 403);
     assert.equal(normalizes, 0);
+    assert.equal(persists, 0);
   }
 
   {

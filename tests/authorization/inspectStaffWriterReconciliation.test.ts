@@ -578,6 +578,121 @@ async function main(): Promise<void> {
   assert.equal(invitation.contractEvaluation.status, "pending");
   assertNonAuthorizing(invitation);
 
+  // D6_INVITATION_OUTCOME_REGRESSION: read-only evidence classifications.
+  const invitationOutcomeCases: readonly {
+    name: string;
+    read: StaffReconciliationRead<StaffInvitationOutcomeObservation>;
+    missingEvidence?: string;
+    unavailableSource?: Awaited<
+      ReturnType<typeof inspectStaffWriterReconciliation>
+    >["unavailableSources"][number];
+    uncertainSource?: Awaited<
+      ReturnType<typeof inspectStaffWriterReconciliation>
+    >["uncertainSources"][number];
+  }[] = [
+    {
+      name: "missing invitation outcome",
+      read: { status: "missing" },
+      missingEvidence: "invitation_outcome"
+    },
+    {
+      name: "empty invitation outcome observation",
+      read: { status: "observed", records: [] },
+      missingEvidence: "invitation_outcome"
+    },
+    {
+      name: "duplicate invitation outcome observations",
+      read: {
+        status: "observed",
+        records: [
+          { operationId: request.operationId, outcome: "succeeded" },
+          { operationId: request.operationId, outcome: "failed" }
+        ]
+      },
+      missingEvidence: "invitation_outcome.ambiguous"
+    },
+    {
+      name: "mismatched invitation operation",
+      read: {
+        status: "observed",
+        records: [{
+          operationId: "different-invitation-operation",
+          outcome: "succeeded"
+        }]
+      },
+      missingEvidence: "invitation_outcome.operationId"
+    },
+    {
+      name: "uncertain invitation acknowledgement",
+      read: { status: "uncertain" },
+      uncertainSource: "invitation_outcome"
+    },
+    {
+      name: "unavailable invitation outcome source",
+      read: { status: "unavailable" },
+      unavailableSource: "invitation_outcome"
+    }
+  ];
+
+  for (const scenario of invitationOutcomeCases) {
+    const result = await inspectStaffWriterReconciliation(
+      invitationRequest,
+      {
+        ...makeReaders({ invitations: scenario.read }),
+        async readStaffEvents() {
+          return { status: "missing" };
+        },
+        async readStaffProjections() {
+          return { status: "missing" };
+        }
+      }
+    );
+
+    assertNonAuthorizing(result);
+
+    if (scenario.missingEvidence) {
+      assert.ok(
+        result.missingEvidence.includes(scenario.missingEvidence),
+        scenario.name
+      );
+    }
+
+    if (scenario.unavailableSource) {
+      assert.ok(
+        result.unavailableSources.includes(scenario.unavailableSource),
+        scenario.name
+      );
+      assert.equal(result.status, "unavailable", scenario.name);
+    }
+
+    if (scenario.uncertainSource) {
+      assert.ok(
+        result.uncertainSources.includes(scenario.uncertainSource),
+        scenario.name
+      );
+      assert.equal(result.status, "uncertain", scenario.name);
+    }
+  }
+
+  const readersWithInvitation = makeReaders();
+  const {
+    readInvitationOutcomes: omittedInvitationReader,
+    ...readersWithoutInvitation
+  } = readersWithInvitation;
+
+  assert.equal(typeof omittedInvitationReader, "function");
+
+  const absentInvitationReader = await inspectStaffWriterReconciliation(
+    invitationRequest,
+    readersWithoutInvitation
+  );
+
+  assert.ok(
+    absentInvitationReader.missingEvidence.includes(
+      "invitation_outcome.reader"
+    )
+  );
+  assertNonAuthorizing(absentInvitationReader);
   let attemptedWrites = 0;
   const readOnlyReaders = makeReaders({
     onRead: () => { attemptedWrites += 1; }

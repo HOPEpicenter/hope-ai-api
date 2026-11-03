@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { types } from "node:util";
 import type { TableClient } from "@azure/data-tables";
+import type { ProtectedInvitationAuditActorResult } from "../services/staff/resolveProtectedInvitationAuditActor";
 import type {
   InvitationAuditEvent,
   InvitationAuditRecorder
@@ -112,10 +113,87 @@ function validatedEvent(
   }
 }
 
+type BoundActor = Readonly<{
+  canonicalStaffId: string;
+  actorCorrelationId: string;
+}>;
+
+/**
+ * An attribution claim supplied by trusted backend composition.
+ * This check cannot independently authenticate a caller or token.
+ * Neither a valid shape nor an injected dependency grants authority.
+ */
+function validatedBinding(input: unknown): BoundActor | null {
+  try {
+    if (
+      input === null ||
+      typeof input !== "object" ||
+      types.isProxy(input)
+    ) return null;
+
+    function data(key: string): unknown {
+      const descriptor = Object.getOwnPropertyDescriptor(
+        input, key
+      );
+      if (!descriptor || !("value" in descriptor)) {
+        throw new Error("Invalid actor binding");
+      }
+      return descriptor.value;
+    }
+
+    if (
+      data("status") !== "authenticated_admin_bound" ||
+      data("authoritative") !== false ||
+      data("storageAccessPermitted") !== false ||
+      data("invitationExecutionPermitted") !== false ||
+      data("retryPermitted") !== false ||
+      data("productionRolloutPermitted") !== false
+    ) return null;
+
+    const actor = data("actor");
+
+    if (
+      actor === null ||
+      typeof actor !== "object" ||
+      types.isProxy(actor)
+    ) return null;
+
+    function actorData(key: string): unknown {
+      const descriptor = Object.getOwnPropertyDescriptor(
+        actor, key
+      );
+      if (!descriptor || !("value" in descriptor)) {
+        throw new Error("Invalid actor identity");
+      }
+      return descriptor.value;
+    }
+
+    const canonicalStaffId = actorData("canonicalStaffId");
+    const actorCorrelationId = actorData("actorCorrelationId");
+
+    if (
+      typeof canonicalStaffId !== "string" ||
+      canonicalStaffId.length === 0 ||
+      canonicalStaffId.length > 128 ||
+      canonicalStaffId.trim() !== canonicalStaffId ||
+      /[\u0000-\u001f\u007f]/.test(canonicalStaffId) ||
+      typeof actorCorrelationId !== "string" ||
+      !actorIdPattern.test(actorCorrelationId)
+    ) return null;
+
+    return Object.freeze({
+      canonicalStaffId,
+      actorCorrelationId
+    });
+  } catch {
+    return null;
+  }
+}
 export class StaffInvitationAuditTableRecorderPrototype
   implements InvitationAuditRecorder {
   constructor(
-    private readonly table: Pick<TableClient, "createEntity">
+    private readonly table: Pick<TableClient, "createEntity">,
+    private readonly binding?: ProtectedInvitationAuditActorResult
   ) {}
 
   /**
@@ -129,6 +207,17 @@ export class StaffInvitationAuditTableRecorderPrototype
 
     if (!event) {
       throw new Error("Invitation audit event rejected");
+    }
+
+    const binding = this.binding === undefined
+      ? null
+      : validatedBinding(this.binding);
+
+    if (
+      this.binding !== undefined &&
+      (!binding || binding.actorCorrelationId !== event.actorCorrelationId)
+    ) {
+      throw new Error("Invitation audit actor binding rejected");
     }
 
     const eventId = randomUUID();
@@ -146,7 +235,8 @@ export class StaffInvitationAuditTableRecorderPrototype
         phase: event.phase,
         status: event.status,
         operationId: event.operationId,
-        actorCorrelationId: event.actorCorrelationId
+        actorCorrelationId: event.actorCorrelationId,
+        ...(binding ? { canonicalStaffId: binding.canonicalStaffId } : {})
       });
     } catch {
       // Never expose storage SDK details or infer retry safety.

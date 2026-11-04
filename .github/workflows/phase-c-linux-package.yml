@@ -128,6 +128,119 @@ jobs:
           "PACKAGE_ZIP=$zip" | Out-File `
             -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      - name: Network-isolated full-host smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          stage="$RUNNER_TEMP/hope-phase-c-linux-package"
+          image="mcr.microsoft.com/azure-functions/node:4-node22"
+          emulator="$RUNNER_TEMP/hope-phase-c-azurite"
+          az_container="hope-phase-c-azurite"
+          fn_container="hope-phase-c-host-smoke"
+
+          test -f "$stage/host.json"
+          test -f "$stage/phase-c-functions-bootstrap.cjs"
+
+          count=$(find "$stage" -mindepth 2 -maxdepth 2 -name function.json | wc -l)
+          test "$count" -eq 81
+
+          mkdir -p "$emulator"
+          npm install --prefix "$emulator" --no-save --no-audit --no-fund azurite@3
+
+          docker pull "$image"
+          docker pull node:22
+
+          cleanup() {
+            echo "=== ISOLATED FUNCTIONS HOST LOGS ==="
+            docker logs "$fn_container" --tail 100 2>&1 || true
+            echo "=== ISOLATED AZURITE LOGS ==="
+            docker logs "$az_container" --tail 40 2>&1 || true
+            docker rm -f "$fn_container" >/dev/null 2>&1 || true
+            docker rm -f "$az_container" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          echo "Starting isolated local Azurite..."
+
+          docker run -d \
+            --name "$az_container" \
+            --network none \
+            -v "$emulator:/opt/hope-azurite:ro" \
+            node:22 \
+            node /opt/hope-azurite/node_modules/azurite/dist/src/azurite.js \
+            --silent \
+            --location /tmp/hope-azurite-data \
+            --blobHost 127.0.0.1 \
+            --queueHost 127.0.0.1 \
+            --tableHost 127.0.0.1
+
+          ready=0
+
+          for attempt in $(seq 1 30); do
+            if docker exec "$az_container" node -e '
+              fetch("http://127.0.0.1:10000/")
+                .then(() => process.exit(0))
+                .catch(() => process.exit(1));
+            ' >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            echo "Azurite did not become ready."
+            exit 1
+          fi
+
+          echo "PASS: isolated Azurite is responding."
+
+          echo "Starting Functions host with shared isolated loopback..."
+
+          docker run -d \
+            --name "$fn_container" \
+            --network "container:$az_container" \
+            -e AzureWebJobsStorage=UseDevelopmentStorage=true \
+            -e FUNCTIONS_WORKER_RUNTIME=node \
+            -e AzureWebJobsSecretStorageType=files \
+            -e AzureWebJobsDisableHomepage=true \
+            -v "$stage:/home/site/wwwroot:ro" \
+            "$image"
+
+          echo "Checking health and version through isolated loopback..."
+
+          success=0
+
+          for attempt in $(seq 1 60); do
+            if docker exec "$fn_container" node -e '
+              (async () => {
+                for (const name of ["health", "version"]) {
+                  const response = await fetch(
+                    `http://127.0.0.1:80/api/${name}`,
+                    { signal: AbortSignal.timeout(2000) }
+                  );
+                  if (!response.ok) process.exit(1);
+                  await response.json();
+                }
+              })().catch(() => process.exit(1));
+            ' >/dev/null 2>&1; then
+              success=1
+              break
+            fi
+
+            sleep 2
+          done
+
+          if [ "$success" -ne 1 ]; then
+            echo "Full-host smoke acceptance not established."
+            exit 1
+          fi
+
+          echo "PASS: full package host returned health and version JSON."
+          echo "PASS: both containers share network-none isolation."
+          echo "NOTE: remaining handlers were not invoked."
+
       - name: Upload build artifact only
         uses: actions/upload-artifact@v4
         with:

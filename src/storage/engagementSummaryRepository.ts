@@ -1,3 +1,4 @@
+import { createHopeTableClient } from "../shared/storage/createHopeTableClient";
 import { TableClient } from "@azure/data-tables";
 import { resolveStorageConnectionString } from "../shared/storage/resolveStorageConnectionString";
 import {
@@ -99,8 +100,12 @@ export class EngagementSummaryRepository {
   private readonly client: TableClient;
 
   constructor(client?: TableClient) {
-    const cs = getConnectionString();
-    if (!cs) {
+    const mode = process.env.HOPE_TABLE_AUTH_MODE?.trim() || "connection-string";
+    if (mode !== "connection-string" && mode !== "managed-identity") {
+      throw new Error("Unsupported Table Storage authentication mode.");
+    }
+    const cs = mode === "managed-identity" ? "" : getConnectionString();
+    if (mode === "connection-string" && !cs) {
       throw new Error(
         "Missing STORAGE_CONNECTION_STRING or AzureWebJobsStorage for Table Storage."
       );
@@ -108,8 +113,11 @@ export class EngagementSummaryRepository {
 
     this.client =
       client ??
-      TableClient.fromConnectionString(cs, getSummariesTableName(), {
-        allowInsecureConnection: true,
+      createHopeTableClient(getSummariesTableName(), {
+        mode: mode as "connection-string" | "managed-identity",
+        connectionString: mode === "connection-string" ? cs : undefined,
+        endpoint: process.env.HOPE_TABLE_ENDPOINT,
+        managedIdentityClientId: process.env.HOPE_TABLE_MANAGED_IDENTITY_CLIENT_ID
       });
   }
 

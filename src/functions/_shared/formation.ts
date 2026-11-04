@@ -1,3 +1,4 @@
+import { getTableClient as getHopeTableClient } from "./tableClient";
 import { compareTimelineNewestFirst } from "../../shared/timeline/timelineOrdering";
 import { TableClient } from "@azure/data-tables";
 import { getFormationEventV1TableClient } from "./formationEventV1TableClient";
@@ -317,11 +318,7 @@ export function getFormationEventsTableClient(): TableClient {
 }
 
 export function getFormationProfilesTableClient(): TableClient {
-  const conn = getConnString();
-  if (!conn) {
-    throw new Error("Missing STORAGE_CONNECTION_STRING (or AzureWebJobsStorage).");
-  }
-  return TableClient.fromConnectionString(conn, FORMATION_PROFILES_TABLE);
+  return getHopeTableClient(FORMATION_PROFILES_TABLE);
 }
 
 export async function ensureTable(client: TableClient): Promise<void> {

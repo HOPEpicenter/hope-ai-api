@@ -43,14 +43,14 @@ function getClient(connectionString: string): TableClient {
   // makeTableClient will apply tableName(...) internally in your shared helper
   // but we keep legacy behavior safe by passing the logical name only.
   const logical = getAutomationRunsLogicalName();
-  return makeTableClient(connectionString, logical);
+  return makeTableClient(process.env.HOPE_TABLE_AUTH_MODE?.trim() === "managed-identity" ? "" : connectionString, logical);
 }
 
 export async function writeAutomationRun(record: AutomationRunRecord): Promise<void> {
   const connectionString = process.env.STORAGE_CONNECTION_STRING;
-  if (!connectionString) throw new Error("Missing STORAGE_CONNECTION_STRING");
+  if (!connectionString && !(process.env.HOPE_TABLE_AUTH_MODE?.trim() === "managed-identity")) throw new Error("Missing STORAGE_CONNECTION_STRING");
 
-  const client = getClient(connectionString);
+  const client = getClient(connectionString ?? "");
   await ensureTableExists(client);
 
   const entity: any = {
@@ -102,7 +102,7 @@ export async function cleanupAutomationRuns(args: {
   note?: string;
 }> {
   const connectionString = process.env.STORAGE_CONNECTION_STRING;
-  if (!connectionString) throw new Error("Missing STORAGE_CONNECTION_STRING");
+  if (!connectionString && !(process.env.HOPE_TABLE_AUTH_MODE?.trim() === "managed-identity")) throw new Error("Missing STORAGE_CONNECTION_STRING");
 
   const retentionDays = Number(args.retentionDays);
   const maxDelete = Number(args.maxDelete);
@@ -113,7 +113,7 @@ export async function cleanupAutomationRuns(args: {
   const cutoffMs = Date.now() - safeRetentionDays * 24 * 60 * 60 * 1000;
   const cutoffIso = new Date(cutoffMs).toISOString();
 
-  const client = getClient(connectionString);
+  const client = getClient(connectionString ?? "");
   await ensureTableExists(client);
 
   const filter = `PartitionKey eq '${AUTOMATION_RUNS_PARTITION_KEY}' and startedAt lt '${cutoffIso}'`;

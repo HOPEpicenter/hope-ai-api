@@ -1,3 +1,4 @@
+import { getTableClient as getHopeTableClient } from "../_shared/tableClient";
 import { randomUUID } from "crypto";
 import { TableClient } from "@azure/data-tables";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
@@ -113,7 +114,7 @@ export default async function (context: any, req: any): Promise<void> {
     const conn =
       (process.env.STORAGE_CONNECTION_STRING ?? "").trim();
 
-    if (!conn) {
+    if (!conn && process.env.HOPE_TABLE_AUTH_MODE?.trim() !== "managed-identity") {
       context.res = {
         status: 500,
         body: {
@@ -132,10 +133,10 @@ export default async function (context: any, req: any): Promise<void> {
       (process.env.FORMATION_PROFILES_TABLE ?? "devFormationProfiles").trim();
 
     const eventsTable =
-      TableClient.fromConnectionString(conn, eventsTableName);
+      getHopeTableClient(eventsTableName);
 
     const profilesTable =
-      TableClient.fromConnectionString(conn, profilesTableName);
+      getHopeTableClient(profilesTableName);
 
     await ensureTableExists(eventsTable);
     await ensureTableExists(profilesTable);

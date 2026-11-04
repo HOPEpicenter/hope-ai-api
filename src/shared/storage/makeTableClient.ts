@@ -1,4 +1,5 @@
-﻿import { TableClient } from "@azure/data-tables";
+import { TableClient } from "@azure/data-tables";
+import { createHopeTableClient } from "./createHopeTableClient";
 
 /**
  * Central place to create TableClient.
@@ -9,18 +10,23 @@
  * versions do not export it. We pass options as `any`.
  */
 export function makeTableClient(connectionString: string, tableName: string): TableClient {
-  if (!connectionString) throw new Error("makeTableClient: connectionString is required");
-  if (!tableName) throw new Error("makeTableClient: tableName is required");
+  const mode = process.env.HOPE_TABLE_AUTH_MODE?.trim() || "connection-string";
 
-  const isAzurite =
-    /UseDevelopmentStorage=true/i.test(connectionString) ||
-    /devstoreaccount1/i.test(connectionString) ||
-    /127\.0\.0\.1/i.test(connectionString) ||
-    /localhost/i.test(connectionString);
+  if (mode === "managed-identity") {
+    return createHopeTableClient(tableName, {
+      mode,
+      connectionString: connectionString || undefined,
+      endpoint: process.env.HOPE_TABLE_ENDPOINT,
+      managedIdentityClientId: process.env.HOPE_TABLE_MANAGED_IDENTITY_CLIENT_ID
+    });
+  }
 
-  // Some environments/libs require allowInsecureConnection for Azurite (http).
-  const options: any = isAzurite ? { allowInsecureConnection: true } : undefined;
+  if (mode !== "connection-string") {
+    throw new Error("Unsupported Table Storage authentication mode.");
+  }
 
-  // @azure/data-tables: TableClient.fromConnectionString(connectionString, tableName, options?)
-  return TableClient.fromConnectionString(connectionString, tableName, options);
+  return createHopeTableClient(tableName, {
+    mode: "connection-string",
+    connectionString
+  });
 }

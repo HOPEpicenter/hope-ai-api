@@ -26,7 +26,7 @@ function getProfilesTableName(): string {
 }
 
 export function getFormationProfilesTableClient(connectionString: string): TableClient {
-  return makeTableClient(connectionString, getProfilesTableName());
+  return makeTableClient(process.env.HOPE_TABLE_AUTH_MODE?.trim() === "managed-identity" ? "" : connectionString, getProfilesTableName());
 }
 
 export async function getFormationProfileEntity(

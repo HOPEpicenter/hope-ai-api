@@ -1,3 +1,4 @@
+import { getTableClient as getHopeTableClient } from "../_shared/tableClient";
 import { TableClient } from "@azure/data-tables";
 import { readCanonicalOpsFollowupsNarrative } from "../../services/followups/readCanonicalOpsFollowupsNarrative";
 import { normalizeOpsFollowupsQuery, readQueryValue } from "../../services/followups/opsFollowupsQuery";
@@ -39,7 +40,7 @@ export default async function (context: any, req: any): Promise<void> {
     }
 
     const conn = (process.env.STORAGE_CONNECTION_STRING ?? "").trim();
-    if (!conn) {
+    if (!conn && process.env.HOPE_TABLE_AUTH_MODE?.trim() !== "managed-identity") {
       context.res = {
         status: 500,
         body: { ok: false, error: "Server missing STORAGE_CONNECTION_STRING" }
@@ -50,8 +51,8 @@ export default async function (context: any, req: any): Promise<void> {
     const eventsTableName = (process.env.FORMATION_EVENTS_TABLE ?? "devFormationEvents").trim();
     const profilesTableName = (process.env.FORMATION_PROFILES_TABLE ?? "devFormationProfiles").trim();
 
-    const eventsTable = TableClient.fromConnectionString(conn, eventsTableName);
-    const profilesTable = TableClient.fromConnectionString(conn, profilesTableName);
+    const eventsTable = getHopeTableClient(eventsTableName);
+    const profilesTable = getHopeTableClient(profilesTableName);
 
     await ensureTableExists(eventsTable);
     await ensureTableExists(profilesTable);

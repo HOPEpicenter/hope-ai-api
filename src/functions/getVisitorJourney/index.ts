@@ -1,3 +1,4 @@
+import { getTableClient as getHopeTableClient } from "../_shared/tableClient";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { TableClient } from "@azure/data-tables";
 import { getConnString } from "../_shared/tableClient";
@@ -10,15 +11,11 @@ const ENGAGEMENT_TABLE = process.env.ENGAGEMENT_EVENTS_TABLE || "devEngagementEv
 const FORMATION_PROFILES_TABLE = process.env.FORMATION_PROFILES_TABLE || "devFormationProfiles";
 
 function getEngagementTable(): TableClient {
-  const conn = getConnString();
-  if (!conn) throw new Error("Missing STORAGE_CONNECTION_STRING");
-  return TableClient.fromConnectionString(conn, ENGAGEMENT_TABLE);
+  return getHopeTableClient(ENGAGEMENT_TABLE);
 }
 
 function getFormationProfilesTable(): TableClient {
-  const conn = getConnString();
-  if (!conn) throw new Error("Missing STORAGE_CONNECTION_STRING");
-  return TableClient.fromConnectionString(conn, FORMATION_PROFILES_TABLE);
+  return getHopeTableClient(FORMATION_PROFILES_TABLE);
 }
 
 export async function getVisitorJourney(context: any, req: any): Promise<void> {

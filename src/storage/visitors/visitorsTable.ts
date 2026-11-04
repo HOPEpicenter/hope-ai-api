@@ -10,12 +10,12 @@ export const VISITORS_PARTITION_KEY = "VISITOR";
  */
 export function getVisitorsTableClient(): TableClient {
   const conn = process.env.STORAGE_CONNECTION_STRING;
-  if (!conn) {
+  if (!conn && !(process.env.HOPE_TABLE_AUTH_MODE?.trim() === "managed-identity")) {
     throw new Error(
       "Missing STORAGE_CONNECTION_STRING in App Settings / local.settings.json"
     );
   }
-  return makeTableClient(conn, VISITORS_TABLE);
+  return makeTableClient(process.env.HOPE_TABLE_AUTH_MODE?.trim() === "managed-identity" ? "" : (conn ?? ""), VISITORS_TABLE);
 }
 
 /**

@@ -1,3 +1,4 @@
+import { getTableClient as getHopeTableClient } from "./tableClient";
 import { TableClient } from "@azure/data-tables";
 import { getConnString } from "./tableClient";
 import {
@@ -33,11 +34,7 @@ function escapeOData(value: string): string {
 }
 
 export function getEngagementEventsTableClient(): TableClient {
-  const conn = getConnString();
-  if (!conn) {
-    throw new Error("Missing STORAGE_CONNECTION_STRING (or AzureWebJobsStorage).");
-  }
-  return TableClient.fromConnectionString(conn, ENGAGEMENT_EVENTS_TABLE);
+  return getHopeTableClient(ENGAGEMENT_EVENTS_TABLE);
 }
 
 export async function getLatestEngagementEventByVisitorId(

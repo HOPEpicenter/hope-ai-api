@@ -29,16 +29,16 @@ function resolveStorageConnectionString(explicit?: string): string {
 
 // NOTE: These accept an optional connection string so older call sites compiling with cs args keep working.
 export function getFormationEventsTableClient(connectionString?: string): TableClient {
-  const cs = resolveStorageConnectionString(connectionString);
+  const cs = process.env.HOPE_TABLE_AUTH_MODE?.trim() === "managed-identity" ? "" : resolveStorageConnectionString(connectionString);
   return makeTableClient(cs, FORMATION_EVENTS_TABLE);
 }
 
 export function getFormationProfilesTableClient(connectionString?: string): TableClient {
-  const cs = resolveStorageConnectionString(connectionString);
+  const cs = process.env.HOPE_TABLE_AUTH_MODE?.trim() === "managed-identity" ? "" : resolveStorageConnectionString(connectionString);
   return makeTableClient(cs, FORMATION_PROFILES_TABLE);
 }
 
 export function getAutomationRunsTableClient(connectionString?: string): TableClient {
-  const cs = resolveStorageConnectionString(connectionString);
+  const cs = process.env.HOPE_TABLE_AUTH_MODE?.trim() === "managed-identity" ? "" : resolveStorageConnectionString(connectionString);
   return makeTableClient(cs, AUTOMATION_RUNS_TABLE);
 }

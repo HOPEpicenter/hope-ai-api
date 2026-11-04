@@ -1,0 +1,137 @@
+name: Phase C Linux Package Build Only
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/phase-c-linux-package.yml"
+      - "src/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "host.json"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Compile backend on Linux
+        run: npm run build
+
+      - name: Remove development dependencies
+        run: npm prune --omit=dev --no-audit --no-fund
+
+      - name: Assemble Linux Functions package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path $env:RUNNER_TEMP 'hope-phase-c-linux-package'
+
+          New-Item -ItemType Directory -Path $stage | Out-Null
+
+          foreach ($name in @('host.json', 'package.json')) {
+            Copy-Item -LiteralPath $name -Destination $stage
+          }
+
+          foreach ($name in @('dist', 'node_modules')) {
+            Copy-Item -LiteralPath $name -Destination $stage -Recurse
+          }
+
+          $definitions = @(
+            Get-ChildItem -LiteralPath 'src/functions' -Directory |
+              Where-Object {
+                Test-Path -LiteralPath (
+                  Join-Path $_.FullName 'function.json'
+                ) -PathType Leaf
+              }
+          )
+
+          if ($definitions.Count -ne 81) {
+            throw "Expected 81 functions; found $($definitions.Count)"
+          }
+
+          foreach ($directory in $definitions) {
+            $target = Join-Path $stage $directory.Name
+            New-Item -ItemType Directory -Path $target | Out-Null
+            Copy-Item -LiteralPath (
+              Join-Path $directory.FullName 'function.json'
+            ) -Destination $target
+
+            $metadata = Get-Content (
+              Join-Path $target 'function.json'
+            ) -Raw | ConvertFrom-Json
+
+            $script = [System.IO.Path]::GetFullPath(
+              (Join-Path $target ([string]$metadata.scriptFile))
+            )
+
+            if (-not (Test-Path -LiteralPath $script -PathType Leaf)) {
+              throw "Missing compiled handler: $($directory.Name)"
+            }
+          }
+
+          $bootstrap = Join-Path $stage 'phase-c-functions-bootstrap.cjs'
+          [System.IO.File]::WriteAllText(
+            $bootstrap,
+            "'use strict';`nmodule.exports = {};`n"
+          )
+
+          $manifestPath = Join-Path $stage 'package.json'
+          $manifest = Get-Content $manifestPath -Raw |
+            ConvertFrom-Json -AsHashtable
+
+          $manifest['main'] = 'phase-c-functions-bootstrap.cjs'
+
+          $json = ConvertTo-Json -InputObject $manifest -Depth 50
+          [System.IO.File]::WriteAllText(
+            $manifestPath,
+            $json + "`n"
+          )
+
+          if (Test-Path (
+            Join-Path $stage 'node_modules/nodemon'
+          )) {
+            throw 'Development dependency nodemon remains in package.'
+          }
+
+          if (Test-Path (
+            Join-Path $stage 'local.settings.json'
+          )) {
+            throw 'Local settings must not be packaged.'
+          }
+
+          $zip = Join-Path $env:RUNNER_TEMP 'hope-phase-c-linux.zip'
+          Compress-Archive -Path (Join-Path $stage '*') `
+            -DestinationPath $zip -CompressionLevel Optimal
+
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
+          Write-Host "Linux package SHA256: $hash"
+          Write-Host "Verified functions: $($definitions.Count)"
+
+          "PACKAGE_ZIP=$zip" | Out-File `
+            -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Upload build artifact only
+        uses: actions/upload-artifact@v4
+        with:
+          name: hope-phase-c-linux-package
+          path: ${{ env.PACKAGE_ZIP }}
+          retention-days: 7
+          if-no-files-found: error

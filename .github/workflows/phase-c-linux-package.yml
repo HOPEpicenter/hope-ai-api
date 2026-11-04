@@ -1,0 +1,250 @@
+name: Phase C Linux Package Build Only
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/phase-c-linux-package.yml"
+      - "src/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "host.json"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Compile backend on Linux
+        run: npm run build
+
+      - name: Remove development dependencies
+        run: npm prune --omit=dev --no-audit --no-fund
+
+      - name: Assemble Linux Functions package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path $env:RUNNER_TEMP 'hope-phase-c-linux-package'
+
+          New-Item -ItemType Directory -Path $stage | Out-Null
+
+          foreach ($name in @('host.json', 'package.json')) {
+            Copy-Item -LiteralPath $name -Destination $stage
+          }
+
+          foreach ($name in @('dist', 'node_modules')) {
+            Copy-Item -LiteralPath $name -Destination $stage -Recurse
+          }
+
+          $definitions = @(
+            Get-ChildItem -LiteralPath 'src/functions' -Directory |
+              Where-Object {
+                Test-Path -LiteralPath (
+                  Join-Path $_.FullName 'function.json'
+                ) -PathType Leaf
+              }
+          )
+
+          if ($definitions.Count -ne 81) {
+            throw "Expected 81 functions; found $($definitions.Count)"
+          }
+
+          foreach ($directory in $definitions) {
+            $target = Join-Path $stage $directory.Name
+            New-Item -ItemType Directory -Path $target | Out-Null
+            Copy-Item -LiteralPath (
+              Join-Path $directory.FullName 'function.json'
+            ) -Destination $target
+
+            $metadata = Get-Content (
+              Join-Path $target 'function.json'
+            ) -Raw | ConvertFrom-Json
+
+            $script = [System.IO.Path]::GetFullPath(
+              (Join-Path $target ([string]$metadata.scriptFile))
+            )
+
+            if (-not (Test-Path -LiteralPath $script -PathType Leaf)) {
+              throw "Missing compiled handler: $($directory.Name)"
+            }
+          }
+
+          $bootstrap = Join-Path $stage 'phase-c-functions-bootstrap.cjs'
+          [System.IO.File]::WriteAllText(
+            $bootstrap,
+            "'use strict';`nmodule.exports = {};`n"
+          )
+
+          $manifestPath = Join-Path $stage 'package.json'
+          $manifest = Get-Content $manifestPath -Raw |
+            ConvertFrom-Json -AsHashtable
+
+          $manifest['main'] = 'phase-c-functions-bootstrap.cjs'
+
+          $json = ConvertTo-Json -InputObject $manifest -Depth 50
+          [System.IO.File]::WriteAllText(
+            $manifestPath,
+            $json + "`n"
+          )
+
+          if (Test-Path (
+            Join-Path $stage 'node_modules/nodemon'
+          )) {
+            throw 'Development dependency nodemon remains in package.'
+          }
+
+          if (Test-Path (
+            Join-Path $stage 'local.settings.json'
+          )) {
+            throw 'Local settings must not be packaged.'
+          }
+
+          $zip = Join-Path $env:RUNNER_TEMP 'hope-phase-c-linux.zip'
+          Compress-Archive -Path (Join-Path $stage '*') `
+            -DestinationPath $zip -CompressionLevel Optimal
+
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
+          Write-Host "Linux package SHA256: $hash"
+          Write-Host "Verified functions: $($definitions.Count)"
+
+          "PACKAGE_ZIP=$zip" | Out-File `
+            -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Network-isolated full-host smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          stage="$RUNNER_TEMP/hope-phase-c-linux-package"
+          image="mcr.microsoft.com/azure-functions/node:4-node22"
+          emulator="$RUNNER_TEMP/hope-phase-c-azurite"
+          az_container="hope-phase-c-azurite"
+          fn_container="hope-phase-c-host-smoke"
+
+          test -f "$stage/host.json"
+          test -f "$stage/phase-c-functions-bootstrap.cjs"
+
+          count=$(find "$stage" -mindepth 2 -maxdepth 2 -name function.json | wc -l)
+          test "$count" -eq 81
+
+          mkdir -p "$emulator"
+          npm install --prefix "$emulator" --no-save --no-audit --no-fund azurite@3
+
+          docker pull "$image"
+          docker pull node:22
+
+          cleanup() {
+            echo "=== ISOLATED FUNCTIONS HOST LOGS ==="
+            docker logs "$fn_container" --tail 100 2>&1 || true
+            echo "=== ISOLATED AZURITE LOGS ==="
+            docker logs "$az_container" --tail 40 2>&1 || true
+            docker rm -f "$fn_container" >/dev/null 2>&1 || true
+            docker rm -f "$az_container" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          echo "Starting isolated local Azurite..."
+
+          docker run -d \
+            --name "$az_container" \
+            --network none \
+            -v "$emulator:/opt/hope-azurite:ro" \
+            node:22 \
+            node /opt/hope-azurite/node_modules/azurite/dist/src/azurite.js \
+            --silent \
+            --location /tmp/hope-azurite-data \
+            --blobHost 127.0.0.1 \
+            --queueHost 127.0.0.1 \
+            --tableHost 127.0.0.1
+
+          ready=0
+
+          for attempt in $(seq 1 30); do
+            if docker exec "$az_container" node -e '
+              fetch("http://127.0.0.1:10000/")
+                .then(() => process.exit(0))
+                .catch(() => process.exit(1));
+            ' >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            echo "Azurite did not become ready."
+            exit 1
+          fi
+
+          echo "PASS: isolated Azurite is responding."
+
+          echo "Starting Functions host with shared isolated loopback..."
+
+          docker run -d \
+            --name "$fn_container" \
+            --network "container:$az_container" \
+            -e AzureWebJobsStorage=UseDevelopmentStorage=true \
+            -e FUNCTIONS_WORKER_RUNTIME=node \
+            -e AzureWebJobsSecretStorageType=files \
+            -e AzureWebJobsDisableHomepage=true \
+            -v "$stage:/home/site/wwwroot:ro" \
+            "$image"
+
+          echo "Checking health and version through isolated loopback..."
+
+          success=0
+
+          for attempt in $(seq 1 60); do
+            if docker exec "$fn_container" node -e '
+              (async () => {
+                for (const name of ["health", "version"]) {
+                  const response = await fetch(
+                    `http://127.0.0.1:80/api/${name}`,
+                    { signal: AbortSignal.timeout(2000) }
+                  );
+                  if (!response.ok) process.exit(1);
+                  await response.json();
+                }
+              })().catch(() => process.exit(1));
+            ' >/dev/null 2>&1; then
+              success=1
+              break
+            fi
+
+            sleep 2
+          done
+
+          if [ "$success" -ne 1 ]; then
+            echo "Full-host smoke acceptance not established."
+            exit 1
+          fi
+
+          echo "PASS: full package host returned health and version JSON."
+          echo "PASS: both containers share network-none isolation."
+          echo "NOTE: remaining handlers were not invoked."
+
+      - name: Upload build artifact only
+        uses: actions/upload-artifact@v4
+        with:
+          name: hope-phase-c-linux-package
+          path: ${{ env.PACKAGE_ZIP }}
+          retention-days: 7
+          if-no-files-found: error

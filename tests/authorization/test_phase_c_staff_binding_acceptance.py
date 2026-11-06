@@ -89,6 +89,9 @@ class FakeRawSocket:
 
 
 class FakeTLSContext:
+    verify_mode = ssl.CERT_REQUIRED
+    check_hostname = True
+
     def wrap_socket(self, raw_socket, server_hostname):
         events["server_hostname"] = server_hostname
         return raw_socket

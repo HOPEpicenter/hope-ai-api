@@ -163,6 +163,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Atomic Staff deactivation prototype regression failed"
           }
+          npx --no-install ts-node tests/staff/staffEventsMetadataCompatibility.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "StaffEvents metadata compatibility regression failed"
+          }
+          npx --no-install ts-node tests/staff/staffScopedAtomicDeactivation.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff-scoped atomic deactivation unit regression failed"
+          }
           npx ts-node tests/authorization/classifyStaffSecurityMutation.test.ts
           if ($LASTEXITCODE -ne 0) {
             throw "Staff security mutation classifier tests failed"
@@ -466,6 +474,12 @@ jobs:
             }
 
             Write-Host "[PASS] Atomic StaffEvent transition prototype Azurite test"
+
+            npx --no-install ts-node tests/staff/staffScopedAtomicDeactivationAzurite.test.ts
+            if ($LASTEXITCODE -ne 0) {
+              throw "Staff-scoped canonical deactivation Azurite test failed"
+            }
+            Write-Host "[PASS] Staff-scoped canonical deactivation Azurite test"
 
             $env:HOPE_ASSIGNMENT_AZURITE_TABLE_PORT = "11002"
             npx --no-install ts-node tests/authorization/formationAssignmentLedgerStorageAzurite.test.ts

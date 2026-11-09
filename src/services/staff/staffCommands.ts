@@ -16,10 +16,23 @@ import {
   readCanonicalStaffIdentityByEntraBinding
 } from "./readCanonicalStaffDirectory";
 
+import type {
+  StaffScopedAtomicResult
+} from "../../repositories/staffScopedAtomicDeactivation";
+
 type StaffEventWriter = Pick<StaffEventsRepository, "append">;
 
 export type StaffCommandDependencies = {
   repository?: StaffEventsRepository;
+
+  /**
+   * Isolated deactivation participation seam.
+   * Not connected to production settings or OAuth execution.
+   */
+  atomicDeactivationEnabled?: boolean;
+  atomicDeactivation?: (
+    event: StaffEvent
+  ) => Promise<StaffScopedAtomicResult>;
   now?: () => string;
   newEventId?: () => string;
   newStaffId?: () => string;
@@ -422,6 +435,71 @@ export async function updateStaffIdentity(
     data
   });
 
+  if (
+    type === "staff.deactivated" &&
+    dependencies.atomicDeactivationEnabled === true
+  ) {
+    // Never fall back to the legacy append when participation
+    // is explicitly selected, including uncertain commits.
+    if (typeof dependencies.atomicDeactivation !== "function") {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Atomic Staff deactivation writer unavailable"
+      };
+    }
+
+    let decision: StaffScopedAtomicResult;
+
+    try {
+      decision = await dependencies.atomicDeactivation(event);
+    } catch {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Atomic Staff deactivation outcome uncertain"
+      };
+    }
+
+    if (
+      !decision ||
+      decision.executionPermitted !== false ||
+      decision.retryPermitted !== false ||
+      decision.productionWriterFenced !== false
+    ) {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Atomic Staff deactivation result invalid"
+      };
+    }
+
+    if (decision.status === "denied") {
+      return {
+        accepted: false,
+        status: 409,
+        error: "Atomic Staff deactivation denied"
+      };
+    }
+
+    if (decision.status !== "committed") {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Atomic Staff deactivation outcome uncertain"
+      };
+    }
+
+    // The injected atomic writer has acknowledged the event.
+    // Never append the same event a second time.
+    // This does not grant OAuth execution or prove fencing.
+    return {
+      accepted: true,
+      eventId: event.eventId,
+      staffId: event.staffId,
+      type: event.type
+    };
+  }
   await (repository as StaffEventWriter).append(event);
 
   return {

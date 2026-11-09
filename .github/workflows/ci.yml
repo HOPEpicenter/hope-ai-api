@@ -171,6 +171,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Staff-scoped atomic deactivation unit regression failed"
           }
+          npx --no-install ts-node tests/staff/staffDeactivationParticipation.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff deactivation participation regression failed"
+          }
           npx ts-node tests/authorization/classifyStaffSecurityMutation.test.ts
           if ($LASTEXITCODE -ne 0) {
             throw "Staff security mutation classifier tests failed"

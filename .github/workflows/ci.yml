@@ -171,6 +171,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Staff-scoped atomic deactivation unit regression failed"
           }
+          npx --no-install ts-node tests/staff/staffScopedAtomicMutation.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Shared Staff mutation unit regression failed"
+          }
           npx --no-install ts-node tests/staff/staffDeactivationParticipation.test.ts
           if ($LASTEXITCODE -ne 0) {
             throw "Staff deactivation participation regression failed"
@@ -484,6 +488,11 @@ jobs:
               throw "Staff-scoped canonical deactivation Azurite test failed"
             }
             Write-Host "[PASS] Staff-scoped canonical deactivation Azurite test"
+            npx --no-install ts-node tests/staff/staffScopedMutationConcurrencyAzurite.test.ts
+            if ($LASTEXITCODE -ne 0) {
+              throw "Shared Staff mutation Azurite concurrency proof failed"
+            }
+            Write-Host "[PASS] Shared Staff mutation Azurite concurrency proof"
 
             $env:HOPE_ASSIGNMENT_AZURITE_TABLE_PORT = "11002"
             npx --no-install ts-node tests/authorization/formationAssignmentLedgerStorageAzurite.test.ts

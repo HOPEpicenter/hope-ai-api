@@ -151,6 +151,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Custody atomic adapter tests failed" }
           npx --no-install ts-node tests/authorization/inspectCustodyAtomicBoundary.test.ts
           if ($LASTEXITCODE -ne 0) { throw "Custody boundary regressions failed" }
+          npx --no-install ts-node tests/authorization/inspectTokenCustodyReceiptReconciliation.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Custody receipt evaluator regressions failed" }
+          npx --no-install ts-node tests/authorization/readTokenCustodyReceiptReconciliation.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Custody receipt reader regressions failed" }
           npx ts-node tests/authorization/inspectOAuthCoordinationParticipation.test.ts
           npx ts-node tests/authorization/modelStaffOAuthCoordinationGap.test.ts
           npx ts-node tests/authorization/oauthEnforceableStaffCoordination.test.ts

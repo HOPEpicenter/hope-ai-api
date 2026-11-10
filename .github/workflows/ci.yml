@@ -255,6 +255,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Staff writer transition integration regressions failed"
           }
+          npx --no-install ts-node tests/authorization/staffWriterRuntimeEnforcement.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff runtime enforcement regression failed: tests/authorization/staffWriterRuntimeEnforcement.test.ts"
+          }
+          npx --no-install ts-node tests/authorization/staffWriterHttpEnforcement.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff runtime enforcement regression failed: tests/authorization/staffWriterHttpEnforcement.test.ts"
+          }
+          npx --no-install ts-node tests/authorization/staffWriterAdminHttpEnforcement.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff runtime enforcement regression failed: tests/authorization/staffWriterAdminHttpEnforcement.test.ts"
+          }
           npx ts-node tests/authorization/staffWriterBypassEvidence.test.ts
           if ($LASTEXITCODE -ne 0) {
             throw "Staff writer bypass inventory evidence tests failed"

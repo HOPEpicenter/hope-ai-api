@@ -1,3 +1,4 @@
+import { readStaffWriterRuntimeEnforcement } from "../../config/staffWriterRuntimeEnforcement";
 import { getFeatureFlags } from "../../config/featureFlags";
 import {
   createStaffInvitation
@@ -53,6 +54,22 @@ export async function postStaffInvitation(
       return;
     }
 
+    const writerEnforcement = readStaffWriterRuntimeEnforcement();
+
+    if (!writerEnforcement.allowLegacyWriter) {
+      context.res = {
+        status: 503,
+        headers: {
+          "content-type": "application/json; charset=utf-8"
+        },
+        body: {
+          ok: false,
+          requestId,
+          error: "Staff legacy writer is unavailable"
+        }
+      };
+      return;
+    }
     const body = req?.body ?? {};
     const result = await createStaffInvitation(
       {

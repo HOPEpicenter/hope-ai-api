@@ -1,3 +1,4 @@
+import { readStaffWriterRuntimeEnforcement } from "../../config/staffWriterRuntimeEnforcement";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
   getEntraStaffActivationAuthorizationConfiguration
@@ -148,6 +149,22 @@ async function handlePostStaffInvitationActivation(
       }
     }
 
+    const writerEnforcement = readStaffWriterRuntimeEnforcement();
+
+    if (!writerEnforcement.allowLegacyWriter) {
+      context.res = {
+        status: 503,
+        headers: {
+          "content-type": "application/json; charset=utf-8"
+        },
+        body: {
+          ok: false,
+          requestId,
+          error: "Staff legacy writer is unavailable"
+        }
+      };
+      return;
+    }
     const result = await dependencies.activate({
       entraTenantId: String(req?.params?.entraTenantId ?? "").trim(),
       entraObjectId: String(req?.params?.entraObjectId ?? "").trim()

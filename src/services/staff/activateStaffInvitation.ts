@@ -4,6 +4,9 @@ import {
   type StaffEvent
 } from "../../domain/staff/projectStaffDirectory";
 import { StaffEventsRepository } from "../../repositories/staffEventsRepository";
+import type {
+  StaffScopedAtomicResult
+} from "../../repositories/staffScopedAtomicDeactivation";
 import {
   readCanonicalStaffIdentityByEntraBinding
 } from "./readCanonicalStaffDirectory";
@@ -17,6 +20,16 @@ export type ActivateStaffInvitationInput = {
 
 export type ActivateStaffInvitationDependencies = {
   repository?: StaffEventsRepository;
+
+  /**
+   * Default-off, injected atomic participation.
+   * Does not authorize OAuth execution.
+   */
+  atomicMutationEnabled?: boolean;
+  atomicMutation?: (
+    event: StaffEvent
+  ) => Promise<StaffScopedAtomicResult>;
+
   now?: () => string;
   newEventId?: () => string;
 };
@@ -100,6 +113,68 @@ export async function activateStaffInvitation(
       status: "active"
     }
   };
+
+  if (dependencies.atomicMutationEnabled === true) {
+    // The selected atomic path must not retry or fall back
+    // to legacy append after any failed or uncertain result.
+    if (typeof dependencies.atomicMutation !== "function") {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Atomic Staff activation writer unavailable"
+      };
+    }
+
+    let decision: StaffScopedAtomicResult;
+
+    try {
+      decision = await dependencies.atomicMutation(event);
+    } catch {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Atomic Staff activation outcome uncertain"
+      };
+    }
+
+    if (
+      !decision ||
+      decision.executionPermitted !== false ||
+      decision.retryPermitted !== false ||
+      decision.productionWriterFenced !== false
+    ) {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Atomic Staff activation result invalid"
+      };
+    }
+
+    if (decision.status === "denied") {
+      return {
+        accepted: false,
+        status: 409,
+        error: "Atomic Staff activation denied"
+      };
+    }
+
+    if (decision.status !== "committed") {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Atomic Staff activation outcome uncertain"
+      };
+    }
+
+    // Canonical event already acknowledged by atomic writer.
+    // No duplicate append and no OAuth authorization granted.
+    return {
+      accepted: true,
+      staffId: staff.staffId,
+      eventId: event.eventId,
+      activated: true
+    };
+  }
 
   await (repository as StaffEventWriter).append(event);
 

@@ -9,6 +9,9 @@ import type {
   StaffStatus
 } from "../operators/operatorIdentity";
 import { StaffEventsRepository } from "../../repositories/staffEventsRepository";
+import {
+  classifyStaffWriterTransition
+} from "../../domain/staff/classifyStaffWriterTransition";
 import type { CanonicalMinistryArea } from "../../domain/ministryAreas/projectMinistryAreas";
 import { readMinistryAreas } from "../ministryAreas/ministryAreaCommands";
 import {
@@ -24,6 +27,11 @@ type StaffEventWriter = Pick<StaffEventsRepository, "append">;
 
 export type StaffCommandDependencies = {
   repository?: StaffEventsRepository;
+  /**
+   * Default legacy compatibility; explicit migration modes
+   * deny legacy writes. No production activation authority.
+   */
+  transitionMode?: unknown;
 
   /**
    * Isolated deactivation participation seam.
@@ -240,6 +248,18 @@ export async function createStaffIdentity(
     };
   }
 
+  const creationTransition = classifyStaffWriterTransition({
+    category: "identity_creation",
+    mode: dependencies.transitionMode
+  });
+
+  if (!creationTransition.legacyAppendEligible) {
+    return {
+      accepted: false,
+      status: 503,
+      error: "Staff creation legacy writer is unavailable"
+    };
+  }
   const entraBindingResult = validateEntraBinding(input);
 
   if (!entraBindingResult.ok) {
@@ -436,6 +456,21 @@ export async function updateStaffIdentity(
     };
   }
 
+  const updateTransition = classifyStaffWriterTransition({
+    category:
+      input.status === "inactive"
+        ? "identity_deactivation"
+        : "identity_update",
+    mode: dependencies.transitionMode
+  });
+
+  if (!updateTransition.legacyAppendEligible) {
+    return {
+      accepted: false,
+      status: 503,
+      error: "Staff mutation legacy writer is unavailable"
+    };
+  }
   const repository =
     dependencies.repository ?? new StaffEventsRepository();
 

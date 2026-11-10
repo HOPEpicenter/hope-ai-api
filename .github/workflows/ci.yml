@@ -267,6 +267,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Staff runtime enforcement regression failed: tests/authorization/staffWriterAdminHttpEnforcement.test.ts"
           }
+          npx --no-install ts-node tests/staff/staffServiceRuntimeFence.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff direct-service runtime fence regressions failed"
+          }
           npx ts-node tests/authorization/staffWriterBypassEvidence.test.ts
           if ($LASTEXITCODE -ne 0) {
             throw "Staff writer bypass inventory evidence tests failed"

@@ -43,6 +43,19 @@ export type StaffCommandDependencies = {
     event: StaffEvent
   ) => Promise<StaffScopedAtomicResult>;
 
+  /**
+   * Default-off Staff creation participation.
+   *
+   * The injected operation must own coordinated creation,
+   * including binding uniqueness and canonical persistence.
+   * A binding reservation alone is not sufficient.
+   * No production implementation is wired here.
+   */
+  atomicCreationEnabled?: boolean;
+  atomicCreation?: (
+    event: StaffEvent
+  ) => Promise<StaffScopedAtomicResult>;
+
   now?: () => string;
   newEventId?: () => string;
   newStaffId?: () => string;
@@ -273,6 +286,70 @@ export async function createStaffIdentity(
       ...(area.ministryAreaId !== undefined ? { ministryAreaId: area.ministryAreaId } : {})
     }
   });
+
+  if (dependencies.atomicCreationEnabled === true) {
+    // Binding-only reservations are not authorization to
+    // create Staff. The injected operation must own the
+    // complete coordinated persistence outcome.
+    if (typeof dependencies.atomicCreation !== "function") {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Coordinated Staff creation writer unavailable"
+      };
+    }
+
+    let decision: StaffScopedAtomicResult;
+
+    try {
+      decision = await dependencies.atomicCreation(event);
+    } catch {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Coordinated Staff creation outcome uncertain"
+      };
+    }
+
+    if (
+      !decision ||
+      decision.executionPermitted !== false ||
+      decision.retryPermitted !== false ||
+      decision.productionWriterFenced !== false
+    ) {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Coordinated Staff creation result invalid"
+      };
+    }
+
+    if (decision.status === "denied") {
+      return {
+        accepted: false,
+        status: 409,
+        error: "Coordinated Staff creation denied"
+      };
+    }
+
+    if (decision.status !== "committed") {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Coordinated Staff creation outcome uncertain"
+      };
+    }
+
+    // An injected coordinator reports canonical creation
+    // committed. Never append a duplicate or infer OAuth
+    // authorization from this acknowledgment.
+    return {
+      accepted: true,
+      eventId: event.eventId,
+      staffId: event.staffId,
+      type: event.type
+    };
+  }
 
   await (repository as StaffEventWriter).append(event);
 

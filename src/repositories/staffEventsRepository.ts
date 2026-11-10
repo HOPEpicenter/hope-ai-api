@@ -1,4 +1,5 @@
 import type { TableClient } from "@azure/data-tables";
+import { readStaffWriterRuntimeEnforcement } from "../config/staffWriterRuntimeEnforcement";
 import { getTableClient } from "../storage/tableClient";
 import type {
   StaffEvent,
@@ -52,6 +53,11 @@ export class StaffEventsRepository {
   constructor(private readonly injectedTable?: TableClient) {}
 
   async append(event: StaffEvent): Promise<void> {
+    // Deny legacy canonical appends while the Staff writer hold is active.
+    // This does not authorize coordinated execution or prove production fencing.
+    if (!readStaffWriterRuntimeEnforcement().allowLegacyWriter) {
+      throw new Error("Canonical Staff event append is unavailable");
+    }
     const table: TableClient =
       this.injectedTable ?? await getTableClient(TABLE_NAME);
 

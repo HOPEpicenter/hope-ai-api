@@ -31,6 +31,7 @@ export type CreateStaffInvitationInput = {
 export type StaffInvitationDependencies = {
   repository?: StaffEventsRepository;
   sendInvitation: StaffInvitationSender;
+  blockLegacyInvitationBeforeGraph?: boolean;
   now?: () => string;
   newEventId?: () => string;
   newStaffId?: () => string;
@@ -105,6 +106,17 @@ export async function createStaffInvitation(
     };
   }
 
+  // Explicit migration hold. Deny before Microsoft Graph,
+  // canonical reads, or legacy StaffEvents persistence.
+  // Default false preserves the existing route behavior.
+  // This flag does not authorize a coordinated writer.
+  if (dependencies.blockLegacyInvitationBeforeGraph === true) {
+    return {
+      accepted: false,
+      status: 503,
+      error: "Legacy Staff invitation writer is fenced"
+    };
+  }
   let invitation: MicrosoftStaffInvitation;
 
   try {

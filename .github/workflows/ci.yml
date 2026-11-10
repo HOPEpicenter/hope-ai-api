@@ -247,6 +247,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Staff invitation legacy fence regressions failed"
           }
+          npx --no-install ts-node tests/authorization/classifyStaffWriterTransition.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff writer transition policy regressions failed"
+          }
+          npx --no-install ts-node tests/staff/staffWriterTransitionIntegration.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff writer transition integration regressions failed"
+          }
           npx ts-node tests/authorization/staffWriterBypassEvidence.test.ts
           if ($LASTEXITCODE -ne 0) {
             throw "Staff writer bypass inventory evidence tests failed"

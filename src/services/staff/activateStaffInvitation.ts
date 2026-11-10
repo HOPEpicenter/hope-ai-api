@@ -4,6 +4,9 @@ import {
   type StaffEvent
 } from "../../domain/staff/projectStaffDirectory";
 import { StaffEventsRepository } from "../../repositories/staffEventsRepository";
+import {
+  classifyStaffWriterTransition
+} from "../../domain/staff/classifyStaffWriterTransition";
 import type {
   StaffScopedAtomicResult
 } from "../../repositories/staffScopedAtomicDeactivation";
@@ -20,6 +23,11 @@ export type ActivateStaffInvitationInput = {
 
 export type ActivateStaffInvitationDependencies = {
   repository?: StaffEventsRepository;
+  /**
+   * Default legacy compatibility; explicit migration modes
+   * deny legacy writes. No production activation authority.
+   */
+  transitionMode?: unknown;
 
   /**
    * Default-off, injected atomic participation.
@@ -68,6 +76,18 @@ export async function activateStaffInvitation(
     };
   }
 
+  const transition = classifyStaffWriterTransition({
+    category: "invitation_activation",
+    mode: dependencies.transitionMode
+  });
+
+  if (!transition.legacyAppendEligible) {
+    return {
+      accepted: false,
+      status: 503,
+      error: "Staff activation legacy writer is unavailable"
+    };
+  }
   const repository =
     dependencies.repository ?? new StaffEventsRepository();
 

@@ -243,6 +243,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Staff writer participation safety proof tests failed"
           }
+          npx --no-install ts-node tests/staff/staffInvitationLegacyFence.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff invitation legacy fence regressions failed"
+          }
           npx ts-node tests/authorization/staffWriterBypassEvidence.test.ts
           if ($LASTEXITCODE -ne 0) {
             throw "Staff writer bypass inventory evidence tests failed"

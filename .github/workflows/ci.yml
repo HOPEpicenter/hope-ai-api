@@ -207,6 +207,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Staff creation reconciliation regression failed"
           }
+          npx --no-install ts-node tests/staff/classifyStaffCreationRecoveryDecision.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff creation recovery decision regression failed"
+          }
           npx ts-node tests/authorization/classifyStaffSecurityMutation.test.ts
           if ($LASTEXITCODE -ne 0) {
             throw "Staff security mutation classifier tests failed"

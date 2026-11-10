@@ -191,6 +191,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Staff creation atomic participation regression failed"
           }
+          npx --no-install ts-node tests/staff/staffScopedAtomicCreation.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff atomic creation regression failed"
+          }
+          npx --no-install ts-node tests/staff/coordinateStaffCreation.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff creation coordination regression failed"
+          }
           npx ts-node tests/authorization/classifyStaffSecurityMutation.test.ts
           if ($LASTEXITCODE -ne 0) {
             throw "Staff security mutation classifier tests failed"
@@ -505,6 +513,10 @@ jobs:
               throw "Shared Staff mutation Azurite concurrency proof failed"
             }
             Write-Host "[PASS] Shared Staff mutation Azurite concurrency proof"
+            npx --no-install ts-node tests/staff/staffCreationCoordinationAzurite.test.ts
+            if ($LASTEXITCODE -ne 0) {
+              throw "Staff creation coordination Azurite proof failed"
+            }
 
             $env:HOPE_ASSIGNMENT_AZURITE_TABLE_PORT = "11002"
             npx --no-install ts-node tests/authorization/formationAssignmentLedgerStorageAzurite.test.ts

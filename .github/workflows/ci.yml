@@ -199,6 +199,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Staff creation coordination regression failed"
           }
+          npx --no-install ts-node tests/staff/inspectStaffCreationEvidence.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff creation evidence inspection regression failed"
+          }
+          npx --no-install ts-node tests/staff/reconcileStaffCreationEvidence.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff creation reconciliation regression failed"
+          }
           npx ts-node tests/authorization/classifyStaffSecurityMutation.test.ts
           if ($LASTEXITCODE -ne 0) {
             throw "Staff security mutation classifier tests failed"
@@ -513,6 +521,10 @@ jobs:
               throw "Shared Staff mutation Azurite concurrency proof failed"
             }
             Write-Host "[PASS] Shared Staff mutation Azurite concurrency proof"
+            npx --no-install ts-node tests/staff/staffCreationReconciliationAzurite.test.ts
+            if ($LASTEXITCODE -ne 0) {
+              throw "Staff creation reconciliation Azurite proof failed"
+            }
             npx --no-install ts-node tests/staff/staffCreationCoordinationAzurite.test.ts
             if ($LASTEXITCODE -ne 0) {
               throw "Staff creation coordination Azurite proof failed"

@@ -1,3 +1,4 @@
+import { readStaffWriterRuntimeEnforcement } from "../../config/staffWriterRuntimeEnforcement";
 import { randomUUID } from "crypto";
 import {
   normalizeEntraStaffBinding,
@@ -76,6 +77,15 @@ export async function activateStaffInvitation(
     };
   }
 
+  // Server-side runtime hold applies even to direct service callers.
+  // It denies execution and never enables a coordinated writer.
+  if (!readStaffWriterRuntimeEnforcement().allowLegacyWriter) {
+    return {
+      accepted: false,
+      status: 503,
+      error: "Staff activation runtime writer is unavailable"
+    };
+  }
   const transition = classifyStaffWriterTransition({
     category: "invitation_activation",
     mode: dependencies.transitionMode

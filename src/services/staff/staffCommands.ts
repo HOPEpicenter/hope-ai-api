@@ -1,3 +1,4 @@
+import { readStaffWriterRuntimeEnforcement } from "../../config/staffWriterRuntimeEnforcement";
 import { randomUUID } from "crypto";
 import type {
   StaffEvent,
@@ -248,6 +249,15 @@ export async function createStaffIdentity(
     };
   }
 
+  // Server-side runtime hold applies even to direct service callers.
+  // It denies execution and never enables a coordinated writer.
+  if (!readStaffWriterRuntimeEnforcement().allowLegacyWriter) {
+    return {
+      accepted: false,
+      status: 503,
+      error: "Staff creation runtime writer is unavailable"
+    };
+  }
   const creationTransition = classifyStaffWriterTransition({
     category: "identity_creation",
     mode: dependencies.transitionMode
@@ -456,6 +466,15 @@ export async function updateStaffIdentity(
     };
   }
 
+  // Server-side runtime hold applies even to direct service callers.
+  // It denies execution and never enables a coordinated writer.
+  if (!readStaffWriterRuntimeEnforcement().allowLegacyWriter) {
+    return {
+      accepted: false,
+      status: 503,
+      error: "Staff mutation runtime writer is unavailable"
+    };
+  }
   const updateTransition = classifyStaffWriterTransition({
     category:
       input.status === "inactive"

@@ -33,6 +33,16 @@ export type StaffCommandDependencies = {
   atomicDeactivation?: (
     event: StaffEvent
   ) => Promise<StaffScopedAtomicResult>;
+
+  /**
+   * Default-off Staff update participation.
+   * Injected for isolated testing only; not wired to production.
+   */
+  atomicMutationEnabled?: boolean;
+  atomicMutation?: (
+    event: StaffEvent
+  ) => Promise<StaffScopedAtomicResult>;
+
   now?: () => string;
   newEventId?: () => string;
   newStaffId?: () => string;
@@ -500,6 +510,72 @@ export async function updateStaffIdentity(
       type: event.type
     };
   }
+
+  if (
+    type === "staff.updated" &&
+    dependencies.atomicMutationEnabled === true
+  ) {
+    // Explicit atomic participation must never fall back
+    // to legacy append, including ambiguous outcomes.
+    if (typeof dependencies.atomicMutation !== "function") {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Atomic Staff mutation writer unavailable"
+      };
+    }
+
+    let decision: StaffScopedAtomicResult;
+
+    try {
+      decision = await dependencies.atomicMutation(event);
+    } catch {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Atomic Staff mutation outcome uncertain"
+      };
+    }
+
+    if (
+      !decision ||
+      decision.executionPermitted !== false ||
+      decision.retryPermitted !== false ||
+      decision.productionWriterFenced !== false
+    ) {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Atomic Staff mutation result invalid"
+      };
+    }
+
+    if (decision.status === "denied") {
+      return {
+        accepted: false,
+        status: 409,
+        error: "Atomic Staff mutation denied"
+      };
+    }
+
+    if (decision.status !== "committed") {
+      return {
+        accepted: false,
+        status: 503,
+        error: "Atomic Staff mutation outcome uncertain"
+      };
+    }
+
+    // The injected writer acknowledged the canonical event.
+    // Do not append it again; this is not OAuth authorization.
+    return {
+      accepted: true,
+      eventId: event.eventId,
+      staffId: event.staffId,
+      type: event.type
+    };
+  }
+
   await (repository as StaffEventWriter).append(event);
 
   return {

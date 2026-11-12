@@ -289,6 +289,8 @@ jobs:
           npx ts-node tests/authorization/sixWeekOwnerHttpAuthorization.test.ts
           npx --no-install ts-node tests/authorization/authenticatedAdminStaffActor.test.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install ts-node tests/authorization/entraStaffAcceptanceHandoff.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx --no-install ts-node tests/authorization/getStaffIdentityAuditAuthenticated.test.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx --no-install ts-node tests/authorization/authorizeStaffInvitationActivation.test.ts

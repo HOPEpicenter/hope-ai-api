@@ -21,31 +21,57 @@ security path when a future server-side integration supplies this boundary.
 Caller-supplied IDs alone are not evidence.
 
 This phase intentionally does not assemble or invoke that live boundary. The
-contract's default is disabled; the tests provide synthetic in-memory evidence.
-Do not enable it from request data or wire it to a production handler as part of
-this phase.
+contract's default is disabled; its `enabled` option is trusted server
+configuration only and must never be populated from request data. The tests
+provide synthetic evidence. No production handler or feature flag enables it.
 
 ## One-time semantics
 
 Only `phase-c.staff-binding.acceptance` can be issued or consumed. Evidence
 must be current (no more than five minutes old), active, administrator
 authorized, and internally identity-consistent at both issuance and
-consumption. Consumption removes the in-memory receipt before checking the
-operation or awaiting the boundary, so failures and concurrent attempts do
-not permit replay. A receipt is an empty object capability held in a
-`WeakMap`; it contains no identity, credential, or token and is unusable by
-serialization or another handoff instance.
+consumption. Consumption re-resolves authorization through the trusted
+boundary, so inactive Staff, lost administrator authority, stale evidence,
+and mismatched verified identity are denied.
 
-The handoff is process-local and non-durable. It does not establish durable
-replay protection across restarts or instances and does not execute or attest
-the acceptance operation. This in-memory receipt therefore does not authorize
-live acceptance. Any future production use requires a separately reviewed
-durable atomic-consumption design and explicit enablement.
+The durable repository uses Azure Table Storage's create-only unique row key
+for issuance, then reads the record and uses a single ETag-conditional
+`Replace` to transition revision 0 from `issued` to `consumed`. Only one
+competing consumer can win across repository instances. Missing, malformed,
+stale-revision, replayed, expired, conflicting, or uncertain storage state
+fails closed; write retries are not performed. The repository receives an
+already-created Table port and does not provision tables or read storage
+configuration.
+
+The returned receipt contains only an opaque random value. Durable state binds
+that value to the fixed operation, expiration, and a per-receipt SHA-256
+identity digest; it does not persist raw Staff, tenant, or object IDs. The
+digest is not encryption and storage access remains sensitive.
+
+Azure Table ETags provide conditional concurrency, not a server-side expiry
+predicate. The repository checks its trusted clock before the conditional
+write and after acknowledgement; if expiry occurs during the write it denies
+authorization even though the receipt may have been consumed. An ambiguous
+storage acknowledgement is reported as unavailable and never treated as
+success. This handoff still does not execute or attest the acceptance
+operation, and it does not authorize live acceptance.
+
+## Remaining security boundary
+
+The trusted server-side boundary must perform fresh token verification,
+canonical Staff resolution, current active-status validation, and configured
+administrator authorization for every issue and consume. Durable records do
+not subscribe to Staff revocation events or maintain a revocation generation;
+revocation is enforced by that fresh boundary check at consumption. There is
+no production wiring in this phase. A future live acceptance design would
+require separate security review, production trust-boundary wiring, and
+explicit enablement; this foundation alone is not approval to run acceptance.
 
 ## Output and verification
 
-Results contain only generic status values. The implementation and synthetic
-tests do not log or return identity values, credentials, tokens, or staff
-records. The approved
+Results contain only generic status values and an opaque receipt value. The
+implementation and synthetic tests do not log or return identity values,
+credentials, tokens, or staff records. The Azurite regression uses only local
+emulator storage and synthetic evidence. The approved
 [`phase-c-staff-binding-acceptance.py`](../../scripts/phase-c-staff-binding-acceptance.py)
 runner remains unchanged; do not run it as part of this offline contract.

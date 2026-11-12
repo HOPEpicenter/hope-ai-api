@@ -125,6 +125,7 @@ export async function submitStaffScopedAtomicCreation(
         partitionKey,
         rowKey: STAFF_SECURITY_METADATA_HEAD,
         revision: 0,
+        authorizationRevision: 0,
         state: "active"
       }
     ],

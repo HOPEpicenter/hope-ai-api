@@ -156,6 +156,8 @@ export async function submitStaffScopedAtomicMutation(
       !Number.isSafeInteger(head.revision) ||
       head.revision < 0 ||
       head.revision >= Number.MAX_SAFE_INTEGER - 1 ||
+      (head.authorizationRevision !== undefined &&
+       head.authorizationRevision !== head.revision) ||
       typeof head.etag !== "string" ||
       !head.etag.trim() ||
       head.etag === "*" ||
@@ -173,6 +175,9 @@ export async function submitStaffScopedAtomicMutation(
         partitionKey,
         rowKey: STAFF_SECURITY_METADATA_HEAD,
         revision,
+        ...(head.authorizationRevision !== undefined
+          ? { authorizationRevision: revision }
+          : {}),
         state: "active"
       },
       "Replace",

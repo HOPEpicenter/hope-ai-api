@@ -67,6 +67,33 @@ no production wiring in this phase. A future live acceptance design would
 require separate security review, production trust-boundary wiring, and
 explicit enablement; this foundation alone is not approval to run acceptance.
 
+## Isolated Staff-revocation atomicity proof
+
+The E125 proof adds an offline-only transaction over synthetic rows in one
+`StaffEvents` Staff partition. It treats the head's `authorizationRevision`
+and `state` as explicit proof fields, binds a receipt to the fixed acceptance
+operation, an opaque verified-identity digest, and the revision at issuance,
+then conditionally updates both the head and receipt using their ETags in one
+Table transaction. The competing deactivation transaction updates that same
+head and appends the canonical lifecycle event atomically. A shared original
+head ETag permits only one competing transaction to commit; the loser is
+denied, and a committed receipt consumption is ordered before any subsequent
+revocation.
+
+This is **not authoritative live authorization**. Production lifecycle
+writers are not migrated or fenced, the proof has no live trust-boundary
+composition, and neither a receipt result nor an advanced authorization
+revision authorizes execution. The authorization digest must be computed from
+fresh server-verified Staff/tenant/object evidence; raw identifiers are not
+stored in the proof receipt. The proof is default-disabled, test-only, and
+uses synthetic data with local Azurite.
+
+A future execution fence must cover the gap between receipt consumption and
+actual acceptance execution, ordering revocation against the operation at its
+real execution boundary. Until that separate fence and production writer
+participation are implemented and reviewed, Phase C live acceptance remains
+blocked.
+
 ## Output and verification
 
 Results contain only generic status values and an opaque receipt value. The

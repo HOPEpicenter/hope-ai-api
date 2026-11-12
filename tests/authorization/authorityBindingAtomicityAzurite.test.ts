@@ -74,7 +74,8 @@ async function main(): Promise<void> {
       for await (const entity of table.listEntities({
         queryOptions: { filter: `PartitionKey eq '${partitionKey}'` }
       })) {
-        if (entity.rowKey.startsWith(receiptPrefix)) count++;
+        if (typeof entity.rowKey === "string" &&
+            entity.rowKey.startsWith(receiptPrefix)) count++;
       }
       return count;
     }

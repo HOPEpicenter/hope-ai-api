@@ -179,6 +179,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Staff reactivation unit regression failed"
           }
+          npx --no-install ts-node tests/staff/staffLifecycleCoordinator.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff lifecycle coordinator regression failed"
+          }
           npx --no-install ts-node tests/staff/staffDeactivationParticipation.test.ts
           if ($LASTEXITCODE -ne 0) {
             throw "Staff deactivation participation regression failed"
@@ -576,6 +580,11 @@ jobs:
               throw "Staff reactivation Azurite proof failed"
             }
             Write-Host "[PASS] Staff reactivation Azurite proof"
+            npx --no-install ts-node tests/staff/staffLifecycleCoordinatorAzurite.test.ts
+            if ($LASTEXITCODE -ne 0) {
+              throw "Staff lifecycle coordinator Azurite proof failed"
+            }
+            Write-Host "[PASS] Staff lifecycle coordinator Azurite proof"
             npx --no-install ts-node tests/staff/staffAcceptanceRevocationAtomicityAzurite.test.ts
             if ($LASTEXITCODE -ne 0) {
               throw "Staff acceptance/revocation atomicity Azurite proof failed"

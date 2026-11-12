@@ -122,6 +122,33 @@ head migration, complete legacy-writer fencing, authoritative administrator
 authorization, and the execution fence remain unresolved before any live
 acceptance could be considered.
 
+## Isolated lifecycle coordinator foundation
+
+The E141 coordinator is a default-disabled adapter around the existing strict
+same-partition atomic mutation, deactivation, pending-activation, and trusted
+reactivation primitives. Its result has no legacy-append fallback capability;
+denied or uncertain outcomes remain denied or uncertain and are never retried
+through `StaffEventsRepository.append`.
+
+Creation, invitations, Entra binding changes, status shortcuts, and activation
+without an explicit transition are rejected. This keeps Graph invitation
+effects, new or changed identity bindings, and unsupported cross-partition work
+outside the coordinator. Reactivation receives only an injected trusted
+authorization port; caller event data is not treated as authorization
+evidence. The coordinator is not wired to HTTP handlers, production lifecycle
+writers, runtime flags, or request-controlled configuration. The existing
+default legacy-compatible runtime behavior is unchanged.
+It is not an authorization boundary: callers must complete the existing
+operation-specific authentication and authorization checks before creating a
+coordinated event. Enablement and authorization ports must come only from
+trusted server-side composition, never request data or caller assertions.
+
+The synthetic and local Azurite tests cover routing, blocked operations,
+replay, conflicts, lost acknowledgements, and the disabled default. This is a
+coordination foundation, not a production writer fence or authorization
+boundary; head migration, migration of legacy lifecycle writers, and the
+acceptance execution fence remain unresolved.
+
 ## Output and verification
 
 Results contain only generic status values and an opaque receipt value. The

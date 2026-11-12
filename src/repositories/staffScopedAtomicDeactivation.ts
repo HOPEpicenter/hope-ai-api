@@ -4,6 +4,7 @@ import {
   STAFF_SECURITY_METADATA_HEAD,
   STAFF_SECURITY_METADATA_RECEIPT_PREFIX
 } from "./staffEventsRepository";
+import { readStaffSecurityHead } from "./staffSecurityHead";
 
 /**
  * Isolated StaffEvents same-partition transaction implementation.
@@ -115,29 +116,22 @@ export async function submitStaffScopedAtomicDeactivation(
     return result("denied");
   }
 
-  let head: Record<string, unknown> | null;
+  let head: ReturnType<typeof readStaffSecurityHead>;
 
   try {
-    head = object(await port.getEntity(
-      event.staffId,
-      STAFF_SECURITY_METADATA_HEAD
-    ));
+    head = readStaffSecurityHead(
+      await port.getEntity(
+        event.staffId,
+        STAFF_SECURITY_METADATA_HEAD
+      ),
+      event.staffId
+    );
   } catch {
     return result("uncertain");
   }
 
   if (!head ||
-      head.state !== "active" ||
-      !Number.isSafeInteger(head.revision) ||
-      typeof head.revision !== "number" ||
-      head.revision < 0 ||
-      head.revision >= Number.MAX_SAFE_INTEGER - 1 ||
-      (head.authorizationRevision !== undefined &&
-       head.authorizationRevision !== head.revision) ||
-      typeof head.etag !== "string" ||
-      !head.etag.trim() ||
-      head.etag === "*" ||
-      head.etag !== head.etag.trim()) {
+      head.state !== "active") {
     return result("denied");
   }
 
@@ -151,9 +145,7 @@ export async function submitStaffScopedAtomicDeactivation(
         partitionKey,
         rowKey: STAFF_SECURITY_METADATA_HEAD,
         revision,
-        ...(head.authorizationRevision !== undefined
-          ? { authorizationRevision: revision }
-          : {}),
+        authorizationRevision: revision,
         state: "revoked"
       },
       "Replace",

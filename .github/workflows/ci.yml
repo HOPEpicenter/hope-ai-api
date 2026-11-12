@@ -175,6 +175,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Shared Staff mutation unit regression failed"
           }
+          npx --no-install ts-node tests/staff/staffScopedAtomicReactivation.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Staff reactivation unit regression failed"
+          }
           npx --no-install ts-node tests/staff/staffDeactivationParticipation.test.ts
           if ($LASTEXITCODE -ne 0) {
             throw "Staff deactivation participation regression failed"
@@ -567,6 +571,11 @@ jobs:
               throw "Shared Staff mutation Azurite concurrency proof failed"
             }
             Write-Host "[PASS] Shared Staff mutation Azurite concurrency proof"
+            npx --no-install ts-node tests/staff/staffScopedAtomicReactivationAzurite.test.ts
+            if ($LASTEXITCODE -ne 0) {
+              throw "Staff reactivation Azurite proof failed"
+            }
+            Write-Host "[PASS] Staff reactivation Azurite proof"
             npx --no-install ts-node tests/staff/staffAcceptanceRevocationAtomicityAzurite.test.ts
             if ($LASTEXITCODE -ne 0) {
               throw "Staff acceptance/revocation atomicity Azurite proof failed"

@@ -10,6 +10,7 @@ import {
   STAFF_SECURITY_METADATA_HEAD,
   STAFF_SECURITY_METADATA_RECEIPT_PREFIX
 } from "./staffEventsRepository";
+import { readStaffSecurityHead } from "./staffSecurityHead";
 import type {
   StaffScopedAtomicPort,
   StaffScopedAtomicResult
@@ -139,29 +140,23 @@ export async function submitStaffScopedAtomicMutation(
     return decision("denied");
   }
 
-  let head: ObjectRecord | null;
+  let head: ReturnType<typeof readStaffSecurityHead>;
 
   try {
-    head = object(await port.getEntity(
-      event.staffId,
-      STAFF_SECURITY_METADATA_HEAD
-    ));
+    head = readStaffSecurityHead(
+      await port.getEntity(
+        event.staffId,
+        STAFF_SECURITY_METADATA_HEAD
+      ),
+      event.staffId
+    );
   } catch {
     return decision("uncertain");
   }
 
+  const activation = event.type === "staff.activated";
   if (!head ||
-      head.state !== "active" ||
-      typeof head.revision !== "number" ||
-      !Number.isSafeInteger(head.revision) ||
-      head.revision < 0 ||
-      head.revision >= Number.MAX_SAFE_INTEGER - 1 ||
-      (head.authorizationRevision !== undefined &&
-       head.authorizationRevision !== head.revision) ||
-      typeof head.etag !== "string" ||
-      !head.etag.trim() ||
-      head.etag === "*" ||
-      head.etag !== head.etag.trim()) {
+      head.state !== (activation ? "pending" : "active")) {
     return decision("denied");
   }
 
@@ -175,9 +170,7 @@ export async function submitStaffScopedAtomicMutation(
         partitionKey,
         rowKey: STAFF_SECURITY_METADATA_HEAD,
         revision,
-        ...(head.authorizationRevision !== undefined
-          ? { authorizationRevision: revision }
-          : {}),
+        authorizationRevision: revision,
         state: "active"
       },
       "Replace",

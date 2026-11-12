@@ -94,6 +94,34 @@ real execution boundary. Until that separate fence and production writer
 participation are implemented and reviewed, Phase C live acceptance remains
 blocked.
 
+## Strict Staff security-head protocol proof
+
+The isolated E134 prototypes require a security head with a nonnegative,
+incrementable `revision`, an equal `authorizationRevision`, an explicit
+`active`, `pending`, or `revoked` state, the expected Staff partition and
+reserved row key, and a non-wildcard ETag. Missing, malformed, mismatched, or
+stale head state is denied. Coordinated mutation and deactivation always
+advance both revisions together; pending heads can transition to active only
+through the activation event path, while deactivation changes active to
+revoked.
+
+Revoked-to-active reactivation is a separate default-disabled transaction. It
+requires an injected trusted server-side authorization boundary to approve the
+exact Staff, activation event, actor, and observed authorization revision.
+That approval is followed by one ETag-conditional transaction that advances
+the head and creates the canonical activation event and operation receipt.
+Authorization failures, ETag conflicts, and ambiguous acknowledgements never
+produce an authorized result.
+
+These are storage protocol proofs only. They are not wired to production
+Staff writers, do not initialize or migrate existing Staff heads, and do not
+make the security head authoritative. The default production writer behavior
+is unchanged. Pending or revoked heads cannot consume acceptance receipts;
+the separate E125 receipt proof still returns no execution permission. Safe
+head migration, complete legacy-writer fencing, authoritative administrator
+authorization, and the execution fence remain unresolved before any live
+acceptance could be considered.
+
 ## Output and verification
 
 Results contain only generic status values and an opaque receipt value. The

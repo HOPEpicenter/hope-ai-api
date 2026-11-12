@@ -1,9 +1,9 @@
 # E150B — Proposed Isolated Staff Authority Storage Boundary
 
-Status: **PROPOSED / DESIGN-ONLY / NON-AUTHORIZING**  
+Status: **TARGET ARCHITECTURE OWNER-APPROVED / DESIGN-ONLY / NON-AUTHORIZING**  
 Evidence date: 2026-11-12  
 Source baseline: protected backend main `ebfeba902236be8c6594e7000ffe3cda346a571a`  
-Owner decision: **NOT YET APPROVED FOR RESOURCE CREATION OR MIGRATION**
+Owner decision (2026-11-12): **Separate authority storage account and dedicated writer identity APPROVED AS TARGET DESIGN ONLY. Azure resource changes and migration NOT AUTHORIZED.**
 
 ## 1. Purpose
 
@@ -64,3 +64,20 @@ Do not treat nominal identity names or inherited RBAC listings as an effective-a
 ## 7. Safety fence
 
 **This PR changes documentation only.** Do not create Azure resources, change RBAC, inspect secret values, open the acceptance VM, use live Staff data, deploy either environment, alter original staging/production, send Graph invitations, enable OAuth execution, contact visitors, or rewrite StaffEvents. Preserve the existing protected-main merge/independent-review workflow and secure pilot readiness priority.
+
+## 8. E150D accountable-owner architecture decision (2026-11-12)
+
+The accountable owner explicitly approved **a separate Staff authority storage account and a dedicated writer identity as the target architecture**, with **no authorization yet to create or modify Azure resources**. This selects the intended isolation direction and does not approve a precise Azure account name, resource group, private endpoint/DNS configuration, RBAC assignment, schema, partition key, deployment identity, app setting, migration, or cost.
+
+The E150C2 read-only human verification additionally established: the isolated Flex app uses `HOPE_TABLE_AUTH_MODE=managed-identity`, and its configured `HOPE_TABLE_ENDPOINT` matches the Phase C storage account `hopec6flexstg01`. **No setting value or credential was copied into the repository.** This means the existing app's account-scoped Table Data Contributor role presently covers its configured application Table storage boundary, further supporting the decision to isolate future authority writes in another permission boundary.
+
+### First implementation gate, before any Azure mutation
+
+1. Define the new authority writer's **independent workload and effective data-plane permission boundary**; prove no old Flex, legacy deployment, or broadly privileged application credential can mutate the new authority state. A different account alone is not proof of this.
+2. Produce a narrowly scoped non-executing configuration/permission contract and regression tests **only if needed** to enforce default-deny behavior; no code path should grant live authority from synthetic E149 models.
+3. Independently review exact provisioning scope, network topology, storage operation costs, RBAC inheritance, shared-key restrictions, isolation/rollback proof plan, and the cancellation/revocation model. Seek a **separate explicit owner authorization** before provisioning or changing any role assignment.
+4. Continue to preserve canonical StaffEvents history and existing six-week Staff follow-up behavior. No production/original-staging changes or live Staff contact are part of E150D.
+
+### Prohibited interpretation
+
+**Architecture approval is not deployment approval, storage-access approval, migration approval, invitation authorization, OAuth authorization, or permission to activate the authority adapter.** All runtime, retry, reconciliation-repair, and rollout gates remain disabled pending subsequent independently reviewed proofs.

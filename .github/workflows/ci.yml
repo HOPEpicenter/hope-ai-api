@@ -519,6 +519,12 @@ jobs:
             }
             Write-Host "[PASS] E154 local authority binding atomicity"
 
+            npx --no-install ts-node tests/authorization/authorityBindingLifecycleOrderingAzurite.test.ts
+            if ($LASTEXITCODE -ne 0) {
+              throw "E155 synthetic authority lifecycle ordering proof failed"
+            }
+            Write-Host "[PASS] E155 synthetic authority lifecycle ordering"
+
 
             npx --no-install ts-node tests/authorization/entraStaffAcceptanceHandoffAzurite.test.ts
 

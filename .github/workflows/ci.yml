@@ -80,6 +80,13 @@ jobs:
           npx --no-install ts-node tests/authorization/modelSyntheticAuthorityConflict.test.ts
           if ($LASTEXITCODE -ne 0) { throw "E149B synthetic authority conflict regressions failed" }
 
+      - name: E149C synthetic legacy projection fence regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npx --no-install ts-node tests/authorization/assessSyntheticLegacyProjectionFence.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "E149C synthetic legacy projection regressions failed" }
+
       - name: Phase C private acceptance security regressions
         shell: bash
         run: |

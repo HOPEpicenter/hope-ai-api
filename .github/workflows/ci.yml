@@ -513,6 +513,13 @@ jobs:
 
             Write-Host "[PASS] OAuth single-partition atomicity proof"
 
+            npx --no-install ts-node tests/authorization/authorityBindingAtomicityAzurite.test.ts
+            if ($LASTEXITCODE -ne 0) {
+              throw "E154 authority binding local Azurite proof failed"
+            }
+            Write-Host "[PASS] E154 local authority binding atomicity"
+
+
             npx --no-install ts-node tests/authorization/entraStaffAcceptanceHandoffAzurite.test.ts
 
             if ($LASTEXITCODE -ne 0) {

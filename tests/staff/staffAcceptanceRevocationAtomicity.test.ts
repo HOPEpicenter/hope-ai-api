@@ -46,7 +46,7 @@ function fixture(
     revision: 4,
     authorizationRevision: 4,
     state: "active",
-    etag: "head-etag"
+    etag: 'W/"head-etag"'
   },
   receipt: Record<string, unknown> | null = {
     partitionKey: staffId,
@@ -117,7 +117,7 @@ async function main(): Promise<void> {
     );
 
     const [headUpdate, receiptUpdate] = f.transactions[0];
-    assert.equal(headUpdate[3]?.etag, "head-etag");
+    assert.equal(headUpdate[3]?.etag, 'W/"head-etag"');
     assert.equal(receiptUpdate[3]?.etag, "receipt-etag");
     assert.deepEqual(headUpdate[1], {
       partitionKey: staffId,
@@ -191,7 +191,7 @@ async function main(): Promise<void> {
             revision: 4,
             authorizationRevision: 4,
             state: "active",
-            etag: "head-etag"
+            etag: 'W/"head-etag"'
           };
         },
         async submitTransaction(submitted) { actions = submitted; }
@@ -221,7 +221,7 @@ async function main(): Promise<void> {
             revision: 4,
             authorizationRevision: 3,
             state: "active",
-            etag: "head-etag"
+            etag: 'W/"head-etag"'
           };
         },
         async submitTransaction() {
@@ -239,7 +239,7 @@ async function main(): Promise<void> {
         rowKey: STAFF_SECURITY_METADATA_HEAD,
         revision: 4,
         state: "active",
-        etag: "head-etag"
+        etag: 'W/"head-etag"'
       });
       const missingAuthorizationRevision =
         await consumeStaffAcceptanceReceiptAtomically(
@@ -250,10 +250,15 @@ async function main(): Promise<void> {
     }
 
   for (const [label, head, receipt, input] of [
+    ["pending head", {
+      partitionKey: staffId, rowKey: STAFF_SECURITY_METADATA_HEAD,
+      revision: 4, authorizationRevision: 4, state: "pending",
+      etag: 'W/"head-etag"'
+    }, undefined, request()],
     ["inactive head", {
       partitionKey: staffId, rowKey: STAFF_SECURITY_METADATA_HEAD,
       revision: 4, authorizationRevision: 4, state: "revoked",
-      etag: "head-etag"
+      etag: 'W/"head-etag"'
     }, undefined, request()],
     ["stale authorization revision", {
       revision: 5, authorizationRevision: 5, state: "active",

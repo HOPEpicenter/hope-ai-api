@@ -7,6 +7,9 @@ import type {
 import {
   submitStaffScopedAtomicMutation
 } from "../../src/repositories/staffScopedAtomicMutation";
+import {
+  STAFF_SECURITY_METADATA_HEAD
+} from "../../src/repositories/staffEventsRepository";
 
 function event(
   type: StaffEvent["type"] = "staff.updated",
@@ -24,9 +27,12 @@ function event(
 
 function fixture(
   head: Record<string, unknown> | null = {
+    partitionKey: "synthetic-staff",
+    rowKey: STAFF_SECURITY_METADATA_HEAD,
     state: "active",
     revision: 7,
-    etag: "synthetic-etag"
+    authorizationRevision: 7,
+    etag: 'W/"synthetic-etag"'
   }
 ) {
   const transactions: TransactionAction[][] = [];
@@ -107,7 +113,14 @@ async function run(): Promise<void> {
   }
 
   {
-    const f = fixture();
+    const f = fixture({
+      partitionKey: "synthetic-staff",
+      rowKey: STAFF_SECURITY_METADATA_HEAD,
+      state: "pending",
+      revision: 7,
+      authorizationRevision: 7,
+      etag: 'W/"synthetic-etag"'
+    });
     const result = await submitStaffScopedAtomicMutation(
       event("staff.activated", { status: "active" }),
       f.port, true
@@ -115,7 +128,10 @@ async function run(): Promise<void> {
 
     assert.equal(result.status, "committed");
     assert.equal(f.transactions.length, 1);
-    console.log("[PASS] Invitation activation participates");
+    const headUpdate = f.transactions[0][0][1] as Record<string, unknown>;
+    assert.equal(headUpdate.state, "active");
+    assert.equal(headUpdate.authorizationRevision, 8);
+    console.log("[PASS] Pending-to-active activation participates");
   }
 
   {
@@ -160,7 +176,12 @@ async function run(): Promise<void> {
 
   {
     const f = fixture({
-      state: "revoked", revision: 8, etag: "revoked-etag"
+      partitionKey: "synthetic-staff",
+      rowKey: STAFF_SECURITY_METADATA_HEAD,
+      state: "revoked",
+      revision: 8,
+      authorizationRevision: 8,
+      etag: 'W/"revoked-etag"'
     });
 
     const result = await submitStaffScopedAtomicMutation(
@@ -182,6 +203,47 @@ async function run(): Promise<void> {
     assert.equal(f.transactions.length, 0);
     console.log("[PASS] Missing security head denied");
   }
+
+  for (const invalidHead of [
+    {
+      partitionKey: "synthetic-staff",
+      rowKey: STAFF_SECURITY_METADATA_HEAD,
+      state: "active",
+      revision: 7,
+      etag: 'W/"synthetic-etag"'
+    },
+    {
+      partitionKey: "synthetic-staff",
+      rowKey: STAFF_SECURITY_METADATA_HEAD,
+      state: "active",
+      revision: 8,
+      authorizationRevision: 7,
+      etag: 'W/"synthetic-etag"'
+    },
+    {
+      partitionKey: "synthetic-staff",
+      rowKey: STAFF_SECURITY_METADATA_HEAD,
+      state: "unknown",
+      revision: 7,
+      authorizationRevision: 7,
+      etag: 'W/"synthetic-etag"'
+    },
+    {
+      partitionKey: "synthetic-staff",
+      rowKey: STAFF_SECURITY_METADATA_HEAD,
+      state: "active",
+      revision: 7,
+      authorizationRevision: 7
+    }
+  ]) {
+    const f = fixture(invalidHead);
+    const result = await submitStaffScopedAtomicMutation(
+      event(), f.port, true
+    );
+    assert.equal(result.status, "denied");
+    assert.equal(f.transactions.length, 0);
+  }
+  console.log("[PASS] Missing, stale, malformed, or ETag-less heads denied");
 
   {
     const f = fixture();

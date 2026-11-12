@@ -30,9 +30,12 @@ function fixture() {
       assert.equal(rowKey, STAFF_SECURITY_METADATA_HEAD);
 
       return {
+        partitionKey: event.staffId,
+        rowKey: STAFF_SECURITY_METADATA_HEAD,
         state: "active",
         revision: 0,
-        etag: "synthetic-etag"
+        authorizationRevision: 0,
+        etag: 'W/"synthetic-etag"'
       };
     },
     async submitTransaction(value) {
@@ -102,11 +105,13 @@ async function main(): Promise<void> {
   const headEntity = head[1] as unknown as {
     rowKey: string;
     revision: number;
+    authorizationRevision: number;
     state: string;
   };
 
   assert.equal(headEntity.rowKey, STAFF_SECURITY_METADATA_HEAD);
   assert.equal(headEntity.revision, 1);
+  assert.equal(headEntity.authorizationRevision, 1);
   assert.equal(headEntity.state, "revoked");
 
   const staffRow = staffEvent[1] as unknown as {

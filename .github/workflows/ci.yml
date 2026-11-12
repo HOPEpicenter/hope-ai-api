@@ -87,6 +87,13 @@ jobs:
           npx --no-install ts-node tests/authorization/assessSyntheticLegacyProjectionFence.test.ts
           if ($LASTEXITCODE -ne 0) { throw "E149C synthetic legacy projection regressions failed" }
 
+      - name: E151 disabled dedicated authority writer boundary regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npx --no-install ts-node tests/authorization/inspectDedicatedAuthorityWriterBoundary.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "E151 dedicated writer boundary regressions failed" }
+
       - name: Phase C private acceptance security regressions
         shell: bash
         run: |

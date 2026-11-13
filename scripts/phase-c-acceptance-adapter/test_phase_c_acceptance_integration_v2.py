@@ -2,6 +2,7 @@ import unittest
 
 from phase_c_acceptance_integration_v2 import (
     simulate_transaction,
+    simulate_lifecycle,
     execution_authorized,
 )
 
@@ -107,6 +108,85 @@ class SyntheticIntegrationTests(unittest.TestCase):
 
         with self.assertRaises(KeyboardInterrupt):
             simulate_transaction(interrupt, lambda key: [])
+
+
+    def test_lifecycle_cleanup_after_success(self):
+        events = []
+
+        result = simulate_lifecycle(
+            lambda: "TEST_KEY",
+            lambda key: ["HTTP_STATUS=200"],
+            lambda: events.append("cleanup"),
+            lambda: events == ["cleanup"],
+        )
+
+        self.assertEqual(result, "ACCEPTANCE_PASSED")
+
+    def test_lifecycle_cleanup_after_credential_failure(self):
+        events = []
+
+        def acquire():
+            raise RuntimeError("SYNTHETIC_SECRET")
+
+        result = simulate_lifecycle(
+            acquire,
+            lambda key: ["HTTP_STATUS=200"],
+            lambda: events.append("cleanup"),
+            lambda: events == ["cleanup"],
+        )
+
+        self.assertEqual(result, "CREDENTIAL_ACQUISITION_FAILED")
+
+    def test_lifecycle_cleanup_after_wrapper_failure(self):
+        events = []
+
+        def run(key):
+            raise RuntimeError("SYNTHETIC_SECRET")
+
+        result = simulate_lifecycle(
+            lambda: "TEST_KEY",
+            run,
+            lambda: events.append("cleanup"),
+            lambda: events == ["cleanup"],
+        )
+
+        self.assertEqual(result, "EXECUTION_FAILURE")
+
+    def test_lifecycle_cleanup_failure_blocks_success(self):
+        def cleanup():
+            raise RuntimeError("SYNTHETIC_SECRET")
+
+        result = simulate_lifecycle(
+            lambda: "TEST_KEY",
+            lambda key: ["HTTP_STATUS=200"],
+            cleanup,
+            lambda: True,
+        )
+
+        self.assertEqual(result, "CLEANUP_FAILED")
+
+    def test_lifecycle_unverified_cleanup_blocks_success(self):
+        result = simulate_lifecycle(
+            lambda: "TEST_KEY",
+            lambda key: ["HTTP_STATUS=200"],
+            lambda: None,
+            lambda: False,
+        )
+
+        self.assertEqual(result, "CLEANUP_NOT_VERIFIED")
+
+    def test_lifecycle_verification_exception_blocks_success(self):
+        def verify():
+            raise RuntimeError("SYNTHETIC_SECRET")
+
+        result = simulate_lifecycle(
+            lambda: "TEST_KEY",
+            lambda key: ["HTTP_STATUS=200"],
+            lambda: None,
+            verify,
+        )
+
+        self.assertEqual(result, "CLEANUP_NOT_VERIFIED")
 
 if __name__ == "__main__":
     unittest.main()

@@ -37,3 +37,35 @@ def simulate_transaction(acquire_key, run_wrapper):
 def execution_authorized():
     """Preparation-only: live execution cannot be enabled."""
     return False
+
+def simulate_lifecycle(acquire_key, run_wrapper, cleanup, verify_cleanup):
+    """Synthetic only; no trusted authorization or real resources.
+
+    Attempt cleanup regardless of transaction outcome. A successful
+    transaction is not accepted until cleanup is independently verified.
+    """
+
+    outcome = "EXECUTION_FAILURE"
+
+    try:
+        outcome = simulate_transaction(acquire_key, run_wrapper)
+    except Exception:
+        outcome = "EXECUTION_FAILURE"
+    finally:
+        try:
+            cleanup()
+        except Exception:
+            outcome = "CLEANUP_FAILED"
+
+    try:
+        verified = verify_cleanup() is True
+    except Exception:
+        verified = False
+
+    if not verified:
+        return "CLEANUP_NOT_VERIFIED"
+
+    if outcome == "CLEANUP_FAILED":
+        return "CLEANUP_FAILED"
+
+    return outcome

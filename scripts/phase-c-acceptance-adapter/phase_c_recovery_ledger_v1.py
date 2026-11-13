@@ -31,12 +31,23 @@ class RecoveryLedger:
                 )
             """)
 
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS job_observations (
+                    operation_id TEXT NOT NULL,
+                    job_id TEXT NOT NULL UNIQUE,
+                    PRIMARY KEY (operation_id, job_id),
+                    FOREIGN KEY (operation_id)
+                        REFERENCES operations(operation_id)
+                )
+            """)
+
     def _connect(self):
         db = sqlite3.connect(
             self.path,
             timeout=5,
             isolation_level=None,
         )
+        db.execute("PRAGMA foreign_keys=ON")
         db.execute("PRAGMA synchronous=FULL")
         db.execute("PRAGMA busy_timeout=5000")
         return db
@@ -143,6 +154,46 @@ class RecoveryLedger:
             db.commit()
 
         return attempt_id if claimed else None
+
+    def record_job_observation(self, operation_id, job_id):
+        """Persist an untrusted association, never an authorization.
+
+        Both identifiers are caller-supplied. This method does not
+        validate cloud provenance, launch jobs, or certify cleanup.
+        """
+        self._require_uuid(operation_id)
+        self._require_uuid(job_id)
+
+        with closing(self._connect()) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute(
+                """
+                INSERT INTO job_observations (operation_id, job_id)
+                VALUES (?, ?)
+                """,
+                (operation_id, job_id),
+            )
+            db.commit()
+
+    def list_job_observations(self, operation_id):
+        """Return unverified associations, never trusted bindings."""
+        self._require_uuid(operation_id)
+
+        with closing(self._connect()) as db, db:
+            rows = db.execute(
+                """
+                SELECT job_id
+                FROM job_observations
+                WHERE operation_id = ?
+                ORDER BY job_id
+                """,
+                (operation_id,),
+            ).fetchall()
+
+        return [
+            {"job_id": row[0], "binding_verified": False}
+            for row in rows
+        ]
 
     def record_failure(self, operation_id, attempt_id):
         """Return claimed recovery to pending; never mark success."""

@@ -123,6 +123,84 @@ class RecoveryLedgerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.ledger.register(self.operation, "2000")
 
+    def test_job_observation_requires_registered_operation(self):
+        job = str(uuid.uuid4())
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.ledger.record_job_observation(
+                self.operation, job
+            )
+
+    def test_job_observation_survives_reopen(self):
+        self.register()
+        job = str(uuid.uuid4())
+        self.ledger.record_job_observation(self.operation, job)
+
+        result = RecoveryLedger(
+            self.path
+        ).list_job_observations(self.operation)
+
+        self.assertEqual(
+            result,
+            [{"job_id": job, "binding_verified": False}],
+        )
+
+    def test_job_cannot_bind_to_another_operation(self):
+        self.register()
+        other = str(uuid.uuid4())
+        self.ledger.register(other, 2000)
+        job = str(uuid.uuid4())
+        self.ledger.record_job_observation(
+            self.operation, job
+        )
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.ledger.record_job_observation(other, job)
+
+    def test_duplicate_observation_rejected(self):
+        self.register()
+        job = str(uuid.uuid4())
+        self.ledger.record_job_observation(
+            self.operation, job
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.ledger.record_job_observation(
+                self.operation, job
+            )
+
+    def test_multiple_jobs_remain_unverified(self):
+        self.register()
+        jobs = [str(uuid.uuid4()) for _ in range(2)]
+        for job in jobs:
+            self.ledger.record_job_observation(
+                self.operation, job
+            )
+
+        observations = self.ledger.list_job_observations(
+            self.operation
+        )
+        self.assertEqual(len(observations), 2)
+        self.assertTrue(all(
+            item["binding_verified"] is False
+            for item in observations
+        ))
+
+    def test_invalid_job_identifier_rejected(self):
+        self.register()
+        with self.assertRaises(ValueError):
+            self.ledger.record_job_observation(
+                self.operation, "invalid-job"
+            )
+
+    def test_job_observation_does_not_change_recovery_state(self):
+        self.register()
+        before = self.ledger.snapshot(self.operation)
+        self.ledger.record_job_observation(
+            self.operation, str(uuid.uuid4())
+        )
+        self.assertEqual(
+            self.ledger.snapshot(self.operation), before
+        )
+
     def test_no_success_state_in_database_contract(self):
         self.register()
         with self.assertRaises(sqlite3.IntegrityError):

@@ -3,6 +3,7 @@ import importlib.util
 import io
 import pathlib
 import unittest
+from unittest.mock import patch
 
 SOURCE = pathlib.Path(__file__).with_name(
     "phase_c_acceptance_adapter_v1.py"
@@ -109,6 +110,50 @@ class PhaseCAcceptanceAdapterTests(unittest.TestCase):
             "FAILURE_CATEGORY=LIVE_EXECUTION_NOT_AUTHORIZED"
         )
 
+
+
+    def test_execute_live_consults_gate(self):
+        with patch.object(
+            adapter, "assess_execution_request",
+            return_value="LIVE_EXECUTION_NOT_AUTHORIZED",
+        ) as gate:
+            result = adapter.execute_live()
+
+        gate.assert_called_once_with(execute=True)
+        self.assertEqual(result, "LIVE_EXECUTION_NOT_AUTHORIZED")
+
+    def test_cli_execute_consults_gate(self):
+        output = io.StringIO()
+
+        with patch.object(
+            adapter, "assess_execution_request",
+            return_value="LIVE_EXECUTION_NOT_AUTHORIZED",
+        ) as gate:
+            with contextlib.redirect_stdout(output):
+                code = adapter.main(["--execute"])
+
+        gate.assert_called_once_with(execute=True)
+        self.assertEqual(code, 2)
+        self.assertEqual(
+            output.getvalue().strip(),
+            "FAILURE_CATEGORY=LIVE_EXECUTION_NOT_AUTHORIZED",
+        )
+
+    def test_default_cli_does_not_request_authorization(self):
+        output = io.StringIO()
+
+        with patch.object(
+            adapter, "assess_execution_request",
+        ) as gate:
+            with contextlib.redirect_stdout(output):
+                code = adapter.main([])
+
+        gate.assert_not_called()
+        self.assertEqual(code, 2)
+        self.assertEqual(
+            output.getvalue().strip(),
+            "FAILURE_CATEGORY=DEFAULT_DISABLED",
+        )
 
 if __name__ == "__main__":
     unittest.main()

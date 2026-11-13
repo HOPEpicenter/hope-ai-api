@@ -7,6 +7,8 @@ network request, Azure operation, or live execution.
 import argparse
 import re
 
+from phase_c_authorization_gate_v1 import assess_execution_request
+
 _FAILURE = re.compile(r"FAILURE_CATEGORY=[A-Z0-9_]+", re.ASCII)
 _STATUS = re.compile(r"HTTP_STATUS=(UNAVAILABLE|[1-5][0-9]{2})", re.ASCII)
 
@@ -52,8 +54,8 @@ def classify_exception(_exception=None):
 
 
 def execute_live():
-    """Permanent denial in this preparation version."""
-    return "LIVE_EXECUTION_NOT_AUTHORIZED"
+    """Consult the default-deny gate; no live bridge is connected."""
+    return assess_execution_request(execute=True)
 
 
 def main(argv=None):
@@ -64,7 +66,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if args.execute:
-        print("FAILURE_CATEGORY=LIVE_EXECUTION_NOT_AUTHORIZED")
+        print("FAILURE_CATEGORY=" + assess_execution_request(execute=True))
         return 2
 
     print("FAILURE_CATEGORY=DEFAULT_DISABLED")

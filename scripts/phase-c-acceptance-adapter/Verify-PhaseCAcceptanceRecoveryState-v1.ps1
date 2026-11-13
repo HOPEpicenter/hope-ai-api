@@ -18,6 +18,12 @@ if (-not $Inspect) {
     exit 2
 }
 
+# These dimensions require independent, transaction-specific evidence.
+# VM baseline inspection cannot establish complete cleanup.
+Write-Output 'TEMPORARY_PERMISSIONS_REVOKED=NOT_VERIFIED'
+Write-Output 'RECOVERY_JOURNAL_VERIFIED=NOT_VERIFIED'
+Write-Output 'FULL_TRANSACTION_CLEANUP_VERIFIED=False'
+
 try {
     $account = & az account show --output json 2>$null
 
@@ -100,7 +106,7 @@ try {
 
     if ($vmDeallocated -and $commandsEmpty) {
         Write-Output 'RECOVERY_STATE=VM_BASELINE_VERIFIED'
-        Write-Output 'FULL_TRANSACTION_CLEANUP_VERIFIED=False'
+
         exit 0
     }
 

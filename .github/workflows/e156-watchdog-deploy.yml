@@ -1,0 +1,40 @@
+name: E156 Watchdog Draft Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      acceptance_mode:
+        description: "Explicitly select disabled baseline"
+        required: true
+        type: choice
+        options:
+          - disabled
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e156-watchdog-deployment
+  cancel-in-progress: false
+
+jobs:
+  watchdog-deployment-disabled:
+    name: Verify disabled deployment baseline
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.acceptance_mode == 'disabled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: HOPE-E156-Watchdog-Deploy
+    steps:
+      - name: Enforce disabled deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "E156_WATCHDOG_DEPLOYMENT=DISABLED"
+          echo "AZURE_LOGIN_ATTEMPTED=False"
+          echo "RUNBOOK_CREATED=False"
+          echo "CLOUD_JOB_CREATED=False"
+          echo "CLEANUP_EXECUTION=False"

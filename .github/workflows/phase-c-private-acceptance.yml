@@ -1,0 +1,42 @@
+name: Phase C Private Acceptance - Disabled Baseline
+
+on:
+  workflow_dispatch:
+    inputs:
+      acceptance_mode:
+        description: "Preparation only - no execution"
+        required: true
+        type: choice
+        options:
+          - disabled
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase-c-private-acceptance
+  cancel-in-progress: false
+
+jobs:
+  verify-disabled-baseline:
+    name: Confirm Phase C acceptance remains disabled
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' &&
+      inputs.acceptance_mode == 'disabled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify execution prohibition
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "PHASE_C_ACCEPTANCE=DISABLED"
+          echo "EXTERNAL_AUTHORIZATION_CONNECTED=False"
+          echo "BRIDGE_EXECUTED=False"
+          echo "CREDENTIAL_ACQUISITION=False"
+          echo "AZURE_LOGIN_ATTEMPTED=False"
+          echo "VM_START_REQUESTED=False"
+          echo "STAFF_LOOKUP_REQUESTED=False"
+          echo "STAFF_AUTHORITY_ACTIVATED=False"

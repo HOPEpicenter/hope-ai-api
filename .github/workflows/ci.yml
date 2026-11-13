@@ -101,6 +101,13 @@ jobs:
           npx --no-install ts-node tests/authorization/assessE156SyntheticDenialEvidence.test.ts
           if ($LASTEXITCODE -ne 0) { throw "E156 status-only evidence regressions failed" }
 
+      - name: E156-D1 disabled diagnostic harness regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          npx --no-install ts-node tests/authorization/inspectE156D1SyntheticProbe.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "E156-D1 disabled diagnostic harness regressions failed" }
+
       - name: E154 canonical binding row-location regressions
         shell: pwsh
         run: |

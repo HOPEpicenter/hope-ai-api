@@ -54,6 +54,10 @@ jobs:
           npm run guard
 
 
+      - name: E156 watchdog pagination regression
+        shell: pwsh
+        run: |
+          & ./tests/authorization/e156WatchdogPagination.Tests.ps1
       - name: Guard scripts (PowerShell)
         shell: pwsh
         run: |

@@ -20,94 +20,80 @@ class RecoveryWorkerTests(unittest.TestCase):
         self.operation = str(uuid.uuid4())
         self.ledger.register(self.operation, 2000)
 
-    def test_disabled_without_callback(self):
-        result = assess_recovery_attempt(
-            self.ledger, self.operation, 1000
+    def attempt(self, now=1000):
+        return assess_recovery_attempt(
+            self.ledger,
+            self.operation,
+            now,
+            synthetic_attempt=True,
         )
+
+    def test_disabled_by_default(self):
         self.assertEqual(
-            result, "RECOVERY_EXECUTION_DISABLED"
+            assess_recovery_attempt(
+                self.ledger, self.operation, 1000
+            ),
+            "RECOVERY_EXECUTION_DISABLED",
         )
         self.assertEqual(
             self.ledger.snapshot(self.operation)["attempts"], 0
         )
 
     def test_synthetic_attempt_remains_pending(self):
+        self.assertEqual(
+            self.attempt(), "RECOVERY_ATTEMPT_FAILED"
+        )
+        self.assertEqual(
+            self.ledger.snapshot(self.operation)["state"],
+            "RECOVERY_REQUIRED",
+        )
+
+    def test_callable_injection_rejected(self):
         events = []
-        result = assess_recovery_attempt(
-            self.ledger,
-            self.operation,
-            1000,
-            synthetic_callback=lambda: events.append("called"),
-        )
-        self.assertEqual(events, ["called"])
-        self.assertEqual(
-            result, "RECOVERY_ATTEMPT_FAILED"
-        )
-        self.assertEqual(
-            self.ledger.snapshot(self.operation)["state"],
-            "RECOVERY_REQUIRED",
-        )
 
-    def test_callback_exception_is_contained(self):
-        def fail():
-            raise RuntimeError("DO_NOT_DISCLOSE")
+        with self.assertRaises(TypeError):
+            assess_recovery_attempt(
+                self.ledger,
+                self.operation,
+                1000,
+                synthetic_callback=lambda: events.append("executed"),
+            )
 
-        result = assess_recovery_attempt(
-            self.ledger,
-            self.operation,
-            1000,
-            synthetic_callback=fail,
-        )
+        self.assertEqual(events, [])
         self.assertEqual(
-            result, "RECOVERY_ATTEMPT_FAILED"
-        )
-        self.assertEqual(
-            self.ledger.snapshot(self.operation)["state"],
-            "RECOVERY_REQUIRED",
+            self.ledger.snapshot(self.operation)["attempts"], 0
         )
 
     def test_active_lease_blocks_worker(self):
         self.ledger.claim_recovery(
             self.operation, 1000, 60
         )
-        events = []
-
-        result = assess_recovery_attempt(
-            self.ledger,
-            self.operation,
-            1001,
-            synthetic_callback=lambda: events.append("called"),
+        self.assertEqual(
+            self.attempt(1001),
+            "RECOVERY_NOT_CLAIMED",
         )
-
-        self.assertEqual(result, "RECOVERY_NOT_CLAIMED")
-        self.assertEqual(events, [])
 
     def test_pending_recovery_can_retry(self):
         for now in (1000, 1010):
             self.assertEqual(
-                assess_recovery_attempt(
-                    self.ledger,
-                    self.operation,
-                    now,
-                    synthetic_callback=lambda: None,
-                ),
+                self.attempt(now),
                 "RECOVERY_ATTEMPT_FAILED",
             )
-
         self.assertEqual(
             self.ledger.snapshot(self.operation)["attempts"], 2
         )
 
-    def test_invalid_callback_denied(self):
-        result = assess_recovery_attempt(
-            self.ledger,
-            self.operation,
-            1000,
-            synthetic_callback="run",
-        )
-        self.assertEqual(
-            result, "INVALID_SYNTHETIC_CALLBACK"
-        )
+    def test_invalid_synthetic_attempt_denied(self):
+        for invalid in ("run", 1, None, lambda: None):
+            self.assertEqual(
+                assess_recovery_attempt(
+                    self.ledger,
+                    self.operation,
+                    1000,
+                    synthetic_attempt=invalid,
+                ),
+                "INVALID_SYNTHETIC_ATTEMPT",
+            )
         self.assertEqual(
             self.ledger.snapshot(self.operation)["attempts"], 0
         )

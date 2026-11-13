@@ -15,19 +15,22 @@ def simulate_transaction(acquire_key, run_wrapper):
 
     try:
         key = acquire_key()
-    except BaseException:
+    except Exception:
+        return "CREDENTIAL_ACQUISITION_FAILED"
+
+    if not isinstance(key, str) or not key:
         return "CREDENTIAL_ACQUISITION_FAILED"
 
     try:
         evidence = run_wrapper(key)
-    except BaseException as error:
+    except Exception as error:
         return classify_exception(error)
     finally:
         key = None
 
     try:
         return classify_output(evidence)
-    except BaseException:
+    except Exception:
         return "INVALID_EVIDENCE"
 
 

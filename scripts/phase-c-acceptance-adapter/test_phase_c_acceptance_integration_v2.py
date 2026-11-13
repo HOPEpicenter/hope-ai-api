@@ -79,5 +79,34 @@ class SyntheticIntegrationTests(unittest.TestCase):
         self.assertFalse(execution_authorized())
 
 
+
+    def test_missing_key_rejected(self):
+        self.assertEqual(
+            simulate_transaction(lambda: None, lambda key: ["HTTP_STATUS=200"]),
+            "CREDENTIAL_ACQUISITION_FAILED",
+        )
+
+    def test_empty_key_rejected(self):
+        self.assertEqual(
+            simulate_transaction(lambda: "", lambda key: ["HTTP_STATUS=200"]),
+            "CREDENTIAL_ACQUISITION_FAILED",
+        )
+
+    def test_wrapper_not_called_without_key(self):
+        invoked = []
+        result = simulate_transaction(
+            lambda: None,
+            lambda key: invoked.append(True),
+        )
+        self.assertEqual(result, "CREDENTIAL_ACQUISITION_FAILED")
+        self.assertEqual(invoked, [])
+
+    def test_keyboard_interrupt_not_swallowed(self):
+        def interrupt():
+            raise KeyboardInterrupt()
+
+        with self.assertRaises(KeyboardInterrupt):
+            simulate_transaction(interrupt, lambda key: [])
+
 if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,12 @@ name: Deploy hope-ai-api-staging to Azure Functions
 on:
   push:
     branches: [ "main" ]
+    paths-ignore:
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/deploy-staging.yml'
+      - '.github/workflows/e156-watchdog-deploy.yml'
+      - 'scripts/e156/Watch-HopeE156CleanupRecovery-v3.ps1'
+      - 'tests/authorization/e156WatchdogPagination.Tests.ps1'
   workflow_dispatch:
 
 permissions:

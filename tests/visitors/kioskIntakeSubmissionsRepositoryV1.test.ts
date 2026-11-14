@@ -132,6 +132,84 @@ test("same submission ID and payload are retry safe", async () => {
   assert.equal(table.rows.size, 1);
 });
 
+test("retry after review preserves reviewed status", async () => {
+  const table = new MemoryTable();
+  const deps = { table, enabled: true, now };
+
+  await appendKioskIntakeSubmissionV1(
+    valid, submissionId, deps
+  );
+
+  const key =
+    `friends-family-2026-11-22/${submissionId}`;
+
+  const stored = table.rows.get(key);
+
+  assert.ok(stored);
+
+  table.rows.set(key, {
+    ...stored,
+    reviewStatus: "reviewed"
+  });
+
+  const result = await appendKioskIntakeSubmissionV1(
+    valid, submissionId, deps
+  );
+
+  assert.deepEqual(result, {
+    accepted: true,
+    status: "already_recorded"
+  });
+
+  assert.equal(table.rows.size, 1);
+  assert.equal(
+    table.rows.get(key).reviewStatus,
+    "reviewed"
+  );
+});
+
+test("reviewed record cannot be replaced by changed payload", async () => {
+  const table = new MemoryTable();
+  const deps = { table, enabled: true, now };
+
+  await appendKioskIntakeSubmissionV1(
+    valid, submissionId, deps
+  );
+
+  const key =
+    `friends-family-2026-11-22/${submissionId}`;
+
+  const stored = table.rows.get(key);
+
+  table.rows.set(key, {
+    ...stored,
+    reviewStatus: "reviewed"
+  });
+
+  const result = await appendKioskIntakeSubmissionV1(
+    {
+      ...valid,
+      contactConsent: false
+    },
+    submissionId,
+    deps
+  );
+
+  assert.deepEqual(result, {
+    accepted: false,
+    status: "idempotency_conflict"
+  });
+
+  assert.equal(table.rows.size, 1);
+  assert.equal(
+    table.rows.get(key).contactConsent,
+    true
+  );
+  assert.equal(
+    table.rows.get(key).reviewStatus,
+    "reviewed"
+  );
+});
 test("same ID with changed payload is rejected", async () => {
   const table = new MemoryTable();
   const deps = { table, enabled: true, now };

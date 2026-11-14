@@ -129,7 +129,8 @@ export async function appendKioskIntakeSubmissionV1(
     if (
       existing?.payloadHash === payloadHash &&
       existing?.source === entity.source &&
-      existing?.reviewStatus === "pending"
+      existing?.partitionKey === EVENT &&
+      existing?.rowKey === submissionId
     ) {
       return { accepted: true, status: "already_recorded" };
     }

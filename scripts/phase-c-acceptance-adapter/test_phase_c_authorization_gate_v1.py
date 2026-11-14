@@ -46,6 +46,56 @@ class PhaseCAuthorizationGateTests(unittest.TestCase):
             DENIAL,
         )
 
+    def test_claimed_trusted_authority_cannot_open_gate(self):
+        from phase_c_trusted_authority_v1 import (
+            OperationAuthorityScope,
+            assess_trusted_operation_authority,
+        )
+
+        scope = OperationAuthorityScope(
+            operation_id="synthetic-operation",
+            resource_scope="synthetic-resource",
+            runbook_name="synthetic-runbook",
+            request_id="synthetic-request",
+            expires_utc=9999999999,
+            approval_provenance="synthetic-approval",
+        )
+
+        claimed_evidence = {
+            "approved": True,
+            "verified": True,
+            "issuer": "trusted",
+        }
+
+        self.assertEqual(
+            assess_trusted_operation_authority(
+                scope=scope,
+                evidence=claimed_evidence,
+                execution_enabled=True,
+            ),
+            "TRUSTED_OPERATION_AUTHORITY_NOT_CONNECTED",
+        )
+
+        self.assertFalse(trusted_verifier_available())
+
+        self.assertEqual(
+            assess_execution_request(
+                execute=True,
+                approval=claimed_evidence,
+                environment="HOPE-Phase-C-Job-Creation",
+            ),
+            DENIAL,
+        )
+
+        with self.assertRaisesRegex(
+            PermissionError,
+            "^LIVE_EXECUTION_NOT_AUTHORIZED$",
+        ):
+            require_execution_authorization(
+                execute=True,
+                approval=claimed_evidence,
+            )
+
     def test_unavailable_external_verifier(self):
         self.assertFalse(trusted_verifier_available())
 

@@ -30,5 +30,9 @@ def require_execution_authorization(**kwargs):
 
 
 def trusted_verifier_available():
-    """No trusted external verifier is connected in this version."""
-    return False
+    """Reflect the protected trusted-operation verifier boundary."""
+    from phase_c_trusted_authority_v1 import (
+        trusted_operation_verifier_available,
+    )
+
+    return trusted_operation_verifier_available()

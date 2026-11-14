@@ -35,14 +35,53 @@ if ([string]$run.path -cne $expectedPath -or
 
 Write-Output 'EXACT_WORKFLOW_RUN_IDENTITY_VERIFIED=True'
 
-$history = @(
-    gh api "repos/$repo/actions/runs/$RunId/approvals" |
-        ConvertFrom-Json
-)
+# Retrieve all pages through the authenticated GitHub CLI.
+# --slurp returns an outer array containing the page arrays.
+$approvalJson = & gh api `
+    "repos/$repo/actions/runs/$RunId/approvals" `
+    --paginate --slurp
 
-if ($LASTEXITCODE -ne 0) {
+if ($LASTEXITCODE -ne 0 -or -not $approvalJson) {
     throw 'APPROVAL_HISTORY_READ_FAILED'
 }
+
+try {
+    $pages = ConvertFrom-Json `
+        -InputObject ($approvalJson -join "`n") `
+        -Depth 40 `
+        -NoEnumerate
+}
+catch {
+    throw 'APPROVAL_HISTORY_JSON_INVALID'
+}
+
+if ($pages -isnot [array]) {
+    throw 'APPROVAL_HISTORY_PAGINATION_INVALID'
+}
+
+$history = @(
+    foreach ($page in $pages) {
+        if ($page -isnot [array]) {
+            throw 'APPROVAL_HISTORY_PAGE_INVALID'
+        }
+
+        foreach ($record in $page) {
+            if ($null -eq $record -or
+                $record -isnot [pscustomobject] -or
+                $null -eq $record.user -or
+                $record.user -isnot [pscustomobject] -or
+                $record.environments -isnot [array] -or
+                $record.state -isnot [string]) {
+                throw 'APPROVAL_HISTORY_RECORD_INVALID'
+            }
+
+            $record
+        }
+    }
+)
+
+Write-Output 'APPROVAL_HISTORY_PAGES_RETRIEVED=True'
+Write-Output "APPROVAL_HISTORY_RECORD_COUNT=$($history.Count)"
 
 $matching = @(
     $history | Where-Object {

@@ -290,6 +290,105 @@ if (-not $denied -or
 }
 
 Write-Host 'PASS=MISMATCHED_JOB_EVIDENCE_DENIED'
+Write-Host '=== APPROVAL HISTORY EMISSION DENIALS ==='
+
+function Assert-EvidenceEmissionDenied {
+    param(
+        [Parameter(Mandatory)]
+        [string] $HistoryJson,
+
+        [Parameter(Mandatory)]
+        [string] $ExpectedResult
+    )
+
+    $global:approvalJson = $HistoryJson
+    $global:jobsJson = New-JobsJson -Jobs @($validJob) -Total 1
+    $global:callCount = 0
+
+    $denied = $false
+    $observed = ''
+    $emitted = @()
+
+    try {
+        $emitted = @(
+            & $reader -RunId 123 `
+                -OperationId $global:op `
+                -RequestId $global:req `
+                -EmitEvidenceJson
+        )
+    }
+    catch {
+        $denied = $true
+        $observed = $_.Exception.Message
+    }
+
+    if (-not $denied) {
+        throw "UNEXPECTED_EVIDENCE_ACCEPTANCE: $ExpectedResult"
+    }
+
+    if ($observed -notlike '*STRUCTURED_APPROVAL_HISTORY_NOT_ACCEPTABLE*') {
+        throw "UNEXPECTED_DENIAL_REASON: $observed"
+    }
+
+    if (@($emitted | Where-Object {
+        $_ -is [string] -and
+        $_.StartsWith('EVIDENCE_JSON=')
+    }).Count -ne 0) {
+        throw "EVIDENCE_EMITTED_ON_DENIAL: $ExpectedResult"
+    }
+
+    Write-Host "PASS=$ExpectedResult"
+}
+
+$approvedRecord = @{
+    state = 'approved'
+    user = @{ login = 'Hope-2018' }
+    environments = @(
+        @{ name = 'HOPE-Phase-C-Job-Creation' }
+    )
+}
+
+$rejectedRecord = @{
+    state = 'rejected'
+    user = @{ login = 'another-reviewer' }
+    environments = @(
+        @{ name = 'HOPE-Phase-C-Job-Creation' }
+    )
+}
+
+$unrelatedRecord = @{
+    state = 'approved'
+    user = @{ login = 'other-reviewer' }
+    environments = @(
+        @{ name = 'Unrelated-Environment' }
+    )
+}
+
+function Convert-ApprovalPages {
+    param([object[]] $Records)
+
+    $page = @($Records)
+
+    ConvertTo-Json -InputObject @(,$page) -Depth 20 -Compress
+}
+
+Assert-EvidenceEmissionDenied `
+    -HistoryJson (Convert-ApprovalPages @(
+        $approvedRecord, $rejectedRecord
+    )) `
+    -ExpectedResult 'REJECTED_APPROVAL_EMISSION_DENIED'
+
+Assert-EvidenceEmissionDenied `
+    -HistoryJson (Convert-ApprovalPages @(
+        $approvedRecord, $approvedRecord
+    )) `
+    -ExpectedResult 'DUPLICATE_APPROVAL_EMISSION_DENIED'
+
+Assert-EvidenceEmissionDenied `
+    -HistoryJson (Convert-ApprovalPages @(
+        $unrelatedRecord
+    )) `
+    -ExpectedResult 'MISSING_APPROVAL_EMISSION_DENIED'
 Write-Host '=== FINAL TEST RESULT ==='
 Write-Host 'ALL_FIVE_JOB_BINDING_TESTS_PASSED=True'
 Write-Host 'SYNTHETIC_GITHUB_RESPONSES_ONLY=True'

@@ -172,6 +172,35 @@ if ($OperationId -or $RequestId) {
     Write-Output 'JOB_OPERATION_BINDING_VERIFIED=True'
     Write-Output 'JOB_EVIDENCE_CONSISTENT_NOT_AUTHORIZED=True'
     if ($EmitEvidenceJson) {
+        # Check the entire supplied history before emitting evidence.
+        # This does not authenticate history or grant authority.
+        $protected = @(
+            $history | Where-Object {
+                $record = $_
+                @($record.environments | Where-Object {
+                    $_.name -ceq $environment
+                }).Count -gt 0
+            }
+        )
+
+        $validApprovals = @(
+            $protected | Where-Object {
+                $_.state -ceq 'approved' -and
+                $_.user.login -ieq $reviewer
+            }
+        )
+
+        $rejections = @(
+            $protected | Where-Object {
+                $_.state -ceq 'rejected'
+            }
+        )
+
+        if ($validApprovals.Count -ne 1 -or
+            $rejections.Count -gt 0) {
+            throw 'STRUCTURED_APPROVAL_HISTORY_NOT_ACCEPTABLE'
+        }
+
         # Raw evidence is observational data, not an authorization.
         # No credentials, tokens, or Azure operations are involved.
         $record = [ordered]@{

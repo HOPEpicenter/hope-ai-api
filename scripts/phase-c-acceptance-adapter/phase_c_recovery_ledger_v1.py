@@ -236,6 +236,33 @@ class RecoveryLedger:
 
         return reserved
 
+    def get_job_creation_reservation(self, operation_id):
+        """Read the durable creation intent without granting authority.
+
+        The returned request ID is coordination metadata only.
+        It is not proof that an Azure job exists or is authorized.
+        """
+        self._require_uuid(operation_id)
+
+        with closing(self._connect()) as db:
+            row = db.execute(
+                """
+                SELECT request_id, created_utc, state
+                FROM job_creation_reservations
+                WHERE operation_id = ?
+                """,
+                (operation_id,),
+            ).fetchone()
+
+        if row is None:
+            return None
+
+        return {
+            "request_id": row[0],
+            "created_utc": row[1],
+            "state": row[2],
+        }
+
     def record_failure(self, operation_id, attempt_id):
         """Return claimed recovery to pending; never mark success."""
         self._require_uuid(operation_id)

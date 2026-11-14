@@ -269,6 +269,49 @@ class RecoveryLedgerTests(unittest.TestCase):
             )
         )
 
+    def test_job_creation_lookup_survives_restart(self):
+        self.register()
+        request = str(uuid.uuid4())
+
+        self.assertTrue(
+            self.ledger.reserve_job_creation(
+                self.operation, request, 1000
+            )
+        )
+
+        reopened = RecoveryLedger(self.path)
+
+        self.assertEqual(
+            reopened.get_job_creation_reservation(self.operation),
+            {
+                "request_id": request,
+                "created_utc": 1000,
+                "state": "UNRESOLVED",
+            },
+        )
+
+    def test_job_creation_lookup_missing_is_read_only(self):
+        self.register()
+
+        before = self.ledger.snapshot(self.operation)
+
+        self.assertIsNone(
+            self.ledger.get_job_creation_reservation(
+                self.operation
+            )
+        )
+
+        self.assertEqual(
+            self.ledger.snapshot(self.operation), before
+        )
+
+    def test_job_creation_lookup_invalid_id_rejected(self):
+        with self.assertRaises(ValueError):
+            self.ledger.get_job_creation_reservation(
+                "invalid-operation"
+            )
+
+
 
 if __name__ == "__main__":
     unittest.main()

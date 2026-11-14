@@ -3,7 +3,11 @@
 param(
     [Parameter(Mandatory)]
     [ValidateRange(1, [long]::MaxValue)]
-    [long] $RunId
+    [long] $RunId,
+
+    [string] $OperationId,
+
+    [string] $RequestId
 )
 
 Set-StrictMode -Version Latest
@@ -80,6 +84,88 @@ $history = @(
     }
 )
 
+# Optional operation-specific job evidence validation.
+# This cannot authorize Azure execution.
+if ($OperationId -or $RequestId) {
+    $uuid4 = '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+
+    if ($OperationId -cnotmatch $uuid4 -or
+        $RequestId -cnotmatch $uuid4) {
+        throw 'OPERATION_REQUEST_ID_INVALID'
+    }
+
+    $jobsJson = & gh api `
+        "repos/$repo/actions/runs/$RunId/jobs?per_page=100" `
+        --paginate --slurp
+
+    if ($LASTEXITCODE -ne 0 -or -not $jobsJson) {
+        throw 'RUN_JOBS_READ_FAILED'
+    }
+
+    try {
+        $jobPages = ConvertFrom-Json `
+            -InputObject ($jobsJson -join "`n") `
+            -Depth 40 `
+            -NoEnumerate
+    }
+    catch {
+        throw 'RUN_JOBS_JSON_INVALID'
+    }
+
+    if ($jobPages -isnot [array] -or $jobPages.Count -eq 0) {
+        throw 'RUN_JOBS_PAGINATION_INVALID'
+    }
+
+    $jobs = @()
+    $expectedTotal = $null
+
+    foreach ($page in $jobPages) {
+        if ($null -eq $page -or
+            $page -isnot [pscustomobject] -or
+            $page.jobs -isnot [array] -or
+            $page.total_count -isnot [long] -and
+            $page.total_count -isnot [int]) {
+            throw 'RUN_JOBS_PAGE_INVALID'
+        }
+
+        if ($null -eq $expectedTotal) {
+            $expectedTotal = [long]$page.total_count
+        }
+        elseif ($expectedTotal -ne [long]$page.total_count) {
+            throw 'RUN_JOBS_TOTAL_MISMATCH'
+        }
+
+        foreach ($job in $page.jobs) {
+            if ($null -eq $job -or
+                $job -isnot [pscustomobject] -or
+                $job.name -isnot [string] -or
+                [long]$job.run_id -ne $RunId) {
+                throw 'RUN_JOB_EVIDENCE_INVALID'
+            }
+
+            $jobs += $job
+        }
+    }
+
+    if ($jobs.Count -ne $expectedTotal) {
+        throw 'RUN_JOBS_INCOMPLETE'
+    }
+
+    $expectedName = "DISABLED operation=$OperationId request=$RequestId"
+
+    $matching = @(
+        $jobs | Where-Object {
+            $_.name -ceq $expectedName
+        }
+    )
+
+    if ($matching.Count -ne 1) {
+        throw 'JOB_OPERATION_BINDING_MISMATCH'
+    }
+
+    Write-Output 'JOB_OPERATION_BINDING_VERIFIED=True'
+    Write-Output 'JOB_EVIDENCE_CONSISTENT_NOT_AUTHORIZED=True'
+}
 Write-Output 'APPROVAL_HISTORY_PAGES_RETRIEVED=True'
 Write-Output "APPROVAL_HISTORY_RECORD_COUNT=$($history.Count)"
 

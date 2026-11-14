@@ -1,0 +1,26 @@
+name: Phase C protected job creation (disabled)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disabled-boundary:
+    name: Protected job creator unavailable
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Confirm execution disabled
+        shell: bash
+        run: |
+          echo "PHASE_C_JOB_CREATION=DISABLED"
+          echo "TRUSTED_OPERATION_AUTHORITY=NOT_CONNECTED"
+          echo "AZURE_LOGIN=DISABLED"
+          echo "JOB_CREATION_REQUESTED=False"
+          echo "No Azure operation will be attempted."

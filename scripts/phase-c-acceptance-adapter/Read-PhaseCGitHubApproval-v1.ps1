@@ -7,7 +7,9 @@ param(
 
     [string] $OperationId,
 
-    [string] $RequestId
+    [string] $RequestId,
+
+    [switch] $EmitEvidenceJson
 )
 
 Set-StrictMode -Version Latest
@@ -19,6 +21,10 @@ $workflow = 'phase-c-protected-job-creation.yml'
 $environment = 'HOPE-Phase-C-Job-Creation'
 $reviewer = 'Hope-2018'
 
+if ($EmitEvidenceJson -and
+    (-not $OperationId -or -not $RequestId)) {
+    throw 'STRUCTURED_EVIDENCE_REQUIRES_OPERATION_BINDING'
+}
 Write-Output '=== PHASE C GITHUB APPROVAL READBACK ==='
 
 $run = gh api "repos/$repo/actions/runs/$RunId" |
@@ -165,6 +171,28 @@ if ($OperationId -or $RequestId) {
 
     Write-Output 'JOB_OPERATION_BINDING_VERIFIED=True'
     Write-Output 'JOB_EVIDENCE_CONSISTENT_NOT_AUTHORIZED=True'
+    if ($EmitEvidenceJson) {
+        # Raw evidence is observational data, not an authorization.
+        # No credentials, tokens, or Azure operations are involved.
+        $record = [ordered]@{
+            schema = 'phase-c-github-evidence-v1'
+            operationId = $OperationId
+            requestId = $RequestId
+            runId = $RunId
+            run = $run
+            job = $matching[0]
+            history = @($history)
+            executionAuthorized = $false
+            trustedIssuerConnected = $false
+        }
+
+        $json = ConvertTo-Json `
+            -InputObject $record `
+            -Depth 40 `
+            -Compress
+
+        Write-Output ('EVIDENCE_JSON=' + $json)
+    }
 }
 Write-Output 'APPROVAL_HISTORY_PAGES_RETRIEVED=True'
 Write-Output "APPROVAL_HISTORY_RECORD_COUNT=$($history.Count)"

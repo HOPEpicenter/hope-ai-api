@@ -189,6 +189,107 @@ if (-not $denied) {
 
 Write-Host 'PASS=INVALID_OPERATION_DENIED'
 
+Write-Host '=== STRUCTURED EVIDENCE JSON ==='
+
+$global:jobsJson = New-JobsJson -Jobs @($validJob) -Total 1
+$global:callCount = 0
+
+$lines = @(
+    & $reader -RunId 123 `
+        -OperationId $global:op `
+        -RequestId $global:req `
+        -EmitEvidenceJson
+)
+
+if ($global:callCount -ne 3) {
+    throw 'STRUCTURED_EVIDENCE_CALL_COUNT_INVALID'
+}
+
+$evidenceLines = @(
+    $lines | Where-Object {
+        $_ -is [string] -and
+        $_.StartsWith('EVIDENCE_JSON=')
+    }
+)
+
+if ($evidenceLines.Count -ne 1) {
+    throw 'STRUCTURED_EVIDENCE_RECORD_COUNT_INVALID'
+}
+
+$record = ConvertFrom-Json `
+    -InputObject $evidenceLines[0].Substring(14) `
+    -Depth 40
+
+if (
+    $record.schema -cne 'phase-c-github-evidence-v1' -or
+    $record.operationId -cne $global:op -or
+    $record.requestId -cne $global:req -or
+    $record.runId -ne 123 -or
+    $record.run.id -ne 123 -or
+    $record.job.name -cne $global:jobName -or
+    $record.job.run_id -ne 123 -or
+    @($record.history).Count -ne 1 -or
+    $record.executionAuthorized -ne $false -or
+    $record.trustedIssuerConnected -ne $false
+) {
+    throw 'STRUCTURED_EVIDENCE_CONTRACT_INVALID'
+}
+
+Assert-Line $lines 'AZURE_JOB_CREATION_AUTHORIZED=False'
+Assert-Line $lines 'NO_EXECUTION=True'
+
+Write-Host 'PASS=STRUCTURED_EVIDENCE_NONAUTHORIZING'
+
+Write-Host '=== STRUCTURED OUTPUT REQUIRES BOTH IDENTIFIERS ==='
+
+$denied = $false
+
+try {
+    $null = & $reader -RunId 123 -EmitEvidenceJson
+}
+catch {
+    $denied = $true
+}
+
+if (-not $denied) {
+    throw 'UNBOUND_STRUCTURED_EVIDENCE_ACCEPTED'
+}
+
+Write-Host 'PASS=UNBOUND_STRUCTURED_EVIDENCE_DENIED'
+
+Write-Host '=== MISMATCHED JOB CANNOT EMIT EVIDENCE ==='
+
+$global:jobsJson = New-JobsJson -Jobs @(
+    @{
+        run_id = 123
+        name = 'DISABLED operation=wrong request=wrong'
+    }
+) -Total 1
+
+$denied = $false
+$emitted = @()
+
+try {
+    $emitted = @(
+        & $reader -RunId 123 `
+            -OperationId $global:op `
+            -RequestId $global:req `
+            -EmitEvidenceJson
+    )
+}
+catch {
+    $denied = $true
+}
+
+if (-not $denied -or
+    @($emitted | Where-Object {
+        $_ -is [string] -and
+        $_.StartsWith('EVIDENCE_JSON=')
+    }).Count -ne 0) {
+    throw 'MISMATCHED_JOB_EVIDENCE_EMITTED'
+}
+
+Write-Host 'PASS=MISMATCHED_JOB_EVIDENCE_DENIED'
 Write-Host '=== FINAL TEST RESULT ==='
 Write-Host 'ALL_FIVE_JOB_BINDING_TESTS_PASSED=True'
 Write-Host 'SYNTHETIC_GITHUB_RESPONSES_ONLY=True'

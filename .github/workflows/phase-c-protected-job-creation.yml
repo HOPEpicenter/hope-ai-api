@@ -2,13 +2,22 @@ name: Phase C protected job creation (disabled)
 
 on:
   workflow_dispatch:
+    inputs:
+      operation_id:
+        description: 'Canonical recovery operation UUID'
+        required: true
+        type: string
+      request_id:
+        description: 'Durable job creation request UUID'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   disabled-boundary:
-    name: Protected job creator unavailable
+    name: "DISABLED operation=${{ inputs.operation_id }} request=${{ inputs.request_id }}"
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: HOPE-Phase-C-Job-Creation

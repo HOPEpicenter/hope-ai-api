@@ -85,6 +85,20 @@ try {
         throw 'JOB_IDENTITY_MISMATCH'
     }
 
+    if ([string]$job.name -cne $JobId) {
+        throw 'JOB_NAME_MISMATCH'
+    }
+
+    $runbookName = 'Remove-HopeE156TemporaryNetwork-v14'
+
+    if ($null -eq $job.PSObject.Properties['properties'] -or
+        $null -eq $job.properties -or
+        $null -eq $job.properties.PSObject.Properties['runbook'] -or
+        $null -eq $job.properties.runbook -or
+        [string]$job.properties.runbook.name -cne $runbookName) {
+        throw 'JOB_RUNBOOK_MISMATCH'
+    }
+
     if ($null -eq $job.PSObject.Properties['properties']) {
         throw 'JOB_PROPERTIES_UNAVAILABLE'
     }

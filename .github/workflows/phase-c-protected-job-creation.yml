@@ -1,0 +1,36 @@
+name: Phase C protected job creation (disabled)
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation_id:
+        description: 'Canonical recovery operation UUID'
+        required: true
+        type: string
+      request_id:
+        description: 'Durable job creation request UUID'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  disabled-boundary:
+    name: "DISABLED operation=${{ inputs.operation_id }} request=${{ inputs.request_id }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: HOPE-Phase-C-Job-Creation
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Confirm execution disabled
+        shell: bash
+        run: |
+          echo "PHASE_C_JOB_CREATION=DISABLED"
+          echo "TRUSTED_OPERATION_AUTHORITY=NOT_CONNECTED"
+          echo "AZURE_LOGIN=DISABLED"
+          echo "JOB_CREATION_REQUESTED=False"
+          echo "No Azure operation will be attempted."

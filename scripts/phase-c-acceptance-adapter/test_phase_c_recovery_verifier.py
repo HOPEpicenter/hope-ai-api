@@ -89,5 +89,34 @@ class PhaseCRecoveryVerifierTests(unittest.TestCase):
         self.assertNotIn("$vm.instanceView.statuses", text)
 
 
+    def test_full_cleanup_always_unverified_during_inspection(self):
+        text = SCRIPT.read_text(encoding="utf-8-sig")
+
+        self.assertEqual(
+            text.count("FULL_TRANSACTION_CLEANUP_VERIFIED=False"),
+            1,
+        )
+
+        self.assertIn(
+            "TEMPORARY_PERMISSIONS_REVOKED=NOT_VERIFIED",
+            text,
+        )
+
+        self.assertIn(
+            "RECOVERY_JOURNAL_VERIFIED=NOT_VERIFIED",
+            text,
+        )
+
+        self.assertLess(
+            text.index("FULL_TRANSACTION_CLEANUP_VERIFIED=False"),
+            text.index("try {\n    $account ="),
+        )
+
+        self.assertNotIn(
+            "FULL_TRANSACTION_CLEANUP_VERIFIED=True",
+            text,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

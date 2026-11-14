@@ -41,6 +41,18 @@ class RecoveryLedger:
                 )
             """)
 
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS job_creation_reservations (
+                    operation_id TEXT PRIMARY KEY,
+                    request_id TEXT NOT NULL UNIQUE,
+                    created_utc INTEGER NOT NULL,
+                    state TEXT NOT NULL DEFAULT 'UNRESOLVED'
+                        CHECK (state = 'UNRESOLVED'),
+                    FOREIGN KEY (operation_id)
+                        REFERENCES operations(operation_id)
+                )
+            """)
+
     def _connect(self):
         db = sqlite3.connect(
             self.path,
@@ -194,6 +206,35 @@ class RecoveryLedger:
             {"job_id": row[0], "binding_verified": False}
             for row in rows
         ]
+
+    def reserve_job_creation(self, operation_id, request_id, now_utc):
+        """Reserve one irreversible creation intent per operation.
+
+        Coordination only; grants no authority to create Azure jobs.
+        An unresolved reservation cannot be released or retried here.
+        """
+        self._require_uuid(operation_id)
+        self._require_uuid(request_id)
+        self._require_time(now_utc)
+
+        with closing(self._connect()) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            cursor = db.execute(
+                """
+                INSERT INTO job_creation_reservations
+                    (operation_id, request_id, created_utc)
+                SELECT ?, ?, ?
+                WHERE EXISTS (
+                    SELECT 1 FROM operations WHERE operation_id = ?
+                )
+                ON CONFLICT DO NOTHING
+                """,
+                (operation_id, request_id, now_utc, operation_id),
+            )
+            reserved = cursor.rowcount == 1
+            db.commit()
+
+        return reserved
 
     def record_failure(self, operation_id, attempt_id):
         """Return claimed recovery to pending; never mark success."""

@@ -215,5 +215,60 @@ class RecoveryLedgerTests(unittest.TestCase):
                 )
 
 
+    def test_first_job_creation_reservation_is_durable(self):
+        self.register()
+        request = str(uuid.uuid4())
+        self.assertTrue(
+            self.ledger.reserve_job_creation(
+                self.operation, request, 1000
+            )
+        )
+        reopened = RecoveryLedger(self.path)
+        self.assertFalse(
+            reopened.reserve_job_creation(
+                self.operation, str(uuid.uuid4()), 1001
+            )
+        )
+
+    def test_duplicate_job_creation_reservation_denied(self):
+        self.register()
+        request = str(uuid.uuid4())
+        self.assertTrue(
+            self.ledger.reserve_job_creation(
+                self.operation, request, 1000
+            )
+        )
+        self.assertFalse(
+            self.ledger.reserve_job_creation(
+                self.operation, request, 1001
+            )
+        )
+
+    def test_expired_recovery_lease_does_not_unlock_creation(self):
+        self.register()
+        request = str(uuid.uuid4())
+        self.assertTrue(
+            self.ledger.reserve_job_creation(
+                self.operation, request, 1000
+            )
+        )
+        self.ledger.claim_recovery(self.operation, 1000, 30)
+        self.assertIsNotNone(
+            self.ledger.claim_recovery(self.operation, 1030)
+        )
+        self.assertFalse(
+            self.ledger.reserve_job_creation(
+                self.operation, str(uuid.uuid4()), 1031
+            )
+        )
+
+    def test_unknown_operation_cannot_reserve_job_creation(self):
+        self.assertFalse(
+            self.ledger.reserve_job_creation(
+                self.operation, str(uuid.uuid4()), 1000
+            )
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

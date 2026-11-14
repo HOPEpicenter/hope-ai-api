@@ -77,3 +77,75 @@ def assess_approval_binding(
     # Matching records are not authenticated by this function.
     # No proof of complete approval history, unique use or issuer trust.
     return "EVIDENCE_CONSISTENT_NOT_AUTHORIZED"
+
+
+def assess_complete_approval_history(
+    ledger, operation_id, request_id, target_scope,
+    run, job, history,
+):
+    """Assess supplied history; never authenticate it or authorize execution.
+
+    The caller must separately establish that the history came from a
+    complete, authenticated GitHub API response. No caller assertion
+    of completeness is accepted as authority here.
+    """
+    if type(history) is not list or not history:
+        return "APPROVAL_HISTORY_INVALID"
+
+    matching = []
+    rejected = False
+
+    for record in history:
+        if type(record) is not dict:
+            return "APPROVAL_HISTORY_INVALID"
+
+        user = record.get("user")
+        environments = record.get("environments")
+        state = record.get("state")
+
+        if (
+            type(user) is not dict
+            or type(user.get("login")) is not str
+            or type(environments) is not list
+            or type(state) is not str
+        ):
+            return "APPROVAL_HISTORY_INVALID"
+
+        if not all(
+            type(item) is dict
+            and type(item.get("name")) is str
+            for item in environments
+        ):
+            return "APPROVAL_HISTORY_INVALID"
+
+        protected = any(
+            item["name"] == ENVIRONMENT
+            for item in environments
+        )
+
+        if not protected:
+            continue
+
+        if state == "rejected":
+            rejected = True
+
+        if (
+            state == "approved"
+            and user["login"].lower() == "hope-2018"
+        ):
+            matching.append(record)
+
+    # A rejection anywhere in supplied protected-environment
+    # history fails closed, regardless of record order.
+    if rejected:
+        return "PROTECTED_APPROVAL_REJECTED"
+
+    if len(matching) != 1:
+        return "PROTECTED_APPROVAL_NOT_UNIQUE"
+
+    # Reuse the existing exact operation/job/reservation checks.
+    # Their successful outcome remains explicitly non-authorizing.
+    return assess_approval_binding(
+        ledger, operation_id, request_id, target_scope,
+        run, job, matching[0],
+    )

@@ -29,14 +29,20 @@ function request(key = "synthetic-secret") {
 
 async function run(
   req: any,
-  submit?: any
+  submit?: any,
+  reserveAdmission?: any
 ): Promise<any> {
   const context: any = {};
 
   await postKioskIntake(
     context,
     req,
-    submit ? { submit } : {}
+    {
+      ...(submit ? { submit } : {}),
+      reserveAdmission:
+        reserveAdmission ??
+        (async () => ({ admitted: true }))
+    }
   );
 
   return context.res;
@@ -50,10 +56,13 @@ async function withFlags(
     process.env.HOPE_KIOSK_BACKEND_INGRESS_ENABLED;
   const previousIntake =
     process.env.HOPE_KIOSK_PUBLIC_INTAKE_ENABLED;
+  const previousCapacity =
+    process.env.HOPE_KIOSK_CAPACITY_GUARD_ENABLED;
 
   process.env.HOPE_API_KEY = "synthetic-secret";
   process.env.HOPE_KIOSK_BACKEND_INGRESS_ENABLED = "true";
   process.env.HOPE_KIOSK_PUBLIC_INTAKE_ENABLED = "true";
+  process.env.HOPE_KIOSK_CAPACITY_GUARD_ENABLED = "true";
 
   try {
     await operation();
@@ -67,6 +76,10 @@ async function withFlags(
     };
 
     restore("HOPE_API_KEY", previousKey);
+    restore(
+      "HOPE_KIOSK_CAPACITY_GUARD_ENABLED",
+      previousCapacity
+    );
     restore(
       "HOPE_KIOSK_BACKEND_INGRESS_ENABLED",
       previousIngress
@@ -223,5 +236,90 @@ test("storage exception never leaks visitor details", async () => {
       JSON.stringify(result).includes("Sensitive"),
       false
     );
+  });
+});
+test("capacity guard is disabled by default", async () => {
+  await withFlags(async () => {
+    delete process.env.HOPE_KIOSK_CAPACITY_GUARD_ENABLED;
+
+    let submitted = false;
+
+    const result = await run(
+      request(),
+      async () => {
+        submitted = true;
+        return { accepted: true, status: "recorded" };
+      }
+    );
+
+    assert.equal(result.status, 404);
+    assert.equal(submitted, false);
+  });
+});
+
+test("exhausted capacity denies submission", async () => {
+  await withFlags(async () => {
+    let submitted = false;
+
+    const result = await run(
+      request(),
+      async () => {
+        submitted = true;
+        return { accepted: true, status: "recorded" };
+      },
+      async () => ({
+        admitted: false,
+        reason: "capacity_exhausted"
+      })
+    );
+
+    assert.equal(result.status, 429);
+    assert.equal(submitted, false);
+    assert.equal(
+      result.body.error,
+      "REGISTRATION_LIMIT_REACHED"
+    );
+  });
+});
+
+test("capacity storage failure cannot submit", async () => {
+  await withFlags(async () => {
+    let submitted = false;
+
+    const result = await run(
+      request(),
+      async () => {
+        submitted = true;
+        return { accepted: true, status: "recorded" };
+      },
+      async () => {
+        throw new Error("STORAGE_UNAVAILABLE");
+      }
+    );
+
+    assert.equal(result.status, 503);
+    assert.equal(submitted, false);
+    assert.equal(
+      JSON.stringify(result).includes("STORAGE_UNAVAILABLE"),
+      false
+    );
+  });
+});
+
+test("invalid API key cannot reserve capacity", async () => {
+  await withFlags(async () => {
+    let reserved = false;
+
+    const result = await run(
+      request("invalid-key"),
+      undefined,
+      async () => {
+        reserved = true;
+        return { admitted: true };
+      }
+    );
+
+    assert.equal(result.status, 401);
+    assert.equal(reserved, false);
   });
 });

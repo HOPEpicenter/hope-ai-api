@@ -4,7 +4,12 @@ import {
   submitKioskIntakeV1
 } from "../../services/visitors/submitKioskIntakeV1";
 
+import {
+  reserveKioskAdmissionSlotV1
+} from "../../services/visitors/reserveKioskAdmissionSlotV1";
+
 type Dependencies = {
+  reserveAdmission?: typeof reserveKioskAdmissionSlotV1;
   submit?: typeof submitKioskIntakeV1;
 };
 
@@ -76,6 +81,18 @@ export async function postKioskIntake(
     return;
   }
 
+  // Capacity enforcement is mandatory once ingress is enabled.
+  // No HTTP caller may control this feature gate.
+  if (
+    process.env.HOPE_KIOSK_CAPACITY_GUARD_ENABLED !== "true"
+  ) {
+    reply(context, 404, {
+      accepted: false,
+      error: "NOT_AVAILABLE"
+    });
+    return;
+  }
+
   const contentType = readHeader(req, "content-type");
 
   if (
@@ -125,6 +142,23 @@ export async function postKioskIntake(
       reply(context, 413, {
         accepted: false,
         error: "SUBMISSION_TOO_LARGE"
+      });
+      return;
+    }
+
+    // Reserve capacity only after API-key authentication and
+    // basic request checks. This is a shared global quota,
+    // not guest or device authentication.
+    const reserve =
+      dependencies.reserveAdmission ??
+      reserveKioskAdmissionSlotV1;
+
+    const admission = await reserve({ enabled: true });
+
+    if (!admission.admitted) {
+      reply(context, 429, {
+        accepted: false,
+        error: "REGISTRATION_LIMIT_REACHED"
       });
       return;
     }

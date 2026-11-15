@@ -3,6 +3,12 @@ import { test } from "node:test";
 import {
   createGetKioskPendingReviewHandler
 } from "../../src/functions/getKioskPendingReview/index";
+import {
+  issueKioskReviewCursorV1
+} from "../../src/services/visitors/kioskReviewCursorV1";
+
+const TEST_CURSOR_KEY = Buffer.alloc(32, 17)
+  .toString("base64url");
 
 const FLAG = "HOPE_KIOSK_STAFF_REVIEW_ENABLED";
 
@@ -54,12 +60,14 @@ async function run(
     failingStorage?: boolean;
     configThrows?: boolean;
     storageCursor?: string;
+    cursorKey?: string;
   } = {}
 ) {
   const context: any = {};
   const calls = {
     authorize: 0,
-    storage: 0
+    storage: 0,
+    continuationToken: undefined as string | undefined
   };
 
   const handler = createGetKioskPendingReviewHandler({
@@ -89,6 +97,7 @@ async function run(
     }) as any,
     readPending: (async (deps: any) => {
       calls.storage++;
+      calls.continuationToken = deps.continuationToken;
 
       assert.equal(deps.enabled, true);
       assert.equal(deps.authorized, true);
@@ -107,12 +116,27 @@ async function run(
     }) as any
   });
 
-  await withFlag(options.enabled ?? true, async () => {
-    await handler(context, {
-      method: "GET",
-      query: options.query ?? {}
+  const previousKey =
+    process.env.HOPE_KIOSK_REVIEW_CURSOR_KEY;
+
+  try {
+    process.env.HOPE_KIOSK_REVIEW_CURSOR_KEY =
+      options.cursorKey ?? TEST_CURSOR_KEY;
+
+    await withFlag(options.enabled ?? true, async () => {
+      await handler(context, {
+        method: "GET",
+        query: options.query ?? {}
+      });
     });
-  });
+  } finally {
+    if (previousKey === undefined) {
+      delete process.env.HOPE_KIOSK_REVIEW_CURSOR_KEY;
+    } else {
+      process.env.HOPE_KIOSK_REVIEW_CURSOR_KEY =
+        previousKey;
+    }
+  }
 
   return { context, calls };
 }
@@ -230,4 +254,122 @@ test("raw storage continuation never appears in HTTP response", async () => {
     Object.prototype.hasOwnProperty.call(context.res.body, "cursor"),
     false
   );
+});
+test("first page returns only an encrypted continuation cursor", async () => {
+  const privateToken = "PRIVATE_SYNTHETIC_STORAGE_TOKEN";
+
+  const { context } = await run({
+    storageCursor: privateToken
+  });
+
+  assert.equal(context.res.status, 200);
+  assert.equal(context.res.body.hasMore, true);
+  assert.equal(
+    typeof context.res.body.nextCursor,
+    "string"
+  );
+
+  const serialized = JSON.stringify(context.res);
+
+  assert.equal(serialized.includes(privateToken), false);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(
+      context.res.body,
+      "nextContinuationToken"
+    ),
+    false
+  );
+});
+
+test("verified administrator can resume encrypted pagination", async () => {
+  const privateToken = "SYNTHETIC_PAGE_TWO";
+
+  const cursor = issueKioskReviewCursorV1({
+    actorId: "synthetic-admin",
+    limit: 25,
+    secret: TEST_CURSOR_KEY,
+    continuationToken: privateToken
+  });
+
+  const { context, calls } = await run({
+    query: { cursor }
+  });
+
+  assert.equal(context.res.status, 200);
+  assert.equal(calls.storage, 1);
+  assert.equal(calls.continuationToken, privateToken);
+  assert.equal(context.res.body.nextCursor, null);
+});
+
+test("cursor for another administrator never reads storage", async () => {
+  const cursor = issueKioskReviewCursorV1({
+    actorId: "another-administrator",
+    limit: 25,
+    secret: TEST_CURSOR_KEY,
+    continuationToken: "PRIVATE_TOKEN"
+  });
+
+  const { context, calls } = await run({
+    query: { cursor }
+  });
+
+  assert.equal(context.res.status, 400);
+  assert.equal(calls.storage, 0);
+});
+
+test("cursor bound to different page limit is rejected", async () => {
+  const cursor = issueKioskReviewCursorV1({
+    actorId: "synthetic-admin",
+    limit: 25,
+    secret: TEST_CURSOR_KEY,
+    continuationToken: "PRIVATE_TOKEN"
+  });
+
+  const { context, calls } = await run({
+    query: { cursor, limit: "5" }
+  });
+
+  assert.equal(context.res.status, 400);
+  assert.equal(calls.storage, 0);
+});
+
+test("malformed cursor never reaches storage", async () => {
+  for (const cursor of [
+    "",
+    "invalid",
+    "x".repeat(8193)
+  ]) {
+    const { context, calls } = await run({
+      query: { cursor }
+    });
+
+    assert.equal(context.res.status, 400);
+    assert.equal(calls.storage, 0);
+  }
+});
+
+test("missing cursor encryption key fails before storage", async () => {
+  const { context, calls } = await run({
+    cursorKey: ""
+  });
+
+  assert.equal(context.res.status, 503);
+  assert.equal(calls.storage, 0);
+});
+
+test("unauthorized staff cannot decrypt or read a cursor", async () => {
+  const cursor = issueKioskReviewCursorV1({
+    actorId: "synthetic-admin",
+    limit: 25,
+    secret: TEST_CURSOR_KEY,
+    continuationToken: "PRIVATE_TOKEN"
+  });
+
+  const { context, calls } = await run({
+    authorized: false,
+    query: { cursor }
+  });
+
+  assert.equal(context.res.status, 403);
+  assert.equal(calls.storage, 0);
 });

@@ -7,6 +7,11 @@ import {
 import {
   listPendingKioskIntakeV1
 } from "../../repositories/listPendingKioskIntakeV1";
+import {
+  issueKioskReviewCursorV1,
+  verifyKioskReviewCursorV1,
+  requireKioskReviewCursorKeyV1
+} from "../../services/visitors/kioskReviewCursorV1";
 
 type Dependencies = {
   readConfiguration?: typeof getEntraStaffAuthorizationConfiguration;
@@ -123,6 +128,45 @@ async function execute(
       }
     }
 
+    // Authorization has already succeeded. Validate trusted
+    // cryptographic configuration before accessing guest storage.
+    const secret =
+      process.env.HOPE_KIOSK_REVIEW_CURSOR_KEY ?? "";
+
+    requireKioskReviewCursorKeyV1(secret);
+
+    const rawCursor = req?.query?.cursor;
+    let continuationToken: string | undefined;
+
+    if (rawCursor !== undefined) {
+      if (
+        typeof rawCursor !== "string" ||
+        rawCursor.length < 1 ||
+        rawCursor.length > 8192
+      ) {
+        respond(context, 400, {
+          ok: false,
+          error: "INVALID_CURSOR"
+        });
+        return;
+      }
+
+      try {
+        continuationToken = verifyKioskReviewCursorV1({
+          cursor: rawCursor,
+          actorId: auth.actorId,
+          limit,
+          secret
+        });
+      } catch {
+        respond(context, 400, {
+          ok: false,
+          error: "INVALID_CURSOR"
+        });
+        return;
+      }
+    }
+
     const readPending =
       dependencies.readPending ??
       listPendingKioskIntakeV1;
@@ -130,19 +174,37 @@ async function execute(
     const result = await readPending({
       enabled: true,
       authorized: true,
-      limit
+      limit,
+      continuationToken
     });
 
-    // Explicit response projection. Never expose raw Azure
-    // continuation tokens or future repository metadata.
-    // HTTP continuation remains unavailable until a separately
-    // authenticated, tamper-resistant cursor is implemented.
+    const storageNext = result.nextContinuationToken;
+
+    if (
+      result.hasMore !== (typeof storageNext === "string")
+    ) {
+      throw new Error("INVALID_KIOSK_REVIEW_PAGE_STATE");
+    }
+
+    const nextCursor =
+      storageNext === null
+        ? null
+        : issueKioskReviewCursorV1({
+            continuationToken: storageNext,
+            actorId: auth.actorId,
+            limit,
+            secret
+          });
+
+    // Only encrypted cursors may cross the HTTP boundary.
+    // Never spread raw repository objects into responses.
     respond(context, 200, {
       ok: true,
       event: result.event,
       items: result.items,
       limit: result.limit,
-      hasMore: result.hasMore
+      hasMore: result.hasMore,
+      nextCursor
     });
   } catch {
     // Do not return credentials, guest details,

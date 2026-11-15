@@ -21,7 +21,8 @@ function request(key = "synthetic-secret") {
     headers: {
       "x-api-key": key,
       "content-type": "application/json",
-      "idempotency-key": id
+      "idempotency-key": id,
+      "x-kiosk-device-pass": "synthetic-device-pass"
     },
     body: guest
   };
@@ -30,7 +31,9 @@ function request(key = "synthetic-secret") {
 async function run(
   req: any,
   submit?: any,
-  reserveAdmission?: any
+  reserveAdmission?: any,
+  verifyDevicePass?: any,
+  assessDevice?: any
 ): Promise<any> {
   const context: any = {};
 
@@ -41,7 +44,16 @@ async function run(
       ...(submit ? { submit } : {}),
       reserveAdmission:
         reserveAdmission ??
-        (async () => ({ admitted: true }))
+        (async () => ({ admitted: true })),
+      verifyDevicePass:
+        verifyDevicePass ??
+        (() => ({
+          deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          expiresAtSeconds: 1795350000
+        })),
+      assessDevice:
+        assessDevice ??
+        (async () => true)
     }
   );
 
@@ -58,11 +70,14 @@ async function withFlags(
     process.env.HOPE_KIOSK_PUBLIC_INTAKE_ENABLED;
   const previousCapacity =
     process.env.HOPE_KIOSK_CAPACITY_GUARD_ENABLED;
+  const previousVerification =
+    process.env.HOPE_KIOSK_DEVICE_VERIFICATION_ENABLED;
 
   process.env.HOPE_API_KEY = "synthetic-secret";
   process.env.HOPE_KIOSK_BACKEND_INGRESS_ENABLED = "true";
   process.env.HOPE_KIOSK_PUBLIC_INTAKE_ENABLED = "true";
   process.env.HOPE_KIOSK_CAPACITY_GUARD_ENABLED = "true";
+  process.env.HOPE_KIOSK_DEVICE_VERIFICATION_ENABLED = "true";
 
   try {
     await operation();
@@ -76,6 +91,10 @@ async function withFlags(
     };
 
     restore("HOPE_API_KEY", previousKey);
+    restore(
+      "HOPE_KIOSK_DEVICE_VERIFICATION_ENABLED",
+      previousVerification
+    );
     restore(
       "HOPE_KIOSK_CAPACITY_GUARD_ENABLED",
       previousCapacity
@@ -321,5 +340,147 @@ test("invalid API key cannot reserve capacity", async () => {
 
     assert.equal(result.status, 401);
     assert.equal(reserved, false);
+  });
+});
+
+test("device verification is disabled by default", async () => {
+  await withFlags(async () => {
+    delete process.env.HOPE_KIOSK_DEVICE_VERIFICATION_ENABLED;
+
+    const result = await run(request());
+
+    assert.equal(result.status, 404);
+  });
+});
+
+test("missing device pass cannot submit", async () => {
+  await withFlags(async () => {
+    const req: any = request();
+    delete req.headers["x-kiosk-device-pass"];
+
+    let submitted = false;
+
+    const result = await run(
+      req,
+      async () => {
+        submitted = true;
+        return { accepted: true, status: "recorded" };
+      }
+    );
+
+    assert.equal(result.status, 403);
+    assert.equal(submitted, false);
+  });
+});
+
+test("invalid device signature denies before capacity", async () => {
+  await withFlags(async () => {
+    let reserved = false;
+    let submitted = false;
+
+    const result = await run(
+      request(),
+      async () => {
+        submitted = true;
+        return { accepted: true, status: "recorded" };
+      },
+      async () => {
+        reserved = true;
+        return { admitted: true };
+      },
+      () => null
+    );
+
+    assert.equal(result.status, 403);
+    assert.equal(reserved, false);
+    assert.equal(submitted, false);
+  });
+});
+
+test("revoked device denies before capacity", async () => {
+  await withFlags(async () => {
+    let reserved = false;
+    let submitted = false;
+
+    const result = await run(
+      request(),
+      async () => {
+        submitted = true;
+        return { accepted: true, status: "recorded" };
+      },
+      async () => {
+        reserved = true;
+        return { admitted: true };
+      },
+      () => ({
+        deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        expiresAtSeconds: 1795350000
+      }),
+      async () => false
+    );
+
+    assert.equal(result.status, 403);
+    assert.equal(reserved, false);
+    assert.equal(submitted, false);
+  });
+});
+
+test("device registry failure prevents submission", async () => {
+  await withFlags(async () => {
+    let submitted = false;
+
+    const result = await run(
+      request(),
+      async () => {
+        submitted = true;
+        return { accepted: true, status: "recorded" };
+      },
+      undefined,
+      undefined,
+      async () => {
+        throw new Error("SENSITIVE_REGISTRY_FAILURE");
+      }
+    );
+
+    assert.equal(result.status, 503);
+    assert.equal(submitted, false);
+    assert.equal(
+      JSON.stringify(result).includes("SENSITIVE_REGISTRY"),
+      false
+    );
+  });
+});
+
+test("active verified device reaches submission", async () => {
+  await withFlags(async () => {
+    let assessed = false;
+    let submitted = false;
+
+    const result = await run(
+      request(),
+      async () => {
+        submitted = true;
+        return { accepted: true, status: "recorded" };
+      },
+      async () => ({ admitted: true }),
+      () => ({
+        deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        expiresAtSeconds: 1795350000
+      }),
+      async (deviceId: string, expiry: number, deps: any) => {
+        assert.equal(
+          deviceId,
+          "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        );
+        assert.equal(expiry, 1795350000);
+        assert.equal(deps.enabled, true);
+        assessed = true;
+        return true;
+      }
+    );
+
+    assert.equal(result.status, 202);
+    assert.equal(assessed, true);
+    assert.equal(submitted, true);
   });
 });

@@ -8,7 +8,16 @@ import {
   reserveKioskAdmissionSlotV1
 } from "../../services/visitors/reserveKioskAdmissionSlotV1";
 
+import {
+  verifyKioskDevicePassV1
+} from "../../services/visitors/verifyKioskDevicePassV1";
+import {
+  assessKioskDeviceV1
+} from "../../services/visitors/kioskDeviceRegistryV1";
+
 type Dependencies = {
+  verifyDevicePass?: typeof verifyKioskDevicePassV1;
+  assessDevice?: typeof assessKioskDeviceV1;
   reserveAdmission?: typeof reserveKioskAdmissionSlotV1;
   submit?: typeof submitKioskIntakeV1;
 };
@@ -93,6 +102,16 @@ export async function postKioskIntake(
     return;
   }
 
+  if (
+    process.env.HOPE_KIOSK_DEVICE_VERIFICATION_ENABLED !== "true"
+  ) {
+    reply(context, 404, {
+      accepted: false,
+      error: "NOT_AVAILABLE"
+    });
+    return;
+  }
+
   const contentType = readHeader(req, "content-type");
 
   if (
@@ -142,6 +161,54 @@ export async function postKioskIntake(
       reply(context, 413, {
         accepted: false,
         error: "SUBMISSION_TOO_LARGE"
+      });
+      return;
+    }
+
+    // Backend independently verifies the signed device pass.
+    // The browser cannot assert a trusted device ID.
+    const pass = readHeader(req, "x-kiosk-device-pass");
+
+    if (!pass || pass.length > 1024) {
+      reply(context, 403, {
+        accepted: false,
+        error: "DEVICE_NOT_AUTHORIZED"
+      });
+      return;
+    }
+
+    const verify =
+      dependencies.verifyDevicePass ??
+      verifyKioskDevicePassV1;
+
+    const device = verify(
+      pass,
+      process.env.HOPE_KIOSK_DEVICE_SIGNING_SECRET ?? ""
+    );
+
+    if (!device) {
+      reply(context, 403, {
+        accepted: false,
+        error: "DEVICE_NOT_AUTHORIZED"
+      });
+      return;
+    }
+
+    // Read authoritative registry state before capacity
+    // reservation or any visitor persistence.
+    const assess =
+      dependencies.assessDevice ?? assessKioskDeviceV1;
+
+    const active = await assess(
+      device.deviceId,
+      device.expiresAtSeconds,
+      { enabled: true }
+    );
+
+    if (!active) {
+      reply(context, 403, {
+        accepted: false,
+        error: "DEVICE_NOT_AUTHORIZED"
       });
       return;
     }

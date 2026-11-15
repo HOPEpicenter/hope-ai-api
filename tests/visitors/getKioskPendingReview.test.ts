@@ -53,6 +53,7 @@ async function run(
     query?: any;
     failingStorage?: boolean;
     configThrows?: boolean;
+    storageCursor?: string;
   } = {}
 ) {
   const context: any = {};
@@ -98,7 +99,10 @@ async function run(
 
       return {
         ...pendingBatch(),
-        limit: deps.limit
+        limit: deps.limit,
+        hasMore: Boolean(options.storageCursor),
+        nextContinuationToken:
+          options.storageCursor ?? null
       };
     }) as any
   });
@@ -201,6 +205,29 @@ test("invalid Entra configuration fails closed", async () => {
     JSON.stringify(context.res).includes(
       "SYNTHETIC_CONFIG_SECRET"
     ),
+    false
+  );
+});
+test("raw storage continuation never appears in HTTP response", async () => {
+  const privateToken = "SYNTHETIC_PRIVATE_AZURE_CURSOR";
+
+  const { context, calls } = await run({
+    storageCursor: privateToken
+  });
+
+  assert.equal(context.res.status, 200);
+  assert.equal(context.res.body.hasMore, true);
+  assert.equal(calls.storage, 1);
+
+  const response = JSON.stringify(context.res);
+
+  assert.equal(response.includes(privateToken), false);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(context.res.body, "nextContinuationToken"),
+    false
+  );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(context.res.body, "cursor"),
     false
   );
 });

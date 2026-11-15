@@ -133,9 +133,16 @@ async function execute(
       limit
     });
 
+    // Explicit response projection. Never expose raw Azure
+    // continuation tokens or future repository metadata.
+    // HTTP continuation remains unavailable until a separately
+    // authenticated, tamper-resistant cursor is implemented.
     respond(context, 200, {
       ok: true,
-      ...result
+      event: result.event,
+      items: result.items,
+      limit: result.limit,
+      hasMore: result.hasMore
     });
   } catch {
     // Do not return credentials, guest details,

@@ -13,7 +13,12 @@ const UUID4 =
 type Store = {
   listEntities(options: {
     queryOptions: { filter: string };
-  }): AsyncIterable<any>;
+  }): {
+    byPage(options: {
+      maxPageSize: number;
+      continuationToken?: string;
+    }): AsyncIterable<any>;
+  };
 };
 
 type Dependencies = {
@@ -21,6 +26,7 @@ type Dependencies = {
   authorized?: boolean;
   store?: Store;
   limit?: number;
+  continuationToken?: string;
 };
 
 export type PendingKioskReviewItem = Readonly<{
@@ -41,6 +47,7 @@ export type PendingKioskReviewBatch = Readonly<{
   items: PendingKioskReviewItem[];
   limit: number;
   hasMore: boolean;
+  nextContinuationToken: string | null;
 }>;
 
 function requireString(
@@ -127,7 +134,8 @@ function projectPendingRow(row: any): PendingKioskReviewItem {
  * No table creation, changes to review status,
  * visitor creation or automated contact.
  *
- * This first-batch primitive does NOT yet offer pagination.
+ * SDK continuation tokens remain inside trusted server code.
+ * The HTTP adapter must never expose these raw tokens.
  */
 export async function listPendingKioskIntakeV1(
   deps: Dependencies = {}
@@ -149,6 +157,21 @@ export async function listPendingKioskIntakeV1(
     throw new Error("INVALID_KIOSK_REVIEW_LIMIT");
   }
 
+  const continuationToken = deps.continuationToken;
+
+  if (
+    continuationToken !== undefined &&
+    (
+      typeof continuationToken !== "string" ||
+      continuationToken.length < 1 ||
+      continuationToken.length > 4096 ||
+      /[\u0000-\u001f\u007f]/.test(continuationToken)
+    )
+  ) {
+    throw new Error("INVALID_KIOSK_REVIEW_CURSOR");
+  }
+
+  // Invalid cursors fail before constructing storage dependencies.
   const store: Store =
     deps.store ?? getTableClient(TABLE);
 
@@ -156,29 +179,66 @@ export async function listPendingKioskIntakeV1(
     `PartitionKey eq '${EVENT}' and ` +
     `reviewStatus eq 'pending'`;
 
-  const items: PendingKioskReviewItem[] = [];
-  let hasMore = false;
-
-  // Read at most one row beyond the requested batch
-  // to indicate whether further matching records exist.
-  // Never log, echo or return unprojected entities.
-  for await (const row of store.listEntities({
+  const pages = store.listEntities({
     queryOptions: { filter }
-  })) {
-    const item = projectPendingRow(row);
+  }).byPage({
+    maxPageSize: limit,
+    continuationToken
+  });
 
-    if (items.length === limit) {
-      hasMore = true;
-      break;
-    }
+  const iterator = pages[Symbol.asyncIterator]();
+  const pageResult = await iterator.next();
 
-    items.push(item);
+  if (pageResult.done) {
+    return {
+      event: EVENT,
+      items: [],
+      limit,
+      hasMore: false,
+      nextContinuationToken: null
+    };
+  }
+
+  const page = pageResult.value;
+
+  if (
+    !Array.isArray(page) ||
+    page.length > limit
+  ) {
+    throw new Error("INVALID_KIOSK_REVIEW_PAGE");
+  }
+
+  const items = page.map(projectPendingRow);
+  // Azure SDK pages are arrays with additional continuation
+  // metadata. Array.isArray narrows the element type to any[],
+  // so recover the SDK page metadata explicitly.
+  const next = (
+    page as any[] & { continuationToken?: unknown }
+  ).continuationToken;
+
+  if (
+    next !== undefined &&
+    next !== null &&
+    (
+      typeof next !== "string" ||
+      next.length < 1 ||
+      next.length > 4096 ||
+      /[\u0000-\u001f\u007f]/.test(next)
+    )
+  ) {
+    throw new Error("INVALID_KIOSK_REVIEW_CURSOR");
+  }
+
+  if (items.length === 0 && next) {
+    throw new Error("INVALID_KIOSK_REVIEW_PAGE");
   }
 
   return {
     event: EVENT,
     items,
     limit,
-    hasMore
+    hasMore: typeof next === "string",
+    nextContinuationToken:
+      typeof next === "string" ? next : null
   };
 }

@@ -19,7 +19,12 @@ import {
   reserveKioskDeviceSlotV1
 } from "../../services/visitors/reserveKioskDeviceSlotV1";
 
+import {
+  inspectExistingKioskIntakeSubmissionV1
+} from "../../repositories/kioskIntakeSubmissionsRepositoryV1";
+
 type Dependencies = {
+  inspectRetry?: typeof inspectExistingKioskIntakeSubmissionV1;
   reserveDeviceSlot?: typeof reserveKioskDeviceSlotV1;
   verifyDevicePass?: typeof verifyKioskDevicePassV1;
   assessDevice?: typeof assessKioskDeviceV1;
@@ -227,6 +232,68 @@ export async function postKioskIntake(
         error: "DEVICE_NOT_AUTHORIZED"
       });
       return;
+    }
+
+    // A retry receipt must never bypass the existing
+    // public-intake feature gate.
+    // Preserve the existing downstream disabled response.
+    if (
+      process.env.HOPE_KIOSK_PUBLIC_INTAKE_ENABLED !== "true"
+    ) {
+      reply(context, 403, {
+        accepted: false,
+        error: "NOT_AVAILABLE"
+      });
+      return;
+    }
+
+    // Inspect an existing completed submission only AFTER
+    // verifying the signed device and live registry state.
+    // This is a status-only, read-only operation.
+    const inspectRetry =
+      dependencies.inspectRetry ??
+      inspectExistingKioskIntakeSubmissionV1;
+
+    const retryStatus = await inspectRetry(
+      body,
+      submissionId,
+      { enabled: true }
+    );
+
+    switch (retryStatus) {
+      case "already_recorded":
+        reply(context, 200, {
+          accepted: true,
+          status: "already_recorded"
+        });
+        return;
+
+      case "idempotency_conflict":
+        reply(context, 409, {
+          accepted: false,
+          status: "idempotency_conflict"
+        });
+        return;
+
+      case "invalid":
+        reply(context, 400, {
+          accepted: false,
+          status: "invalid"
+        });
+        return;
+
+      case "missing":
+        // Only new submissions proceed to capacity checks.
+        break;
+
+      default:
+        // Disabled or unexpected repository status:
+        // do not admit or consume capacity.
+        reply(context, 503, {
+          accepted: false,
+          error: "REGISTRATION_UNAVAILABLE"
+        });
+        return;
     }
 
     // Device identity comes from the verified signed pass.

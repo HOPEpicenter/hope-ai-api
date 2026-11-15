@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  appendKioskIntakeSubmissionV1
+  appendKioskIntakeSubmissionV1,
+  inspectExistingKioskIntakeSubmissionV1
 } from "../../src/repositories/kioskIntakeSubmissionsRepositoryV1";
 
 const submissionId =
@@ -301,4 +302,208 @@ test("a stored receipt does not expose visitor PII", async () => {
 
   assert.equal(serialized.includes(valid.name), false);
   assert.equal(serialized.includes(valid.email), false);
+});
+function makeRetryPreflightStore() {
+  const rows = new Map<string, any>();
+  let writes = 0;
+  let reads = 0;
+
+  return {
+    get writes() { return writes; },
+    get reads() { return reads; },
+    rows,
+
+    async createEntity(entity: any) {
+      writes++;
+
+      const key = `${entity.partitionKey}/${entity.rowKey}`;
+
+      if (rows.has(key)) {
+        const error: any = new Error("synthetic conflict");
+        error.statusCode = 409;
+        throw error;
+      }
+
+      rows.set(key, { ...entity });
+      return {};
+    },
+
+    async getEntity(partitionKey: string, rowKey: string) {
+      reads++;
+
+      const entity = rows.get(`${partitionKey}/${rowKey}`);
+
+      if (!entity) {
+        const error: any = new Error("synthetic not found");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      return { ...entity };
+    }
+  };
+}
+
+test("retry preflight is disabled without reads or writes", async () => {
+  const store = makeRetryPreflightStore();
+
+  const status = await inspectExistingKioskIntakeSubmissionV1(
+    valid, submissionId, { table: store }
+  );
+
+  assert.equal(status, "disabled");
+  assert.equal(store.reads, 0);
+  assert.equal(store.writes, 0);
+});
+
+test("retry preflight reports missing without writes", async () => {
+  const store = makeRetryPreflightStore();
+
+  const status = await inspectExistingKioskIntakeSubmissionV1(
+    valid, submissionId, {
+      table: store,
+      enabled: true
+    }
+  );
+
+  assert.equal(status, "missing");
+  assert.equal(store.writes, 0);
+  assert.equal(store.reads, 1);
+});
+
+test("retry preflight recognizes completed matching submission", async () => {
+  const store = makeRetryPreflightStore();
+  const deps = { table: store, enabled: true };
+
+  const first = await appendKioskIntakeSubmissionV1(
+    valid, submissionId, deps
+  );
+
+  assert.equal(first.status, "recorded");
+
+  const originalWrites = store.writes;
+
+  const status = await inspectExistingKioskIntakeSubmissionV1(
+    valid, submissionId, deps
+  );
+
+  assert.equal(status, "already_recorded");
+  assert.equal(store.writes, originalWrites);
+});
+
+test("retry preflight rejects conflicting payload", async () => {
+  const store = makeRetryPreflightStore();
+  const deps = { table: store, enabled: true };
+
+  await appendKioskIntakeSubmissionV1(
+    valid, submissionId, deps
+  );
+
+  const changed = {
+    ...valid,
+    name: "Different Synthetic Guest"
+  };
+
+  const status = await inspectExistingKioskIntakeSubmissionV1(
+    changed, submissionId, deps
+  );
+
+  assert.equal(status, "idempotency_conflict");
+  assert.equal(store.writes, 1);
+});
+
+test("retry preflight rejects forged row provenance", async () => {
+  const store = makeRetryPreflightStore();
+  const deps = { table: store, enabled: true };
+
+  await appendKioskIntakeSubmissionV1(
+    valid, submissionId, deps
+  );
+
+  const key = `friends-family-2026-11-22/${submissionId}`;
+  const entity = store.rows.get(key);
+
+  store.rows.set(key, {
+    ...entity,
+    source: "untrusted_synthetic_source"
+  });
+
+  const status = await inspectExistingKioskIntakeSubmissionV1(
+    valid, submissionId, deps
+  );
+
+  assert.equal(status, "idempotency_conflict");
+});
+
+test("retry preflight never treats storage errors as missing", async () => {
+  const store = {
+    async createEntity() { return {}; },
+    async getEntity() {
+      throw new Error("SYNTHETIC_STORAGE_FAILURE");
+    }
+  };
+
+  await assert.rejects(
+    inspectExistingKioskIntakeSubmissionV1(
+      valid, submissionId, {
+        table: store,
+        enabled: true
+      }
+    ),
+    /SYNTHETIC_STORAGE_FAILURE/
+  );
+});
+
+test("retry preflight validates before storage access", async () => {
+  const store = makeRetryPreflightStore();
+
+  const status = await inspectExistingKioskIntakeSubmissionV1(
+    valid, "../invalid-id", {
+      table: store,
+      enabled: true
+    }
+  );
+
+  assert.equal(status, "invalid");
+  assert.equal(store.reads, 0);
+  assert.equal(store.writes, 0);
+});
+
+test("retry preflight does not replace atomic insert", async () => {
+  const store = makeRetryPreflightStore();
+  const deps = { table: store, enabled: true };
+
+  const observations = await Promise.all([
+    inspectExistingKioskIntakeSubmissionV1(
+      valid, submissionId, deps
+    ),
+    inspectExistingKioskIntakeSubmissionV1(
+      valid, submissionId, deps
+    )
+  ]);
+
+  assert.deepEqual(observations, ["missing", "missing"]);
+
+  const writes = await Promise.all([
+    appendKioskIntakeSubmissionV1(
+      valid, submissionId, deps
+    ),
+    appendKioskIntakeSubmissionV1(
+      valid, submissionId, deps
+    )
+  ]);
+
+  assert.equal(
+    writes.filter(result => result.status === "recorded").length,
+    1
+  );
+
+  assert.equal(
+    writes.filter(result =>
+      result.status === "already_recorded"
+    ).length,
+    1
+  );
+
+  assert.equal(store.rows.size, 1);
 });

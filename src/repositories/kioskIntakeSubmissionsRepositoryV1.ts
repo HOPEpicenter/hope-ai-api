@@ -48,6 +48,106 @@ function isConflict(error: any): boolean {
  * No HTTP route is registered.
  * No canonical visitor or six-week plan is created.
  */
+/**
+ * Shared fingerprint for both append and retry inspection.
+ * Never return the hash to an HTTP caller.
+ */
+function fingerprintKioskIntake(input: unknown): string | null {
+  const assessed = assessKioskIntakeV1(input);
+
+  if (!assessed.valid) {
+    return null;
+  }
+
+  const payload = assessed.intake;
+  const canonical = JSON.stringify([
+    payload.name,
+    payload.email.toLowerCase(),
+    payload.phone,
+    payload.visitType,
+    [...payload.interests].sort(),
+    payload.invitedBy,
+    payload.contactConsent
+  ]);
+
+  return createHash("sha256")
+    .update(canonical)
+    .digest("hex");
+}
+
+function isNotFound(error: any): boolean {
+  return (
+    Number(error?.statusCode ?? error?.status ?? 0) === 404 ||
+    error?.code === "ResourceNotFound" ||
+    error?.code === "EntityNotFound"
+  );
+}
+
+export type KioskRetryPreflightResult =
+  | "disabled"
+  | "invalid"
+  | "missing"
+  | "already_recorded"
+  | "idempotency_conflict";
+
+/**
+ * Read-only preflight for completed kiosk retries.
+ *
+ * This is NOT a public authorization boundary.
+ * Call only after verifying the signed device and
+ * authoritative active-device registry state.
+ *
+ * No table creation, writes or visitor data are returned.
+ * The final atomic createEntity remains authoritative.
+ */
+export async function inspectExistingKioskIntakeSubmissionV1(
+  input: unknown,
+  submissionId: unknown,
+  deps: Dependencies = {}
+): Promise<KioskRetryPreflightResult> {
+  if (deps.enabled !== true) {
+    return "disabled";
+  }
+
+  if (
+    typeof submissionId !== "string" ||
+    !UUID4.test(submissionId)
+  ) {
+    return "invalid";
+  }
+
+  const payloadHash = fingerprintKioskIntake(input);
+
+  if (!payloadHash) {
+    return "invalid";
+  }
+
+  const table: Store = deps.table ?? getTableClient(TABLE);
+
+  let existing: any;
+
+  try {
+    existing = await table.getEntity(EVENT, submissionId);
+  } catch (error) {
+    if (isNotFound(error)) {
+      return "missing";
+    }
+
+    // Unknown storage errors are not proof of absence.
+    throw error;
+  }
+
+  if (
+    existing?.payloadHash === payloadHash &&
+    existing?.source === "hope_ipad_kiosk_v1" &&
+    existing?.partitionKey === EVENT &&
+    existing?.rowKey === submissionId
+  ) {
+    return "already_recorded";
+  }
+
+  return "idempotency_conflict";
+}
 export async function appendKioskIntakeSubmissionV1(
   input: unknown,
   submissionId: unknown,
@@ -71,19 +171,11 @@ export async function appendKioskIntakeSubmissionV1(
   }
 
   const payload = assessed.intake;
-  const canonical = JSON.stringify([
-    payload.name,
-    payload.email.toLowerCase(),
-    payload.phone,
-    payload.visitType,
-    [...payload.interests].sort(),
-    payload.invitedBy,
-    payload.contactConsent
-  ]);
+  const payloadHash = fingerprintKioskIntake(input);
 
-  const payloadHash = createHash("sha256")
-    .update(canonical)
-    .digest("hex");
+  if (!payloadHash) {
+    return { accepted: false, status: "invalid" };
+  }
 
   const table: Store = deps.table ?? getTableClient(TABLE);
 

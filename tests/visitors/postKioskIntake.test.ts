@@ -34,7 +34,8 @@ async function run(
   reserveAdmission?: any,
   verifyDevicePass?: any,
   assessDevice?: any,
-  reserveDeviceSlot?: any
+  reserveDeviceSlot?: any,
+  inspectRetry?: any
 ): Promise<any> {
   const context: any = {};
 
@@ -57,7 +58,10 @@ async function run(
         (async () => true),
       reserveDeviceSlot:
         reserveDeviceSlot ??
-        (async () => ({ admitted: true }))
+        (async () => ({ admitted: true })),
+      inspectRetry:
+        inspectRetry ??
+        (async () => "missing")
     }
   );
 
@@ -619,5 +623,238 @@ test("revoked device cannot consume device rate-limit slots", async () => {
 
     assert.equal(result.status, 403);
     assert.equal(deviceReserved, false);
+  });
+});
+test("completed matching retry bypasses both capacity guards", async () => {
+  await withFlags(async () => {
+    let deviceReserved = false;
+    let globalReserved = false;
+    let submitted = false;
+
+    const result = await run(
+      request(),
+      async () => {
+        submitted = true;
+        return { accepted: true, status: "recorded" };
+      },
+      async () => {
+        globalReserved = true;
+        return { admitted: true };
+      },
+      undefined,
+      undefined,
+      async () => {
+        deviceReserved = true;
+        return { admitted: true };
+      },
+      async () => "already_recorded"
+    );
+
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.body, {
+      accepted: true,
+      status: "already_recorded"
+    });
+    assert.equal(deviceReserved, false);
+    assert.equal(globalReserved, false);
+    assert.equal(submitted, false);
+  });
+});
+
+test("conflicting retry bypasses capacity and is rejected", async () => {
+  await withFlags(async () => {
+    let deviceReserved = false;
+    let globalReserved = false;
+    let submitted = false;
+
+    const result = await run(
+      request(),
+      async () => {
+        submitted = true;
+        return { accepted: true, status: "recorded" };
+      },
+      async () => {
+        globalReserved = true;
+        return { admitted: true };
+      },
+      undefined,
+      undefined,
+      async () => {
+        deviceReserved = true;
+        return { admitted: true };
+      },
+      async () => "idempotency_conflict"
+    );
+
+    assert.equal(result.status, 409);
+    assert.equal(result.body.status, "idempotency_conflict");
+    assert.equal(deviceReserved, false);
+    assert.equal(globalReserved, false);
+    assert.equal(submitted, false);
+  });
+});
+
+test("new submission reserves both limits after preflight", async () => {
+  await withFlags(async () => {
+    const stages: string[] = [];
+
+    const result = await run(
+      request(),
+      async () => {
+        stages.push("submit");
+        return { accepted: true, status: "recorded" };
+      },
+      async () => {
+        stages.push("global");
+        return { admitted: true };
+      },
+      undefined,
+      async () => {
+        stages.push("registry");
+        return true;
+      },
+      async () => {
+        stages.push("device");
+        return { admitted: true };
+      },
+      async () => {
+        stages.push("preflight");
+        return "missing";
+      }
+    );
+
+    assert.equal(result.status, 202);
+    assert.deepEqual(stages, [
+      "registry",
+      "preflight",
+      "device",
+      "global",
+      "submit"
+    ]);
+  });
+});
+
+test("revoked device cannot inspect submission existence", async () => {
+  await withFlags(async () => {
+    let inspected = false;
+
+    const result = await run(
+      request(),
+      undefined,
+      undefined,
+      undefined,
+      async () => false,
+      undefined,
+      async () => {
+        inspected = true;
+        return "already_recorded";
+      }
+    );
+
+    assert.equal(result.status, 403);
+    assert.equal(inspected, false);
+  });
+});
+
+test("invalid signature cannot inspect submission existence", async () => {
+  await withFlags(async () => {
+    let inspected = false;
+
+    const result = await run(
+      request(),
+      undefined,
+      undefined,
+      () => null,
+      undefined,
+      undefined,
+      async () => {
+        inspected = true;
+        return "already_recorded";
+      }
+    );
+
+    assert.equal(result.status, 403);
+    assert.equal(inspected, false);
+  });
+});
+
+test("preflight storage failure denies before capacity", async () => {
+  await withFlags(async () => {
+    let deviceReserved = false;
+    let globalReserved = false;
+
+    const result = await run(
+      request(),
+      undefined,
+      async () => {
+        globalReserved = true;
+        return { admitted: true };
+      },
+      undefined,
+      undefined,
+      async () => {
+        deviceReserved = true;
+        return { admitted: true };
+      },
+      async () => {
+        throw new Error("SYNTHETIC_PRIVATE_PREFLIGHT_ERROR");
+      }
+    );
+
+    assert.equal(result.status, 503);
+    assert.equal(deviceReserved, false);
+    assert.equal(globalReserved, false);
+    assert.equal(
+      JSON.stringify(result).includes(
+        "SYNTHETIC_PRIVATE_PREFLIGHT_ERROR"
+      ),
+      false
+    );
+  });
+});
+
+test("public intake flag prevents completed retry receipt", async () => {
+  await withFlags(async () => {
+    delete process.env.HOPE_KIOSK_PUBLIC_INTAKE_ENABLED;
+
+    let inspected = false;
+
+    const result = await run(
+      request(),
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      async () => {
+        inspected = true;
+        return "already_recorded";
+      }
+    );
+
+    assert.notEqual(result.status, 200);
+    assert.equal(inspected, false);
+  });
+});
+
+test("unexpected preflight result fails closed", async () => {
+  await withFlags(async () => {
+    let submitted = false;
+
+    const result = await run(
+      request(),
+      async () => {
+        submitted = true;
+        return { accepted: true, status: "recorded" };
+      },
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      async () => "unexpected"
+    );
+
+    assert.equal(result.status, 503);
+    assert.equal(submitted, false);
   });
 });

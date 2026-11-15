@@ -270,3 +270,169 @@ test("weak configured authority key is rejected", async () => {
     assert.equal(response.status, 403);
   });
 });
+test("registered active device returns minimal status", async () => {
+  await withSettings(async () => {
+    let assessed = false;
+
+    const result = await execute(
+      request({
+        action: "assess",
+        deviceId: id,
+        expiresAtSeconds: expiry
+      }),
+      {
+        assess: async (
+          deviceId: string,
+          exp: number,
+          deps: any
+        ) => {
+          assert.equal(deviceId, id);
+          assert.equal(exp, expiry);
+          assert.equal(deps.enabled, true);
+          assessed = true;
+          return true;
+        }
+      }
+    );
+
+    assert.equal(assessed, true);
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.body, {
+      ok: true,
+      status: "active"
+    });
+
+    assert.equal(
+      JSON.stringify(result.body).includes(id),
+      false
+    );
+  });
+});
+
+test("revoked or unknown device is denied", async () => {
+  await withSettings(async () => {
+    const result = await execute(
+      request({
+        action: "assess",
+        deviceId: id,
+        expiresAtSeconds: expiry
+      }),
+      { assess: async () => false }
+    );
+
+    assert.equal(result.status, 403);
+    assert.deepEqual(result.body, {
+      ok: false,
+      error: "DEVICE_NOT_ACTIVE"
+    });
+  });
+});
+
+test("device assessment storage failure fails closed", async () => {
+  await withSettings(async () => {
+    const result = await execute(
+      request({
+        action: "assess",
+        deviceId: id,
+        expiresAtSeconds: expiry
+      }),
+      {
+        assess: async () => {
+          throw new Error("synthetic-sensitive-storage");
+        }
+      }
+    );
+
+    assert.equal(result.status, 503);
+    assert.equal(
+      JSON.stringify(result).includes(
+        "synthetic-sensitive-storage"
+      ),
+      false
+    );
+  });
+});
+
+test("missing authority key prevents assessment", async () => {
+  await withSettings(async () => {
+    let assessed = false;
+
+    const result = await execute(
+      request(
+        {
+          action: "assess",
+          deviceId: id,
+          expiresAtSeconds: expiry
+        },
+        "synthetic-hope-key",
+        ""
+      ),
+      {
+        assess: async () => {
+          assessed = true;
+          return true;
+        }
+      }
+    );
+
+    assert.equal(result.status, 403);
+    assert.equal(assessed, false);
+  });
+});
+
+test("invalid HOPE key prevents assessment", async () => {
+  await withSettings(async () => {
+    let assessed = false;
+
+    const result = await execute(
+      request(
+        {
+          action: "assess",
+          deviceId: id,
+          expiresAtSeconds: expiry
+        },
+        "invalid-key"
+      ),
+      {
+        assess: async () => {
+          assessed = true;
+          return true;
+        }
+      }
+    );
+
+    assert.equal(result.status, 401);
+    assert.equal(assessed, false);
+  });
+});
+
+test("unexpected assessment fields are rejected", async () => {
+  await withSettings(async () => {
+    const result = await execute(
+      request({
+        action: "assess",
+        deviceId: id,
+        expiresAtSeconds: expiry,
+        bypassRevocation: true
+      })
+    );
+
+    assert.equal(result.status, 400);
+  });
+});
+
+test("device authority disabled prevents assessment", async () => {
+  await withSettings(async () => {
+    delete process.env.HOPE_KIOSK_DEVICE_AUTHORITY_ENABLED;
+
+    const result = await execute(
+      request({
+        action: "assess",
+        deviceId: id,
+        expiresAtSeconds: expiry
+      })
+    );
+
+    assert.equal(result.status, 404);
+  });
+});

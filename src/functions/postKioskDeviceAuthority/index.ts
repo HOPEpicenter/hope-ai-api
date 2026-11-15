@@ -3,7 +3,8 @@ import { timingSafeEqual } from "node:crypto";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
   registerKioskDeviceV1,
-  revokeKioskDeviceV1
+  revokeKioskDeviceV1,
+  assessKioskDeviceV1
 } from "../../services/visitors/kioskDeviceRegistryV1";
 
 const MAX_BODY_BYTES = 512;
@@ -13,6 +14,7 @@ const UUID4 =
 type Dependencies = {
   register?: typeof registerKioskDeviceV1;
   revoke?: typeof revokeKioskDeviceV1;
+  assess?: typeof assessKioskDeviceV1;
 };
 
 function header(req: any, name: string): string {
@@ -159,12 +161,55 @@ export async function postKioskDeviceAuthority(
       !UUID4.test(deviceId) ||
       (
         action !== "register" &&
-        action !== "revoke"
+        action !== "revoke" &&
+        action !== "assess"
       )
     ) {
       respond(context, 400, {
         ok: false,
         error: "INVALID_REQUEST"
+      });
+      return;
+    }
+
+    if (action === "assess") {
+      if (
+        fields.join(",") !==
+          "action,deviceId,expiresAtSeconds" ||
+        !Number.isSafeInteger(body.expiresAtSeconds)
+      ) {
+        respond(context, 400, {
+          ok: false,
+          error: "INVALID_REQUEST"
+        });
+        return;
+      }
+
+      // Read-only authoritative status check.
+      // The device identity is derived by the trusted
+      // dashboard from a verified signed credential.
+      // It must never be accepted from an anonymous
+      // browser request as sufficient authorization.
+      const assess =
+        deps.assess ?? assessKioskDeviceV1;
+
+      const active = await assess(
+        deviceId,
+        body.expiresAtSeconds,
+        { enabled: true }
+      );
+
+      if (!active) {
+        respond(context, 403, {
+          ok: false,
+          error: "DEVICE_NOT_ACTIVE"
+        });
+        return;
+      }
+
+      respond(context, 200, {
+        ok: true,
+        status: "active"
       });
       return;
     }

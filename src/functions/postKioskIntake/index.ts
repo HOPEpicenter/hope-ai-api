@@ -15,7 +15,12 @@ import {
   assessKioskDeviceV1
 } from "../../services/visitors/kioskDeviceRegistryV1";
 
+import {
+  reserveKioskDeviceSlotV1
+} from "../../services/visitors/reserveKioskDeviceSlotV1";
+
 type Dependencies = {
+  reserveDeviceSlot?: typeof reserveKioskDeviceSlotV1;
   verifyDevicePass?: typeof verifyKioskDevicePassV1;
   assessDevice?: typeof assessKioskDeviceV1;
   reserveAdmission?: typeof reserveKioskAdmissionSlotV1;
@@ -94,6 +99,17 @@ export async function postKioskIntake(
   // No HTTP caller may control this feature gate.
   if (
     process.env.HOPE_KIOSK_CAPACITY_GUARD_ENABLED !== "true"
+  ) {
+    reply(context, 404, {
+      accepted: false,
+      error: "NOT_AVAILABLE"
+    });
+    return;
+  }
+
+  // Device-specific capacity is mandatory for enabled intake.
+  if (
+    process.env.HOPE_KIOSK_DEVICE_CAPACITY_GUARD_ENABLED !== "true"
   ) {
     reply(context, 404, {
       accepted: false,
@@ -209,6 +225,26 @@ export async function postKioskIntake(
       reply(context, 403, {
         accepted: false,
         error: "DEVICE_NOT_AUTHORIZED"
+      });
+      return;
+    }
+
+    // Device identity comes from the verified signed pass.
+    // The registry check has already succeeded.
+    // No visitor data is persisted before this reservation.
+    const reserveDevice =
+      dependencies.reserveDeviceSlot ??
+      reserveKioskDeviceSlotV1;
+
+    const deviceAdmission = await reserveDevice(
+      device.deviceId,
+      { enabled: true }
+    );
+
+    if (!deviceAdmission.admitted) {
+      reply(context, 429, {
+        accepted: false,
+        error: "DEVICE_RATE_LIMIT_REACHED"
       });
       return;
     }

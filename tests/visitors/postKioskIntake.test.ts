@@ -33,7 +33,8 @@ async function run(
   submit?: any,
   reserveAdmission?: any,
   verifyDevicePass?: any,
-  assessDevice?: any
+  assessDevice?: any,
+  reserveDeviceSlot?: any
 ): Promise<any> {
   const context: any = {};
 
@@ -53,7 +54,10 @@ async function run(
         })),
       assessDevice:
         assessDevice ??
-        (async () => true)
+        (async () => true),
+      reserveDeviceSlot:
+        reserveDeviceSlot ??
+        (async () => ({ admitted: true }))
     }
   );
 
@@ -72,12 +76,15 @@ async function withFlags(
     process.env.HOPE_KIOSK_CAPACITY_GUARD_ENABLED;
   const previousVerification =
     process.env.HOPE_KIOSK_DEVICE_VERIFICATION_ENABLED;
+  const previousDeviceCapacity =
+    process.env.HOPE_KIOSK_DEVICE_CAPACITY_GUARD_ENABLED;
 
   process.env.HOPE_API_KEY = "synthetic-secret";
   process.env.HOPE_KIOSK_BACKEND_INGRESS_ENABLED = "true";
   process.env.HOPE_KIOSK_PUBLIC_INTAKE_ENABLED = "true";
   process.env.HOPE_KIOSK_CAPACITY_GUARD_ENABLED = "true";
   process.env.HOPE_KIOSK_DEVICE_VERIFICATION_ENABLED = "true";
+  process.env.HOPE_KIOSK_DEVICE_CAPACITY_GUARD_ENABLED = "true";
 
   try {
     await operation();
@@ -94,6 +101,10 @@ async function withFlags(
     restore(
       "HOPE_KIOSK_DEVICE_VERIFICATION_ENABLED",
       previousVerification
+    );
+    restore(
+      "HOPE_KIOSK_DEVICE_CAPACITY_GUARD_ENABLED",
+      previousDeviceCapacity
     );
     restore(
       "HOPE_KIOSK_CAPACITY_GUARD_ENABLED",
@@ -482,5 +493,131 @@ test("active verified device reaches submission", async () => {
     assert.equal(result.status, 202);
     assert.equal(assessed, true);
     assert.equal(submitted, true);
+  });
+});
+test("device-specific capacity gate is default off", async () => {
+  await withFlags(async () => {
+    delete process.env.HOPE_KIOSK_DEVICE_CAPACITY_GUARD_ENABLED;
+    const result = await run(request());
+    assert.equal(result.status, 404);
+  });
+});
+
+test("device limit exhaustion denies before global capacity", async () => {
+  await withFlags(async () => {
+    let globalReserved = false;
+    let submitted = false;
+
+    const result = await run(
+      request(),
+      async () => {
+        submitted = true;
+        return { accepted: true, status: "recorded" };
+      },
+      async () => {
+        globalReserved = true;
+        return { admitted: true };
+      },
+      undefined,
+      undefined,
+      async () => ({
+        admitted: false,
+        reason: "device_capacity_exhausted"
+      })
+    );
+
+    assert.equal(result.status, 429);
+    assert.equal(result.body.error, "DEVICE_RATE_LIMIT_REACHED");
+    assert.equal(globalReserved, false);
+    assert.equal(submitted, false);
+  });
+});
+
+test("verified device ID determines the rate-limit identity", async () => {
+  await withFlags(async () => {
+    let deviceReserved = false;
+    let globallyReserved = false;
+
+    const result = await run(
+      request(),
+      async () => ({ accepted: true, status: "recorded" }),
+      async () => {
+        globallyReserved = true;
+        return { admitted: true };
+      },
+      () => ({
+        deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        expiresAtSeconds: 1795350000
+      }),
+      async () => true,
+      async (deviceId: string, deps: any) => {
+        assert.equal(
+          deviceId,
+          "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        );
+        assert.equal(deps.enabled, true);
+        deviceReserved = true;
+        return { admitted: true };
+      }
+    );
+
+    assert.equal(result.status, 202);
+    assert.equal(deviceReserved, true);
+    assert.equal(globallyReserved, true);
+  });
+});
+
+test("device capacity storage errors fail closed", async () => {
+  await withFlags(async () => {
+    let globallyReserved = false;
+    let submitted = false;
+
+    const result = await run(
+      request(),
+      async () => {
+        submitted = true;
+        return { accepted: true, status: "recorded" };
+      },
+      async () => {
+        globallyReserved = true;
+        return { admitted: true };
+      },
+      undefined,
+      undefined,
+      async () => {
+        throw new Error("SYNTHETIC_PRIVATE_DEVICE_STORE_ERROR");
+      }
+    );
+
+    assert.equal(result.status, 503);
+    assert.equal(globallyReserved, false);
+    assert.equal(submitted, false);
+    assert.equal(
+      JSON.stringify(result).includes(
+        "SYNTHETIC_PRIVATE_DEVICE_STORE_ERROR"
+      ),
+      false
+    );
+  });
+});
+
+test("revoked device cannot consume device rate-limit slots", async () => {
+  await withFlags(async () => {
+    let deviceReserved = false;
+
+    const result = await run(
+      request(),
+      async () => ({ accepted: true, status: "recorded" }),
+      undefined,
+      undefined,
+      async () => false,
+      async () => {
+        deviceReserved = true;
+        return { admitted: true };
+      }
+    );
+
+    assert.equal(result.status, 403);
+    assert.equal(deviceReserved, false);
   });
 });

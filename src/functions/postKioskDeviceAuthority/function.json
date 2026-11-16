@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/postKioskDeviceAuthority/index.js",
+  "entryPoint": "postKioskDeviceAuthority",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": ["post"],
+      "route": "kiosk/device-authority"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

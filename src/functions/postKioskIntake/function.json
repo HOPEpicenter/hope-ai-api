@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/postKioskIntake/index.js",
+  "entryPoint": "postKioskIntake",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": ["post"],
+      "route": "kiosk/intake"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

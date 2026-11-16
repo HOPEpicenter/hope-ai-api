@@ -1,0 +1,375 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import {
+  createGetKioskPendingReviewHandler
+} from "../../src/functions/getKioskPendingReview/index";
+import {
+  issueKioskReviewCursorV1
+} from "../../src/services/visitors/kioskReviewCursorV1";
+
+const TEST_CURSOR_KEY = Buffer.alloc(32, 17)
+  .toString("base64url");
+
+const FLAG = "HOPE_KIOSK_STAFF_REVIEW_ENABLED";
+
+async function withFlag(
+  enabled: boolean,
+  operation: () => Promise<void>
+): Promise<void> {
+  const previous = process.env[FLAG];
+
+  try {
+    if (enabled) {
+      process.env[FLAG] = "true";
+    } else {
+      delete process.env[FLAG];
+    }
+
+    await operation();
+  } finally {
+    if (previous === undefined) {
+      delete process.env[FLAG];
+    } else {
+      process.env[FLAG] = previous;
+    }
+  }
+}
+
+function pendingBatch() {
+  return {
+    event: "friends-family-2026-11-22" as const,
+    items: [],
+    limit: 25,
+    hasMore: false
+  };
+}
+
+function configuration(enforcementEnabled: boolean) {
+  return {
+    enforcementEnabled
+  };
+}
+
+async function run(
+  options: {
+    enabled?: boolean;
+    enforcement?: boolean;
+    authorized?: boolean;
+    authStatus?: number;
+    query?: any;
+    failingStorage?: boolean;
+    configThrows?: boolean;
+    storageCursor?: string;
+    cursorKey?: string;
+  } = {}
+) {
+  const context: any = {};
+  const calls = {
+    authorize: 0,
+    storage: 0,
+    continuationToken: undefined as string | undefined
+  };
+
+  const handler = createGetKioskPendingReviewHandler({
+    readConfiguration: (() => {
+      if (options.configThrows) {
+        throw new Error("SYNTHETIC_CONFIG_SECRET");
+      }
+      return configuration(
+        options.enforcement ?? true
+      );
+    }) as any,
+    authorizeActor: (async () => {
+      calls.authorize++;
+
+      if (options.authorized === false) {
+        return {
+          ok: false,
+          status: options.authStatus ?? 403,
+          body: { error: "Unauthorized" }
+        };
+      }
+
+      return {
+        ok: true,
+        actorId: "synthetic-admin"
+      };
+    }) as any,
+    readPending: (async (deps: any) => {
+      calls.storage++;
+      calls.continuationToken = deps.continuationToken;
+
+      assert.equal(deps.enabled, true);
+      assert.equal(deps.authorized, true);
+
+      if (options.failingStorage) {
+        throw new Error("SYNTHETIC_PRIVATE_GUEST_DATA");
+      }
+
+      return {
+        ...pendingBatch(),
+        limit: deps.limit,
+        hasMore: Boolean(options.storageCursor),
+        nextContinuationToken:
+          options.storageCursor ?? null
+      };
+    }) as any
+  });
+
+  const previousKey =
+    process.env.HOPE_KIOSK_REVIEW_CURSOR_KEY;
+
+  try {
+    process.env.HOPE_KIOSK_REVIEW_CURSOR_KEY =
+      options.cursorKey ?? TEST_CURSOR_KEY;
+
+    await withFlag(options.enabled ?? true, async () => {
+      await handler(context, {
+        method: "GET",
+        query: options.query ?? {}
+      });
+    });
+  } finally {
+    if (previousKey === undefined) {
+      delete process.env.HOPE_KIOSK_REVIEW_CURSOR_KEY;
+    } else {
+      process.env.HOPE_KIOSK_REVIEW_CURSOR_KEY =
+        previousKey;
+    }
+  }
+
+  return { context, calls };
+}
+
+test("review feature is disabled without authorization or reads", async () => {
+  const { context, calls } = await run({ enabled: false });
+  assert.equal(context.res.status, 404);
+  assert.equal(calls.authorize, 0);
+  assert.equal(calls.storage, 0);
+});
+
+test("disabled Entra enforcement cannot use legacy fallback", async () => {
+  const { context, calls } = await run({
+    enforcement: false
+  });
+  assert.equal(context.res.status, 403);
+  assert.equal(calls.authorize, 0);
+  assert.equal(calls.storage, 0);
+});
+
+test("unauthorized administrator is denied without storage read", async () => {
+  const { context, calls } = await run({
+    authorized: false
+  });
+  assert.equal(context.res.status, 403);
+  assert.equal(calls.storage, 0);
+});
+
+test("missing or invalid staff bearer authority is denied", async () => {
+  const { context, calls } = await run({
+    authorized: false,
+    authStatus: 401
+  });
+  assert.equal(context.res.status, 401);
+  assert.equal(calls.storage, 0);
+});
+
+test("authorized review returns a bounded read-only batch", async () => {
+  const { context, calls } = await run();
+  assert.equal(context.res.status, 200);
+  assert.equal(context.res.body.ok, true);
+  assert.equal(context.res.body.limit, 25);
+  assert.equal(calls.authorize, 1);
+  assert.equal(calls.storage, 1);
+  assert.equal(
+    context.res.headers["cache-control"],
+    "no-store"
+  );
+});
+
+test("administrator can request a smaller limit", async () => {
+  const { context } = await run({
+    query: { limit: "5" }
+  });
+  assert.equal(context.res.status, 200);
+  assert.equal(context.res.body.limit, 5);
+});
+
+test("invalid limits never reach storage", async () => {
+  for (const limit of ["0", "26", "-1", "1.5", "abc"]) {
+    const { context, calls } = await run({
+      query: { limit }
+    });
+    assert.equal(context.res.status, 400);
+    assert.equal(calls.storage, 0);
+  }
+});
+
+test("storage failure exposes no guest details", async () => {
+  const { context } = await run({
+    failingStorage: true
+  });
+  assert.equal(context.res.status, 503);
+  assert.equal(
+    JSON.stringify(context.res).includes(
+      "SYNTHETIC_PRIVATE_GUEST_DATA"
+    ),
+    false
+  );
+});
+
+test("invalid Entra configuration fails closed", async () => {
+  const { context, calls } = await run({
+    configThrows: true
+  });
+  assert.equal(context.res.status, 503);
+  assert.equal(calls.authorize, 0);
+  assert.equal(calls.storage, 0);
+  assert.equal(
+    JSON.stringify(context.res).includes(
+      "SYNTHETIC_CONFIG_SECRET"
+    ),
+    false
+  );
+});
+test("raw storage continuation never appears in HTTP response", async () => {
+  const privateToken = "SYNTHETIC_PRIVATE_AZURE_CURSOR";
+
+  const { context, calls } = await run({
+    storageCursor: privateToken
+  });
+
+  assert.equal(context.res.status, 200);
+  assert.equal(context.res.body.hasMore, true);
+  assert.equal(calls.storage, 1);
+
+  const response = JSON.stringify(context.res);
+
+  assert.equal(response.includes(privateToken), false);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(context.res.body, "nextContinuationToken"),
+    false
+  );
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(context.res.body, "cursor"),
+    false
+  );
+});
+test("first page returns only an encrypted continuation cursor", async () => {
+  const privateToken = "PRIVATE_SYNTHETIC_STORAGE_TOKEN";
+
+  const { context } = await run({
+    storageCursor: privateToken
+  });
+
+  assert.equal(context.res.status, 200);
+  assert.equal(context.res.body.hasMore, true);
+  assert.equal(
+    typeof context.res.body.nextCursor,
+    "string"
+  );
+
+  const serialized = JSON.stringify(context.res);
+
+  assert.equal(serialized.includes(privateToken), false);
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(
+      context.res.body,
+      "nextContinuationToken"
+    ),
+    false
+  );
+});
+
+test("verified administrator can resume encrypted pagination", async () => {
+  const privateToken = "SYNTHETIC_PAGE_TWO";
+
+  const cursor = issueKioskReviewCursorV1({
+    actorId: "synthetic-admin",
+    limit: 25,
+    secret: TEST_CURSOR_KEY,
+    continuationToken: privateToken
+  });
+
+  const { context, calls } = await run({
+    query: { cursor }
+  });
+
+  assert.equal(context.res.status, 200);
+  assert.equal(calls.storage, 1);
+  assert.equal(calls.continuationToken, privateToken);
+  assert.equal(context.res.body.nextCursor, null);
+});
+
+test("cursor for another administrator never reads storage", async () => {
+  const cursor = issueKioskReviewCursorV1({
+    actorId: "another-administrator",
+    limit: 25,
+    secret: TEST_CURSOR_KEY,
+    continuationToken: "PRIVATE_TOKEN"
+  });
+
+  const { context, calls } = await run({
+    query: { cursor }
+  });
+
+  assert.equal(context.res.status, 400);
+  assert.equal(calls.storage, 0);
+});
+
+test("cursor bound to different page limit is rejected", async () => {
+  const cursor = issueKioskReviewCursorV1({
+    actorId: "synthetic-admin",
+    limit: 25,
+    secret: TEST_CURSOR_KEY,
+    continuationToken: "PRIVATE_TOKEN"
+  });
+
+  const { context, calls } = await run({
+    query: { cursor, limit: "5" }
+  });
+
+  assert.equal(context.res.status, 400);
+  assert.equal(calls.storage, 0);
+});
+
+test("malformed cursor never reaches storage", async () => {
+  for (const cursor of [
+    "",
+    "invalid",
+    "x".repeat(8193)
+  ]) {
+    const { context, calls } = await run({
+      query: { cursor }
+    });
+
+    assert.equal(context.res.status, 400);
+    assert.equal(calls.storage, 0);
+  }
+});
+
+test("missing cursor encryption key fails before storage", async () => {
+  const { context, calls } = await run({
+    cursorKey: ""
+  });
+
+  assert.equal(context.res.status, 503);
+  assert.equal(calls.storage, 0);
+});
+
+test("unauthorized staff cannot decrypt or read a cursor", async () => {
+  const cursor = issueKioskReviewCursorV1({
+    actorId: "synthetic-admin",
+    limit: 25,
+    secret: TEST_CURSOR_KEY,
+    continuationToken: "PRIVATE_TOKEN"
+  });
+
+  const { context, calls } = await run({
+    authorized: false,
+    query: { cursor }
+  });
+
+  assert.equal(context.res.status, 403);
+  assert.equal(calls.storage, 0);
+});

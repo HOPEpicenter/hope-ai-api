@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/postKioskOwnerVerification/index.js",
+  "entryPoint": "postKioskOwnerVerification",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": ["post"],
+      "route": "kiosk/owner-verification"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

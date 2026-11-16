@@ -71,7 +71,9 @@ export function createTrustedBootstrapGate(config, dependencies) {
       let identity;
 
       try {
-        identity = await dependencies.authenticateOwner();
+        identity = await dependencies.authenticateOwner(
+          request.accessToken
+        );
       } catch {
         return deny("OWNER_AUTHENTICATION_FAILED");
       }

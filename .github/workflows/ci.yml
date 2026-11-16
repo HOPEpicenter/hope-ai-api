@@ -70,6 +70,19 @@ jobs:
           $ErrorActionPreference = "Stop"
           npm run build
 
+      - name: Synthetic kiosk bootstrap trust-boundary regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          node --test `
+            scripts/kiosk-bootstrap/owner-token-signed-approval-gate.test.cjs `
+            scripts/kiosk-bootstrap/entra-owner-token.test.cjs `
+            scripts/kiosk-bootstrap/kiosk-bootstrap-config.test.cjs `
+            scripts/kiosk-bootstrap/trusted-bootstrap-gate.test.mjs `
+            scripts/kiosk-bootstrap/verify-signed-approval.test.mjs `
+            scripts/kiosk-bootstrap/signed-approval-ledger.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw "Synthetic kiosk bootstrap trust-boundary regressions failed" }
+
       - name: E149A disabled Staff authority regressions
         shell: pwsh
         run: |

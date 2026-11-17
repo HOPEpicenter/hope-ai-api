@@ -432,3 +432,146 @@ acceptance resources prior to provisioning.
 NOT AN INFRASTRUCTURE AUTHORIZATION.** Do not provision, change RBAC,
 merge protected main, deploy either staging or production, activate
 Staff Authority, or create the first Staff administrator.
+
+## 14. Lead engineering decision and non-executing deployment contract
+
+**Decision owner:** HOPE Ministry OS lead engineering. **Independent reviewer:**
+Hope-2018 checks the resulting proposal and implementation; the reviewer
+does not select the engineering architecture. **Accountable owner:** must
+separately approve costs, privileged Azure changes, deployment and any
+Staff bootstrap. This section makes the technical choices explicit.
+
+### 14.1 Selected implementation architecture
+
+- **Separate resource group:** `rg-hope-kiosk-staff-authority`
+  (candidate name, not created) for authority storage, writer identity
+  and isolated writer workload.
+- **Authority storage:** `sthopekauth20261122` (candidate; naming and
+  availability pending), StorageV2, Standard_LRS, East US 2, private
+  Table endpoint, shared keys/public access disabled.
+- **Table:** `StaffAuthority`; authority head, normalized kiosk Entra
+  binding, generation, immutable receipt and projection obligation
+  must be designed to share an appropriate atomic partition.
+- **Compute:** an Azure Container Apps Job configured with Manual
+  trigger, one replica/completion, parallelism one, and
+  `replicaRetryLimit: 0`; no schedule/event trigger or public HTTP
+  endpoint. Select a separately deployed writer artifact with pinned
+  immutable digest and minimal identity. Existing kiosk API is not a
+  permitted authority writer.
+- **Runtime identity:** only
+  `id-hope-kiosk-authority-writer` (candidate name) is bound to the
+  authority-writing job. No connection strings, account keys or
+  existing kiosk API identity are accepted as authority credentials.
+- **Private networking:** existing VNet, `snet-kiosk-private-endpoints`,
+  and Table DNS zone are preferred, but the Container Apps managed
+  environment's VNet routing and DNS connectivity are a *go/no-go
+  feasibility dependency*. Do not attach an unverified environment
+  or infer reachability from VNet existence alone.
+
+A *manual trigger is not an authorization boundary by itself*. Azure
+Container Apps job start permissions may allow an execution-template
+override (including image/command/environment), which effectively
+grants use of the job's managed identity. Thus:
+- Do **not** assign `Container Apps Jobs Operator` or `Container Apps
+  Jobs Contributor` to ordinary staff, dashboard principals, kiosk
+  API, general CI, or broad shared automation identities.
+- `Microsoft.App/jobs/start/action` is reserved for a reviewed,
+  separate trusted operations principal subject to explicit owner
+  approval; even a narrowly scoped custom job-start role must be
+  treated as a high-trust delegation. Job image and identity changes
+  also require explicit reviewed deployment authority.
+- No standing job-start grants are part of initial provisioning
+  unless the privilege owner and break-glass controls are approved.
+
+Reference basis (Microsoft Learn, checked 2026-11-17):
+- https://learn.microsoft.com/en-us/azure/container-apps/jobs
+- https://learn.microsoft.com/en-us/azure/container-apps/jobs-get-started-cli
+- https://learn.microsoft.com/en-us/azure/storage/tables/assign-azure-role-data-access
+- https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/storage
+
+### 14.2 Exact proposed RBAC scope and limits
+
+The future writer data-role assignment target is the **table** resource,
+not the account:
+`/subscriptions/<approved-subscription-id>/resourceGroups/rg-hope-kiosk-staff-authority/providers/Microsoft.Storage/storageAccounts/sthopekauth20261122/tableServices/default/tables/StaffAuthority`.
+
+- Writer identity -> `Storage Table Data Contributor` at that scope,
+  subject to creating the Table through an independently controlled
+  provisioning identity and proving all SDK operations work without
+  account-scope elevation.
+- Future read service -> `Storage Table Data Reader` at the same
+  table scope, only if/when a separate reader is approved.
+- Existing kiosk API and original staging identities -> **no** new
+  role assignment at the authority account, Table or parent scope.
+- CI/build identity -> no authority data access and no job-start
+  permission; infrastructure deployment roles to be separately
+  enumerated and minimized.
+- Break-glass/owner -> time-bound auditable privilege; do not assume
+  a separate group blocks inherited subscription privileges.
+
+Contributor on the Table includes write **and delete** capabilities;
+it cannot enforce append-only receipts through RBAC. Protocol
+immutability must be protected by ETags, receipts/reconciliation,
+audit detection, and writer code restrictions; tamper resistance
+against compromise of the dedicated writer is a residual risk for
+independent review. No claim of cryptographic immutability is made.
+
+### 14.3 Pre-provisioning feasibility gate (read-only)
+
+Collect only classified metadata, without secrets:
+1. Existing Container Apps managed environment: resource-group,
+   region, workload profile, VNet/subnet attachment, private DNS
+   routing and ability to host a job from the proposed separate RG.
+2. Confirm Container Apps Job support in the selected region and
+   required managed identity and VNet environment.
+3. Confirm Azure Table resource-scope RBAC is valid for the planned
+   writer/read operations, and inventory actual inherited and
+   privileged assignments on all applicable scopes.
+4. Confirm private endpoint subnet IP availability and DNS zone links,
+   without altering existing network configuration.
+5. Confirm authority account name availability, resource group and
+   subscription approval, estimate monthly fixed/variable costs,
+   determine logging destination and alert/retention owner.
+6. Confirm container registry pull credentials and digest pinning;
+   verify that the deployment identity does not silently acquire
+   Table writer or job-start permissions.
+7. Validate independent staging deployment guard before any
+   protected-main merge. The existing `deploy-staging.yml` executes
+   upon non-ignored `main` pushes, including kiosk files.
+
+Unknown/missing/failed checks block Gate B; they do not authorize
+fallback to public endpoints, broad roles, or alternate resources.
+
+### 14.4 Provisioning execution plan - intentionally disabled
+
+The eventual ordered change plan, **only after separate owner approval**:
+1. Provision dedicated authority resource group with appropriate
+   inherited-RBAC review, governance and tags.
+2. Provision secured authority storage account, Table and logging
+   destination, default private/keys-off posture.
+3. Provision private Table endpoint, DNS zone group/link if needed;
+   independently verify private resolution from the chosen workload.
+4. Provision writer user-assigned identity; bind only the validated
+   Table-scoped role and confirm the old kiosk identity has no
+   authority path.
+5. Provision a manual-only Container Apps Job with zero automatic
+   retries, verified immutable image, and no authorized live
+   operation/start grants at creation.
+6. Verify isolation with **approved synthetic test data**:
+   old writer direct Table mutation denied at Azure data plane,
+   dedicated writer allowed only as specified, conditional
+   transactions and ambiguous response behavior fail closed.
+7. Configure audit/alert rules and confirm incident stop/rollback.
+8. Seek a distinct decision for any writer execution, canonical
+   projection integration, OAuth permission or real Staff bootstrap.
+
+No ARM/Bicep `what-if`, `az deployment create`, `az role assignment
+create`, `az containerapp job create/start`, storage creation or
+other mutation command is executed by this documentation update.
+The exact deployment artifact is **not yet implemented**. It must be
+reviewed, disabled by default, and tested before any approved use.
+
+**Explicit engineering hold:** Gate B infrastructure provisioning,
+job execution, Staff Authority activation, canonical Staff mutation,
+Graph invitation, OAuth execution, original staging and production
+deployment remain prohibited. PR #1507 stays draft.

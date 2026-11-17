@@ -4,6 +4,11 @@ import {
   type VerifiedEntraStaffAccessToken
 } from "../authorization/verifyEntraStaffAccessToken";
 
+export type KioskOwnerVerificationConfiguration =
+  EntraStaffTokenVerificationConfiguration & Readonly<{
+    expectedOwnerObjectId: string;
+  }>;
+
 export type OwnerTokenVerifier = (
   token: string,
   configuration: EntraStaffTokenVerificationConfiguration
@@ -40,7 +45,7 @@ function result(verified: boolean): OwnerVerificationResult {
  */
 export async function verifyKioskBootstrapOwner(
   token: unknown,
-  configuration: EntraStaffTokenVerificationConfiguration | null,
+  configuration: KioskOwnerVerificationConfiguration | null,
   enabled = false,
   verifier: OwnerTokenVerifier = verifyEntraStaffAccessToken
 ): Promise<OwnerVerificationResult> {
@@ -54,6 +59,9 @@ export async function verifyKioskBootstrapOwner(
     !Array.isArray(configuration.allowedClientApplicationIds) ||
     configuration.allowedClientApplicationIds.length === 0 ||
     !configuration.tenantId ||
+    typeof configuration.expectedOwnerObjectId !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      .test(configuration.expectedOwnerObjectId) ||
     !configuration.audience ||
     !configuration.requiredPermissions ||
     (
@@ -70,11 +78,12 @@ export async function verifyKioskBootstrapOwner(
       identity.tenantId.toLowerCase() ===
       configuration.tenantId.toLowerCase();
 
-    return result(
-      tenantMatches &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-        .test(identity.objectId)
-    );
+    const ownerMatches =
+      typeof identity.objectId === "string" &&
+      identity.objectId.toLowerCase() ===
+        configuration.expectedOwnerObjectId.toLowerCase();
+
+    return result(tenantMatches && ownerMatches);
   } catch {
     return result(false);
   }

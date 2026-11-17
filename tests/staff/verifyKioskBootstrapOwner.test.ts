@@ -9,6 +9,7 @@ const token = `${"a".repeat(20)}.${"b".repeat(20)}.${"c".repeat(20)}`;
 
 const config = {
   tenantId: tenant,
+  expectedOwnerObjectId: object,
   audience: "api://isolated-test-api",
   requiredPermissions: { scopes: ["Owner.Verify"] },
   allowedClientApplicationIds: [
@@ -62,6 +63,25 @@ async function main(): Promise<void> {
   );
   assert.equal(wrongTenant.verified, false);
 
+  const wrongOwner = await verifyKioskBootstrapOwner(
+    token,
+    {
+      ...config,
+      expectedOwnerObjectId:
+        "44444444-4444-4444-8444-444444444444"
+    },
+    true,
+    verifier
+  );
+  assert.equal(wrongOwner.verified, false);
+
+  const missingOwner = await verifyKioskBootstrapOwner(
+    token,
+    { ...config, expectedOwnerObjectId: "" },
+    true,
+    verifier
+  );
+  assert.equal(missingOwner.verified, false);
   const rejected = await verifyKioskBootstrapOwner(
     token, config, true,
     async () => {
@@ -80,7 +100,7 @@ async function main(): Promise<void> {
 
   for (const outcome of [
     disabled, invalid, verified, wrongTenant,
-    rejected, missingClientFence
+    rejected, missingClientFence, wrongOwner, missingOwner
   ]) {
     assert.equal(outcome.executionPermitted, false);
     assert.equal(outcome.staffCreationPermitted, false);
@@ -94,6 +114,8 @@ async function main(): Promise<void> {
   console.log("INVALID_TOKEN_SHAPE_DENIED=True");
   console.log("TRUSTED_VERIFIER_INJECTION_PASSED=True");
   console.log("TENANT_MISMATCH_DENIED=True");
+  console.log("WRONG_OWNER_OBJECT_ID_DENIED=True");
+  console.log("MISSING_OWNER_OBJECT_ID_DENIED=True");
   console.log("VERIFIER_FAILURE_DENIED=True");
   console.log("CLIENT_FENCE_REQUIRED=True");
   console.log("NO_IDENTITY_INFORMATION_RETURNED=True");

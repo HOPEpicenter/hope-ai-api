@@ -653,3 +653,171 @@ or Graph invitation is authorized by this section.
 
 Gate A remains pending final evidence and independent
 security review. Gate B requires separate owner approval.
+
+## 16. Authority monitoring decision - 2026-11-17
+
+Status: PROPOSED / NOT PROVISIONED.
+
+K359A verified three existing Log Analytics workspaces,
+all in eastus, with 30-day retention and PerGB2018 SKU.
+
+Selected architecture:
+- Dedicated proposed workspace: law-hope-kiosk-authority
+- Resource group: rg-hope-kiosk-staff-authority
+- Region: eastus2
+- SKU: Pay-as-you-go
+- Initial retention target: 30 days
+- Container Apps job and environment execution logs
+- Storage Table read/write/delete diagnostic logs
+- Azure management-plane activity and RBAC change monitoring
+- Restricted audit access and sensitive-data redaction
+- Alert ownership and incident response required
+
+The workspace and all diagnostic settings remain
+unprovisioned. Workspace naming and regional availability
+must be confirmed before approval.
+
+Cost gates:
+- Verify current East US 2 ingestion and retention pricing.
+- Include private endpoints, storage transactions, job
+  execution, environment charges, alert rules and logging.
+- Establish an explicit monthly spending ceiling.
+- Identify the accountable monitoring and incident owner.
+- Validate any shared-secret requirements for configuring
+  Container Apps logging and protect those credentials.
+
+Thirty-day retention is an initial cost-planning target,
+not a finalized evidence-retention policy.
+
+This decision does not authorize resource creation,
+diagnostic configuration, RBAC changes, deployments,
+job execution or Staff Authority activation.
+
+## 17. Infrastructure pricing evidence - 2026-11-17
+
+Status: RETAIL PRICING EVIDENCE / NO SPENDING APPROVAL.
+
+All prices below are public USD retail meter observations.
+Azure Sponsorship billing adjustments are not assumed.
+
+### 17.1 Observed pricing
+
+K359C - Azure Container Apps, East US 2:
+- Standard active vCPU: USD 0.000024/second
+- Standard active memory: USD 0.000003/GiB-second
+- Environment Management Hour: USD 0.10/hour
+- Environment Private Endpoint: USD 0.10/hour
+
+Environment management meter applicability remains unresolved.
+No Container Apps environment private endpoint is proposed.
+
+K359F - Standard Azure Private Link:
+- Global standard endpoint: USD 0.01/hour
+- 730-hour endpoint planning amount: USD 7.30
+- Data processing billed separately, subject to tiers.
+
+K359H-A - Log Analytics, East US 2:
+- Analytics Logs ingestion paid meter: USD 2.76/GB
+- A zero-price ingestion meter also exists; eligibility unverified.
+- Analytics Logs retention meter: USD 0.12/GB-month
+- Billable retention eligibility and included periods require review.
+
+K359I - Azure Tables, East US 2:
+- Account Encrypted LRS data: USD 0.045/GB-month
+- Account Encrypted LRS reads: USD 0.005/10K
+- Account Encrypted LRS writes: USD 0.025/10K
+- Account Encrypted LRS batch writes: USD 0.075/10K
+- Account Encrypted LRS lists/scans: USD 0.09/10K
+
+These Account Encrypted LRS prices must not be
+substituted for unverified Standard LRS meter pricing.
+
+### 17.2 Budget and security decision gates
+
+Before owner approval:
+1. Confirm which Container Apps environment management
+   charges apply to the exact workload-profiles configuration.
+2. Confirm Standard_LRS authority Table billing categories.
+3. Estimate logging ingestion, storage volume, transactions,
+   alert execution and job runtime using explicit assumptions.
+4. Identify diagnostic ingestion and retention charges,
+   private endpoint data transfer and any other fixed costs.
+5. Obtain an Azure Sponsorship-aware spending estimate.
+6. Set an explicit monthly budget ceiling and alert thresholds.
+7. Verify effective inherited access, custom roles, privileged
+   eligibility and permission-level legacy writer exclusion.
+8. Approve monitoring access, incident ownership, job-start
+   restrictions and fail-closed recovery procedures.
+9. Resolve staging deployment consequences before main merge.
+
+No amount in this section constitutes an approved budget.
+Unresolved charges must not be assumed to be zero.
+
+Gate A: pending final cost and effective-isolation evidence.
+Gate B infrastructure authorization: NOT GRANTED.
+Staff Authority activation: NOT AUTHORIZED.
+
+
+## 18. Conditional monthly cost scenarios - 2026-11-17
+
+Status: PLANNING MODEL / NOT AN APPROVED BUDGET.
+
+Assumptions:
+- One standard private endpoint, 730 hours.
+- Paid Analytics Logs ingestion: USD 2.76/GB.
+- One GB of Account Encrypted LRS Table data used
+  only as a provisional pricing proxy.
+- Example job: 1 vCPU, 2 GiB, 600 seconds per run.
+- Compute uses active vCPU/memory retail rates.
+- No assumed Azure Sponsorship discounts.
+
+### 18.1 Light usage
+
+- Private endpoint: USD 7.2999999999999998223643160600
+- Analytics Logs: 1 GB
+- Authority Table data: 1 GB
+- Job executions: 1
+- Modeled subtotal excluding operations:
+  USD 10.12
+
+### 18.2 Pilot usage
+
+- Private endpoint: USD 7.2999999999999998223643160600
+- Analytics Logs: 5 GB
+- Authority Table data: 1 GB
+- Table operations: 10K reads, 10K writes,
+  and 10K batch writes using provisional
+  Account Encrypted LRS rates.
+- Job executions: 10
+- Modeled subtotal:
+  USD 21.43
+
+### 18.3 Potential environment fee
+
+If the environment management meter applies continuously:
+- Additional exposure: USD 73/month.
+- Pilot subtotal plus that fee:
+  USD 94.43.
+
+This is conditional, not a confirmed charge.
+
+### 18.4 Exclusions and approval controls
+
+These figures exclude:
+- Unverified Standard LRS Table price differences.
+- Private Link data processing and transfers.
+- Alert rules, monitoring queries and notifications.
+- Additional diagnostic ingestion and retention.
+- Registry, networking and other applicable charges.
+- Taxes and Sponsorship-specific billing adjustments.
+
+Before Gate B approval:
+- Resolve billable Container Apps environment features.
+- Confirm applicable Table billing classification.
+- Select a final workload and telemetry allowance.
+- Establish a monthly spending ceiling and alerts.
+- Obtain accountable owner approval for costs and
+  exact resource provisioning.
+
+No amount here authorizes spending or deployment.
+Staff Authority remains disabled.

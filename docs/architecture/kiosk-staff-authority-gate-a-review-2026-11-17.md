@@ -821,3 +821,245 @@ Before Gate B approval:
 
 No amount here authorizes spending or deployment.
 Staff Authority remains disabled.
+
+## 19. Authority job execution security - 2026-11-17
+
+Status: ENGINEERING DECISION / NOT PROVISIONED.
+
+K359M verified Microsoft.App provider operations:
+- Microsoft.App/jobs/read
+- Microsoft.App/jobs/start/action
+- Microsoft.App/jobs/listSecrets/action
+- Microsoft.App/jobs/write
+- Microsoft.App/jobs/executions/read
+- Microsoft.App/managedEnvironments/read
+
+All six operations were present.
+
+### 19.1 Selected permission boundary
+
+No standing authority job-start role is included
+in the initial infrastructure provisioning plan.
+
+The following must have no authority job-start,
+write, secret-listing, or identity-attachment path:
+- Existing kiosk API identity
+- Ordinary ministry staff
+- General CI identity
+- Dedicated authority writer identity
+
+A future trusted operations principal requires:
+- Separate accountable-owner authorization
+- Reviewed job-specific control-plane scope
+- Audit evidence and execution correlation
+- Explicit operation and artifact authorization
+- Independent security review
+
+The jobs/start/action permission is high trust
+because execution-template overrides may be allowed.
+A custom start-only role does not by itself eliminate
+the ability to execute arbitrary code with the
+job's managed identity.
+
+### 19.2 Deployment and execution restrictions
+
+- Manual job trigger only
+- Zero automatic retries
+- No schedule or event trigger
+- No public administrative HTTP endpoint
+- No live bootstrap payload at provisioning
+- Immutable reviewed container image digest
+- Separate trusted deployment identity
+- No job-start permission for general CI
+- No listSecrets permission for ordinary operators
+- No broad Contributor role for the kiosk API
+- No Graph invitation or OAuth execution
+- No authority-writing operation without separate approval
+
+### 19.3 Required verification
+
+Before authorizing execution:
+- Inspect effective inherited and custom Azure roles.
+- Verify identity assignment and deployment privileges.
+- Demonstrate denied job start for unauthorized principals.
+- Test execution-template override restrictions or
+  compensate with equivalent high-trust governance.
+- Verify private Table access from the execution network.
+- Prove dedicated writer cannot mutate unrelated stores.
+- Verify logging, incident response and emergency stop.
+- Preserve durable receipts and revocation generations.
+
+These are future acceptance tests, not completed proofs.
+Tests requiring live Azure mutation need separate approval.
+
+Gate B provisioning remains unauthorized.
+Authority job execution remains unauthorized.
+Staff Authority remains disabled.
+
+## 20. Proposed minimum-change provisioning manifest
+
+Status: PROPOSED / NO OWNER PROVISIONING APPROVAL.
+
+### 20.1 Approved-subscription boundary
+
+Subscription: Microsoft Azure Sponsorship
+Region: eastus2
+
+Existing kiosk VNet:
+vnet-hope-kiosk-acceptance
+
+Existing kiosk resource group:
+rg-hope-kiosk-acceptance-20261122
+
+Preserve existing staging, production, network
+delegations, identities and operational storage.
+
+### 20.2 Exact proposed resources
+
+1. Dedicated authority resource group:
+   rg-hope-kiosk-staff-authority
+
+2. Private StorageV2 account:
+   sthopekauth20261122
+   Proposed Standard_LRS, shared keys disabled,
+   public network access disabled.
+
+3. Authority Table:
+   StaffAuthority
+
+4. Private Table endpoint:
+   pe-kiosk-authority-table
+   Existing kiosk private endpoint subnet.
+   Reuse verified kiosk Table private DNS linkage.
+
+5. Dedicated subnet:
+   snet-kiosk-staff-authority
+   10.88.0.160/27
+   Delegation: Microsoft.App/environments
+
+6. New workload-profiles Container Apps environment:
+   Dedicated authority environment.
+   Consumption profile for the manual job.
+   No public administrative ingress.
+
+7. Dedicated writer managed identity:
+   id-hope-kiosk-authority-writer
+
+8. Separate authority Container Apps Job:
+   Manual trigger, one replica/completion,
+   parallelism one, replicaRetryLimit zero.
+   Immutable reviewed image digest.
+   No initial live execution or standing start grant.
+
+9. Dedicated monitoring workspace:
+   law-hope-kiosk-authority
+   East US 2, initial 30-day retention target.
+   Diagnostic settings and restricted access
+   subject to separate implementation review.
+
+Resource names are candidates until availability
+and actual Azure deployment constraints are verified.
+
+### 20.3 Permission contract
+
+- Writer identity:
+  Storage Table Data Contributor only at the
+  StaffAuthority Table resource scope, after validation.
+- Existing kiosk API identity:
+  no new authority Table data permissions.
+- Legacy and original staging identities:
+  no new authority Table data permissions.
+- General CI and ministry staff:
+  no authority job start or modification permissions.
+- Dedicated deployment identity:
+  separately reviewed minimum infrastructure privileges.
+- Authorization reader:
+  future separate read-only identity and approval.
+- Subscription Owner and inherited tenant-root
+  User Access Administrator:
+  governed privileged-access exceptions.
+
+No account-scoped Table Contributor fallback is
+authorized without a new engineering review and
+explicit owner approval.
+
+### 20.4 Proposed provisioning order
+
+Phase 1: Establish approved spending and access controls.
+
+Phase 2: Create dedicated group, storage, Table
+and monitoring resources.
+
+Phase 3: Add the dedicated subnet, environment,
+private Table endpoint and verified DNS integration.
+
+Phase 4: Create writer identity and narrowly scoped
+Table data permission.
+
+Phase 5: Deploy disabled manual job configuration
+with reviewed image and no live start authority.
+
+Phase 6: Perform separately authorized synthetic
+network, data-plane and security acceptance.
+
+Phase 7: Independent reviewer verifies results.
+
+Phase 8: Accountable owner decides whether to
+authorize any later live bootstrap operation.
+
+Each phase requires its own applicable approval.
+This ordering is a proposal, not an executable script.
+
+### 20.5 Financial approval hold
+
+Known conditional monthly planning scenarios:
+- Light usage subtotal: USD 10.12.
+- Pilot usage subtotal: USD 21.43.
+- Potential environment management: USD 73.00.
+
+These totals omit unresolved charges and do not
+constitute a complete Azure cost estimate.
+
+Before provisioning:
+- Confirm environment and storage billing treatment.
+- Price alert rules, registry, diagnostic ingestion,
+  transfers and other applicable networking features.
+- Obtain a Sponsorship-aware cost estimate.
+- Establish a written monthly spending ceiling,
+  alert thresholds and accountable cost owner.
+
+Azure budget alerts are not automatic spending caps.
+A separate stop/decommission procedure is required.
+
+### 20.6 Security and operational stop conditions
+
+Do not proceed if:
+- Legacy identities retain an authority write path.
+- Privileged or inherited access is unreviewed.
+- Job-start or template-override authority is uncontrolled.
+- Private routing or DNS cannot be proved.
+- Table-scoped RBAC fails minimum-required operations.
+- Logging or emergency containment is ineffective.
+- Durable receipts, generation fencing or
+  fail-closed recovery are not demonstrated.
+- The deployment artifact or resource names
+  differ from the independently reviewed proposal.
+- Original staging deployment side effects are unresolved.
+
+### 20.7 Explicit authorization boundaries
+
+This document does not authorize:
+- Resource provisioning or networking changes
+- Azure RBAC mutation
+- Container Apps Job execution
+- Staff Authority activation
+- Canonical Staff creation
+- OAuth execution or Graph invitation
+- Visitor contact
+- Original staging or production deployment
+- Protected-main merge
+
+Gate A: approval package in preparation.
+Independent security sign-off: pending.
+Gate B infrastructure approval: NOT GRANTED.
+Live Staff bootstrap approval: NOT GRANTED.

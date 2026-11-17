@@ -1063,3 +1063,180 @@ Gate A: approval package in preparation.
 Independent security sign-off: pending.
 Gate B infrastructure approval: NOT GRANTED.
 Live Staff bootstrap approval: NOT GRANTED.
+
+## 21. Final candidate resource names - 2026-11-17
+
+Status: ENGINEERING SELECTION / NOT PROVISIONED.
+
+K359T confirmed authority storage name availability.
+
+K359U confirmed:
+- Proposed authority resource group does not exist.
+- Writer identity: zero existing matches.
+- Monitoring workspace: zero existing matches.
+- Container Apps environment: zero existing matches.
+- Authority job: zero existing matches.
+
+Selected resource names:
+- Resource group: rg-hope-kiosk-staff-authority
+- Storage account: sthopekauth20261122
+- Authority Table: StaffAuthority
+- Writer identity: id-hope-kiosk-authority-writer
+- Container Apps environment: cae-hope-kiosk-authority
+- Manual job: job-hope-kiosk-authority-bootstrap
+- Monitoring: law-hope-kiosk-authority
+- Private endpoint: pe-kiosk-authority-table
+- Subnet: snet-kiosk-staff-authority
+- Subnet prefix: 10.88.0.160/27
+
+The names are selected but not reserved.
+Repeat availability checks immediately before any
+separately authorized provisioning if necessary.
+
+Outstanding conditions:
+- Effective permission and identity isolation.
+- Private runtime connectivity acceptance.
+- Exact environment billing applicability.
+- Monitoring/incident ownership and spending ceiling.
+- Immutable writer artifact and controlled execution.
+- Independent security review and owner approval.
+
+No provisioning, RBAC changes, deployment, job start,
+Staff Authority activation or Staff creation is authorized.
+
+## 22. Verified authority writer role risk - 2026-11-17
+
+Status: SECURITY DESIGN REFINEMENT / NO AZURE MUTATION.
+
+K359W-A verified the built-in Storage Table Data
+Contributor role in the approved subscription.
+
+Observed data permissions:
+- entities/read
+- entities/write
+- entities/delete
+- entities/add/action
+- entities/update/action
+
+Observed control-plane permissions:
+- tables/read
+- tables/write
+- tables/delete
+
+The role definition is available at root scope.
+This does not constitute a root-scope assignment.
+
+### 22.1 Engineering decision
+
+The built-in role remains a candidate for separately
+approved synthetic acceptance testing only.
+
+It is not approved as the final unrestricted
+production authority writer permission.
+
+Before live authority activation:
+- Evaluate a narrower custom Table data role.
+- Exclude unnecessary delete permissions.
+- Validate required conditional transaction support.
+- Confirm role assignment at the individual Table scope.
+- Demonstrate unauthorized operations are denied.
+- Independently protect authoritative receipts and
+  revocation generations from destructive modification.
+
+Excluding delete permission alone is insufficient:
+write/update permissions can still alter records.
+
+No custom role is selected or created by this section.
+
+### 22.2 Additional security requirement
+
+Immutable receipt claims require stronger evidence
+than application-level append-only behavior.
+
+Assess separately controlled evidence retention,
+audit trails, and writer-compromise containment.
+
+ETags protect conditional concurrency but do not
+prevent a privileged writer from issuing authorized
+changes or deletes.
+
+### 22.3 Authorization status
+
+Gate A: security refinement documented.
+Custom role implementation: NOT AUTHORIZED.
+Azure RBAC modification: NOT AUTHORIZED.
+Infrastructure provisioning: NOT AUTHORIZED.
+Live Staff Authority activation: NOT AUTHORIZED.
+
+## 23. Candidate least-privilege writer role
+
+Status: SECURITY DESIGN ONLY / NOT AUTHORIZED.
+
+Engineering selection:
+Evaluate a dedicated custom Azure RBAC role for the
+StaffAuthority writer rather than automatically using
+the built-in Storage Table Data Contributor role.
+
+### 23.1 Candidate permissions
+
+Control-plane actions:
+- Microsoft.Storage/storageAccounts/tableServices/tables/read
+
+Candidate data actions:
+- Microsoft.Storage/storageAccounts/tableServices/tables/entities/read
+- Microsoft.Storage/storageAccounts/tableServices/tables/entities/add/action
+- Microsoft.Storage/storageAccounts/tableServices/tables/entities/update/action
+
+Withhold by default:
+- Entity delete
+- General entity write
+- Table write/delete
+- Storage account management
+- Role assignment
+- Container Apps Job start/write
+- Access to unrelated storage accounts
+
+These permissions are candidates, not a validated
+deployable role definition.
+
+Verify provider operation support, required SDK calls,
+conditional ETags, and batch transaction behavior.
+If additional permissions are necessary, document
+each required operation before proposing expansion.
+
+Role assignment must be scoped to the individual
+StaffAuthority Table, subject to Azure validation.
+
+### 23.2 Receipt integrity
+
+A custom role without delete permission does not
+guarantee immutable receipts. Entity update permission
+may still permit modification of historical evidence.
+
+Required protections:
+- Conditional ETag and generation enforcement
+- Independently protected operation audit evidence
+- Durable replay and conflict detection
+- Writer-compromise containment
+- Fail-closed authorization on missing or contradictory
+  authority evidence
+- No automatic restoration of revoked authority
+
+The separately protected evidence design must be
+completed and accepted before live activation.
+
+### 23.3 Acceptance boundary
+
+Before live execution:
+- Validate exact Azure role definition and scopes.
+- Prove required synthetic operations succeed.
+- Prove disallowed updates/deletes and legacy
+  authority writes are rejected where designed.
+- Independently verify receipt integrity and recovery.
+
+Synthetic Azure acceptance requires separate owner
+authorization after the necessary infrastructure exists.
+
+No custom role creation, RBAC assignment,
+infrastructure provisioning, job execution,
+Staff creation or authority activation is authorized.

@@ -264,3 +264,171 @@ Not approved:
 Gate A result: DOCUMENT READY FOR INDEPENDENT REVIEW.
 Infrastructure authorization: NOT GRANTED.
 Staff creation authorization: NOT GRANTED.
+
+## 13. Gate A revision - independent reviewer findings (2026-11-17)
+
+Independent reviewer Hope-2018 approved the existing **non-authorizing
+code foundation**, but explicitly recorded **CHANGES REQUIRED / OPEN
+QUESTIONS REMAIN** for the proposed infrastructure architecture.
+The GitHub review state of APPROVED must not be interpreted as an
+architecture, provisioning, or Staff bootstrap approval.
+
+The following are concrete **candidate decisions for a second review**,
+not claims about deployed resources or verified effective isolation.
+
+### 13.1 Authority resource-group boundary and administrative privileges
+
+**Proposed decision:** place the authority storage account, its dedicated
+writer identity, and writer workload in a *new, dedicated authority
+resource group* in the existing approved subscription, rather than the
+current kiosk operational resource group. Candidate logical name:
+`rg-hope-kiosk-staff-authority` (not created, availability not verified).
+Keep private endpoint and DNS connection points in the existing kiosk VNet
+unless the connectivity review identifies an unavoidable reason otherwise.
+
+**Required independent proof before provisioning:**
+- Enumerate direct and inherited Azure role assignments at the new
+  resource-group's parent subscription scope, including Owner,
+  Contributor, User Access Administrator, Role Based Access Control
+  Administrator, groups, PIM/eligible assignments, and CI/deployment
+  identities where observable.
+- Explicitly distinguish management-plane privilege (which can change
+  identities, assignments, deployment code or account configuration) from
+  Table data-plane roles. A new resource group does **not** defeat
+  inherited subscription privileges.
+- Classify all pathways for existing kiosk, legacy, original staging,
+  deployment, and recovery identities to obtain authority data access.
+  Do not display tokens, account keys or connection-string values.
+- Require a preapproved break-glass administrator, access-change logging,
+  least-privilege identity assignment, and a separate operational change
+  approval. Do not claim absolute isolation from subscription owners.
+- Verify shared-key access disabled, and demonstrate real Azure
+  unauthorized principal denial against disposable synthetic authority
+  data after separately authorized provisioning.
+
+**Stop condition:** any existing kiosk runtime identity, legacy runtime
+or broadly shared application credential retains a usable authority
+Table mutation path.
+
+### 13.2 Dedicated writer workload selection
+
+**Preferred candidate:** a separately deployed, **manual-trigger-only
+Azure Container Apps Job**, assigned only the dedicated user-managed
+writer identity, inside an independently verified private-network-capable
+Container Apps environment. A *new* workload is proposed; the existing
+kiosk API must not be repurposed as the authority writer.
+
+Before selection, verify that the existing Microsoft.App environment,
+`snet-kiosk-flex` delegation, its networking/egress, identity binding,
+Container Apps Job manual start controls, and storage private DNS route
+actually support the deployment. If not, evaluate a separate environment
+or alternative isolated job hosting without silently expanding scope.
+
+**Deployment posture:** no schedule, no event trigger, zero unattended
+bootstrap executions, no credentials or runtime values in repository,
+no exposed HTTP administrative endpoint, explicit operator authorization
+per operation, immutable artifact digest and trusted deployment identity.
+The identity allowed to deploy/start a job must be reviewed separately
+from the writer's Table-data identity. A disabled configuration or CLI
+flag is not a replacement for permission-level isolation.
+
+**Unresolved:** actual Container Apps environment inventory and
+network support, job/start RBAC, dedicated compute costs, identity
+assignment authority, region support, and the specific artifact to run.
+Do not create a job or modify an environment as part of this revision.
+
+### 13.3 Proposed exact permission-intent matrix
+
+| Principal | Authority Table data | Other data stores | Management-plane intent |
+| --- | --- | --- | --- |
+| Dedicated writer managed identity | Proposed `Storage Table Data Contributor` **at the authority Table resource scope**, only if Azure accepts that scope and the SDK operations require no broader privilege | No canonical StaffEvents write permission by default | No resource creation, role assignment, or identity assignment privileges |
+| Existing kiosk API managed identity | No assignment; independently prove no inherited/alternate authority data-plane access | Retain existing operational storage roles | No new authority account management privileges |
+| Existing legacy/original staging identities | No assignment; deny verification required | Existing access unchanged | No new authority resource management privileges |
+| Dedicated authorization reader (future decision) | Proposed `Storage Table Data Reader` on authority Table only | None required for authoritative reads | None |
+| CI/deployment identity (future decision) | No authority data-plane permission by default | None required for authority records | Only explicitly approved resource deployment/identity attachment actions; no unconstrained Owner/Contributor assumption |
+| Designated human break-glass operator | No standing data-plane grant by default | None by default | Time-bound, audited elevation with independent approval, where supported |
+
+This is a *permission contract*, not a statement that Azure RBAC
+assignments exist or that Table-level scoping is validated. Resolve
+actual Table resource IDs, supported assignable scopes, inherited Data
+Actions, and control-plane privilege bypasses before owner authorization.
+Do not grant the existing kiosk identity Table Contributor on the new
+authority storage account for convenience.
+
+### 13.4 Network, monitoring and evidence requirements
+
+**Network:** proposed one Table private endpoint for the new account in
+`snet-kiosk-private-endpoints`, with the existing
+`privatelink.table.core.windows.net` zone reused only after read-only
+link and routing checks. The observed five endpoint configurations are
+not proof of remaining IP capacity. Confirm source job routing,
+name resolution, outbound policy, effective NSG/UDR coverage, private
+endpoint approval, and no unintended public fallback.
+
+**Monitoring proposal:** capture management-plane Activity Log events
+(resource, identity, role and network changes), authority Table
+operation failures/conflicts, job start/stop outcomes, and correlation
+IDs with immutable operation receipt IDs. Send operational alerts for:
+- unexpected writer start or unauthorized principal access attempt;
+- binding conflict, ETag/precondition failure spikes, or replay attempts;
+- missing projection obligation, reconciliation-required or unknown
+  acknowledgment state;
+- writer identity or RBAC modification, private endpoint/DNS changes;
+- missing logging/diagnostic evidence and repeated job failure.
+
+Decide diagnostic destination, retention, access restrictions, alert
+ownership, incident response contact, storage/telemetry costs, and
+sensitive-data redaction **before** infrastructure authorization.
+Do not log visitor PII, staff tokens, secret values or raw Entra IDs.
+Azure telemetry availability and exact log categories require validation;
+the list above is a proposed detection contract, not deployed monitoring.
+
+### 13.5 Rollback, recovery and operational freeze
+
+**Pre-execution acceptance:** verify authority state is empty or
+explicitly reconcile previously observed synthetic receipts; snapshot
+approved configuration **without secrets**; verify independent deny
+tests and deterministic operation IDs before any live bootstrap.
+
+**Immediate containment:** disable all authority job starts and external
+executor permissions, retain authoritative data and immutable receipts,
+and alert the owner. Disabling jobs alone is insufficient if Table
+permissions remain; emergency response must include separately
+authorized revocation of writer data-plane permissions or identity
+assignment where appropriate.
+
+**Recovery:** when the authority commit is ambiguous, perform
+read-only receipt/ownership/generation inspection first; classify
+committed, not committed, conflicting, and unknown. No blind retry,
+projection repair, role restoration, Graph action or OAuth authorization.
+Cross-account/canonical StaffEvents projections remain asynchronous and
+non-atomic. Missing/contradictory evidence fails closed.
+
+**Rollback:** roll back code/configuration only by a separately approved
+change; never delete or regress authority head, immutable receipts,
+revocations or security generations. Disabling an authority reader must
+not silently restore grants from historical StaffEvents projections.
+Restore service only after independent review and an explicit owner
+decision. Historical audit and six-week follow-up data stay intact.
+
+**Cost and lifecycle:** obtain a current Azure estimate for account
+capacity/transactions, private endpoint, private DNS, job compute,
+diagnostics/logging, alert rules and any new Container Apps environment.
+Specify spending ceiling, owner and decommission plan for temporary
+acceptance resources prior to provisioning.
+
+### 13.6 Exact gate disposition
+
+| Gate A finding | Proposed resolution | Evidence still required |
+| --- | --- | --- |
+| RBAC isolation | Dedicated account/group, role-intent matrix, no kiosk writer access | Inherited/effective access inventory and actual Azure denied writes |
+| Resource group | Dedicated authority group candidate | Parent-scope privilege review and final owner decision |
+| Workload hosting | Manual-only isolated Container Apps Job candidate | Existing environment suitability, costs, deploy/start permission proof |
+| Role scope | Table-scoped writer/reader roles proposed | Validate real resource scope, built-in Data Actions and privilege pathways |
+| Monitoring | Audit/alert contracts defined above | Diagnostic feasibility, destination, retention, operator and price |
+| Rollback | Fail-closed containment and evidence-first recovery specified | Practiced synthetic incident/rollback proof |
+
+**Current outcome: DESIGN REVISION FOR INDEPENDENT RE-REVIEW;
+NOT AN INFRASTRUCTURE AUTHORIZATION.** Do not provision, change RBAC,
+merge protected main, deploy either staging or production, activate
+Staff Authority, or create the first Staff administrator.

@@ -281,7 +281,13 @@ export async function coordinateStaffCreation(
   //
   // This is still not an atomic snapshot, durable writer lease,
   // or authorization decision.
-  if (requireReservationReadback) {
+  // The isolated kiosk must never allow callers to opt out
+  // of reservation evidence inspection.
+  // This remains non-authorizing and is not a durable lock.
+  const kioskReadbackRequired =
+    process.env.WEBSITE_SITE_NAME === "hope-kiosk-acceptance-api";
+
+  if (requireReservationReadback || kioskReadbackRequired) {
     if (typeof ports.inspectReservation !== "function") {
       return result("uncertain", "reservation", true);
     }

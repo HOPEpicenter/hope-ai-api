@@ -4,7 +4,8 @@ import {
 } from "../../domain/staff/projectStaffDirectory";
 import type {
   BindingReservationRequest,
-  BindingReservationResult
+  BindingReservationResult,
+  ReservationEvidence
 } from "../../repositories/oauthStaffSecurityStorageRepository";
 import type {
   StaffScopedAtomicResult
@@ -27,6 +28,10 @@ export interface StaffCreationCoordinationPorts {
   reserveBinding(
     request: BindingReservationRequest
   ): Promise<BindingReservationResult>;
+
+  inspectReservation?(
+    request: BindingReservationRequest
+  ): Promise<ReservationEvidence>;
 
   createCanonical(
     event: StaffEvent
@@ -227,7 +232,8 @@ export async function coordinateStaffCreation(
   input: unknown,
   operationId: unknown,
   ports: StaffCreationCoordinationPorts,
-  prototypeEnabled = false
+  prototypeEnabled = false,
+  requireReservationReadback = false
 ): Promise<StaffCreationCoordinationResult> {
   if (prototypeEnabled !== true) {
     return result("denied", "not_started", false);
@@ -269,7 +275,39 @@ export async function coordinateStaffCreation(
     return result("uncertain", "reservation", true);
   }
 
-  // Acknowledged reservation alone is insufficient.
+  // Kiosk path: a reservation acknowledgement is not enough.
+  // The injected reader must independently observe consistent
+  // historical evidence before canonical creation is attempted.
+  //
+  // This is still not an atomic snapshot, durable writer lease,
+  // or authorization decision.
+  if (requireReservationReadback) {
+    if (typeof ports.inspectReservation !== "function") {
+      return result("uncertain", "reservation", true);
+    }
+
+    let observed: ReservationEvidence;
+
+    try {
+      observed = await ports.inspectReservation(
+        checked.reservation
+      );
+    } catch {
+      return result("uncertain", "reservation", true);
+    }
+
+    if (
+      !observed ||
+      observed.status !== "observed_consistent" ||
+      observed.executionPermitted !== false ||
+      observed.retryPermitted !== false
+    ) {
+      return result("uncertain", "reservation", true);
+    }
+  }
+
+  // Acknowledged reservation and readback are insufficient
+  // to establish exclusive writer authority.
   // No alternate legacy append is permitted here.
   let creation: StaffScopedAtomicResult;
 

@@ -575,3 +575,81 @@ reviewed, disabled by default, and tested before any approved use.
 job execution, Staff Authority activation, canonical Staff mutation,
 Graph invitation, OAuth execution, original staging and production
 deployment remain prohibited. PR #1507 stays draft.
+
+## 15. Verified authority network decision - 2026-11-17
+
+Status: ENGINEERING DESIGN SELECTED / NOT PROVISIONED.
+
+### 15.1 Dedicated environment and subnet
+
+Selected candidate:
+- VNet: vnet-hope-kiosk-acceptance
+- Region: eastus2
+- Subnet: snet-kiosk-staff-authority
+- CIDR: 10.88.0.160/27
+- Delegation: Microsoft.App/environments
+- Environment: new workload-profiles Container Apps environment
+- Job: manual-only authority writer, zero automatic retries
+- No public administrative HTTP endpoint
+
+K358GO verified the existing subnet address allocations.
+The proposed /27 does not overlap the reported existing
+subnets. Preserve all existing subnet delegations.
+
+The new subnet and environment are not provisioned.
+A workload-profiles environment is required for the
+selected /27 topology; do not substitute the legacy
+consumption-only environment.
+
+### 15.2 Regional capability evidence
+
+K358GM:
+No Microsoft.App managed environments were found in
+the approved subscription at the inspection checkpoint.
+
+K358GP:
+- managedEnvironments supported in East US 2: True
+- jobs supported in East US 2: True
+- Microsoft.App provider registration: Registered
+
+These observations confirm regional resource-provider
+availability, not completed deployment feasibility.
+
+### 15.3 Private Table DNS evidence
+
+K358GQ:
+- Three private Table DNS zones identified in the subscription.
+- The kiosk-associated zone has a successful VNet link.
+- Link provisioning state: Succeeded.
+
+Decision:
+Reuse the existing kiosk Table private DNS zone linkage.
+The new authority storage account still requires its own
+private Table endpoint and appropriate DNS zone group.
+
+Do not create duplicate DNS zones or additional VNet links
+unless a specific verified dependency requires them.
+
+### 15.4 Remaining Gate A blockers
+
+Before requesting owner provisioning authorization:
+
+1. Confirm available private endpoint subnet capacity.
+2. Validate planned job-to-private-Table routing, DNS and
+   applicable network security controls.
+3. Confirm table-scoped writer RBAC, effective inherited
+   privileges and exclusion of legacy write pathways.
+4. Validate container artifact provenance, registry access,
+   identity attachment and restricted job-start privileges.
+5. Establish monitoring destination, retention, operator,
+   alerts and an explicit monthly spending ceiling.
+6. Complete the minimum-change resource provisioning plan,
+   including failure containment and decommission controls.
+7. Resolve protected-main staging deployment consequences.
+
+No infrastructure provisioning, RBAC modification, job
+execution, deployment, authority activation, Staff creation
+or Graph invitation is authorized by this section.
+
+Gate A remains pending final evidence and independent
+security review. Gate B requires separate owner approval.

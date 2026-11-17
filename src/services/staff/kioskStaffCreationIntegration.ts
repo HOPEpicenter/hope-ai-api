@@ -1,4 +1,12 @@
 import type { StaffEvent } from "../../domain/staff/projectStaffDirectory";
+import {
+  inspectStaffCreationEvidence,
+  type StaffCreationEvidenceReadPort
+} from "../../repositories/inspectStaffCreationEvidence";
+import {
+  reconcileStaffCreationEvidence,
+  type StaffCreationReconciliationResult
+} from "./reconcileStaffCreationEvidence";
 import type {
   OAuthStaffSecurityStorageRepository
 } from "../../repositories/oauthStaffSecurityStorageRepository";
@@ -87,5 +95,39 @@ export async function integrateKioskStaffCreationTestOnly(
     },
     true,
     true
+  );
+}
+/**
+ * Read-only interruption inspection for an isolated test caller.
+ * No recovery writes, reservations, retries, or authorization.
+ * Sequential evidence reads are not an atomic snapshot.
+ */
+export async function reconcileKioskStaffCreationTestOnly(
+  event: StaffEvent,
+  operationId: string,
+  security: KioskStaffCreationTestPorts["security"],
+  canonicalRead: StaffCreationEvidenceReadPort,
+  testOnlyEnabled = false
+): Promise<StaffCreationReconciliationResult> {
+  const enabled =
+    testOnlyEnabled === true &&
+    process.env.NODE_ENV === "test" &&
+    process.env.HOPE_KIOSK_BOOTSTRAP_TEST_ONLY === "true" &&
+    !process.env.WEBSITE_SITE_NAME;
+
+  return reconcileStaffCreationEvidence(
+    event,
+    operationId,
+    {
+      inspectReservation: request =>
+        security.inspectReservation(request),
+      inspectCanonical: creation =>
+        inspectStaffCreationEvidence(
+          creation,
+          canonicalRead,
+          true
+        )
+    },
+    enabled
   );
 }

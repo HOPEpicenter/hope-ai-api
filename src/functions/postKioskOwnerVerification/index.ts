@@ -103,6 +103,11 @@ export function createKioskOwnerVerificationHandler(
       return;
     }
 
+    if (req?.method !== "POST") {
+      respond(405, DENIED);
+      return;
+    }
+
     const auth = requireApiKeyForFunction(req);
     if (!auth.ok) {
       respond(401, DENIED);

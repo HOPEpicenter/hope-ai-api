@@ -23,6 +23,7 @@ async function main(): Promise<void> {
   });
 
   const request = {
+    method: "POST",
     headers: new Map([
       ["x-api-key", "synthetic-key"],
       ["authorization", "Bearer aaa.bbb.ccc"]
@@ -68,6 +69,32 @@ async function main(): Promise<void> {
     assert.equal(verified.body.authorizationGranted, false);
     assert.equal(calls, 1);
 
+    request.method = "GET";
+    const wrongMethod = await execute();
+    assert.equal(wrongMethod.status, 405);
+    assert.equal(calls, 1);
+    request.method = "POST";
+
+    request.headers.set("x-api-key", "incorrect-key");
+    const wrongKey = await execute();
+    assert.equal(wrongKey.status, 401);
+    assert.equal(calls, 1);
+    request.headers.set("x-api-key", "synthetic-key");
+
+    request.headers.delete("authorization");
+    const missingBearer = await execute();
+    assert.equal(missingBearer.status, 401);
+    assert.equal(calls, 1);
+
+    request.headers.set("authorization", "Bearer invalid");
+    const malformedBearer = await execute();
+    assert.equal(malformedBearer.status, 401);
+    assert.equal(calls, 1);
+
+    request.headers.set(
+      "authorization",
+      "Bearer aaa.bbb.ccc"
+    );
     process.env.WEBSITE_SITE_NAME = "different-site";
     const wrongSite = await execute();
     assert.equal(wrongSite.status, 404);
@@ -77,6 +104,10 @@ async function main(): Promise<void> {
     console.log("MISSING_OWNER_CONFIGURATION_DENIED=True");
     console.log("SYNTHETIC_VERIFICATION_CONTRACT_PASSED=True");
     console.log("WRONG_SITE_DENIED=True");
+    console.log("NON_POST_METHOD_REJECTED=True");
+    console.log("INVALID_API_KEY_REJECTED=True");
+    console.log("MISSING_BEARER_REJECTED=True");
+    console.log("MALFORMED_BEARER_REJECTED=True");
     console.log("NO_STAFF_CREATION_PATH=True");
     console.log("K323_OFFLINE_TESTS_PASSED=True");
   } finally {

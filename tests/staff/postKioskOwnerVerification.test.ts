@@ -69,27 +69,62 @@ async function main(): Promise<void> {
     assert.equal(verified.body.authorizationGranted, false);
     assert.equal(calls, 1);
 
+    // Azure Functions may provide plain-object headers.
+    const objectRequest: any = {
+      method: "POST",
+      headers: {
+        "x-api-key": "synthetic-key",
+        authorization: "Bearer aaa.bbb.ccc"
+      }
+    };
+
+    const executeObject = async () => {
+      const context: any = {};
+      await handler(context, objectRequest);
+      return context.res;
+    };
+
+    const plainObject = await executeObject();
+    assert.equal(plainObject.status, 200);
+    assert.equal(plainObject.body.verified, true);
+    assert.equal(plainObject.body.staffCreationPermitted, false);
+    assert.equal(plainObject.body.authorizationGranted, false);
+    assert.equal(calls, 2);
+
+    delete objectRequest.headers.authorization;
+    objectRequest.headers.Authorization = "Bearer aaa.bbb.ccc";
+
+    const capitalizedHeader = await executeObject();
+    assert.equal(capitalizedHeader.status, 200);
+    assert.equal(capitalizedHeader.body.staffCreationPermitted, false);
+    assert.equal(calls, 3);
+
+    objectRequest.headers.Authorization = "Bearer invalid";
+    const invalidObjectBearer = await executeObject();
+    assert.equal(invalidObjectBearer.status, 401);
+    assert.equal(calls, 3);
+
     request.method = "GET";
     const wrongMethod = await execute();
     assert.equal(wrongMethod.status, 405);
-    assert.equal(calls, 1);
+    assert.equal(calls, 3);
     request.method = "POST";
 
     request.headers.set("x-api-key", "incorrect-key");
     const wrongKey = await execute();
     assert.equal(wrongKey.status, 401);
-    assert.equal(calls, 1);
+    assert.equal(calls, 3);
     request.headers.set("x-api-key", "synthetic-key");
 
     request.headers.delete("authorization");
     const missingBearer = await execute();
     assert.equal(missingBearer.status, 401);
-    assert.equal(calls, 1);
+    assert.equal(calls, 3);
 
     request.headers.set("authorization", "Bearer invalid");
     const malformedBearer = await execute();
     assert.equal(malformedBearer.status, 401);
-    assert.equal(calls, 1);
+    assert.equal(calls, 3);
 
     request.headers.set(
       "authorization",
@@ -98,7 +133,7 @@ async function main(): Promise<void> {
     process.env.WEBSITE_SITE_NAME = "different-site";
     const wrongSite = await execute();
     assert.equal(wrongSite.status, 404);
-    assert.equal(calls, 1);
+    assert.equal(calls, 3);
 
     console.log("DEFAULT_DISABLED_HTTP_404=True");
     console.log("MISSING_OWNER_CONFIGURATION_DENIED=True");
@@ -109,6 +144,10 @@ async function main(): Promise<void> {
     console.log("MISSING_BEARER_REJECTED=True");
     console.log("MALFORMED_BEARER_REJECTED=True");
     console.log("NO_STAFF_CREATION_PATH=True");
+    console.log("PLAIN_OBJECT_BEARER_ACCEPTED=True");
+    console.log("CAPITALIZED_BEARER_ACCEPTED=True");
+    console.log("INVALID_OBJECT_BEARER_DENIED=True");
+    console.log("K354_HEADER_REGRESSIONS_PASSED=True");
     console.log("K323_OFFLINE_TESTS_PASSED=True");
   } finally {
     process.env = original;

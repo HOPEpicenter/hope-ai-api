@@ -67,9 +67,17 @@ function readConfiguration():
 
 function readBearer(req: any): string | null {
   const headers = req?.headers;
-  if (!headers || typeof headers.get !== "function") return null;
+  if (!headers) return null;
 
-  const raw: unknown = headers.get("authorization");
+  const raw: unknown =
+    (typeof headers.get === "function"
+      ? headers.get("authorization")
+      : undefined) ??
+    headers["authorization"] ??
+    headers["Authorization"] ??
+    (typeof req?.get === "function"
+      ? req.get("authorization")
+      : undefined);
 
   if (typeof raw !== "string" || raw.length > 16400) {
     return null;

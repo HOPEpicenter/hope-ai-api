@@ -19,7 +19,8 @@ export type StaffWriterRuntimeEnforcement = Readonly<{
 }>;
 
 export function classifyStaffWriterRuntimeEnforcement(
-  value: unknown
+  value: unknown,
+  siteName?: unknown
 ): StaffWriterRuntimeEnforcement {
   const mode =
     value === undefined
@@ -30,10 +31,15 @@ export function classifyStaffWriterRuntimeEnforcement(
         ? value
         : "invalid";
 
+  // Isolated kiosk cannot inherit the legacy writer default.
+  // This is a deny-only guard, not coordinated writer authority.
+  const isolatedKiosk =
+    siteName === "hope-kiosk-acceptance-api";
+
   return {
     mode,
-    allowLegacyWriter: mode === "legacy",
-    blockInvitationBeforeGraph: mode !== "legacy",
+    allowLegacyWriter: mode === "legacy" && !isolatedKiosk,
+    blockInvitationBeforeGraph: mode !== "legacy" || isolatedKiosk,
     coordinatedExecutionPermitted: false,
     authorizationGranted: false,
     productionWriterFenced: false
@@ -43,6 +49,7 @@ export function classifyStaffWriterRuntimeEnforcement(
 export function readStaffWriterRuntimeEnforcement():
   StaffWriterRuntimeEnforcement {
   return classifyStaffWriterRuntimeEnforcement(
-    process.env.HOPE_STAFF_WRITER_TRANSITION_MODE
+    process.env.HOPE_STAFF_WRITER_TRANSITION_MODE,
+    process.env.WEBSITE_SITE_NAME
   );
 }

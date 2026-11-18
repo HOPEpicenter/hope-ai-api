@@ -109,7 +109,11 @@ export async function submitStaffScopedAtomicCreation(
   port: StaffCreationTransactionPort,
   prototypeEnabled = false
 ): Promise<StaffScopedAtomicResult> {
+  // This prototype must never execute inside an Azure
+  // Function App, even when a caller supplies true.
+  // A future trusted writer needs separate reviewed authority.
   if (prototypeEnabled !== true ||
+      Boolean(process.env.WEBSITE_SITE_NAME) ||
       !validCreation(event) ||
       !port ||
       typeof port.submitTransaction !== "function") {

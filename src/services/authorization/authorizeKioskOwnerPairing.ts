@@ -1,3 +1,4 @@
+import type { JWTVerifyGetKey } from "jose";
 import {
   verifyEntraStaffAccessToken
 } from "./verifyEntraStaffAccessToken";
@@ -40,7 +41,8 @@ const APPROVED: KioskOwnerPairingDecision = Object.freeze({
  * authenticated, authorized service boundary.
  */
 export async function authorizeKioskOwnerPairing(
-  accessToken: unknown
+  accessToken: unknown,
+  resolveSigningKey?: JWTVerifyGetKey
 ): Promise<KioskOwnerPairingDecision> {
   if (
     process.env.WEBSITE_SITE_NAME !== SITE ||
@@ -81,7 +83,8 @@ export async function authorizeKioskOwnerPairing(
           scopes: [REQUIRED_SCOPE]
         },
         allowedClientApplicationIds: [client]
-      }
+      },
+      resolveSigningKey
     );
 
     return (

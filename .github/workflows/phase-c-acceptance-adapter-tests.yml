@@ -1,0 +1,36 @@
+name: Phase C acceptance adapter security tests
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/phase-c-acceptance-adapter/**'
+      - '.github/workflows/phase-c-acceptance-adapter-tests.yml'
+      - '.github/workflows/phase-c-private-acceptance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-security-tests:
+    name: Default-disabled adapter regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify adapter synthetic tests
+        working-directory: scripts/phase-c-acceptance-adapter
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -B -m unittest discover -v -p 'test_phase_c_*.py'

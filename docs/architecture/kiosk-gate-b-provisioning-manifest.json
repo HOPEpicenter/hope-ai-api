@@ -36,7 +36,12 @@
     "authoritySubnet": "10.88.0.160/27",
     "authoritySubnetName": "snet-kiosk-staff-authority",
     "authorityTablePrivateEndpoint": "pe-kiosk-authority-table",
-    "registryPrivateDnsZone": "privatelink.azurecr.io"
+    "registryPrivateDnsZone": "privatelink.azurecr.io",
+    "receiptStorage": "sthopekrec20261122",
+    "receiptContainer": "authority-receipts",
+    "receiptWriterIdentity": "id-hope-kiosk-receipt-writer",
+    "receiptVerifierIdentity": "id-hope-kiosk-receipt-verifier",
+    "receiptBlobPrivateEndpoint": "pe-kiosk-receipt-blob"
   },
   "security": {
     "publicRegistryAccessAllowed": false,
@@ -50,14 +55,94 @@
     "manualJobExecutionOnly": true,
     "zeroAutomaticRetries": true,
     "noStandingJobStartPrivilege": true,
-    "noAutomatedVisitorContact": true
+    "noAutomatedVisitorContact": true,
+    "receiptStorageProvisioned": false,
+    "receiptRetentionConfigured": false,
+    "receiptRetentionLocked": false,
+    "receiptIdentityPermissionsVerified": false,
+    "receiptIntegrityVerified": false,
+    "receiptRbacDesign": {
+      "status": "CANDIDATE_NOT_VALIDATED",
+      "assignmentScope": "authority-receipts container only",
+      "writerIdentity": "id-hope-kiosk-receipt-writer",
+      "writerDataActions": [
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action"
+      ],
+      "writerExcludedDataActions": [
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/move/action",
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read"
+      ],
+      "verifierIdentity": "id-hope-kiosk-receipt-verifier",
+      "verifierDataActions": [
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read"
+      ],
+      "verifierExcludedDataActions": [
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action",
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete"
+      ],
+      "delegationKeyPermission": false,
+      "retentionPolicyManagementAllowed": false,
+      "sharedKeyAccessAllowed": false,
+      "inheritedPrivilegesVerified": false,
+      "actualSdkPermissionsVerified": false,
+      "syntheticAzureAcceptancePassed": false,
+      "retentionLockAuthorized": false
+    },
+    "receiptRetentionDesign": {
+      "status": "PROPOSED_NOT_VALIDATED",
+      "policyType": "CONTAINER_LEVEL_TIME_BASED_WORM",
+      "container": "authority-receipts",
+      "receiptFormat": "ONE_NEW_BLOCK_BLOB_PER_RECEIPT",
+      "requiredBlobVersioning": false,
+      "proposedNfsEnabled": false,
+      "proposedSftpEnabled": false,
+      "protectedAppendWritesAllowed": false,
+      "retentionDays": null,
+      "retentionDurationApproved": false,
+      "legalHoldRequired": false,
+      "policyCreationAuthorized": false,
+      "policyLockAuthorized": false,
+      "policyLocked": false,
+      "enforcementTestPassed": false,
+      "activationDelayAccountedFor": true,
+      "independentReceiptVerificationRequired": true,
+      "retirementImpactReviewed": false,
+      "ownerApprovalRequired": true
+    }
   },
   "financial": {
     "annualMinistryBudgetUsd": 1500,
     "temporaryKioskMonthlyPlanningLimitUsd": 100,
     "illustrativeThirtyDayEstimateUsd": 75.6,
     "hardCostCapEnforced": false,
-    "spendingAuthorizationGranted": false
+    "spendingAuthorizationGranted": false,
+    "additionalReceiptCostsValidated": false,
+    "illustrativeEstimateRequiresRevision": true,
+    "receiptCostGate": {
+      "status": "PLANNING_ONLY_NOT_APPROVED",
+      "estimatePeriodDays": 30,
+      "priorInfrastructureEstimateUsd": 75.6,
+      "addedReceiptEndpointEstimateUsd": 7.3,
+      "provisionalSubtotalUsd": 82.9,
+      "monthlyPlanningLimitUsd": 100,
+      "unallocatedPlanningAllowanceUsd": 17.1,
+      "receiptStorageCapacityCostVerified": false,
+      "receiptTransactionCostVerified": false,
+      "finalNetworkCostsVerified": false,
+      "loggingCostsVerified": false,
+      "full31DayEstimateVerified": false,
+      "residualRetentionCostsVerified": false,
+      "finalCostEstimateApproved": false,
+      "separateAzureBudgetRequired": false,
+      "existingAnnualBudgetPreserved": true,
+      "hardSpendingCapExists": false,
+      "provisioningSpendingApproved": false,
+      "retirementCostOwnerAssigned": false,
+      "postKioskReceiptRetentionRequired": true
+    }
   },
   "unresolved": [
     "Exact private registry endpoint and DNS configuration",
@@ -68,7 +153,26 @@
     "Private image build and delivery path",
     "Cost validation and retirement responsibilities",
     "Synthetic infrastructure acceptance evidence",
-    "Separate owner provisioning authorization"
+    "Separate owner provisioning authorization",
+    "Receipt Blob storage feature and immutability compatibility",
+    "Receipt Blob private endpoint and DNS capacity",
+    "Independent receipt writer and verifier RBAC",
+    "Receipt storage cost and monthly estimate revision",
+    "Retention duration and owner-approved irreversible controls",
+    "Verify create-only Put Blob requests using custom RBAC",
+    "Verify writer cannot overwrite or delete receipts",
+    "Verify verifier read-only access and inherited privileges",
+    "Validate locked WORM behavior with synthetic records",
+    "Approve receipt retention duration and privacy requirements",
+    "Verify container-level WORM account compatibility",
+    "Test policy activation and overwrite/delete denial",
+    "Confirm retained receipts can migrate into Ministry OS",
+    "Approve storage retirement and post-retention costs",
+    "Quantify receipt capacity and transaction usage",
+    "Verify complete 30-day and 31-day Azure costs",
+    "Assign responsibility for post-kiosk retained evidence",
+    "Confirm total cost fits the monthly planning allowance",
+    "Obtain separate owner spending authorization"
   ],
   "integration": {
     "destination": "Canonical HOPE Ministry OS",

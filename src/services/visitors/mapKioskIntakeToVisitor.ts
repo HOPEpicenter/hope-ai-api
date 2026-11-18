@@ -21,7 +21,9 @@ export type KioskVisitorReconciliation = Readonly<{
     email: string;
     phone: string;
   };
-  firstVisitDate: "2026-11-22";
+  eventVisitDate: "2026-11-22";
+  firstVisitDate: "2026-11-22" | null;
+  requiresVisitHistoryReview: boolean;
   eligibleForStaffFollowup: boolean;
   requiresAuthorizedStaffReview: true;
 }>;
@@ -39,7 +41,9 @@ export function mapKioskIntakeToVisitor(
     typeof submission.name !== "string" ||
     typeof submission.email !== "string" ||
     typeof submission.phone !== "string" ||
-    typeof submission.contactConsent !== "boolean"
+    typeof submission.contactConsent !== "boolean" ||
+    (submission.visitType !== "first" &&
+      submission.visitType !== "returning")
   ) {
     throw new Error("INVALID_KIOSK_RECONCILIATION_INPUT");
   }
@@ -81,7 +85,11 @@ export function mapKioskIntakeToVisitor(
   return {
     submissionId: submission.submissionId,
     visitor: { name, email, phone },
-    firstVisitDate: "2026-11-22",
+    eventVisitDate: "2026-11-22",
+    firstVisitDate:
+      submission.visitType === "first" ? "2026-11-22" : null,
+    requiresVisitHistoryReview:
+      submission.visitType === "returning",
     eligibleForStaffFollowup: submission.contactConsent,
     requiresAuthorizedStaffReview: true
   };

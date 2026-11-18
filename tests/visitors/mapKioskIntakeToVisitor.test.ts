@@ -80,3 +80,28 @@ test("invalid phone is rejected", () => {
     phone: "invalid-phone"
   }));
 });
+
+test("returning visitors require visit-history review", () => {
+  const result = mapKioskIntakeToVisitor({
+    ...valid,
+    visitType: "returning"
+  });
+
+  assert.equal(result.eventVisitDate, "2026-11-22");
+  assert.equal(result.firstVisitDate, null);
+  assert.equal(result.requiresVisitHistoryReview, true);
+});
+
+test("first-time visitors retain event first-visit date", () => {
+  const result = mapKioskIntakeToVisitor(valid);
+
+  assert.equal(result.firstVisitDate, "2026-11-22");
+  assert.equal(result.requiresVisitHistoryReview, false);
+});
+
+test("invalid visit classification is rejected", () => {
+  assert.throws(() => mapKioskIntakeToVisitor({
+    ...valid,
+    visitType: "unknown"
+  }));
+});

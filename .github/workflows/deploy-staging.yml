@@ -1,14 +1,8 @@
 name: Deploy hope-ai-api-staging to Azure Functions
 
+# Original staging deployment requires explicit operator dispatch.
+# Merging unrelated backend changes must not deploy staging.
 on:
-  push:
-    branches: [ "main" ]
-    paths-ignore:
-      - '.github/workflows/ci.yml'
-      - '.github/workflows/deploy-staging.yml'
-      - '.github/workflows/e156-watchdog-deploy.yml'
-      - 'scripts/e156/Watch-HopeE156CleanupRecovery-v3.ps1'
-      - 'tests/authorization/e156WatchdogPagination.Tests.ps1'
   workflow_dispatch:
 
 permissions:
@@ -16,6 +10,7 @@ permissions:
 
 jobs:
   build-and-deploy:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -212,7 +207,7 @@ jobs:
 
   record-staging-evidence:
     needs: build-and-deploy
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: Preview
     permissions: {}
@@ -233,12 +228,12 @@ jobs:
           $ErrorActionPreference = 'Stop'
 
           if (
-            $env:EVENT_NAME -cne 'push' -or
+            $env:EVENT_NAME -cne 'workflow_dispatch' -or
             $env:TARGET_REF -cne 'refs/heads/main' -or
             $env:TARGET_SHA -cnotmatch '^[0-9a-f]{40}$' -or
             $env:WORKFLOW_REF -cne "$($env:REPOSITORY)/.github/workflows/deploy-staging.yml@refs/heads/main"
           ) {
-            throw 'Staging evidence is only valid for a main-branch push of a full commit SHA.'
+            throw 'Staging evidence requires manual dispatch from main at a full commit SHA.'
           }
 
           $manifest = @{

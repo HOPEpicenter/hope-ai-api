@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "1.0",
+  "status": "PROPOSED_NOT_AUTHORIZED",
+  "project": "HOPE Ministry OS",
+  "component": "Temporary Kiosk Staff Authority",
+  "architectureReview": {
+    "pullRequest": 1509,
+    "reviewer": "Hope-2018",
+    "disposition": "APPROVED_DESIGN_ONLY"
+  },
+  "execution": {
+    "provisioningAuthorized": false,
+    "deploymentAuthorized": false,
+    "authorityActivationAuthorized": false,
+    "staffCreationAuthorized": false,
+    "automaticExecutionAllowed": false
+  },
+  "existingEnvironment": {
+    "subscriptionName": "Microsoft Azure Sponsorship",
+    "region": "eastus2",
+    "kioskResourceGroup": "rg-hope-kiosk-acceptance-20261122",
+    "kioskVirtualNetwork": "vnet-hope-kiosk-acceptance",
+    "virtualNetworkPrefix": "10.88.0.0/24",
+    "originalStagingMustRemainUnchanged": true,
+    "productionMustRemainUnchanged": true
+  },
+  "proposedResources": {
+    "resourceGroup": "rg-hope-kiosk-staff-authority",
+    "authorityStorage": "sthopekauth20261122",
+    "authorityTable": "StaffAuthority",
+    "authorityWriterIdentity": "id-hope-kiosk-authority-writer",
+    "containerAppsEnvironment": "cae-hope-kiosk-authority",
+    "bootstrapJob": "job-hope-kiosk-authority-bootstrap",
+    "logAnalyticsWorkspace": "law-hope-kiosk-authority",
+    "premiumRegistry": "hopekioskauth2026",
+    "authoritySubnet": "10.88.0.160/27",
+    "authoritySubnetName": "snet-kiosk-staff-authority",
+    "authorityTablePrivateEndpoint": "pe-kiosk-authority-table",
+    "registryPrivateDnsZone": "privatelink.azurecr.io"
+  },
+  "security": {
+    "publicRegistryAccessAllowed": false,
+    "publicAuthorityStorageAccessAllowed": false,
+    "privateNetworkRequired": true,
+    "dedicatedWriterIdentityRequired": true,
+    "tableScopedCustomRoleRequired": true,
+    "independentReceiptIdentityRequired": true,
+    "protectedReceiptStorageRequired": true,
+    "retentionPolicyLockAuthorized": false,
+    "manualJobExecutionOnly": true,
+    "zeroAutomaticRetries": true,
+    "noStandingJobStartPrivilege": true,
+    "noAutomatedVisitorContact": true
+  },
+  "financial": {
+    "annualMinistryBudgetUsd": 1500,
+    "temporaryKioskMonthlyPlanningLimitUsd": 100,
+    "illustrativeThirtyDayEstimateUsd": 75.6,
+    "hardCostCapEnforced": false,
+    "spendingAuthorizationGranted": false
+  },
+  "unresolved": [
+    "Exact private registry endpoint and DNS configuration",
+    "Container Apps environment and job execution settings",
+    "Effective custom role permissions and inherited RBAC",
+    "Independent receipt storage and verifier architecture",
+    "Retention duration and irreversible lock approval",
+    "Private image build and delivery path",
+    "Cost validation and retirement responsibilities",
+    "Synthetic infrastructure acceptance evidence",
+    "Separate owner provisioning authorization"
+  ],
+  "integration": {
+    "destination": "Canonical HOPE Ministry OS",
+    "temporaryResourceRetirementRequired": true,
+    "automaticStaffAuthorityMigrationAllowed": false
+  }
+}

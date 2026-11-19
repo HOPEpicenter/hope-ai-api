@@ -7,12 +7,16 @@ live access. A live adapter and a trusted approval verifier do not exist.
 The read-only `inspectSyntheticIntakeFixture` entry point also accepts only
 branded in-memory fixtures, defaults to disabled, and returns status only.
 Its `enabled` option and fixture capture are never live authorization.
+The offline inspection authorization assessment is permanently denied: a
+signature matching a supplied key does not establish a trusted issuer,
+authenticated operator, UUID provenance, or durable replay protection.
 
 Run the local tests from this backend worktree in PowerShell 7:
 
 ```powershell
 node --test scripts\kiosk-bootstrap\simulate-synthetic-intake-cleanup.test.mjs
 node --test scripts\kiosk-bootstrap\simulate-synthetic-intake-inspection.test.mjs
+node --test scripts\kiosk-bootstrap\assess-synthetic-inspection-authority.test.mjs
 ```
 
 ## Capture the future synthetic submission identity
@@ -32,11 +36,15 @@ declines contact; a future test must use exactly that payload.
 
 ## Prerequisites for any future live operation
 
-- Obtain a separate operation-specific approval bound to the exact isolated
-  subscription, resource group, account, table, partition, captured UUID,
-  synthetic payload fingerprint, inspected ETag, action, and validity period.
-  Verify the approval through an independent trusted mechanism, not a flag,
-  environment variable, or the simulator's test objects.
+- Obtain a separate short-lived `kiosk.synthetic-intake.inspect-one.v1`
+  approval bound to the exact isolated subscription, resource group, account,
+  table, partition, UUID, synthetic payload fingerprint, UUID evidence,
+  operator identity, operation ID, issuer, audience, and validity period.
+  The contract limits validity to 15 minutes. A trusted source must verify
+  operator identity, signer authority, UUID provenance, and durable single-use
+  consumption independently; caller input and fixture data cannot do so.
+- Inspection approval never authorizes deletion. Any future deletion requires
+  a separately verified action-specific approval bound to the inspected ETag.
 - A real trusted verifier and read-only live adapter have not been implemented.
   The existing bootstrap approval components are design-only and do not grant
   authority for this inspection. They must not be reused as approval.

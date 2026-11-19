@@ -37,6 +37,10 @@ const stores = new WeakSet();
 const captures = new WeakMap();
 const approvals = new WeakMap();
 
+export function isExpectedSyntheticIntakeFingerprint(value) {
+  return value === HASH;
+}
+
 function result(status) {
   return Object.freeze({ status, liveExecutionPermitted: false });
 }

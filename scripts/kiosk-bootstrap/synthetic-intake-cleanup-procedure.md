@@ -10,6 +10,10 @@ Its `enabled` option and fixture capture are never live authorization.
 The offline inspection authorization assessment is permanently denied: a
 signature matching a supplied key does not establish a trusted issuer,
 authenticated operator, UUID provenance, or durable replay protection.
+The inspection consumption simulator uses an isolated in-memory claim and
+audit record; even its successful fixture result grants no live authority.
+It accepts no external transaction port and is neither durable nor a trusted
+identity, key, or provenance verifier.
 
 Run the local tests from this backend worktree in PowerShell 7:
 
@@ -45,6 +49,12 @@ declines contact; a future test must use exactly that payload.
   consumption independently; caller input and fixture data cannot do so.
 - Inspection approval never authorizes deletion. Any future deletion requires
   a separately verified action-specific approval bound to the inspected ETag.
+- A future trusted consumption service must atomically create a unique,
+  durable single-use claim and matching audit receipt bound to the operation
+  ID and approved scope, issuer, audience, operator, UUID evidence and expiry.
+  Concurrent attempts and replay must fail across restarts and instances.
+  Conflicts, partial results, timeouts, or unverifiable outcomes must stop
+  without automatic retry or a live inspection.
 - A real trusted verifier and read-only live adapter have not been implemented.
   The existing bootstrap approval components are design-only and do not grant
   authority for this inspection. They must not be reused as approval.
@@ -52,6 +62,7 @@ declines contact; a future test must use exactly that payload.
   account endpoint and approved private network path. Do not use shared keys
   or create or grant permissions.
   A local workstation must not be assumed to have that managed identity.
+  Effective Table data permissions have not been verified.
 - Confirm the target table already exists; a missing table or row is a stop.
   Do not call `ensureTable`, list rows, or search for a visitor.
 - Read only the exact partition and UUID with `getEntity`. Verify the

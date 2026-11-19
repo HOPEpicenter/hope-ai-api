@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { generateKeyPairSync, sign } from "node:crypto";
 import { assessSyntheticInspectionAuthority } from "./assess-synthetic-inspection-authority.mjs";
+import {
+  createSyntheticInspectionConsumptionFixture,
+  inspectSyntheticConsumptionFixture,
+  simulateSyntheticInspectionConsumption
+} from "./simulate-synthetic-inspection-consumption.mjs";
 
 const require = createRequire(import.meta.url);
 require("ts-node/register");
@@ -164,4 +169,89 @@ test("rejects expired, future, excessive, and malformed approval validity", asyn
     item.envelope = envelope(item, change);
     check(item, "APPROVAL_TIME_INVALID");
   }
+});
+
+function checkConsumption(result, status, fixtureConsumed = false) {
+  assert.equal(result.status, status);
+  assert.equal(result.fixtureConsumed, fixtureConsumed);
+  for (const key of [
+    "operatorVerified", "issuerAuthorized", "uuidEvidenceVerified",
+    "replayProtectionVerified", "durableConsumptionVerified",
+    "inspectionAuthorized", "executionPermitted", "cleanupAuthorized"
+  ]) assert.equal(result[key], false);
+}
+
+test("fixture consumption is single-use but never provides live authorization", async () => {
+  const item = await request();
+  item.envelope = envelope(item);
+  const fixture = createSyntheticInspectionConsumptionFixture(context, item.operator);
+  checkConsumption(inspectSyntheticConsumptionFixture(item.operationId, fixture),
+    "FIXTURE_AUDIT_UNAVAILABLE");
+  checkConsumption(simulateSyntheticInspectionConsumption(item, fixture),
+    "FIXTURE_CONSUMPTION_ONLY", true);
+  checkConsumption(inspectSyntheticConsumptionFixture(item.operationId, fixture),
+    "FIXTURE_AUDIT_MATCHED");
+  checkConsumption(simulateSyntheticInspectionConsumption(item, fixture), "FIXTURE_REPLAY");
+  const freshFixture = createSyntheticInspectionConsumptionFixture(context, item.operator);
+  checkConsumption(simulateSyntheticInspectionConsumption(item, freshFixture),
+    "FIXTURE_CONSUMPTION_ONLY", true);
+});
+
+test("unbranded ledgers, claimed transactions and caller keys cannot grant authority", async () => {
+  const item = await request();
+  item.envelope = envelope(item);
+  let calls = 0;
+  const fake = { submitTransaction() { calls++; return true; } };
+  checkConsumption(simulateSyntheticInspectionConsumption({
+    ...item, approved: true, consumed: true, execute: true
+  }, fake), "FIXTURE_REQUIRED");
+  assert.equal(calls, 0);
+  const otherKeys = generateKeyPairSync("ed25519");
+  const otherContext = {
+    ...context, publicKeyPem: otherKeys.publicKey.export({ type: "spki", format: "pem" })
+  };
+  const fixture = createSyntheticInspectionConsumptionFixture(otherContext, item.operator);
+  checkConsumption(simulateSyntheticInspectionConsumption(item, fixture), "APPROVAL_REJECTED");
+  item.envelope = envelope(item, {}, otherKeys.privateKey);
+  checkConsumption(simulateSyntheticInspectionConsumption(item, fixture),
+    "FIXTURE_CONSUMPTION_ONLY", true);
+});
+
+test("competing fixture attempts cannot both consume the same operation", async () => {
+  const item = await request();
+  item.envelope = envelope(item);
+  const fixture = createSyntheticInspectionConsumptionFixture(context, item.operator);
+  const results = await Promise.all([
+    Promise.resolve().then(() => simulateSyntheticInspectionConsumption(item, fixture)),
+    Promise.resolve().then(() => simulateSyntheticInspectionConsumption(item, fixture))
+  ]);
+  checkConsumption(results[0], "FIXTURE_CONSUMPTION_ONLY", true);
+  checkConsumption(results[1], "FIXTURE_REPLAY");
+});
+
+test("fixture consumption rejects invalid approvals and operator mismatches before consumption", async () => {
+  const item = await request();
+  const fixture = createSyntheticInspectionConsumptionFixture(context, item.operator);
+  for (const changes of [
+    { operation: "kiosk.synthetic-intake.delete-one.v1" },
+    { issuer: "other-issuer" }, { audience: "other-audience" },
+    { operator: { ...item.operator, objectId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" } },
+    { target: { ...item.target, payloadFingerprint: "0".repeat(64) } },
+    { issuedAt: "2026-11-16T11:40:00.000Z", expiresAt: "2026-11-16T11:45:00.000Z" },
+    { issuedAt: "2026-11-16T12:01:00.000Z" }
+  ]) {
+    item.envelope = envelope(item, changes);
+    checkConsumption(simulateSyntheticInspectionConsumption(item, fixture), "APPROVAL_REJECTED");
+  }
+  item.envelope = envelope(item, {}, generateKeyPairSync("ed25519").privateKey);
+  checkConsumption(simulateSyntheticInspectionConsumption(item, fixture), "APPROVAL_REJECTED");
+  const differentOperator = {
+    ...item.operator, objectId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+  };
+  const otherFixture = createSyntheticInspectionConsumptionFixture(context, differentOperator);
+  item.envelope = envelope(item);
+  checkConsumption(simulateSyntheticInspectionConsumption(item, otherFixture),
+    "FIXTURE_OPERATOR_MISMATCH");
+  checkConsumption(simulateSyntheticInspectionConsumption(item, fixture),
+    "FIXTURE_CONSUMPTION_ONLY", true);
 });

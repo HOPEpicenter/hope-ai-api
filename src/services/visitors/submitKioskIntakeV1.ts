@@ -2,7 +2,8 @@ import {
   assessKioskIntakeV1
 } from "./assessKioskIntakeV1";
 import {
-  appendKioskIntakeSubmissionV1
+  appendKioskIntakeSubmissionV1,
+  type KioskSubmissionSource
 } from "../../repositories/kioskIntakeSubmissionsRepositoryV1";
 
 type Persist = typeof appendKioskIntakeSubmissionV1;
@@ -17,6 +18,7 @@ type Dependencies = {
    */
   authorizeRequest?: () => Promise<boolean>;
   persist?: Persist;
+  source?: KioskSubmissionSource;
 };
 
 export type SubmissionResult = Readonly<{
@@ -79,7 +81,7 @@ export async function submitKioskIntakeV1(
   const receipt = await persist(
     assessment.intake,
     submissionId,
-    { enabled: true }
+    { enabled: true, source: deps.source ?? "hope_ipad_kiosk_v1" }
   );
 
   // The receipt contains no visitor details.

@@ -4,7 +4,7 @@ import {
 
 const TABLE = "KioskIntakeSubmissions";
 const EVENT = "friends-family-2026-11-22";
-const SOURCE = "hope_ipad_kiosk_v1";
+const SOURCES = new Set(["hope_ipad_kiosk_v1", "hope_guest_qr_v1"]);
 const MAX_BATCH = 25;
 
 const UUID4 =
@@ -68,7 +68,7 @@ function projectPendingRow(row: any): PendingKioskReviewItem {
   if (
     !row ||
     row.partitionKey !== EVENT ||
-    row.source !== SOURCE ||
+    !SOURCES.has(row.source) ||
     row.reviewStatus !== "pending" ||
     typeof row.rowKey !== "string" ||
     !UUID4.test(row.rowKey) ||

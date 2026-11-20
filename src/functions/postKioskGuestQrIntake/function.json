@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/postKioskGuestQrIntake/index.js",
+  "entryPoint": "postKioskGuestQrIntake",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": ["post"],
+      "route": "kiosk/guest-qr/intake"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

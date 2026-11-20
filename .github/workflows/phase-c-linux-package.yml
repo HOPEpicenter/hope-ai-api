@@ -63,7 +63,7 @@ jobs:
               }
           )
 
-          if ($definitions.Count -ne 87) {
+          if ($definitions.Count -ne 89) {
             throw "Expected 87 functions; found $($definitions.Count)"
           }
 
@@ -143,7 +143,7 @@ jobs:
           test -f "$stage/phase-c-functions-bootstrap.cjs"
 
           count=$(find "$stage" -mindepth 2 -maxdepth 2 -name function.json | wc -l)
-          test "$count" -eq 87
+          test "$count" -eq 89
 
           mkdir -p "$emulator"
           npm install --prefix "$emulator" --no-save --no-audit --no-fund azurite@3

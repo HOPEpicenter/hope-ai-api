@@ -16,9 +16,64 @@ audit record; even its successful fixture result grants no live authority.
 It accepts no external transaction port and is neither durable nor a trusted
 identity, key, or provenance verifier.
 
+## Disabled private connectivity diagnostic
+
+The private Table connectivity diagnostic has one exported entry point, which
+always returns `AUTHORIZATION_UNAVAILABLE`. No application route, job, trigger,
+startup hook, flag, caller input, or approval invokes its private checks. This
+is not inspection or deletion authority and does not access a visitor table.
+
+The disconnected runtime implementation pins the isolated Table hostname and
+requires every resolved IPv4 address to match a separately supplied canonical
+RFC1918 subnet. It connects to the selected IP on port 443 while verifying the
+original hostname and TLS certificate. It obtains an Azure Storage token using
+the configured user-assigned managed identity in a fresh, time-bounded worker,
+with SDK retries and redirects disabled. The worker receives only the App Service
+identity endpoint and header as its environment, isolating SDK managed-identity
+state and excluding other credential sources; its output streams are not read
+or forwarded. The private orchestrator returns statuses only, never the token.
+The response deadline does not wait indefinitely for worker termination; the
+worker is unreferenced during cleanup and cleanup errors use a fixed, non-sensitive
+status message. A stalled or failed termination cannot guarantee the worker
+actually stopped. This remains a blocker for any live enablement.
+
+The optional service check sends one authenticated GET for
+[`Get Table Service Properties`](https://learn.microsoft.com/en-us/rest/api/storageservices/get-table-service-properties)
+at `/?restype=service&comp=properties`, not a table or entity path. Microsoft
+documents this operation as returning account service properties, not visitor
+data, and states that only the storage account owner may call it. The diagnostic
+discards the response body and does not follow redirects. Whether this operation
+accepts the isolated identity's bearer token and permissions remains unverified;
+it must not be used as a reason to grant permissions.
+
+A TLS-verified HTTP 401 or 403 is an HTTP response, not evidence that private
+connectivity failed. Neither response proves effective Table data permissions.
+Likewise, a 200 would establish access to this service-properties operation
+only; it would not prove access to any visitor table or entity.
+
+Before any separately authorized live test, independently verify the expected
+private endpoint subnet/CIDR and the configured client ID's mapping to the
+approved backend identity, effective permissions, private DNS and execution
+environment. The supplied CIDR and configured identity are not trusted evidence
+or authorization. Review the installed SDK's retry and logging behavior, the
+metadata operation's bearer support and permissions, token handling, isolated
+worker termination, and the intended no-visitor-data scope. Ensure runtime
+debugging, instrumentation, and platform logging cannot capture identity
+secrets or request authorization headers. Obtain a specific short-lived
+owner-approved connectivity-test authorization; inspection or deletion
+approval does not grant it.
+
+The smallest prospective execution mechanism is a separately reviewed,
+short-lived one-shot entry point in the existing isolated Linux backend
+environment, with an independently verified authorization boundary and
+trusted configuration, followed by removal or renewed disabling. Such an
+entry point is **not implemented**. Do not deploy or invoke the diagnostic
+until that mechanism and its private-network path are independently approved.
+
 Run the local tests from this backend worktree in PowerShell 7:
 
 ```powershell
+node --test scripts\kiosk-bootstrap\inspect-isolated-table-connectivity.test.mjs
 node --test scripts\kiosk-bootstrap\simulate-synthetic-intake-cleanup.test.mjs
 node --test scripts\kiosk-bootstrap\simulate-synthetic-intake-inspection.test.mjs
 node --test scripts\kiosk-bootstrap\assess-synthetic-inspection-authority.test.mjs

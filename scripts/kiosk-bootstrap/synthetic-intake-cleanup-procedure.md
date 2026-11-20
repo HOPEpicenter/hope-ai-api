@@ -3,7 +3,8 @@
 The accompanying simulator is restricted to branded in-memory fixtures. It
 cannot read Azure or delete a live row. Its capture and approval objects are
 synthetic test doubles, not evidence or authorization. No CLI flag enables
-live access. A live adapter and a trusted approval verifier do not exist.
+live access. A private managed-identity read adapter exists, but its public
+entry point is unconditionally disabled and no trusted approval verifier exists.
 The read-only `inspectSyntheticIntakeFixture` entry point also accepts only
 branded in-memory fixtures, defaults to disabled, and returns status only.
 Its `enabled` option and fixture capture are never live authorization.
@@ -55,9 +56,10 @@ declines contact; a future test must use exactly that payload.
   Concurrent attempts and replay must fail across restarts and instances.
   Conflicts, partial results, timeouts, or unverifiable outcomes must stop
   without automatic retry or a live inspection.
-- A real trusted verifier and read-only live adapter have not been implemented.
-  The existing bootstrap approval components are design-only and do not grant
-  authority for this inspection. They must not be reused as approval.
+- A real trusted verifier, UUID-provenance verifier, and durable approval
+  consumer have not been implemented. The private read adapter cannot be
+  invoked through its disabled entry point. The existing bootstrap approval
+  components are design-only and must not be reused as approval.
 - Establish and verify the managed-identity execution context and exact
   account endpoint and approved private network path. Do not use shared keys
   or create or grant permissions.

@@ -1,4 +1,4 @@
-import { TableClient, TableServiceClient } from "@azure/data-tables";
+import { TableClient, TableServiceClient, type TableServiceClientOptions } from "@azure/data-tables";
 import { ManagedIdentityCredential } from "@azure/identity";
 
 export type HopeTableClientConfig = {
@@ -16,7 +16,8 @@ export type HopeTableClientConfig = {
  */
 export function createHopeTableClient(
   tableName: string,
-  config: HopeTableClientConfig
+  config: HopeTableClientConfig,
+  managedIdentityOptions?: TableServiceClientOptions
 ): TableClient {
   if (!tableName || !tableName.trim()) {
     throw new Error("Table name is required.");
@@ -72,7 +73,8 @@ export function createHopeTableClient(
   return new TableClient(
     endpoint.replace(/\/$/, ""),
     tableName,
-    credential
+    credential,
+    managedIdentityOptions
   );
 }
 

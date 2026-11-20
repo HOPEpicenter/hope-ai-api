@@ -1,4 +1,9 @@
-import { createHash } from "node:crypto";
+import {
+  isExpectedSyntheticIntakeFingerprint,
+  matchesSyntheticIntakeRow
+} from "../../src/services/visitors/syntheticIntakeInspectionValidation.ts";
+
+export { isExpectedSyntheticIntakeFingerprint };
 
 // Fixture-only: no Azure client, credentials, command-line execution, or live deletion.
 const SCOPE = Object.freeze({
@@ -10,36 +15,9 @@ const SCOPE = Object.freeze({
 });
 const UUID4 =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const SYNTHETIC = Object.freeze({
-  name: "Synthetic Kiosk Cleanup Test",
-  email: "kiosk-cleanup@example.invalid",
-  phone: "",
-  visitType: "first",
-  interests: Object.freeze(["prayer"]),
-  invitedBy: "",
-  contactConsent: false
-});
-const HASH = createHash("sha256").update(JSON.stringify([
-  SYNTHETIC.name,
-  SYNTHETIC.email.toLowerCase(),
-  SYNTHETIC.phone,
-  SYNTHETIC.visitType,
-  [...SYNTHETIC.interests].sort(),
-  SYNTHETIC.invitedBy,
-  SYNTHETIC.contactConsent
-])).digest("hex");
-const ALLOWED_FIELDS = new Set([
-  "partitionKey", "rowKey", "payloadHash", "name", "email", "phone",
-  "visitType", "interestsJson", "invitedBy", "contactConsent", "receivedAt",
-  "source", "reviewStatus", "etag", "timestamp"
-]);
 const stores = new WeakSet();
 const captures = new WeakMap();
 const approvals = new WeakMap();
-
-export function isExpectedSyntheticIntakeFingerprint(value) {
-  return value === HASH;
-}
 
 function result(status) {
   return Object.freeze({ status, liveExecutionPermitted: false });
@@ -62,26 +40,6 @@ function validEtag(etag) {
     /^(?:W\/)?"[\x21\x23-\x7e\x80-\xff]*"(?![\s\S])/.test(etag);
 }
 
-function matchesRow(row, submissionId) {
-  return row && typeof row === "object" && !Array.isArray(row) &&
-    Object.keys(row).every(key => ALLOWED_FIELDS.has(key)) &&
-    row.partitionKey === SCOPE.partition &&
-    row.rowKey === submissionId &&
-    row.source === "hope_ipad_kiosk_v1" &&
-    row.reviewStatus === "pending" &&
-    row.name === SYNTHETIC.name &&
-    row.email === SYNTHETIC.email &&
-    row.phone === SYNTHETIC.phone &&
-    row.visitType === SYNTHETIC.visitType &&
-    row.interestsJson === JSON.stringify(SYNTHETIC.interests) &&
-    row.invitedBy === SYNTHETIC.invitedBy &&
-    row.contactConsent === SYNTHETIC.contactConsent &&
-    row.payloadHash === HASH &&
-    typeof row.receivedAt === "string" &&
-    Number.isFinite(Date.parse(row.receivedAt)) &&
-    validEtag(row.etag);
-}
-
 /**
  * Simulates one exact-row read and, only with fixture approval, a conditional
  * delete. Captures and approvals here are test-only, not real authorization.
@@ -101,8 +59,7 @@ export async function simulateSyntheticIntakeCleanup(
 
   const evidence = captures.get(capture);
   if (!evidence || evidence.store !== store ||
-      evidence.submissionId !== target.submissionId ||
-      evidence.payloadHash !== HASH) {
+      evidence.submissionId !== target.submissionId) {
     return result("SYNTHETIC_PROOF_REQUIRED");
   }
 
@@ -125,7 +82,7 @@ export async function simulateSyntheticIntakeCleanup(
     return result(error?.statusCode === 404 ? "ROW_NOT_FOUND" : "READ_FAILED");
   }
 
-  if (!matchesRow(row, target.submissionId)) return result("ROW_REJECTED");
+  if (!matchesSyntheticIntakeRow(row, target.submissionId)) return result("ROW_REJECTED");
   if (mode === "inspect") return result("MATCHED_READ_ONLY");
   if (row.etag !== authorization.etag) return result("ETAG_CHANGED");
 
@@ -197,7 +154,7 @@ export function createSyntheticCleanupFixture(initialRow) {
     store,
     captureSyntheticSubmission(submissionId) {
       const capture = Object.freeze({});
-      captures.set(capture, { store, submissionId, payloadHash: HASH });
+      captures.set(capture, { store, submissionId });
       return capture;
     },
     approveSimulation(target, capture, etag) {

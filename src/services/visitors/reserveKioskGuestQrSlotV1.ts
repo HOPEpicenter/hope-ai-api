@@ -16,6 +16,10 @@ const UUID4 =
 
 type Store = {
   createEntity(entity: any): Promise<unknown>;
+  getEntity?(
+    partitionKey: string,
+    rowKey: string
+  ): Promise<any>;
 };
 
 type Dependencies = {
@@ -23,6 +27,7 @@ type Dependencies = {
   now?: Date;
   capacity?: number;
   scope?: "minute" | "event";
+  claimHash?: string;
   store?: Store;
 };
 
@@ -98,6 +103,20 @@ export async function reserveKioskGuestQrSlotV1(
     throw new Error("INVALID_EVENT_CLAIM_CAPACITY");
   }
 
+  // An optional fingerprint binds event-wide retries to
+  // one validated payload and one idempotency key.
+  const claimHash = deps.claimHash;
+
+  if (
+    claimHash !== undefined &&
+    (
+      scope !== "event" ||
+      !/^[0-9a-f]{64}$/.test(claimHash)
+    )
+  ) {
+    throw new Error("INVALID_GUEST_QR_CLAIM_HASH");
+  }
+
   const now = deps.now ?? new Date();
 
   if (
@@ -128,12 +147,36 @@ export async function reserveKioskGuestQrSlotV1(
     try {
       await store.createEntity({
         partitionKey: EVENT,
-        rowKey
+        rowKey,
+        ...(claimHash === undefined ? {} : { claimHash })
       });
 
       return { admitted: true };
     } catch (error) {
       if (conflict(error)) {
+        // Only an exact match on the immutable event-wide
+        // claim may resume after an uncertain prior write.
+        if (
+          scope === "event" &&
+          claimHash !== undefined &&
+          store.getEntity
+        ) {
+          const existing = await store.getEntity(
+            EVENT,
+            rowKey
+          );
+
+          if (
+            existing?.partitionKey === EVENT &&
+            existing?.rowKey === rowKey &&
+            existing?.claimHash === claimHash
+          ) {
+            return { admitted: true };
+          }
+        }
+
+        // Different claims, missing metadata, and legacy
+        // unbound reservations are never reusable.
         continue;
       }
 

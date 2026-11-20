@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { assessKioskIntakeV1 } from
   "../../services/visitors/assessKioskIntakeV1";
@@ -152,7 +153,8 @@ export async function postKioskGuestQrIntake(
     }
 
     // Reject invalid visitor data before consuming quotas.
-    if (!assessKioskIntakeV1(body).valid) {
+    const assessment = assessKioskIntakeV1(body);
+    if (!assessment.valid) {
       reply(context, 400, "INVALID_SUBMISSION");
       return;
     }
@@ -239,7 +241,15 @@ export async function postKioskGuestQrIntake(
         enabled: true,
         now: new Date(nowMs),
         capacity: 1,
-        scope: "event"
+        scope: "event",
+        // No visitor fields enter the admission table.
+        // The canonical intake repository remains the
+        // final authority for durable idempotent writes.
+        claimHash: createHash("sha256")
+          .update(submissionId)
+          .update("\n")
+          .update(JSON.stringify(assessment.intake))
+          .digest("hex")
       }
     );
 

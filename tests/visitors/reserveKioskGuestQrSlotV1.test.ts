@@ -13,6 +13,20 @@ class AtomicStore {
   rows = new Map<string, any>();
   attempts = 0;
 
+  async getEntity(
+    partitionKey: string,
+    rowKey: string
+  ): Promise<any> {
+    const entity = this.rows.get(`${partitionKey}/${rowKey}`);
+    if (!entity) {
+      const error = new Error("missing") as
+        Error & { statusCode: number };
+      error.statusCode = 404;
+      throw error;
+    }
+    return entity;
+  }
+
   async createEntity(entity: any): Promise<unknown> {
     this.attempts++;
     const key = `${entity.partitionKey}/${entity.rowKey}`;
@@ -346,4 +360,127 @@ test("invalid reservation scope fails closed", async () => {
   );
 
   assert.equal(store.attempts, 0);
+});
+test("identical bound retry is admitted after uncertain write", async () => {
+  const store = new AtomicStore();
+  const claimHash = "a".repeat(64);
+
+  const first = await reserveKioskGuestQrSlotV1(grantA, {
+    enabled: true, capacity: 1, scope: "event",
+    claimHash, now: sunday, store
+  });
+
+  const retry = await reserveKioskGuestQrSlotV1(grantA, {
+    enabled: true, capacity: 1, scope: "event",
+    claimHash, now: nextMinute, store
+  });
+
+  assert.equal(first.admitted, true);
+  assert.equal(retry.admitted, true);
+  assert.equal(store.rows.size, 1);
+});
+
+test("changed payload or idempotency key cannot reuse claim", async () => {
+  const store = new AtomicStore();
+
+  await reserveKioskGuestQrSlotV1(grantA, {
+    enabled: true, capacity: 1, scope: "event",
+    claimHash: "a".repeat(64), now: sunday, store
+  });
+
+  const changed = await reserveKioskGuestQrSlotV1(grantA, {
+    enabled: true, capacity: 1, scope: "event",
+    claimHash: "b".repeat(64), now: nextMinute, store
+  });
+
+  assert.deepEqual(changed, {
+    admitted: false, reason: "capacity_exhausted"
+  });
+});
+
+test("concurrent identical bound retries create only one row", async () => {
+  const store = new AtomicStore();
+
+  const results = await Promise.all(
+    Array.from({ length: 20 }, () =>
+      reserveKioskGuestQrSlotV1(grantA, {
+        enabled: true, capacity: 1, scope: "event",
+        claimHash: "c".repeat(64), now: sunday, store
+      })
+    )
+  );
+
+  assert.equal(results.every(result => result.admitted), true);
+  assert.equal(store.rows.size, 1);
+});
+
+test("unbound legacy claim cannot be reused", async () => {
+  const store = new AtomicStore();
+
+  await reserveKioskGuestQrSlotV1(grantA, {
+    enabled: true, capacity: 1, scope: "event",
+    now: sunday, store
+  });
+
+  const retry = await reserveKioskGuestQrSlotV1(grantA, {
+    enabled: true, capacity: 1, scope: "event",
+    claimHash: "d".repeat(64), now: sunday, store
+  });
+
+  assert.equal(retry.admitted, false);
+});
+
+test("unreadable reservation never permits retry", async () => {
+  const store = new AtomicStore();
+
+  await reserveKioskGuestQrSlotV1(grantA, {
+    enabled: true, capacity: 1, scope: "event",
+    claimHash: "e".repeat(64), now: sunday, store
+  });
+
+  const inaccessible = {
+    createEntity: (entity: any) => store.createEntity(entity),
+    async getEntity() {
+      throw new Error("UNAVAILABLE_STORAGE");
+    }
+  };
+
+  await assert.rejects(
+    reserveKioskGuestQrSlotV1(grantA, {
+      enabled: true, capacity: 1, scope: "event",
+      claimHash: "e".repeat(64), now: sunday,
+      store: inaccessible
+    }),
+    /UNAVAILABLE_STORAGE/
+  );
+});
+
+test("malformed claim fingerprint is denied before writes", async () => {
+  const store = new AtomicStore();
+
+  await assert.rejects(
+    reserveKioskGuestQrSlotV1(grantA, {
+      enabled: true, capacity: 1, scope: "event",
+      claimHash: "invalid", now: sunday, store
+    }),
+    /INVALID_GUEST_QR_CLAIM_HASH/
+  );
+
+  assert.equal(store.attempts, 0);
+});
+
+test("reservation stores only opaque non-PII fingerprint", async () => {
+  const store = new AtomicStore();
+
+  await reserveKioskGuestQrSlotV1(grantA, {
+    enabled: true, capacity: 1, scope: "event",
+    claimHash: "f".repeat(64), now: sunday, store
+  });
+
+  const row = [...store.rows.values()][0];
+
+  assert.deepEqual(
+    Object.keys(row).sort(),
+    ["claimHash", "partitionKey", "rowKey"]
+  );
 });

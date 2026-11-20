@@ -206,6 +206,7 @@ test("accepted QR submission preserves trusted source", async () => {
         assert.equal(options.enabled, true);
         assert.equal(options.capacity, 1);
         assert.equal(options.scope, "event");
+        assert.match(options.claimHash, /^[0-9a-f]{64}$/);
         assert.equal(options.now.getTime(), now);
         stages.push("guest");
         return { admitted: true };

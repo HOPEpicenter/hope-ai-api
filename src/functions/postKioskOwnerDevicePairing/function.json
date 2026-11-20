@@ -1,0 +1,19 @@
+{
+  "scriptFile": "../dist/functions/postKioskOwnerDevicePairing/index.js",
+  "entryPoint": "postKioskOwnerDevicePairing",
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "direction": "in",
+      "authLevel": "anonymous",
+      "name": "req",
+      "methods": ["post"],
+      "route": "kiosk/owner-device-pairing"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ]
+}

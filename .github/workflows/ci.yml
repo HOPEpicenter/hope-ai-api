@@ -84,6 +84,18 @@ jobs:
             tests/authorization/postKioskOwnerVerification.test.cjs
           if ($LASTEXITCODE -ne 0) { throw "Synthetic kiosk bootstrap trust-boundary regressions failed" }
 
+      - name: Kiosk owner pairing security regressions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          npx --no-install ts-node tests/authorization/authorizeKioskOwnerPairing.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Owner authorization regressions failed" }
+          npx --no-install ts-node tests/authorization/authorizeKioskOwnerPairingSigned.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Signed owner token regressions failed" }
+          npx --no-install ts-node tests/authorization/postKioskOwnerDevicePairing.test.ts
+          if ($LASTEXITCODE -ne 0) { throw "Owner device registration regressions failed" }
+
       - name: E149A disabled Staff authority regressions
         shell: pwsh
         run: |

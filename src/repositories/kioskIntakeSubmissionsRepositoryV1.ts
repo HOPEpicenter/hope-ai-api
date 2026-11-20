@@ -15,10 +15,23 @@ type Store = {
   getEntity(partitionKey: string, rowKey: string): Promise<any>;
 };
 
+export type KioskSubmissionSource =
+  | "hope_ipad_kiosk_v1"
+  | "hope_guest_qr_v1";
+
+const DEFAULT_SOURCE: KioskSubmissionSource =
+  "hope_ipad_kiosk_v1";
+
+function validSource(value: unknown): value is KioskSubmissionSource {
+  return value === "hope_ipad_kiosk_v1" ||
+    value === "hope_guest_qr_v1";
+}
+
 type Dependencies = {
   table?: Store;
   now?: () => string;
   enabled?: boolean;
+  source?: KioskSubmissionSource;
 };
 
 export type KioskSubmissionReceipt =
@@ -109,6 +122,12 @@ export async function inspectExistingKioskIntakeSubmissionV1(
     return "disabled";
   }
 
+  const source = deps.source ?? DEFAULT_SOURCE;
+
+  if (!validSource(source)) {
+    return "invalid";
+  }
+
   if (
     typeof submissionId !== "string" ||
     !UUID4.test(submissionId)
@@ -139,7 +158,7 @@ export async function inspectExistingKioskIntakeSubmissionV1(
 
   if (
     existing?.payloadHash === payloadHash &&
-    existing?.source === "hope_ipad_kiosk_v1" &&
+    existing?.source === source &&
     existing?.partitionKey === EVENT &&
     existing?.rowKey === submissionId
   ) {
@@ -158,6 +177,12 @@ export async function appendKioskIntakeSubmissionV1(
   // this internal persistence primitive after its own checks pass.
   if (deps.enabled !== true) {
     return { accepted: false, status: "disabled" };
+  }
+
+  const source = deps.source ?? DEFAULT_SOURCE;
+
+  if (!validSource(source)) {
+    return { accepted: false, status: "invalid" };
   }
 
   const assessed = assessKioskIntakeV1(input);
@@ -204,7 +229,7 @@ export async function appendKioskIntakeSubmissionV1(
     invitedBy: payload.invitedBy,
     contactConsent: payload.contactConsent,
     receivedAt: occurredAt,
-    source: "hope_ipad_kiosk_v1",
+    source,
     reviewStatus: "pending"
   };
 

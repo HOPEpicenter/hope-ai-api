@@ -231,11 +231,15 @@ export async function postKioskGuestQrIntake(
     const reserveGuest = dependencies.reserveGuest ??
       reserveKioskGuestQrSlotV1;
 
+    // One event-wide claim per verified guest session.
+    // Previously recorded identical retries return above.
     const guestAdmission = await reserveGuest(
       grant.grantId,
       {
         enabled: true,
-        now: new Date(nowMs)
+        now: new Date(nowMs),
+        capacity: 1,
+        scope: "event"
       }
     );
 

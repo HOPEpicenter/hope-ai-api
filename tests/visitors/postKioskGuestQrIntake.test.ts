@@ -201,8 +201,12 @@ test("accepted QR submission preserves trusted source", async () => {
         stages.push("preflight");
         return "missing";
       },
-      reserveGuest: async (value: string) => {
+      reserveGuest: async (value: string, options: any) => {
         assert.equal(value, grantId);
+        assert.equal(options.enabled, true);
+        assert.equal(options.capacity, 1);
+        assert.equal(options.scope, "event");
+        assert.equal(options.now.getTime(), now);
         stages.push("guest");
         return { admitted: true };
       },

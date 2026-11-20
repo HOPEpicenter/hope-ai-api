@@ -243,3 +243,107 @@ test("default capacity allows 12 claims per minute", async () => {
 
   assert.equal(results[12].admitted, false);
 });
+test("event-wide claim stays used across minute boundaries", async () => {
+  const store = new AtomicStore();
+
+  const first = await reserveKioskGuestQrSlotV1(grantA, {
+    enabled: true,
+    capacity: 1,
+    scope: "event",
+    now: sunday,
+    store
+  });
+
+  const second = await reserveKioskGuestQrSlotV1(grantA, {
+    enabled: true,
+    capacity: 1,
+    scope: "event",
+    now: nextMinute,
+    store
+  });
+
+  assert.equal(first.admitted, true);
+  assert.deepEqual(second, {
+    admitted: false,
+    reason: "capacity_exhausted"
+  });
+  assert.equal(store.rows.size, 1);
+});
+
+test("concurrent event-wide claims admit only one", async () => {
+  const store = new AtomicStore();
+
+  const results = await Promise.all(
+    Array.from({ length: 20 }, () =>
+      reserveKioskGuestQrSlotV1(grantA, {
+        enabled: true,
+        capacity: 1,
+        scope: "event",
+        now: sunday,
+        store
+      })
+    )
+  );
+
+  assert.equal(
+    results.filter(result => result.admitted).length,
+    1
+  );
+  assert.equal(store.rows.size, 1);
+});
+
+test("different guests have independent event claims", async () => {
+  const store = new AtomicStore();
+
+  for (const grant of [grantA, grantB]) {
+    const result = await reserveKioskGuestQrSlotV1(
+      grant,
+      {
+        enabled: true,
+        capacity: 1,
+        scope: "event",
+        now: sunday,
+        store
+      }
+    );
+
+    assert.equal(result.admitted, true);
+  }
+
+  assert.equal(store.rows.size, 2);
+});
+
+test("event-wide claim cannot silently permit multiple slots", async () => {
+  const store = new AtomicStore();
+
+  for (const capacity of [2, 12, 30]) {
+    await assert.rejects(
+      reserveKioskGuestQrSlotV1(grantA, {
+        enabled: true,
+        scope: "event",
+        capacity,
+        now: sunday,
+        store
+      }),
+      /INVALID_EVENT_CLAIM_CAPACITY/
+    );
+  }
+
+  assert.equal(store.attempts, 0);
+});
+
+test("invalid reservation scope fails closed", async () => {
+  const store = new AtomicStore();
+
+  await assert.rejects(
+    reserveKioskGuestQrSlotV1(grantA, {
+      enabled: true,
+      scope: "invalid" as any,
+      now: sunday,
+      store
+    }),
+    /INVALID_GUEST_QR_SCOPE/
+  );
+
+  assert.equal(store.attempts, 0);
+});

@@ -22,6 +22,7 @@ type Dependencies = {
   enabled?: boolean;
   now?: Date;
   capacity?: number;
+  scope?: "minute" | "event";
   store?: Store;
 };
 
@@ -86,6 +87,17 @@ export async function reserveKioskGuestQrSlotV1(
     throw new Error("INVALID_GUEST_QR_CAPACITY");
   }
 
+  const scope = deps.scope ?? "minute";
+
+  if (scope !== "minute" && scope !== "event") {
+    throw new Error("INVALID_GUEST_QR_SCOPE");
+  }
+
+  // Event-wide registration claims must have capacity one.
+  if (scope === "event" && capacity !== 1) {
+    throw new Error("INVALID_EVENT_CLAIM_CAPACITY");
+  }
+
   const now = deps.now ?? new Date();
 
   if (
@@ -99,7 +111,9 @@ export async function reserveKioskGuestQrSlotV1(
     return { admitted: false, reason: "outside_event" };
   }
 
-  const minute = Math.floor(now.getTime() / 60000);
+  const bucket = scope === "event"
+    ? "event"
+    : String(Math.floor(now.getTime() / 60000));
   const store = deps.store ?? getTableClient(TABLE);
 
   if (!deps.store) {
@@ -108,7 +122,7 @@ export async function reserveKioskGuestQrSlotV1(
 
   for (let slot = 0; slot < capacity; slot++) {
     const rowKey =
-      `qr__${grantId}__${minute}__` +
+      `qr__${grantId}__${bucket}__` +
       String(slot).padStart(2, "0");
 
     try {

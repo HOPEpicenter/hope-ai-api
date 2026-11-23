@@ -7,6 +7,11 @@ const CHECK_IN_PARTITION = "VISITOR_CHECK_IN";
 const SUBMISSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const STORAGE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
+export function isVisitorCheckInRequest(submissionId: unknown, serviceId: unknown): boolean {
+  return typeof submissionId === "string" && SUBMISSION_ID.test(submissionId) &&
+    typeof serviceId === "string" && STORAGE_ID.test(serviceId);
+}
+
 type CheckInCommand = {
   submissionId: string;
   visitorId: string;
@@ -69,9 +74,8 @@ export async function recordVisitorCheckIn(
   dependencies: Dependencies = {}
 ): Promise<CheckInResult> {
   if (
-    typeof command.submissionId !== "string" || !SUBMISSION_ID.test(command.submissionId) ||
-    typeof command.visitorId !== "string" || !STORAGE_ID.test(command.visitorId) ||
-    typeof command.serviceId !== "string" || !STORAGE_ID.test(command.serviceId)
+    !isVisitorCheckInRequest(command.submissionId, command.serviceId) ||
+    typeof command.visitorId !== "string" || !STORAGE_ID.test(command.visitorId)
   ) {
     return { status: "invalid" };
   }
@@ -81,7 +85,10 @@ export async function recordVisitorCheckIn(
   const previous = await readCheckIn(table, command.submissionId);
   if (previous) return readReceipt(previous, command);
 
-  const visitor = await (dependencies.readVisitor ?? getVisitorById)(command.visitorId);
+  const visitor = await (dependencies.readVisitor ?? getVisitorById)(command.visitorId, {
+    getTableClient: () => table,
+    ensureTableExists: async () => {}
+  });
   if (!visitor || visitor.visitorId !== command.visitorId) {
     return { status: "visitor_not_found" };
   }

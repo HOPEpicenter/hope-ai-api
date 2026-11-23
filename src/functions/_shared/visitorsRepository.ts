@@ -52,6 +52,7 @@ type VisitorEntity = {
   postalCode?: string;
   birthday?: string;
   provenanceJson?: string;
+  checkInCreationId?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -433,6 +434,52 @@ export async function createVisitorRecord(input: {
     created: true
   };
 }
+/** Create only for a previously claimed check-in, using the canonical contact index. */
+export async function createVisitorFromCheckIn(
+  table: TableClient,
+  input: {
+    visitorId: string;
+    submissionId: string;
+    name: string;
+    contact: { kind: "EMAIL" | "PHONE"; value: string };
+    now: string;
+  }
+): Promise<boolean> {
+  const { visitorId, submissionId, name, contact, now } = input;
+  try {
+    const existing = await table.getEntity<VisitorEntity>(VISITOR_PK, visitorId);
+    return existing.checkInCreationId === submissionId;
+  } catch (error) {
+    if ((error as { statusCode?: number } | null)?.statusCode !== 404) throw error;
+  }
+  const reservation = await reserveIdentity(
+    table, contact.kind, encodeURIComponent(contact.value), visitorId, now
+  );
+  if (!reservation.created && reservation.visitorId !== visitorId) return false;
+
+  const entity: VisitorEntity = {
+    partitionKey: VISITOR_PK,
+    rowKey: visitorId,
+    checkInCreationId: submissionId,
+    name,
+    ...(contact.kind === "EMAIL"
+      ? { email: contact.value, emailLower: contact.value }
+      : { phone: contact.value, phoneCanonical: contact.value }),
+    provenanceJson: serializeVisitorProvenance(createOperationalVisitorProvenance(now)),
+    createdAt: now,
+    updatedAt: now
+  };
+  try {
+    await table.createEntity(entity);
+  } catch (error) {
+    // Leave the reservation in place so an interrupted attempt can resume.
+    // A matching marker proves this attempt owns the profile.
+    const existing = await table.getEntity<VisitorEntity>(VISITOR_PK, visitorId).catch(() => null);
+    if (existing?.checkInCreationId !== submissionId) throw error;
+  }
+  return true;
+}
+
 export async function updateVisitorRecord(
   visitorId: string,
   input: {

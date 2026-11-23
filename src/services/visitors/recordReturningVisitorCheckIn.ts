@@ -39,15 +39,17 @@ function matchesContact(visitor: Omit<VisitorContact, "rowKey">, email: string, 
   };
 }
 
-/** Internal only. Resolve contact evidence without creating or editing a profile. */
-export async function recordReturningVisitorCheckIn(
-  command: Contact & { name: string; submissionId: string; serviceId: string },
+/** Resolve contact evidence without creating or editing a profile. */
+export async function resolveVisitorCheckInIdentity(
+  command: Contact & { name: string },
   dependencies: {
     readContacts?: typeof readContacts;
     readVisitor?: typeof getVisitorById;
-    record?: typeof recordVisitorCheckIn;
   } = {}
-): Promise<CheckInResult | { status: "unmatched" | "requires_staff_review" }> {
+): Promise<
+  | { status: "matched"; visitorId: string }
+  | { status: "invalid" | "unmatched" | "requires_staff_review" }
+> {
   const name = normalizeName(command.name);
   const email = command.email?.trim().toLowerCase() ?? "";
   const phone = normalizePhoneIdentifier(command.phone ?? "");
@@ -80,9 +82,20 @@ export async function recordReturningVisitorCheckIn(
   if ((email && !match.email) || (phone && !match.phone)) {
     return { status: "requires_staff_review" };
   }
+  return { status: "matched", visitorId: candidate };
+}
+
+export async function recordReturningVisitorCheckIn(
+  command: Contact & { name: string; submissionId: string; serviceId: string },
+  dependencies: NonNullable<Parameters<typeof resolveVisitorCheckInIdentity>[1]> & {
+    record?: typeof recordVisitorCheckIn;
+  } = {}
+): Promise<CheckInResult | { status: "unmatched" | "requires_staff_review" }> {
+  const identity = await resolveVisitorCheckInIdentity(command, dependencies);
+  if (identity.status !== "matched") return { status: identity.status };
   return (dependencies.record ?? recordVisitorCheckIn)({
     submissionId: command.submissionId,
-    visitorId: candidate,
+    visitorId: identity.visitorId,
     serviceId: command.serviceId
   });
 }

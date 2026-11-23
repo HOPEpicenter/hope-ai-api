@@ -260,6 +260,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Staff acceptance/revocation atomicity regression failed"
           }
+          npx --no-install ts-node tests/staff/assessKioskExistingStaffBinding.test.ts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Existing Staff kiosk binding preflight regression failed"
+          }
           npx --no-install ts-node tests/staff/coordinateStaffCreation.test.ts
           if ($LASTEXITCODE -ne 0) {
             throw "Staff creation coordination regression failed"

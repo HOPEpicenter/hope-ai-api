@@ -1,0 +1,15 @@
+{
+  "bindings": [
+    {
+      "authLevel": "anonymous",
+      "type": "httpTrigger",
+      "direction": "in",
+      "name": "req",
+      "methods": ["get", "post"],
+      "route": "visitor-check-ins"
+    },
+    { "type": "http", "direction": "out", "name": "res" }
+  ],
+  "scriptFile": "../dist/functions/visitorSundayCheckIn/index.js",
+  "entryPoint": "visitorSundayCheckIn"
+}

@@ -19,7 +19,7 @@ function isAlreadyExistsError(err: any): boolean {
   );
 }
 
-export async function ensureTableExists(client: TableClient): Promise<void> {
+export async function ensureTableExists(client: Pick<TableClient, "createTable">): Promise<void> {
   try {
     await client.createTable();
   } catch (err: any) {

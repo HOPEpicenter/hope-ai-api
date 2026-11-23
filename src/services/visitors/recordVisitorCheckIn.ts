@@ -21,7 +21,7 @@ type CheckInEntity = Omit<CheckInReceipt, "submissionId"> & {
 };
 
 type Dependencies = {
-  table?: Pick<TableClient, "createEntity" | "getEntity" | "createTable">;
+  table?: TableClient;
   readVisitor?: typeof getVisitorById;
   now?: () => Date;
 };

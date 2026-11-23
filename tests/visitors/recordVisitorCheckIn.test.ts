@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { TableClient, TableEntity, TableEntityResult } from "@azure/data-tables";
+import { TableClient, type TableEntity, type TableEntityResult } from "@azure/data-tables";
 import { recordVisitorCheckIn } from "../../src/services/visitors/recordVisitorCheckIn";
 
 const command = {
@@ -13,7 +13,7 @@ const recordedAt = "2026-11-29T15:00:00.000Z";
 function fixture() {
   const rows = new Map<string, TableEntity>();
   const failures = { beforeWrite: false, afterWrite: false };
-  const table: Pick<TableClient, "createTable" | "createEntity" | "getEntity"> = {
+  const table = Object.assign(new TableClient("http://127.0.0.1:10002", "Visitors"), {
     async createTable() {},
     async createEntity(entity: TableEntity) {
       if (failures.beforeWrite) throw new Error("storage unavailable");
@@ -28,7 +28,7 @@ function fixture() {
       if (!row) throw { statusCode: 404 };
       return { ...row, etag: "synthetic" } as TableEntityResult<T>;
     }
-  };
+  } satisfies Pick<TableClient, "createTable" | "createEntity" | "getEntity">);
   return {
     rows, failures,
     dependencies: {

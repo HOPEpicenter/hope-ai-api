@@ -445,6 +445,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx --no-install ts-node tests/visitors/recordVisitorCheckIn.test.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install ts-node tests/visitors/recordReturningVisitorCheckIn.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Dashboard visitor identity regression
         shell: pwsh

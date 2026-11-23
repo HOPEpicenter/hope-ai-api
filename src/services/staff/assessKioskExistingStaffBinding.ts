@@ -72,7 +72,7 @@ function object(value: unknown): Record<string, unknown> | null {
  * intended record still requires trusted authority verification.
  */
 export function assessKioskExistingStaffBinding(
-  evidence: KioskExistingStaffBindingEvidence | null | undefined
+  evidence: unknown
 ): KioskExistingStaffBindingAssessment {
   const input = object(evidence);
   if (!input) return decision("EVIDENCE_MISSING");

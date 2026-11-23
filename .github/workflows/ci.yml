@@ -443,6 +443,19 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx --no-install ts-node tests/visitors/isSyntheticVisitorRecord.test.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install ts-node tests/visitors/recordVisitorCheckIn.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install ts-node tests/visitors/recordReturningVisitorCheckIn.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install ts-node tests/visitors/recordVisitorArrival.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Sunday visitor check-in HTTP regressions
+        shell: pwsh
+        env:
+          STORAGE_CONNECTION_STRING: UseDevelopmentStorage=true
+        run: |
+          npx --no-install ts-node tests/visitors/visitorSundayCheckInHttp.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Dashboard visitor identity regression
         shell: pwsh

@@ -427,6 +427,102 @@ test(
     console.log("RETRY_PRESERVES_ONE_HISTORY_ITEM=True");
     console.log("HISTORY_CONTACT_DATA_EXCLUDED=True");
     console.log("CROSS_PERSON_HISTORY_ISOLATION_VERIFIED=True");
+    // Use the actual default consent reader and isolated communication ledger.
+    // Staff identity is synthetic; denied formation writes are tripwires.
+    process.env.HOPE_API_KEY = "synthetic-step106-staff-key";
+    const commandKey = process.env.HOPE_API_KEY;
+    const commandActorId = "synthetic-step106-staff";
+    const commandActor = { staffId: commandActorId, status: "active" as const, roleLabel: "Pastor" };
+    const contactGuard = (await import("../src/services/followups/requireCurrentRegistrationContactPermission")).requireCurrentRegistrationContactPermission;
+    const communication = await import("../src/services/communications/ministryCommunicationCommands");
+    const { MinistryCommunicationEventsRepository } = await import("../src/repositories/ministryCommunicationEventsRepository");
+    const { postCareCandidateAssign } = await import("../src/functions/postCareCandidateAssign");
+    const { postCareCandidateAssignBulk } = await import("../src/functions/postCareCandidateAssignBulk");
+    const { postFormationEvent } = await import("../src/functions/postFormationEvent");
+    const { postEngagementEvent } = await import("../src/functions/postEngagementEvent");
+    const { startSixWeekVisitorFollowup } = await import("../src/services/followups/sixWeekVisitorFollowupCommands");
+    const ledger = new MinistryCommunicationEventsRepository();
+    let commandClock = Date.parse("2026-11-24T19:00:00.000Z");
+    const communicationDeps = {
+      readActor: async () => commandActor,
+      now: () => new Date(++commandClock).toISOString()
+    };
+    const intentFor = (visitorId: string, communicationId = "synthetic-step106-intent") => ({
+      visitorId, communicationId, actorId: commandActorId,
+      channel: "email" as const, intent: "follow_up" as const,
+      context: "person_360" as const
+    });
+    const preferenceFor = (visitorId: string) => ({
+      visitorId, actorId: commandActorId, channel: "email" as const, state: "granted" as const
+    });
+    const stopWrite = (): never => { throw new Error("Unexpected denied command dependency access"); };
+    const ctxFor = (): any => ({ res: undefined, log: Object.assign(() => {}, { error: () => {}, warn: () => {}, info: () => {} }) });
+    type SingleDeps = import("../src/functions/postCareCandidateAssign").CareAssignConsentDependencies;
+    const careAuth = {
+      requireActor: (async () => ({ ok: true, actor: commandActor })) as unknown as NonNullable<SingleDeps["requireActor"]>,
+      requireAssignee: (async () => ({ ok: true, actor: commandActor, assignee: commandActor })) as unknown as NonNullable<SingleDeps["requireAssignee"]>
+    };
+    const authorizeActor: NonNullable<import("../src/functions/postFormationEvent").FormationEventConsentDependencies["authorizeActor"]> =
+      async () => ({ ok: true, actorId: commandActorId });
+    const commandHeaders = { "x-api-key": commandKey, "x-hope-staff-actor-id": commandActorId };
+    async function assertDeniedCommands(visitorId: string, status: 409 | 503, mixedVisitorId: string) {
+      const before = await ledger.listByVisitor(visitorId);
+      const guardFailure = await contactGuard(visitorId);
+      assert.equal(guardFailure?.status, status);
+      for (const result of [
+        await communication.recordMinistryCommunicationIntent(intentFor(visitorId), communicationDeps),
+        await communication.recordMinistryCommunicationIntent(intentFor(visitorId, "synthetic-new-denied-intent"), communicationDeps),
+        await communication.recordMinistryCommunicationPreference(preferenceFor(visitorId), communicationDeps)
+      ]) {
+        assert.equal(result.accepted, false);
+        assert.equal(result.status, status);
+      }
+      assert.deepEqual(await ledger.listByVisitor(visitorId), before);
+      const single = ctxFor();
+      await postCareCandidateAssign(single, { headers: commandHeaders, params: { visitorId }, body: { assignedTo: commandActorId } }, {
+        ...careAuth, getVisitor: async () => stopWrite()
+      });
+      assert.equal(single.res.status, status);
+      const bulk = ctxFor();
+      await postCareCandidateAssignBulk(bulk, { headers: commandHeaders, body: { assignedTo: commandActorId, visitorIds: [mixedVisitorId, visitorId] } }, {
+        ...careAuth, getTable: () => stopWrite(), getVisitor: async () => stopWrite(), upsertProfile: async () => stopWrite()
+      });
+      assert.equal(bulk.res.status, status);
+      for (const type of ["FOLLOWUP_ASSIGNED", "FOLLOWUP_CONTACTED", "NEXT_STEP_SELECTED", "FOLLOWUP_OUTCOME_RECORDED"]) {
+        const req = { headers: commandHeaders, body: { v: 1, eventId: randomUUID(), visitorId, type, occurredAt: "2026-11-24T00:00:00.000Z", source: { system: "hope-dashboard-next", actorId: commandActorId }, data: {} } };
+        const formation = ctxFor();
+        await postFormationEvent(formation, req, { authorizeActor, ensureTables: async () => stopWrite(), recordFormation: async () => stopWrite() });
+        assert.equal(formation.res.status, status);
+        const engagement = ctxFor();
+        await postEngagementEvent(engagement, req, { authorizeActor, appendEngagement: async () => stopWrite(), recordFormation: async () => stopWrite() });
+        assert.equal(engagement.res.status, status);
+      }
+      const previousPlans = await followups.listByVisitor(visitorId);
+      const start = await startSixWeekVisitorFollowup({ visitorId, actorId: commandActorId, firstVisitDate: "2026-11-24", contactConsent: true }, {
+        readActor: async () => commandActor,
+        repository: followups
+      });
+      assert.equal(start.accepted, false);
+      assert.equal(start.status, status);
+      assert.deepEqual(await followups.listByVisitor(visitorId), previousPlans);
+    }
+    assert.equal(await contactGuard(adultReceipt.visitorId), null);
+    // Registration grant is not a substitute for channel-specific permission.
+    const noChannel = await communication.recordMinistryCommunicationIntent(intentFor(adultReceipt.visitorId), communicationDeps);
+    assert.equal(noChannel.accepted, false);
+    assert.equal(noChannel.status, 409);
+    assert.equal((await ledger.listByVisitor(adultReceipt.visitorId)).length, 0);
+    const channelGrant = await communication.recordMinistryCommunicationPreference(preferenceFor(adultReceipt.visitorId), communicationDeps);
+    assert.equal(channelGrant.accepted, true);
+    const intentGrant = await communication.recordMinistryCommunicationIntent(intentFor(adultReceipt.visitorId), communicationDeps);
+    assert.equal(intentGrant.accepted, true);
+    assert.equal((await ledger.listByVisitor(adultReceipt.visitorId)).length, 2);
+    assert.equal((await ledger.listByVisitor(familyReceipt.visitorId)).length, 0);
+    console.log("ACTUAL_GRANTED_RECEIPT_AND_CHANNEL_LEDGER_VERIFIED=True");
+    await assertDeniedCommands(familyReceipt.visitorId, 409, adultReceipt.visitorId);
+    assert.equal((await ledger.listByVisitor(familyReceipt.visitorId)).length, 0);
+    console.log("ACTUAL_DECLINED_FAMILY_COMMANDS_DENIED=True");
+    console.log("MIXED_CONSENT_PREFLIGHT_DENIED_BEFORE_FORMATION_ACCESS=True");
     {
       const individual = await readFamilyHistory(adultReceipt.visitorId);
       const family = await readFamilyHistory(familyReceipt.visitorId);
@@ -538,6 +634,13 @@ test(
     assert.equal(suppressed.items.length, 0);
     assert.deepEqual(await followups.listByVisitor(adultReceipt.visitorId), adultEvents);
     console.log("STALE_ACTIONABLE_PLAN_SUPPRESSED=True");
+    await assertDeniedCommands(adultReceipt.visitorId, 409, familyReceipt.visitorId);
+    assert.equal((await ledger.listByVisitor(adultReceipt.visitorId)).length, 2);
+    const cancelled = await communication.cancelMinistryCommunication({ visitorId: adultReceipt.visitorId, actorId: commandActorId, communicationId: "synthetic-step106-intent", reason: "Synthetic permission withdrawn" }, communicationDeps);
+    assert.equal(cancelled.accepted, true);
+    assert.equal((await ledger.listByVisitor(adultReceipt.visitorId)).length, 3);
+    console.log("ACTUAL_WITHDRAWAL_BLOCKS_NEW_AND_REPLAYED_COMMANDS=True");
+    console.log("ACTUAL_LEDGER_CANCELLATION_PRESERVED=True");
     const historical = await readRegistrationHistory(adultReceipt.visitorId);
     assert.equal(historical.status, "ready");
     assert.equal(historical.registrationCount, 2);
@@ -566,6 +669,13 @@ test(
     );
     assert.deepEqual(await followups.listByVisitor(adultReceipt.visitorId), adultEvents);
     console.log("UNKNOWN_CONSENT_READS_FAIL_CLOSED=True");
+    // The malformed adult receipt is newer than the withdrawal. Put it first
+    // in bulk preflight so a known family decline cannot mask unavailable state.
+    await assertDeniedCommands(adultReceipt.visitorId, 503, adultReceipt.visitorId);
+    assert.equal((await ledger.listByVisitor(adultReceipt.visitorId)).length, 3);
+    assert.equal((await ledger.listByVisitor(familyReceipt.visitorId)).length, 0);
+    console.log("ACTUAL_MALFORMED_CONSENT_COMMANDS_FAIL_CLOSED=True");
+    console.log("DENIED_COMMANDS_PRESERVE_LEDGER_AND_PLAN_HISTORY=True");
     assert.deepEqual(await readRegistrationHistory(adultReceipt.visitorId), {
       status: "unavailable"
     });

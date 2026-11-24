@@ -17,6 +17,11 @@ export type VersionedVisitorEvent = {
 };
 
 export type VisitorEventUpdateRepository = {
+  readCommand: (commandId: string) => Promise<{
+    eventId: string;
+    fingerprint: string;
+    active: boolean;
+  } | null>;
   read: (eventId: string) =>
     Promise<VersionedVisitorEvent | null>;
   updateIfVersion: (
@@ -126,6 +131,28 @@ export async function updateVisitorEvent(
     active: input.active ?? null
   });
 
+  // Check the permanent command ledger before reading current event state.
+  // A historical retry must never apply its change a second time.
+  const previous = await repository.readCommand(commandId);
+
+  if (previous) {
+    if (previous.eventId !== input.eventId ||
+        previous.fingerprint !== fingerprint) {
+      return {
+        accepted: false,
+        status: 409,
+        error: "event_command_conflict"
+      };
+    }
+
+    return {
+      accepted: true,
+      eventId: previous.eventId,
+      replay: true,
+      active: previous.active
+    };
+  }
+
   const snapshot = await repository.read(input.eventId);
 
   if (!snapshot) {
@@ -136,21 +163,13 @@ export async function updateVisitorEvent(
     };
   }
 
-  // The most recent command can be retried safely.
+  // An event head claiming this command without its permanent
+  // ledger entry is inconsistent and must not be trusted.
   if (snapshot.lastCommandId === commandId) {
-    if (snapshot.lastCommandFingerprint !== fingerprint) {
-      return {
-        accepted: false,
-        status: 409,
-        error: "event_command_conflict"
-      };
-    }
-
     return {
-      accepted: true,
-      eventId: snapshot.event.id,
-      replay: true,
-      active: snapshot.event.active
+      accepted: false,
+      status: 409,
+      error: "event_command_history_missing"
     };
   }
 

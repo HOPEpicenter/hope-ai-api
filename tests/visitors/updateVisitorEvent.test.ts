@@ -25,8 +25,14 @@ function memoryRepository() {
   };
 
   let writes = 0;
+  const history = new Map<string, {
+    eventId: string;
+    fingerprint: string;
+    active: boolean;
+  }>();
 
   const repository: VisitorEventUpdateRepository = {
+    readCommand: async id => history.get(id) ?? null,
     read: async id =>
       id === state.event.id
         ? {
@@ -41,6 +47,11 @@ function memoryRepository() {
       if (version !== state.version) return false;
 
       writes++;
+      history.set(commandId, {
+        eventId: event.id,
+        fingerprint,
+        active: event.active
+      });
 
       state = {
         event: { ...event },
@@ -163,6 +174,7 @@ test("concurrent version conflicts never overwrite changes", async () => {
   const memory = memoryRepository();
 
   const competing: VisitorEventUpdateRepository = {
+    readCommand: memory.repository.readCommand,
     read: memory.repository.read,
     updateIfVersion: async () => false
   };
@@ -182,6 +194,9 @@ test("concurrent version conflicts never overwrite changes", async () => {
 
 test("invalid requests never reach storage", async () => {
   const repository: VisitorEventUpdateRepository = {
+    readCommand: async () => {
+      throw new Error("Unexpected history read");
+    },
     read: async () => {
       throw new Error("Unexpected storage read");
     },

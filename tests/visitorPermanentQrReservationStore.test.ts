@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
-import { TableClient } from "@azure/data-tables";
+import { createIsolatedVisitorTestTable } from "./permanentVisitorIsolatedTestTable";
 
 import {
   createPermanentVisitorQrReservationStore as createStore
@@ -327,8 +327,8 @@ test("local Azurite verifies durable atomic reservation behavior", {
   const tableName = "HopeVisitor57" +
     randomUUID().replace(/-/g, "");
 
-  const client = TableClient.fromConnectionString(
-    "UseDevelopmentStorage=true",
+  const client = createIsolatedVisitorTestTable(
+
     tableName
   );
 
@@ -336,10 +336,11 @@ test("local Azurite verifies durable atomic reservation behavior", {
 
   assert.equal(endpoint.protocol, "http:");
   assert.equal(endpoint.hostname, "127.0.0.1");
-  assert.equal(endpoint.port, "10002");
+  assert.equal(endpoint.port, process.env.HOPE_VISITOR_133_PORT);
+  assert.notEqual(endpoint.port, "10002");
   assert.equal(
     endpoint.pathname.replace(/\/$/, ""),
-    "/devstoreaccount1"
+    "/hopevisitor133"
   );
 
   await client.createTable();
@@ -450,8 +451,7 @@ test("local Azurite verifies durable atomic reservation behavior", {
 
       // Fresh adapter over the same durable local table.
       const reopened = createStore(
-        TableClient.fromConnectionString(
-          "UseDevelopmentStorage=true",
+        createIsolatedVisitorTestTable(
           tableName
         )
       );
@@ -526,8 +526,7 @@ test("local Azurite verifies durable atomic reservation behavior", {
     });
 
     await t.test("independent clients cannot both claim the same capacity slot", async () => {
-      const otherClient = TableClient.fromConnectionString(
-        "UseDevelopmentStorage=true",
+      const otherClient = createIsolatedVisitorTestTable(
         tableName
       );
 

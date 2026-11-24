@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
-import { TableClient } from "@azure/data-tables";
+import type { TableClient } from "@azure/data-tables";
+import { createIsolatedVisitorTestTable } from "./permanentVisitorIsolatedTestTable";
 
 import {
   readLatestRegistrationConsent as readConsent,
@@ -33,8 +34,8 @@ async function withTable(
     "true"
   );
 
-  const table = TableClient.fromConnectionString(
-    "UseDevelopmentStorage=true",
+  const table = createIsolatedVisitorTestTable(
+
     "HopeVisitor67F" +
       randomUUID().replace(/-/g, "")
   );
@@ -43,10 +44,11 @@ async function withTable(
 
   assert.equal(endpoint.protocol, "http:");
   assert.equal(endpoint.hostname, "127.0.0.1");
-  assert.equal(endpoint.port, "10002");
+  assert.equal(endpoint.port, process.env.HOPE_VISITOR_133_PORT);
+  assert.notEqual(endpoint.port, "10002");
   assert.equal(
     endpoint.pathname.replace(/\/$/, ""),
-    "/devstoreaccount1"
+    "/hopevisitor133"
   );
 
   await table.createTable();
@@ -77,7 +79,7 @@ async function saveVisit(
   });
 }
 
-function staffFixture(active = true) {
+function staffFixture(table?: TableClient, active = true) {
   const events: SixWeekFollowupEvent[] = [];
 
   const start: typeof startSixWeekVisitorFollowup =
@@ -89,6 +91,11 @@ function staffFixture(active = true) {
         staffId: id,
         status: active ? "active" : "inactive"
       }),
+
+      readRegistrationConsent: async id => {
+        if (!table) throw new Error("Isolated consent fixture table required");
+        return readConsent(id, table);
+      },
 
       now: () => "2026-11-24T20:00:00.000Z",
 
@@ -130,7 +137,7 @@ test("latest explicit decline prevents a new follow-up plan", async () => {
       "synthetic-other-visitor"
     );
 
-    const staff = staffFixture();
+    const staff = staffFixture(table);
 
     assert.equal(
       await readConsent(visitorId, table),
@@ -160,7 +167,7 @@ test("later explicit permission allows authorized Staff to start six-week follow
       "2026-11-24T18:00:00.000Z"
     );
 
-    const staff = staffFixture();
+    const staff = staffFixture(table);
 
     const result = await startProtected(staffInput, {
       readConsent: id => readConsent(id, table),
@@ -214,7 +221,7 @@ test("unknown or malformed stored consent fails closed", async () => {
       })
     });
 
-    const staff = staffFixture();
+    const staff = staffFixture(table);
 
     assert.equal(
       await readConsent(visitorId, table),
@@ -254,7 +261,7 @@ test("legacy attendance preserves authorized Staff consent workflow", async () =
       "legacy_no_evidence"
     );
 
-    const staff = staffFixture();
+    const staff = staffFixture(table);
 
     const result = await startProtected(staffInput, {
       readConsent: id => readConsent(id, table),
@@ -273,7 +280,7 @@ test("stored permission never bypasses active Staff authorization", async () => 
       "2026-11-24T18:00:00.000Z"
     );
 
-    const staff = staffFixture(false);
+    const staff = staffFixture(table, false);
 
     const result = await startProtected(staffInput, {
       readConsent: id => readConsent(id, table),

@@ -716,6 +716,10 @@ jobs:
         shell: pwsh
         run: ./scripts/test-permanent-visitor-backend.ps1
 
+      - name: Permanent visitor isolated storage regressions
+        shell: pwsh
+        run: ./scripts/test-permanent-visitor-storage.ps1
+
       - name: Express smoke (Azurite owned by script)
         shell: pwsh
         env:

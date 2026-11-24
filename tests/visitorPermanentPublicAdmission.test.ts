@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
-import { TableClient } from "@azure/data-tables";
+import { createIsolatedVisitorTestTable } from "./permanentVisitorIsolatedTestTable";
 
 import {
   reservePermanentPublicVisitAdmission as reserve,
@@ -303,8 +303,8 @@ test("automatic public admission persists and resumes through actual local Table
     "HopeVisitor66" +
     randomUUID().replace(/-/g, "");
 
-  const client = TableClient.fromConnectionString(
-    "UseDevelopmentStorage=true",
+  const client = createIsolatedVisitorTestTable(
+
     tableName
   );
 
@@ -312,11 +312,12 @@ test("automatic public admission persists and resumes through actual local Table
 
   assert.equal(endpoint.protocol, "http:");
   assert.equal(endpoint.hostname, "127.0.0.1");
-  assert.equal(endpoint.port, "10002");
+  assert.equal(endpoint.port, process.env.HOPE_VISITOR_133_PORT);
+  assert.notEqual(endpoint.port, "10002");
 
   assert.equal(
     endpoint.pathname.replace(/\/$/, ""),
-    "/devstoreaccount1"
+    "/hopevisitor133"
   );
 
   await client.createTable();
@@ -342,8 +343,8 @@ test("automatic public admission persists and resumes through actual local Table
       { admitted: true, status: "reserved" }
     );
 
-    const reopened = TableClient.fromConnectionString(
-      "UseDevelopmentStorage=true",
+    const reopened = createIsolatedVisitorTestTable(
+
       tableName
     );
 

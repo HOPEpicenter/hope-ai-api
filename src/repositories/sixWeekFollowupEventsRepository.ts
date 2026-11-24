@@ -1,3 +1,7 @@
+import {
+  isPublicVisitorConsentWithdrawal
+} from "../domain/followups/projectSixWeekVisitorFollowup";
+
 import type { TableClient } from "@azure/data-tables";
 import type {
   SixWeekFollowupEvent,
@@ -19,6 +23,13 @@ type SixWeekFollowupEventEntity = {
 const TABLE_NAME = "VisitorFollowupEvents";
 
 function rowKeyFor(event: SixWeekFollowupEvent): string {
+  // One durable public-consent closure per visitor plan.
+  // Exact retries and concurrent withdrawals cannot
+  // create multiple closure records.
+  if (isPublicVisitorConsentWithdrawal(event)) {
+    return "0001__public-consent-withdrawn";
+  }
+
   if (event.type === "six_week_followup.plan_started") {
     return "0000__plan-started";
   }

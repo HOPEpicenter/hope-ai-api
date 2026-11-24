@@ -1396,3 +1396,322 @@ test("concurrent automatic enrollment uses the existing unique plan-start bounda
     );
   });
 });
+
+test("later declined registration closes outstanding follow-up without deleting attendance", async () => {
+  await withEnrollmentTables(async (
+    visitors, reservations, followups
+  ) => {
+    const deps = enrollmentDependencies(
+      visitors, reservations, followups
+    );
+
+    const first = {
+      token: publicSession(),
+      submissionId: command.submissionId,
+      body: {
+        ...publicBody,
+        contactConsent: true
+      }
+    };
+
+    assert.deepEqual(
+      await submitPublic(first, deps),
+      { accepted: true, status: "recorded" }
+    );
+
+    const receipt = await visitors.getEntity<{
+      visitorId: string;
+      recordedAt: string;
+    }>("VISITOR_CHECK_IN", first.submissionId);
+
+    const visitorId = receipt.visitorId;
+
+    await followups.append({
+      eventId: "evt-synthetic-completed-week-one",
+      visitorId,
+      type: "six_week_followup.task_completed",
+      actorId: "synthetic-staff",
+      occurredAt: receipt.recordedAt,
+      data: {
+        weekNumber: 1,
+        contactMethod: "call",
+        outcome: "Synthetic historical contact"
+      }
+    });
+
+    const laterContext = {
+      ...publicContext,
+      nowMs: publicContext.nowMs + 86400000
+    };
+
+    const decline = {
+      token: publicSession(laterContext),
+      submissionId:
+        "22222222-2222-4222-8222-222222222222",
+      body: {
+        ...publicBody,
+        visitType: "returning",
+        contactConsent: false
+      }
+    };
+
+    const laterDeps = {
+      ...deps,
+      context: laterContext
+    };
+
+    assert.deepEqual(
+      await submitPublic(decline, laterDeps),
+      { accepted: true, status: "recorded" }
+    );
+
+    const plan = projectSixWeekVisitorFollowup(
+      await followups.listByVisitor(visitorId)
+    );
+
+    assert.ok(plan);
+    assert.equal(plan.status, "cancelled");
+    assert.equal(plan.nextTask, null);
+    assert.equal(plan.tasks[0].status, "completed");
+
+    assert.ok(plan.tasks.slice(1).every(
+      task => task.status === "cancelled"
+    ));
+
+    assert.equal(
+      plan.cancellationReason,
+      "Visitor withdrew follow-up permission"
+    );
+
+    assert.deepEqual(
+      await submitPublic(decline, laterDeps),
+      { accepted: true, status: "recorded" }
+    );
+
+    const events = await followups.listByVisitor(
+      visitorId
+    );
+
+    assert.equal(events.filter(event =>
+      event.type === "six_week_followup.plan_cancelled"
+    ).length, 1);
+
+    let visits = 0;
+
+    for await (const row of visitors.listEntities()) {
+      if (row.partitionKey === "VISITOR_CHECK_IN") {
+        visits++;
+      }
+    }
+
+    assert.equal(visits, 2);
+  });
+});
+
+test("concurrent consent withdrawals create one durable closure", async () => {
+  await withEnrollmentTables(async (
+    visitors, reservations, followups
+  ) => {
+    const deps = enrollmentDependencies(
+      visitors, reservations, followups
+    );
+
+    assert.deepEqual(
+      await submitPublic({
+        token: publicSession(),
+        submissionId: command.submissionId,
+        body: {
+          ...publicBody,
+          contactConsent: true
+        }
+      }, deps),
+      { accepted: true, status: "recorded" }
+    );
+
+    const first = await visitors.getEntity<{
+      visitorId: string;
+    }>("VISITOR_CHECK_IN", command.submissionId);
+
+    const laterContext = {
+      ...publicContext,
+      nowMs: publicContext.nowMs + 86400000
+    };
+
+    const request = {
+      token: publicSession(laterContext),
+      submissionId:
+        "22222222-2222-4222-8222-222222222222",
+      body: {
+        ...publicBody,
+        visitType: "returning",
+        contactConsent: false
+      }
+    };
+
+    // Record the decline before concurrent reconciliation.
+    assert.deepEqual(
+      await submitPublic(request, {
+        ...publicDependencies(visitors, reservations),
+        context: laterContext
+      }),
+      { accepted: true, status: "recorded" }
+    );
+
+    const evidence = {
+      visitorId: first.visitorId,
+      submissionId: request.submissionId,
+      serviceId: "visit-2026-11-25",
+      visitDate: "2026-11-25"
+    };
+
+    const reconcileDeps = {
+      enabled: true,
+      visitors,
+      repository: followups
+    };
+
+    const results = await Promise.all([
+      enrollRecordedPublicVisitor(
+        evidence, reconcileDeps
+      ),
+      enrollRecordedPublicVisitor(
+        evidence, reconcileDeps
+      )
+    ]);
+
+    assert.deepEqual(results, [
+      "not_eligible",
+      "not_eligible"
+    ]);
+
+    const events = await followups.listByVisitor(
+      first.visitorId
+    );
+
+    assert.equal(events.filter(event =>
+      event.type === "six_week_followup.plan_cancelled"
+    ).length, 1);
+  });
+});
+
+test("a later ordinary resume cannot reopen a public consent withdrawal", () => {
+  const visitorId = "synthetic-consent-closed";
+
+  const plan = projectSixWeekVisitorFollowup([
+    {
+      eventId: "evt-start",
+      visitorId,
+      type: "six_week_followup.plan_started",
+      occurredAt: "2026-11-24T18:00:00.000Z",
+      actorId: "synthetic-staff",
+      data: {
+        firstVisitDate: "2026-11-24",
+        contactConsent: true,
+        ownerStaffId: null
+      }
+    },
+    {
+      eventId: "evt-withdrawal",
+      visitorId,
+      type: "six_week_followup.plan_cancelled",
+      occurredAt: "2026-11-25T18:00:00.000Z",
+      actorId: "system:permanent-visitor-registration",
+      data: {
+        reason:
+          "Visitor withdrew follow-up permission"
+      }
+    },
+    {
+      eventId: "evt-later-resume",
+      visitorId,
+      type: "six_week_followup.plan_resumed",
+      occurredAt: "2026-11-26T18:00:00.000Z",
+      actorId: "synthetic-staff",
+      data: {}
+    }
+  ]);
+
+  assert.ok(plan);
+  assert.equal(plan.status, "cancelled");
+  assert.equal(plan.nextTask, null);
+
+  assert.ok(plan.tasks.every(
+    task => task.status === "cancelled"
+  ));
+});
+
+test("subsequent permission does not automatically restart a consent-closed plan", async () => {
+  await withEnrollmentTables(async (
+    visitors, reservations, followups
+  ) => {
+    const deps = enrollmentDependencies(
+      visitors, reservations, followups
+    );
+
+    const visits = [
+      {
+        submissionId: command.submissionId,
+        contactConsent: true
+      },
+      {
+        submissionId:
+          "22222222-2222-4222-8222-222222222222",
+        contactConsent: false
+      },
+      {
+        submissionId:
+          "33333333-3333-4333-8333-333333333333",
+        contactConsent: true
+      }
+    ];
+
+    for (let index = 0; index < visits.length; index++) {
+      const visit = visits[index];
+
+      const context = {
+        ...publicContext,
+        nowMs:
+          publicContext.nowMs + index * 86400000
+      };
+
+      assert.deepEqual(
+        await submitPublic({
+          token: publicSession(context),
+          submissionId: visit.submissionId,
+          body: {
+            ...publicBody,
+            visitType: index === 0
+              ? "first" : "returning",
+            contactConsent: visit.contactConsent
+          }
+        }, {
+          ...deps,
+          context
+        }),
+        { accepted: true, status: "recorded" }
+      );
+    }
+
+    const receipt = await visitors.getEntity<{
+      visitorId: string;
+    }>("VISITOR_CHECK_IN", command.submissionId);
+
+    const events = await followups.listByVisitor(
+      receipt.visitorId
+    );
+
+    assert.equal(events.filter(event =>
+      event.type === "six_week_followup.plan_started"
+    ).length, 1);
+
+    assert.equal(events.filter(event =>
+      event.type === "six_week_followup.plan_cancelled"
+    ).length, 1);
+
+    const plan = projectSixWeekVisitorFollowup(events);
+
+    assert.ok(plan);
+    assert.equal(plan.status, "cancelled");
+    assert.equal(plan.nextTask, null);
+  });
+});

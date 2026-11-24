@@ -131,7 +131,6 @@ export async function submitPermanentPublicVisitRegistration(
     }
 
     if (deps.automaticFollowupEnabled === true &&
-        command.profile.contactConsent === true &&
         typeof deps.enrollFollowup !== "function") {
       return reject("unavailable");
     }
@@ -184,8 +183,7 @@ export async function submitPermanentPublicVisitRegistration(
       case "recorded": {
         // Enroll only after complete canonical persistence.
         // An incomplete family result never reaches here.
-        if (deps.automaticFollowupEnabled === true &&
-            command.profile.contactConsent === true) {
+        if (deps.automaticFollowupEnabled === true) {
           const visitorId = "receipt" in result
             ? result.receipt.visitorId
             : result.adultVisitorId;

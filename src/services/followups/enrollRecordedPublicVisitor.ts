@@ -6,6 +6,8 @@ import type {
 
 import {
   projectSixWeekVisitorFollowup,
+  PUBLIC_VISITOR_SYSTEM_ORIGIN,
+  PUBLIC_VISITOR_CONSENT_WITHDRAWAL_REASON,
   type SixWeekFollowupEvent
 } from "../../domain/followups/projectSixWeekVisitorFollowup";
 
@@ -17,8 +19,7 @@ import {
   isVisitorCheckInRequest
 } from "../visitors/recordVisitorCheckIn";
 
-const SYSTEM_ORIGIN =
-  "system:permanent-visitor-registration";
+const SYSTEM_ORIGIN = PUBLIC_VISITOR_SYSTEM_ORIGIN;
 
 const VISITOR_ID =
   /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -132,21 +133,14 @@ export async function enrollRecordedPublicVisitor(
       return "unavailable";
     }
 
-    if (profile.contactConsent !== true) {
-      return "not_eligible";
-    }
-
     const currentConsent =
       await readLatestRegistrationConsent(
         evidence.visitorId,
         deps.visitors
       );
 
-    if (currentConsent === "declined") {
-      return "not_eligible";
-    }
-
-    if (currentConsent !== "granted") {
+    if (currentConsent !== "granted" &&
+        currentConsent !== "declined") {
       return "unavailable";
     }
 
@@ -160,6 +154,94 @@ export async function enrollRecordedPublicVisitor(
     }
 
     const repository = deps.repository;
+
+    async function closeForDecline():
+      Promise<PublicVisitorEnrollmentResult> {
+      const events = await repository.listByVisitor(
+        evidence.visitorId
+      );
+
+      if (events.some(event =>
+        event.visitorId !== evidence.visitorId
+      )) {
+        return "unavailable";
+      }
+
+      if (events.length === 0) {
+        return "not_eligible";
+      }
+
+      const plan =
+        projectSixWeekVisitorFollowup(events);
+
+      if (!plan) {
+        return "unavailable";
+      }
+
+      if (plan.status === "completed" ||
+          plan.status === "cancelled") {
+        return "not_eligible";
+      }
+
+      // Recheck the latest decision before closure.
+      // An old declined receipt must not override a
+      // subsequently recorded grant by itself.
+      const latest = await readLatestRegistrationConsent(
+        evidence.visitorId,
+        deps.visitors
+      );
+
+      if (latest === "granted") {
+        return "not_eligible";
+      }
+
+      if (latest !== "declined") {
+        return "unavailable";
+      }
+
+      await repository.append({
+        eventId:
+          `evt-public-withdrawal-${evidence.submissionId}`,
+        visitorId: evidence.visitorId,
+        type: "six_week_followup.plan_cancelled",
+        occurredAt: new Date().toISOString(),
+        actorId: SYSTEM_ORIGIN,
+        data: {
+          reason:
+            PUBLIC_VISITOR_CONSENT_WITHDRAWAL_REASON
+        }
+      });
+
+      const persisted = await repository.listByVisitor(
+        evidence.visitorId
+      );
+
+      if (persisted.some(event =>
+        event.visitorId !== evidence.visitorId
+      )) {
+        return "unavailable";
+      }
+
+      const closed =
+        projectSixWeekVisitorFollowup(persisted);
+
+      return closed &&
+        (closed.status === "cancelled" ||
+         closed.status === "completed") &&
+        closed.nextTask === null
+        ? "not_eligible"
+        : "unavailable";
+    }
+
+    if (currentConsent === "declined") {
+      return await closeForDecline();
+    }
+
+    // An older declined visit cannot initiate enrollment,
+    // even when a subsequent visit granted permission.
+    if (profile.contactConsent !== true) {
+      return "not_eligible";
+    }
 
     const previous = await repository.listByVisitor(
       evidence.visitorId
@@ -187,7 +269,7 @@ export async function enrollRecordedPublicVisitor(
     );
 
     if (latest === "declined") {
-      return "not_eligible";
+      return await closeForDecline();
     }
 
     if (latest !== "granted") {
@@ -228,6 +310,22 @@ export async function enrollRecordedPublicVisitor(
     }
 
     if (created && plan.startedBy !== SYSTEM_ORIGIN) {
+      return "unavailable";
+    }
+
+    // Reconcile a withdrawal observed while the
+    // unique plan-start operation was in progress.
+    const afterAppend =
+      await readLatestRegistrationConsent(
+        evidence.visitorId,
+        deps.visitors
+      );
+
+    if (afterAppend === "declined") {
+      return await closeForDecline();
+    }
+
+    if (afterAppend !== "granted") {
       return "unavailable";
     }
 

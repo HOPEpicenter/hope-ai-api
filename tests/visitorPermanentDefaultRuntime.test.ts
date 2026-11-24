@@ -522,6 +522,40 @@ test(
     await assertDeniedCommands(familyReceipt.visitorId, 409, adultReceipt.visitorId);
     assert.equal((await ledger.listByVisitor(familyReceipt.visitorId)).length, 0);
     console.log("ACTUAL_DECLINED_FAMILY_COMMANDS_DENIED=True");
+    const { mayExposeRegistrationContactWork } = await import("../src/services/followups/mayExposeRegistrationContactWork");
+    const { readCanonicalCareProjection } = await import("../src/services/care/readCanonicalCareProjection");
+    const { buildOpsFollowupsQueue } = await import("../src/services/followups/buildOpsFollowupsQueue");
+    const queueProfile = (visitorId: string): import("../src/functions/_shared/formation").FunctionFormationProfileEntity => ({
+      partitionKey: "VISITOR", rowKey: visitorId, visitorId,
+      assignedTo: commandActorId, lastFollowupAssignedAt: "2026-11-23T19:00:00.000Z"
+    });
+    const queueRows = (ids: string[]) => ids.map(visitorId => ({
+      partitionKey: visitorId, visitorId, type: "FOLLOWUP_ASSIGNED",
+      occurredAt: "2026-11-23T19:00:00.000Z", assigneeId: commandActorId
+    }));
+    const tableFor = (rows: object[]) => ({
+      async *listEntities() { for (const row of rows) yield row; }
+    }) as unknown as import("@azure/data-tables").TableClient;
+    const opsQueue = (ids: string[], includeResolved = false, extra: object[] = []) => buildOpsFollowupsQueue({
+      eventsTable: tableFor([...queueRows(ids), ...extra]), profilesTable: tableFor([]),
+      engagementService: {} as import("../src/services/engagements/engagementsService").EngagementsService,
+      limit: 10, cursor: 0, includeSynthetic: true, includeResolved, enrichmentMode: "task-preview"
+    });
+    const careQueue = (ids: string[]) => readCanonicalCareProjection({
+      profiles: ids.map(queueProfile),
+      readDashboardCard: async () => { throw new Error("Unexpected care card read"); }
+    });
+    assert.equal(await mayExposeRegistrationContactWork(adultReceipt.visitorId), true);
+    assert.equal(await mayExposeRegistrationContactWork(familyReceipt.visitorId), false);
+    const initialCare = await careQueue([familyReceipt.visitorId]);
+    assert.equal(initialCare.items.length, 0);
+    assert.equal(initialCare.summary.totalCandidates, 0);
+    await assert.rejects(() => careQueue([adultReceipt.visitorId]), /Unexpected care card read/);
+    const initialOps = await opsQueue([adultReceipt.visitorId, familyReceipt.visitorId]);
+    assert.deepEqual(initialOps.items.map(item => item.visitorId), [adultReceipt.visitorId]);
+    assert.equal(initialOps.stats.total, 1);
+    assert.equal(initialOps.owners[0]?.total, 1);
+    console.log("ACTUAL_CARE_AND_OPS_DECLINE_EXCLUDED=True");
     console.log("MIXED_CONSENT_PREFLIGHT_DENIED_BEFORE_FORMATION_ACCESS=True");
     {
       const individual = await readFamilyHistory(adultReceipt.visitorId);
@@ -640,6 +674,23 @@ test(
     assert.equal(cancelled.accepted, true);
     assert.equal((await ledger.listByVisitor(adultReceipt.visitorId)).length, 3);
     console.log("ACTUAL_WITHDRAWAL_BLOCKS_NEW_AND_REPLAYED_COMMANDS=True");
+    assert.equal(await mayExposeRegistrationContactWork(adultReceipt.visitorId), false);
+    const withdrawnCare = await careQueue([adultReceipt.visitorId, familyReceipt.visitorId]);
+    assert.equal(withdrawnCare.items.length, 0);
+    assert.equal(withdrawnCare.summary.totalCandidates, 0);
+    const withdrawnOps = await opsQueue([adultReceipt.visitorId, familyReceipt.visitorId]);
+    assert.equal(withdrawnOps.items.length, 0);
+    assert.equal(withdrawnOps.stats.total, 0);
+    assert.equal(withdrawnOps.owners.length, 0);
+    const resolvedOps = await opsQueue([adultReceipt.visitorId], true, [{
+      partitionKey: adultReceipt.visitorId, visitorId: adultReceipt.visitorId,
+      type: "FOLLOWUP_OUTCOME_RECORDED", occurredAt: "2026-11-24T00:00:00.000Z",
+      metadata: { outcome: "closed" }
+    }]);
+    assert.equal(resolvedOps.items.length, 1);
+    assert.equal(resolvedOps.items[0].followupResolved, true);
+    console.log("ACTUAL_WITHDRAWAL_REMOVED_FROM_QUEUE_COUNTS=True");
+    console.log("RESOLVED_OPERATIONAL_HISTORY_PRESERVED=True");
     console.log("ACTUAL_LEDGER_CANCELLATION_PRESERVED=True");
     const historical = await readRegistrationHistory(adultReceipt.visitorId);
     assert.equal(historical.status, "ready");
@@ -675,6 +726,19 @@ test(
     assert.equal((await ledger.listByVisitor(adultReceipt.visitorId)).length, 3);
     assert.equal((await ledger.listByVisitor(familyReceipt.visitorId)).length, 0);
     console.log("ACTUAL_MALFORMED_CONSENT_COMMANDS_FAIL_CLOSED=True");
+    await assert.rejects(() => careQueue([adultReceipt.visitorId]), /consent could not be verified/);
+    await assert.rejects(() => opsQueue([adultReceipt.visitorId]), /consent could not be verified/);
+    assert.equal(await mayExposeRegistrationContactWork("synthetic-legacy-107"), true);
+    const savedQueueFlag = process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD;
+    try {
+      process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD = "false";
+      assert.equal(await mayExposeRegistrationContactWork(adultReceipt.visitorId), true);
+    } finally {
+      if (savedQueueFlag === undefined) delete process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD;
+      else process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD = savedQueueFlag;
+    }
+    console.log("ACTUAL_UNKNOWN_QUEUE_CONSENT_FAILS_CLOSED=True");
+    console.log("QUEUE_LEGACY_AND_DISABLED_COMPATIBILITY_VERIFIED=True");
     console.log("DENIED_COMMANDS_PRESERVE_LEDGER_AND_PLAN_HISTORY=True");
     assert.deepEqual(await readRegistrationHistory(adultReceipt.visitorId), {
       status: "unavailable"

@@ -1,4 +1,5 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
+import { mayExposeRegistrationContactWork } from "../../services/followups/mayExposeRegistrationContactWork";
 import { isTerminalFollowupOutcome } from "../../services/followups/isTerminalFollowupOutcome";
 import {
   getFormationProfilesTableClient,
@@ -96,6 +97,8 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
           orphanFollowupsExcluded++;
           continue;
         }
+
+        if (!(await mayExposeRegistrationContactWork(visitorId))) continue;
 
         const visitor = await getVisitorById(visitorId);
 

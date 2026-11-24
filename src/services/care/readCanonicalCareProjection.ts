@@ -10,6 +10,7 @@ import {
 import {
   isTerminalFollowupOutcome
 } from "../followups/isTerminalFollowupOutcome";
+import { mayExposeRegistrationContactWork } from "../followups/mayExposeRegistrationContactWork";
 import {
   readCareCandidateList,
   type ReadCareCandidateListResult
@@ -50,13 +51,22 @@ export async function readCanonicalCareProjection(
     input.readDashboardCard ??
     readCanonicalVisitorDashboardCard;
 
+  const eligibleProfiles: FunctionFormationProfileEntity[] = [];
+  for (const profile of input.profiles) {
+    if (isOpenAssignedFollowup(profile) &&
+        !(await mayExposeRegistrationContactWork(String(profile.visitorId ?? "").trim()))) {
+      continue;
+    }
+    eligibleProfiles.push(profile);
+  }
+
   const canonicalCardsByVisitorId = new Map<
     string,
     CanonicalVisitorDashboardCard
   >();
 
   await Promise.all(
-    input.profiles.map(async (profile) => {
+    eligibleProfiles.map(async (profile) => {
       const visitorId = String(
         profile.visitorId ?? ""
       ).trim();
@@ -75,7 +85,7 @@ export async function readCanonicalCareProjection(
     })
   );
 
-  const summaryProfiles = input.profiles
+  const summaryProfiles = eligibleProfiles
     .filter(isOpenAssignedFollowup)
     .map((profile) => {
       const visitorId = String(

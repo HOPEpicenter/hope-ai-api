@@ -19,6 +19,48 @@ type TransactionClient = {
   }>;
 };
 
+/**
+ * Serialize transactions sharing one SDK client.
+ *
+ * Separate adapter instances must share the same queue
+ * when they receive the same client object.
+ *
+ * This is process-local SDK protection, not a replacement
+ * for durable storage-level atomicity.
+ */
+const transactionTails =
+  new WeakMap<TransactionClient, Promise<void>>();
+
+async function runClientTransaction<T>(
+  client: TransactionClient,
+  action: () => Promise<T>
+): Promise<T> {
+  const previous = transactionTails.get(client) ??
+    Promise.resolve();
+
+  let release!: () => void;
+
+  const current = new Promise<void>(resolve => {
+    release = resolve;
+  });
+
+  transactionTails.set(client, current);
+
+  await previous;
+
+  try {
+    return await action();
+  } finally {
+    // A failed transaction must never block later work.
+    release();
+
+    if (transactionTails.get(client) === current) {
+      transactionTails.delete(client);
+    }
+  }
+}
+
+
 function errorMatches(
   error: unknown,
   status: number,
@@ -170,7 +212,10 @@ export function createPermanentVisitorQrReservationStore(
       );
 
       try {
-        const response = await client.submitTransaction(actions);
+        const response = await runClientTransaction(
+          client,
+          () => client.submitTransaction(actions)
+        );
 
         if (response.status < 200 ||
             response.status >= 300 ||

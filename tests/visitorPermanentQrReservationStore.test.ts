@@ -205,6 +205,119 @@ test("unknown missing-table and contradictory codes remain failures", async () =
 });
 
 
+test("adapters sharing one SDK client serialize transactions", async () => {
+  let calls = 0;
+  let active = 0;
+  let maxActive = 0;
+
+  let releaseFirst!: () => void;
+  let markStarted!: () => void;
+
+  const firstStarted = new Promise<void>(resolve => {
+    markStarted = resolve;
+  });
+
+  const firstGate = new Promise<void>(resolve => {
+    releaseFirst = resolve;
+  });
+
+  const client = {
+    getEntity: async () => null,
+
+    submitTransaction: async () => {
+      calls++;
+      active++;
+      maxActive = Math.max(maxActive, active);
+
+      try {
+        if (calls === 1) {
+          markStarted();
+          await firstGate;
+        }
+
+        return {
+          status: 202,
+          subResponses: [
+            { status: 204 },
+            { status: 204 },
+            { status: 204 }
+          ]
+        };
+      } finally {
+        active--;
+      }
+    }
+  };
+
+  const firstStore = createStore(client);
+  const secondStore = createStore(client);
+
+  const first = firstStore.createAll(rows());
+
+  await firstStarted;
+
+  const second = secondStore.createAll(rows());
+
+  await new Promise<void>(
+    resolve => setImmediate(resolve)
+  );
+
+  const callsWhileFirstActive = calls;
+
+  releaseFirst();
+
+  assert.deepEqual(
+    await Promise.all([first, second]),
+    ["created", "created"]
+  );
+
+  assert.equal(callsWhileFirstActive, 1);
+  assert.equal(maxActive, 1);
+  assert.equal(calls, 2);
+});
+
+test("failed transaction releases queue for subsequent work", async () => {
+  let calls = 0;
+
+  const client = {
+    getEntity: async () => null,
+
+    submitTransaction: async () => {
+      calls++;
+
+      if (calls === 1) {
+        throw new Error("synthetic transaction failure");
+      }
+
+      return {
+        status: 202,
+        subResponses: [
+          { status: 204 },
+          { status: 204 },
+          { status: 204 }
+        ]
+      };
+    }
+  };
+
+  const firstStore = createStore(client);
+  const secondStore = createStore(client);
+
+  const results = await Promise.allSettled([
+    firstStore.createAll(rows()),
+    secondStore.createAll(rows())
+  ]);
+
+  assert.equal(results[0].status, "rejected");
+  assert.deepEqual(results[1], {
+    status: "fulfilled",
+    value: "created"
+  });
+
+  assert.equal(calls, 2);
+});
+
+
 test("local Azurite verifies durable atomic reservation behavior", {
   skip: process.env.HOPE_VISITOR_57_LOCAL_ACCEPTANCE !== "true",
   timeout: 120000
@@ -374,6 +487,105 @@ test("local Azurite verifies durable atomic reservation behavior", {
         status: "conflict"
       });
     });
+
+    await t.test("concurrent same-client transactions remain isolated", async () => {
+      const firstStore = createStore(client);
+      const secondStore = createStore(client);
+
+      const first = rows(
+        randomUUID(),
+        randomUUID(),
+        "slot__29933281__000"
+      );
+
+      const second = rows(
+        randomUUID(),
+        randomUUID(),
+        "slot__29933281__001"
+      );
+
+      const results = await Promise.all([
+        firstStore.createAll(first),
+        secondStore.createAll(second)
+      ]);
+
+      assert.deepEqual(results, [
+        "created", "created"
+      ]);
+
+      for (const row of [...first, ...second]) {
+        assert.deepEqual(
+          await store.read(
+            row.partitionKey,
+            row.rowKey
+          ),
+          row
+        );
+      }
+    });
+
+    await t.test("independent clients cannot both claim the same capacity slot", async () => {
+      const otherClient = TableClient.fromConnectionString(
+        "UseDevelopmentStorage=true",
+        tableName
+      );
+
+      const otherStore = createStore(otherClient);
+
+      const first = rows(
+        randomUUID(),
+        randomUUID(),
+        "slot__29933282__000"
+      );
+
+      const second = rows(
+        randomUUID(),
+        randomUUID(),
+        "slot__29933282__000"
+      );
+
+      const results = await Promise.all([
+        store.createAll(first),
+        otherStore.createAll(second)
+      ]);
+
+      assert.equal(
+        results.filter(result => result === "created").length,
+        1
+      );
+
+      assert.equal(
+        results.filter(result => result === "conflict").length,
+        1
+      );
+
+      const winner = results[0] === "created"
+        ? first : second;
+
+      const loser = results[0] === "created"
+        ? second : first;
+
+      for (const row of winner) {
+        assert.deepEqual(
+          await store.read(
+            row.partitionKey,
+            row.rowKey
+          ),
+          row
+        );
+      }
+
+      for (const row of loser.slice(0, 2)) {
+        assert.equal(
+          await store.read(
+            row.partitionKey,
+            row.rowKey
+          ),
+          null
+        );
+      }
+    });
+
 
   } finally {
     // Delete only the unique synthetic test table.

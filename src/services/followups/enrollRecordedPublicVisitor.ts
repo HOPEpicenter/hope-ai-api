@@ -40,6 +40,7 @@ export type PublicVisitorEnrollmentResult =
 type Dependencies = {
   enabled?: boolean;
   visitors?: TableClient;
+  readEnrollmentPermission?: import("./permanentVisitorConsentRuntime").EnrollmentPermissionReader;
   repository?: Pick<
     SixWeekFollowupEventsRepository,
     "append" | "listByVisitor"
@@ -133,11 +134,11 @@ export async function enrollRecordedPublicVisitor(
       return "unavailable";
     }
 
-    const currentConsent =
-      await readLatestRegistrationConsent(
-        evidence.visitorId,
-        deps.visitors
-      );
+    const readConsent = () => deps.readEnrollmentPermission
+      ? deps.readEnrollmentPermission(evidence)
+      : readLatestRegistrationConsent(evidence.visitorId, deps.visitors);
+    const currentConsent = await readConsent();
+    if (currentConsent === "blocked") return "not_eligible";
 
     if (currentConsent !== "granted" &&
         currentConsent !== "declined") {
@@ -186,10 +187,9 @@ export async function enrollRecordedPublicVisitor(
       // Recheck the latest decision before closure.
       // An old declined receipt must not override a
       // subsequently recorded grant by itself.
-      const latest = await readLatestRegistrationConsent(
-        evidence.visitorId,
-        deps.visitors
-      );
+      // The new authority path never cancels plans from a public receipt.
+      if (deps.readEnrollmentPermission) return "unavailable";
+      const latest = await readConsent();
 
       if (latest === "granted") {
         return "not_eligible";
@@ -263,10 +263,8 @@ export async function enrollRecordedPublicVisitor(
 
     // Recheck durable permission immediately before
     // attempting the unique plan-start append.
-    const latest = await readLatestRegistrationConsent(
-      evidence.visitorId,
-      deps.visitors
-    );
+    const latest = await readConsent();
+    if (latest === "blocked") return "not_eligible";
 
     if (latest === "declined") {
       return await closeForDecline();
@@ -315,11 +313,8 @@ export async function enrollRecordedPublicVisitor(
 
     // Reconcile a withdrawal observed while the
     // unique plan-start operation was in progress.
-    const afterAppend =
-      await readLatestRegistrationConsent(
-        evidence.visitorId,
-        deps.visitors
-      );
+    const afterAppend = await readConsent();
+    if (afterAppend === "blocked") return "not_eligible";
 
     if (afterAppend === "declined") {
       return await closeForDecline();

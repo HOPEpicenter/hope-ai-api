@@ -8,6 +8,8 @@ type Result = "disabled" | "requires_review" | "unavailable" | "completed" | "al
 type Dependencies = {
   enabled?: boolean;
   visitors?: TableClient;
+  recordConsent?: import("../followups/permanentVisitorConsentRuntime").RegistrationConsentRecorder;
+  readEnrollmentPermission?: import("../followups/permanentVisitorConsentRuntime").EnrollmentPermissionReader;
   repository?: Pick<SixWeekFollowupEventsRepository, "append" | "listByVisitor">;
 };
 
@@ -20,15 +22,19 @@ export async function reconcilePermanentVisitCompletion(
   submissionId: string, deps: Dependencies = {}
 ): Promise<Result> {
   if (deps.enabled !== true) return "disabled";
-  if (!deps.visitors || !deps.repository) return "unavailable";
+  if (!deps.visitors || !deps.repository ||
+      Boolean(deps.recordConsent) !== Boolean(deps.readEnrollmentPermission)) return "unavailable";
   const table = deps.visitors;
   try {
     const state = await inspectPermanentVisitRecovery(submissionId, table);
     if (state.status === "unavailable") return "unavailable";
     if (state.status !== "ready") return "requires_review";
-    if (state.stage === "completed") return "already_completed";
-    if (state.stage !== "completion_unconfirmed" || !state.adultRecorded ||
-        state.familyExpected !== state.familyRecorded || !state.followupExpected) return "requires_review";
+    if (state.stage === "completed" && !deps.recordConsent) return "already_completed";
+    // In authority mode an incomplete family must not prevent processing
+    // the independently verified adult receipt. Never complete its journal.
+    if (!state.adultRecorded || !state.followupExpected) return "requires_review";
+    if (!deps.recordConsent && (state.stage !== "completion_unconfirmed" ||
+        state.familyExpected !== state.familyRecorded)) return "requires_review";
     const intent: PermanentVisitRecoveryIntent = {
       submissionId: state.submissionId, serviceId: state.serviceId, visitDate: state.visitDate,
       familyExpected: state.familyExpected, followupExpected: state.followupExpected
@@ -42,9 +48,25 @@ export async function reconcilePermanentVisitCompletion(
     const claim = await table.getEntity<{ visitorId: string }>("VISITOR_CHECK_IN_CLAIM", submissionId);
     if (claim.partitionKey !== "VISITOR_CHECK_IN_CLAIM" || claim.rowKey !== submissionId ||
         claim.visitorId !== receipt.visitorId) return "unavailable";
+    if (state.stage === "completed") {
+      // Historical completion must not silently bootstrap authority.
+      const permission = await deps.readEnrollmentPermission!({
+        visitorId: receipt.visitorId, submissionId, serviceId: intent.serviceId, visitDate: intent.visitDate
+      });
+      return permission === "unavailable" ? "requires_review" : "already_completed";
+    }
+    if (deps.recordConsent) {
+      const consent = await deps.recordConsent({
+        visitorId: receipt.visitorId, submissionId, serviceId: intent.serviceId
+      });
+      if (consent.status !== "recorded") return "unavailable";
+    }
+    if (state.stage !== "completion_unconfirmed" ||
+        state.familyExpected !== state.familyRecorded) return "requires_review";
     const result = await enrollRecordedPublicVisitor({
       visitorId: receipt.visitorId, submissionId, serviceId: intent.serviceId, visitDate: intent.visitDate
-    }, { enabled: true, visitors: table, repository: deps.repository });
+    }, { enabled: true, visitors: table, repository: deps.repository,
+      readEnrollmentPermission: deps.readEnrollmentPermission });
     if (result !== "enrolled" && result !== "existing" && result !== "not_eligible") return "unavailable";
     // Recheck canonical attendance before claiming pipeline completion.
     const after = await inspectPermanentVisitRecovery(submissionId, table);

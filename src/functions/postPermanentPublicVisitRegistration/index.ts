@@ -182,6 +182,16 @@ async function liveRuntime(): Promise<Runtime> {
 
   const followups =
     new SixWeekFollowupEventsRepository();
+  // The entry point below fences this mode until Staff guards and migration
+  // are implemented. No consent table client is constructed while disabled.
+  const consent = process.env.FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY === "true"
+    ? (await import("../../services/followups/permanentVisitorConsentRuntime"))
+        .createPermanentVisitorConsentRuntime(visitors, getTableClient("PermanentVisitorConsent"),
+          process.env.HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER ?? "")
+    : undefined;
+  const arrival: typeof recordVisitorArrival = consent
+    ? command => recordVisitorArrival(command, { table: visitors, recordConsent: consent.recordConsent })
+    : recordVisitorArrival;
 
   return {
     store:
@@ -191,15 +201,18 @@ async function liveRuntime(): Promise<Runtime> {
 
     recoveryJournal: createPermanentVisitRecoveryJournal(visitors),
 
-    recordAdult: recordVisitorArrival,
+    recordAdult: arrival,
 
-    recordFamily: recordVisitorFamilyCheckIn,
+    recordFamily: consent
+      ? command => recordVisitorFamilyCheckIn(command, { arrival })
+      : recordVisitorFamilyCheckIn,
 
     enrollFollowup: evidence =>
       enrollRecordedPublicVisitor(evidence, {
         enabled: true,
         visitors,
-        repository: followups
+        repository: followups,
+        ...(consent ? { readEnrollmentPermission: consent.readEnrollmentPermission } : {})
       })
   };
 }
@@ -225,6 +238,12 @@ export async function postPermanentPublicVisitRegistration(
       process.env.FEATURE_PERMANENT_VISITOR_AUTOMATIC_FOLLOWUP
         !== "true") {
     reply(context, 404, { status: "unavailable" });
+    return;
+  }
+
+  // STEP 148B activation fence: do not enable before Staff guard cutover.
+  if (process.env.FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY === "true") {
+    reply(context, 503, { status: "unavailable", accepted: false });
     return;
   }
 

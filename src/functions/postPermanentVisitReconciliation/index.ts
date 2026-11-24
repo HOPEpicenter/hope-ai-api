@@ -23,6 +23,8 @@ export async function postPermanentVisitReconciliation(context: any, req: any, d
   }
   if (process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD !== "true" ||
       process.env.FEATURE_PERMANENT_VISITOR_AUTOMATIC_FOLLOWUP !== "true") { unavailable(); return; }
+  // STEP 148B activation fence: same boundary as public registration.
+  if (process.env.FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY === "true") { unavailable(); return; }
   try {
     const adminKey = (process.env.HOPE_ADMIN_API_KEY ?? "").trim();
     if (adminKey && [process.env.HOPE_API_KEY, process.env.HOPE_PERMANENT_VISIT_BRIDGE_KEY,
@@ -45,9 +47,18 @@ export async function postPermanentVisitReconciliation(context: any, req: any, d
     }
     const result = await executeAuditedVisitReconciliation(
       deps.auditTable ?? getTableClient("Visitors"), auth.actorId, submissionId,
-      () => (deps.reconcile ?? (id => reconcilePermanentVisitCompletion(id, {
-        enabled: true, visitors: getTableClient("Visitors"), repository: new SixWeekFollowupEventsRepository()
-      })))(submissionId));
+      () => (deps.reconcile ?? (async id => {
+        const visitors = getTableClient("Visitors");
+        const consent = process.env.FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY === "true"
+          ? (await import("../../services/followups/permanentVisitorConsentRuntime"))
+              .createPermanentVisitorConsentRuntime(visitors, getTableClient("PermanentVisitorConsent"),
+                process.env.HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER ?? "")
+          : undefined;
+        return reconcilePermanentVisitCompletion(id, {
+          enabled: true, visitors, repository: new SixWeekFollowupEventsRepository(),
+          ...(consent ?? {})
+        });
+      }))(submissionId));
     if (result === "completed" || result === "already_completed") {
       reply(200, { ok: true, submissionId, status: result }); return;
     }

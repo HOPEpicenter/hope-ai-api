@@ -49,6 +49,7 @@ export async function recordVisitorArrival(
     resolveIdentity?: typeof resolveVisitorCheckInIdentity;
     createProfile?: typeof createVisitorFromCheckIn;
     record?: typeof recordVisitorCheckIn;
+    recordConsent?: import("../followups/permanentVisitorConsentRuntime").RegistrationConsentRecorder;
   } = {}
 ): Promise<CheckInResult | { status: "requires_staff_review" }> {
   if (!isVisitorCheckInRequest(command.submissionId, command.serviceId)) {
@@ -150,7 +151,7 @@ export async function recordVisitorArrival(
     if (!created) return { status: "requires_staff_review" };
   }
 
-  return (dependencies.record ?? recordVisitorCheckIn)({
+  const result = await (dependencies.record ?? recordVisitorCheckIn)({
     submissionId: command.submissionId,
     serviceId: command.serviceId,
     visitorId: claim.visitorId,
@@ -158,4 +159,15 @@ export async function recordVisitorArrival(
       ? { registrationDetailsJson }
       : {})
   }, { table });
+  if (result.status === "recorded" && dependencies.recordConsent) {
+    // Adult attendance is already durable. Do not confirm or proceed to
+    // family writes if consent processing cannot be confirmed.
+    const consent = await dependencies.recordConsent({
+      visitorId: result.receipt.visitorId,
+      submissionId: result.receipt.submissionId,
+      serviceId: result.receipt.serviceId
+    });
+    if (consent.status !== "recorded") throw new Error("Registration consent unconfirmed");
+  }
+  return result;
 }

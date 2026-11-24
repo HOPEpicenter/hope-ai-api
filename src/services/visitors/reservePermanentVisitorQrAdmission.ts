@@ -1,4 +1,12 @@
 import {
+  verifyPermanentPublicVisitSession
+} from "./permanentPublicVisitSession";
+
+import type {
+  PermanentPublicVisitContext
+} from "./resolvePermanentPublicVisitEvent";
+
+import {
   createHash,
   createHmac
 } from "node:crypto";
@@ -158,6 +166,40 @@ export async function reservePermanentVisitorQrAdmission(
   }>,
   deps: Dependencies = {}
 ): Promise<PermanentQrAdmissionResult> {
+  return reservePermanentVisitorAdmissionCore<PermanentQrGrantContext>(
+    input,
+    deps,
+    verifyPermanentVisitorQrGrant
+  );
+}
+
+// Both credential paths use the same durable reservation logic.
+// The permanent public path requires no device or owner activation.
+type SharedAdmissionDependencies<C> =
+  Omit<Dependencies, "context"> & {
+    context?: C;
+  };
+
+type SharedVerifiedGrant = Readonly<{
+  grantId: string;
+  serviceId: string;
+  date: string;
+  expiresAtSeconds: number;
+}>;
+
+async function reservePermanentVisitorAdmissionCore<
+  C extends { nowMs: number }
+>(
+  input: Parameters<
+    typeof reservePermanentVisitorQrAdmission
+  >[0],
+  deps: SharedAdmissionDependencies<C>,
+  verifyGrant: (
+    token: unknown,
+    secret: unknown,
+    context: C
+  ) => SharedVerifiedGrant | null
+): Promise<PermanentQrAdmissionResult> {
   try {
     const capacity = deps.capacity ?? 30;
 
@@ -175,7 +217,7 @@ export async function reservePermanentVisitorQrAdmission(
 
     const store = deps.store;
 
-    const grant = verifyPermanentVisitorQrGrant(
+    const grant = verifyGrant(
       input.token,
       deps.signingSecret,
       deps.context
@@ -353,4 +395,20 @@ export async function reservePermanentVisitorQrAdmission(
     // A later identical retry may inspect durable rows.
     return reject("unavailable");
   }
+}
+
+export type PermanentPublicAdmissionDependencies =
+  SharedAdmissionDependencies<PermanentPublicVisitContext>;
+
+export async function reservePermanentPublicVisitAdmission(
+  input: Parameters<
+    typeof reservePermanentVisitorQrAdmission
+  >[0],
+  deps: PermanentPublicAdmissionDependencies = {}
+): Promise<PermanentQrAdmissionResult> {
+  return reservePermanentVisitorAdmissionCore<PermanentPublicVisitContext>(
+    input,
+    deps,
+    verifyPermanentPublicVisitSession
+  );
 }

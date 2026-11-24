@@ -19,8 +19,8 @@ import {
 } from "../../services/visitors/submitPermanentPublicVisitRegistration";
 
 import {
-  verifyPermanentPublicVisitSession
-} from "../../services/visitors/permanentPublicVisitSession";
+  verifyPermanentPublicVisitSessionForRecovery
+} from "../../services/visitors/verifyPermanentPublicVisitSessionForRecovery";
 
 import {
   preparePermanentPublicVisitRegistration
@@ -335,7 +335,7 @@ export async function postPermanentPublicVisitRegistration(
     // Verify the session before constructing storage
     // dependencies. The pipeline verifies it again
     // at the durable reservation boundary.
-    if (!verifyPermanentPublicVisitSession(
+    if (!verifyPermanentPublicVisitSessionForRecovery(
       input.token,
       signingSecret,
       {

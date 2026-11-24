@@ -2680,3 +2680,458 @@ test("public submission HTTP never confirms an uncertain writer result and exact
     })
   );
 });
+
+
+const expiredPublicContext = {
+  ...publicContext,
+  nowMs: publicContext.nowMs + 11 * 60000
+};
+
+test("public session recovery resumes a reserved registration after expiration without new capacity", async () => {
+  await withSubmissionHttpEnvironment(() =>
+    withEnrollmentTables(async (
+      visitors, reservations, followups
+    ) => {
+      const actual = enrollmentDependencies(
+        visitors, reservations, followups
+      );
+
+      const first = submissionHttpFixture(
+        async () => ({
+          ...actual,
+          recordAdult: async () => {
+            throw new Error(
+              "Synthetic interruption before canonical write"
+            );
+          }
+        })
+      );
+
+      const uncertain = await first.call();
+
+      assert.equal(uncertain.status, 503);
+      assert.equal(
+        await publicRowCount(reservations),
+        3
+      );
+      assert.equal(
+        await publicRowCount(visitors),
+        0
+      );
+
+      const recovery = submissionHttpFixture(
+        async () => actual,
+        {
+          now: () => expiredPublicContext.nowMs
+        }
+      );
+
+      const recovered = await recovery.call({
+        body: first.request.body
+      });
+
+      assert.equal(recovered.status, 200);
+
+      assert.deepEqual(recovered.body, {
+        status: "recorded",
+        accepted: true
+      });
+
+      assert.equal(
+        await publicRowCount(reservations),
+        3
+      );
+
+      assert.equal(
+        (await familyPartitionRows(
+          visitors, "VISITOR"
+        )).length,
+        1
+      );
+
+      assert.equal(
+        (await familyPartitionRows(
+          visitors, "VISITOR_CHECK_IN"
+        )).length,
+        1
+      );
+
+      const receipt = await visitors.getEntity<{
+        visitorId: string;
+      }>(
+        "VISITOR_CHECK_IN",
+        command.submissionId
+      );
+
+      assert.equal(
+        (await followups.listByVisitor(
+          receipt.visitorId
+        )).length,
+        1
+      );
+
+      // A second expired-session retry must remain
+      // idempotent after successful recovery.
+      assert.equal(
+        (await recovery.call({
+          body: first.request.body
+        })).status,
+        200
+      );
+
+      assert.equal(
+        await publicRowCount(reservations),
+        3
+      );
+    })
+  );
+});
+
+test("public session recovery denies expired credentials without a prior durable reservation", async () => {
+  await withSubmissionHttpEnvironment(() =>
+    withEnrollmentTables(async (
+      visitors, reservations, followups
+    ) => {
+      const f = submissionHttpFixture(
+        async () => enrollmentDependencies(
+          visitors, reservations, followups
+        ),
+        {
+          now: () => expiredPublicContext.nowMs
+        }
+      );
+
+      const result = await f.call();
+
+      assert.equal(result.status, 403);
+      assert.equal(
+        result.body.status,
+        "admission_denied"
+      );
+
+      assert.equal(
+        await publicRowCount(visitors),
+        0
+      );
+
+      assert.equal(
+        await publicRowCount(reservations),
+        0
+      );
+
+      // A fresh valid session may still authorize a
+      // submission that was never previously reserved.
+      const fresh = await f.call({
+        body: {
+          ...f.request.body,
+          token: publicSession(
+            expiredPublicContext
+          )
+        }
+      });
+
+      assert.equal(fresh.status, 200);
+
+      assert.equal(
+        await publicRowCount(reservations),
+        3
+      );
+    })
+  );
+});
+
+test("public session recovery cannot change consent contact details or submission identity", async () => {
+  await withSubmissionHttpEnvironment(() =>
+    withEnrollmentTables(async (
+      visitors, reservations, followups
+    ) => {
+      const actual = enrollmentDependencies(
+        visitors, reservations, followups
+      );
+
+      const first = submissionHttpFixture(
+        async () => actual
+      );
+
+      assert.equal(
+        (await first.call()).status,
+        200
+      );
+
+      const recovery = submissionHttpFixture(
+        async () => actual,
+        {
+          now: () => expiredPublicContext.nowMs
+        }
+      );
+
+      for (const changed of [
+        {
+          ...first.request.body,
+          body: {
+            ...first.request.body.body,
+            contactConsent: false
+          }
+        },
+        {
+          ...first.request.body,
+          body: {
+            ...first.request.body.body,
+            email: "changed@example.invalid"
+          }
+        },
+        {
+          ...first.request.body,
+          submissionId:
+            "22222222-2222-4222-8222-222222222222"
+        }
+      ]) {
+        const result = await recovery.call({
+          body: changed
+        });
+
+        assert.equal(result.status, 409);
+
+        assert.equal(
+          result.body.status,
+          "submission_conflict"
+        );
+      }
+
+      assert.equal(
+        await publicRowCount(reservations),
+        3
+      );
+
+      assert.equal(
+        (await familyPartitionRows(
+          visitors, "VISITOR_CHECK_IN"
+        )).length,
+        1
+      );
+    })
+  );
+});
+
+test("public session recovery rejects tampering excessive expiration and changed event context", async () => {
+  await withSubmissionHttpEnvironment(async () => {
+    const neverRuntime = async () => {
+      throw new Error(
+        "Invalid recovery reached runtime"
+      );
+    };
+
+    const expired = submissionHttpFixture(
+      neverRuntime,
+      {
+        now: () => expiredPublicContext.nowMs
+      }
+    );
+
+    const parts =
+      expired.request.body.token.split(".");
+
+    const signature = parts[2];
+
+    parts[2] =
+      (signature[0] === "A" ? "B" : "A") +
+      signature.slice(1);
+
+    const tampered = await expired.call({
+      body: {
+        ...expired.request.body,
+        token: parts.join(".")
+      }
+    });
+
+    assert.equal(tampered.status, 403);
+    assert.equal(expired.runtimeCalls(), 0);
+
+    // Original ten-minute session plus more than
+    // two additional hours exceeds recovery policy.
+    const tooLate = submissionHttpFixture(
+      neverRuntime,
+      {
+        now: () =>
+          publicContext.nowMs + 131 * 60000
+      }
+    );
+
+    assert.equal(
+      (await tooLate.call()).status,
+      403
+    );
+
+    assert.equal(tooLate.runtimeCalls(), 0);
+
+    const eventChanged = submissionHttpFixture(
+      neverRuntime,
+      {
+        now: () => expiredPublicContext.nowMs,
+
+        approvedEvents: async () => [
+          {
+            id: "synthetic-new-event",
+            name: "Different Event",
+            date: "2026-11-24",
+            active: true
+          }
+        ]
+      }
+    );
+
+    assert.equal(
+      (await eventChanged.call()).status,
+      403
+    );
+
+    assert.equal(
+      eventChanged.runtimeCalls(),
+      0
+    );
+
+    // 11:45 PM Eastern to 12:05 AM Eastern.
+    // Still inside the recovery window, but a
+    // different authoritative calendar date.
+    const beforeMidnight = {
+      ...publicContext,
+      nowMs: Date.parse(
+        "2026-11-25T04:45:00Z"
+      )
+    };
+
+    const afterMidnight = submissionHttpFixture(
+      neverRuntime,
+      {
+        now: () =>
+          Date.parse(
+            "2026-11-25T05:05:00Z"
+          )
+      }
+    );
+
+    const crossedDate = await afterMidnight.call({
+      body: {
+        ...afterMidnight.request.body,
+        token: publicSession(beforeMidnight)
+      }
+    });
+
+    assert.equal(crossedDate.status, 403);
+
+    assert.equal(
+      afterMidnight.runtimeCalls(),
+      0
+    );
+  });
+});
+
+test("public session recovery completes an interrupted family without duplicate attendance or followup", async () => {
+  await withSubmissionHttpEnvironment(() =>
+    withEnrollmentTables(async (
+      visitors, reservations, followups
+    ) => {
+      const actual = fullFamilyDependencies(
+        visitors, reservations, followups
+      );
+
+      const first = submissionHttpFixture(
+        async () => ({
+          ...actual,
+
+          recordFamily: input =>
+            recordVisitorFamilyCheckIn(input, {
+              arrival: adult =>
+                recordVisitorArrival(
+                  adult,
+                  actualLocalArrival(visitors)
+                ),
+
+              async saveFamily(attendance) {
+                const saved =
+                  await recordVisitorFamilyAttendance(
+                    attendance,
+                    { table: visitors }
+                  );
+
+                assert.equal(
+                  saved.status,
+                  "saved"
+                );
+
+                throw new Error(
+                  "Synthetic lost family acknowledgement"
+                );
+              }
+            })
+        })
+      );
+
+      const requestBody = {
+        ...first.request.body,
+        body: fullFamilyBody
+      };
+
+      const uncertain = await first.call({
+        body: requestBody
+      });
+
+      assert.equal(uncertain.status, 503);
+
+      const receipt = await visitors.getEntity<{
+        visitorId: string;
+      }>(
+        "VISITOR_CHECK_IN",
+        command.submissionId
+      );
+
+      assert.equal(
+        (await followups.listByVisitor(
+          receipt.visitorId
+        )).length,
+        0
+      );
+
+      const recovery = submissionHttpFixture(
+        async () => actual,
+        {
+          now: () => expiredPublicContext.nowMs
+        }
+      );
+
+      assert.equal(
+        (await recovery.call({
+          body: requestBody
+        })).status,
+        200
+      );
+
+      assert.equal(
+        (await familyPartitionRows(
+          visitors, "VISITOR_CHECK_IN"
+        )).length,
+        1
+      );
+
+      assert.equal(
+        (await familyPartitionRows(
+          visitors,
+          "VISITOR_FAMILY_ATTENDANCE"
+        )).length,
+        1
+      );
+
+      assert.equal(
+        (await followups.listByVisitor(
+          receipt.visitorId
+        )).length,
+        1
+      );
+
+      assert.equal(
+        await publicRowCount(reservations),
+        3
+      );
+    })
+  );
+});

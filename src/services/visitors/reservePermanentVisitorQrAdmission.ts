@@ -3,8 +3,8 @@ import type {
 } from "./preparePermanentPublicVisitRegistration";
 
 import {
-  verifyPermanentPublicVisitSession
-} from "./permanentPublicVisitSession";
+  verifyPermanentPublicVisitSessionForRecovery
+} from "./verifyPermanentPublicVisitSessionForRecovery";
 
 import type {
   PermanentPublicVisitContext
@@ -354,6 +354,15 @@ async function reservePermanentVisitorAdmissionCore<
       return reject(previous);
     }
 
+    // Expired public sessions can resume only the
+    // exact, fully verified original transaction.
+    // They must never create another grant, submission
+    // or capacity row.
+    if (grant.expiresAtSeconds <=
+        Math.floor(deps.context.nowMs / 1000)) {
+      return reject("denied");
+    }
+
     const minute = Math.floor(deps.context.nowMs / 60000);
 
     for (let index = 0; index < capacity; index++) {
@@ -451,7 +460,7 @@ export async function reservePermanentPublicVisitAdmission(
   >(
     input,
     deps,
-    verifyPermanentPublicVisitSession,
+    verifyPermanentPublicVisitSessionForRecovery,
     fingerprintPublicRegistration
   );
 }

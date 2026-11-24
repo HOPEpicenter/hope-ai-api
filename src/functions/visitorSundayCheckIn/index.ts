@@ -3,6 +3,8 @@ import { DateTime } from "luxon";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { resolveSixWeekActorAuthorization } from "../_shared/sixWeekStaffActor";
 import { recordVisitorArrival } from "../../services/visitors/recordVisitorArrival";
+import { recordVisitorFamilyCheckIn } from "../../services/visitors/recordVisitorFamilyCheckIn";
+import { validateVisitorFamily } from "../../services/visitors/validateVisitorFamily";
 import { isVisitorCheckInRequest } from "../../services/visitors/recordVisitorCheckIn";
 import { listApprovedVisitorEvents } from "../../services/visitors/listApprovedVisitorEvents";
 import {
@@ -21,6 +23,7 @@ type Context = { res?: { status: number; headers: Record<string, string>; body: 
 type Dependencies = {
   now?: () => DateTime;
   record?: typeof recordVisitorArrival;
+  recordFamily?: typeof recordVisitorFamilyCheckIn;
   reserve?: typeof reserveSundayCheckIn;
   list?: typeof listSundayCheckIns;
   approvedEvents?: (date: string) => Promise<readonly VisitorEvent[]>;
@@ -102,7 +105,7 @@ export async function visitorSundayCheckIn(
     let serviceId = `${now.weekday === 7 ? "sunday" : "visit"}-${now.toISODate()}`;
     const body = req.body as Record<string, unknown> | null;
     if (!body || typeof body !== "object" || Array.isArray(body) ||
-        Object.keys(body).some(key => !["name", "contactMethod", "contact", "submissionId", "eventId"].includes(key)) ||
+        Object.keys(body).some(key => !["name", "contactMethod", "contact", "submissionId", "eventId", "family"].includes(key)) ||
         typeof body.name !== "string" || body.name.length > 160 ||
         typeof body.contact !== "string" || body.contact.length > 254 ||
         typeof body.submissionId !== "string" || !isVisitorCheckInRequest(body.submissionId, serviceId) ||
@@ -125,10 +128,54 @@ export async function visitorSundayCheckIn(
       return;
     }
     serviceId = event.serviceId;
+    const familyRequested = Object.prototype.hasOwnProperty.call(body, "family");
+    if (familyRequested) {
+      if (process.env.FEATURE_VISITOR_FAMILY_CHECK_IN !== "true") {
+        reply(context, 404, { status: "unavailable" });
+        return;
+      }
+      const family = validateVisitorFamily(body.family);
+      if (!family.valid) {
+        reply(context, 400, { status: "invalid" });
+        return;
+      }
+      const guardianName = family.family.guardianName
+        .normalize("NFC").trim().replace(/\s+/g, " ").toLowerCase();
+      const adultName = (body.name as string)
+        .normalize("NFC").trim().replace(/\s+/g, " ").toLowerCase();
+      if (guardianName !== adultName) {
+        reply(context, 400, { status: "invalid" });
+        return;
+      }
+    }
+
     if (!await (deps.reserve ?? reserveSundayCheckIn)(now.toMillis())) {
       reply(context, 429, { status: "try_later" });
       return;
     }
+    if (familyRequested) {
+      const result = await (deps.recordFamily ?? recordVisitorFamilyCheckIn)({
+        submissionId: body.submissionId as string,
+        serviceId,
+        name: body.name as string,
+        [body.contactMethod as "email" | "phone"]: body.contact,
+        family: body.family
+      });
+
+      if (result.status === "recorded") {
+        reply(context, 200, { status: "recorded" });
+      } else if (result.status === "family_incomplete") {
+        // Never announce a complete family arrival after partial storage.
+        reply(context, result.reason === "submission_conflict" ? 409 : 503,
+          { status: "try_later" });
+      } else if (result.status === "invalid") {
+        reply(context, 400, { status: "invalid" });
+      } else {
+        reply(context, 409, { status: "ask_staff" });
+      }
+      return;
+    }
+
     const result = await (deps.record ?? recordVisitorArrival)({
       submissionId: body.submissionId,
       serviceId,

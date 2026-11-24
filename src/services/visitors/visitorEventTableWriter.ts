@@ -12,6 +12,7 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 type VisitorEventRow = {
   partitionKey: string;
   rowKey: string;
+  date: string;
   name: string;
   active: boolean;
   commandId: string;
@@ -53,7 +54,7 @@ function partition(date: string): string {
       parsed.toISOString().slice(0, 10) !== date) {
     throw new Error("Invalid event partition date");
   }
-  return `date-${date}`;
+  return "directory";
 }
 
 function validRecord(record: StoredVisitorEvent): boolean {
@@ -88,6 +89,7 @@ export function createVisitorEventTableWriter(
       const row: VisitorEventRow = {
         partitionKey: partition(record.date),
         rowKey: record.id,
+        date: record.date,
         name: record.name,
         active: true,
         commandId: record.commandId,
@@ -124,6 +126,9 @@ export function createVisitorEventTableWriter(
       if (
         row.partitionKey !== partitionKey ||
         row.rowKey !== id ||
+        typeof row.date !== "string" ||
+        !DATE.test(row.date) ||
+        partition(row.date) !== "directory" ||
         typeof row.name !== "string" ||
         !row.name.trim() ||
         row.name.length > 120 ||
@@ -138,7 +143,7 @@ export function createVisitorEventTableWriter(
 
       return {
         id,
-        date,
+        date: row.date,
         name: row.name,
         active: row.active,
         commandId: row.commandId,

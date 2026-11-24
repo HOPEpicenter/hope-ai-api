@@ -7,6 +7,7 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 type StoredEvent = {
   partitionKey?: unknown;
   rowKey?: unknown;
+  date?: unknown;
   name?: unknown;
   active?: unknown;
 };
@@ -37,12 +38,12 @@ export async function listApprovedVisitorEvents(
 
   const readRows = dependencies.readRows ?? ((selectedDate: string) => {
     const table = getTableClient("VisitorEvents");
-    const partition = `date-${selectedDate}`;
+    const partition = "directory";
 
     return table.listEntities<StoredEvent>({
       queryOptions: {
-        filter: `PartitionKey eq '${partition}'`,
-        select: ["PartitionKey", "RowKey", "name", "active"]
+        filter: `PartitionKey eq '${partition}' and date eq '${selectedDate}'`,
+        select: ["PartitionKey", "RowKey", "date", "name", "active"]
       }
     });
   });
@@ -51,10 +52,11 @@ export async function listApprovedVisitorEvents(
   const seen = new Set<string>();
 
   for await (const row of readRows(date)) {
-    const partition = `date-${date}`;
+    const partition = "directory";
 
     if (
       row.partitionKey !== partition ||
+      row.date !== date ||
       typeof row.rowKey !== "string" ||
       !ID.test(row.rowKey) ||
       typeof row.name !== "string" ||

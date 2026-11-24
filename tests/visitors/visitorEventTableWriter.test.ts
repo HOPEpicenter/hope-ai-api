@@ -14,6 +14,7 @@ const input = {
 type Row = {
   partitionKey: string;
   rowKey: string;
+  date: string;
   name: string;
   active: boolean;
   commandId: string;
@@ -63,7 +64,8 @@ test("event command persists in the reader-compatible schema", async () => {
 
   const row = [...rows.values()][0];
 
-  assert.equal(row.partitionKey, "date-2026-12-06");
+  assert.equal(row.partitionKey, "directory");
+  assert.equal(row.date, "2026-12-06");
   assert.equal(row.name, "Sunday Worship");
   assert.equal(row.active, true);
   assert.equal(row.actorId, "synthetic-admin");
@@ -146,4 +148,39 @@ test("missing and malformed rows never become valid replays", async () => {
     writer.read(input.date, row.rowKey),
     /Malformed canonical visitor event row/
   );
+});
+test("a command ID cannot create another event on a different date", async () => {
+  const { writer, rows } = storage();
+
+  const first = await createVisitorEvent(input, writer);
+  assert.equal(first.accepted, true);
+
+  const changedDate = await createVisitorEvent(
+    { ...input, date: "2026-12-13" },
+    writer
+  );
+
+  assert.deepEqual(changedDate, {
+    accepted: false,
+    status: 409,
+    error: "event_command_conflict"
+  });
+
+  assert.equal(rows.size, 1);
+  assert.equal([...rows.values()][0].date, "2026-12-06");
+});
+
+test("two separate commands may create events on different dates", async () => {
+  const { writer, rows } = storage();
+
+  const first = await createVisitorEvent(input, writer);
+  const second = await createVisitorEvent({
+    ...input,
+    commandId: "123e4567-e89b-42d3-a456-426614174001",
+    date: "2026-12-13"
+  }, writer);
+
+  assert.equal(first.accepted, true);
+  assert.equal(second.accepted, true);
+  assert.equal(rows.size, 2);
 });

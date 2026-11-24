@@ -3,19 +3,21 @@ import { test } from "node:test";
 import { listApprovedVisitorEvents } from "../../src/services/visitors/listApprovedVisitorEvents";
 
 const date = "2026-11-29";
-const partitionKey = `date-${date}`;
+const partitionKey = "directory";
 
 test("approved church events are loaded from the trusted directory", async () => {
   const events = await listApprovedVisitorEvents(date, {
     readRows: async function* () {
       yield {
         partitionKey,
+        date,
         rowKey: "worship-2026-11-29",
         name: "Sunday Worship",
         active: true
       };
       yield {
         partitionKey,
+        date,
         rowKey: "prayer-2026-11-29",
         name: "Prayer Meeting",
         active: true
@@ -40,6 +42,7 @@ test("an empty event directory returns no approved events", async () => {
 test("malformed and duplicate directory records fail closed", async () => {
   const row = {
     partitionKey,
+    date,
     rowKey: "worship-2026-11-29",
     name: "Worship",
     active: true

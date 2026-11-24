@@ -173,5 +173,20 @@ export function createPermanentVisitorConsentRepository(table: Port) {
       return rejected("unavailable");
     } catch { return rejected("unavailable"); }
   }
-  return { read, apply };
+  // Internal read-only lookup for an immutable registration operation.
+  // The returned revision is historical, never a current permission result.
+  async function inspectOperation(visitorId: string, operationId: string) {
+    try {
+      if (!validId(visitorId) || !validId(operationId)) return { status: "unavailable" } as const;
+      const pk = partition(visitorId);
+      const stored = await receipt(pk, operationId);
+      if (!stored) return { status: "not_found" } as const;
+      const current = await head(pk);
+      if (!current || current.state.revision < stored.after.revision ||
+          (current.state.revision === stored.after.revision && current.lastOperationId !== operationId))
+        return { status: "unavailable" } as const;
+      return { status: "found", operation: stored.operation, revision: stored.after.revision } as const;
+    } catch { return { status: "unavailable" } as const; }
+  }
+  return { read, apply, inspectOperation };
 }

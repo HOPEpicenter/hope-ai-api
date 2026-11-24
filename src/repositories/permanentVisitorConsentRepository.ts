@@ -188,5 +188,83 @@ export function createPermanentVisitorConsentRepository(table: Port) {
       return { status: "found", operation: stored.operation, revision: stored.after.revision } as const;
     } catch { return { status: "unavailable" } as const; }
   }
-  return { read, apply, inspectOperation };
+  // Inactive internal intent evidence, not an execution credential. The caller
+  // must independently authenticate Staff and bind a canonical command digest.
+  // No external writer is invoked by these methods.
+  type ContactIntent = {
+    operationId: string; actorId: string; expectedRevision: number;
+    scope: "six_week" | "care" | "ministry_communication" | "staff_enrollment";
+    commandDigest: string;
+  };
+  type ContactStatus = "current" | "recorded" | "replayed" | "not_found" |
+    "stale" | "blocked" | "conflict" | "unavailable" | "invalid";
+  type ContactResult = { status: ContactStatus };
+  type ContactRow = { schemaVersion: 1; intentJson: string; consentOperationId: string; recordedAt: string };
+  const result = (status: ContactStatus): ContactResult => ({ status });
+  function contactInput(input: unknown): ContactIntent | null {
+    const v = record(input);
+    if (!v || !exact(v,["operationId","actorId","expectedRevision","scope","commandDigest"]) ||
+        !validId(v.operationId) || !validId(v.actorId) || !revision(v.expectedRevision) ||
+        (v.scope !== "six_week" && v.scope !== "care" && v.scope !== "ministry_communication" && v.scope !== "staff_enrollment") ||
+        typeof v.commandDigest !== "string" || !/^[0-9a-f]{64}$/.test(v.commandDigest)) return null;
+    return {operationId:v.operationId,actorId:v.actorId,expectedRevision:v.expectedRevision,scope:v.scope,commandDigest:v.commandDigest};
+  }
+  function contactPermitted(state: ConsentAuthority): boolean {
+    return state.effective === "granted" && state.pending === null;
+  }
+  const contactKey = (id: string) => `contact:${id}`;
+  async function inspectContact(pk: string, intent: ContactIntent): Promise<ContactResult> {
+    const row = await get<ContactRow>(pk, contactKey(intent.operationId));
+    if (!row) return result("not_found");
+    if (row.partitionKey !== pk || row.rowKey !== contactKey(intent.operationId) || row.schemaVersion !== 1 ||
+        typeof row.intentJson !== "string" || row.intentJson.length > 4096 ||
+        !validId(row.consentOperationId) || !validTime(row.recordedAt)) return result("unavailable");
+    const stored = contactInput(JSON.parse(row.intentJson));
+    if (!stored || stored.operationId !== intent.operationId || json(stored) !== row.intentJson) return result("unavailable");
+    if (json(stored) !== json(intent)) return result("conflict");
+    const anchor = await receipt(pk, row.consentOperationId);
+    if (!anchor || anchor.after.revision !== intent.expectedRevision || !contactPermitted(anchor.after)) return result("unavailable");
+    const current = await head(pk);
+    if (!current || current.state.revision < intent.expectedRevision) return result("unavailable");
+    if (current.state.revision !== intent.expectedRevision) return result("stale");
+    if (current.lastOperationId !== row.consentOperationId || json(current.state) !== json(anchor.after)) return result("unavailable");
+    return result(contactPermitted(current.state) ? "current" : "blocked");
+  }
+  /** Snapshot-only evidence. A current result is not a lease, a reusable
+   * execution token, or proof that a separate storage mutation is safe. */
+  async function inspectContactIntent(visitorId: string, input: unknown): Promise<ContactResult> {
+    try {
+      const intent = contactInput(input);
+      if (!validId(visitorId) || !intent) return result("invalid");
+      return await inspectContact(partition(visitorId),intent);
+    } catch { return result("unavailable"); }
+  }
+  /** Atomically serialize intent creation against changes to the consent head.
+   * Keep the logical consent revision and last consent operation unchanged.
+   * Never rebase a stale request or treat historical replay as new authority. */
+  async function recordContactIntent(visitorId: string, input: unknown): Promise<ContactResult> {
+    try {
+      const intent = contactInput(input);
+      if (!validId(visitorId) || !intent) return result("invalid");
+      const pk = partition(visitorId);
+      const prior = await inspectContact(pk,intent);
+      if (prior.status !== "not_found") return prior.status === "current" ? result("replayed") : prior;
+      const current = await head(pk);
+      if (!current) return result("unavailable");
+      if (current.state.revision !== intent.expectedRevision) return result("stale");
+      if (!contactPermitted(current.state)) return result("blocked");
+      const unchanged = {partitionKey:pk,rowKey:HEAD,schemaVersion:1,stateJson:json(current.state),lastOperationId:current.lastOperationId};
+      const evidence = {partitionKey:pk,rowKey:contactKey(intent.operationId),schemaVersion:1,intentJson:json(intent),consentOperationId:current.lastOperationId,recordedAt:new Date().toISOString()};
+      let acknowledged = true;
+      try { await table.submitTransaction([["update",unchanged,"Replace",{etag:current.etag}],["create",evidence]]); }
+      catch { acknowledged = false; }
+      const observed = await inspectContact(pk,intent);
+      if (observed.status === "current") return result(acknowledged ? "recorded" : "replayed");
+      if (observed.status !== "not_found") return observed;
+      const latest = await head(pk);
+      if (latest && latest.state.revision !== intent.expectedRevision) return result("stale");
+      return result("unavailable");
+    } catch { return result("unavailable"); }
+  }
+  return { read, apply, inspectOperation, recordContactIntent, inspectContactIntent };
 }

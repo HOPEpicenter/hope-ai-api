@@ -1,4 +1,8 @@
 import {
+  recordVisitorFamilyAttendance
+} from "../src/services/visitors/recordVisitorFamilyAttendance";
+
+import {
   enrollRecordedPublicVisitor
 } from "../src/services/followups/enrollRecordedPublicVisitor";
 
@@ -1713,5 +1717,439 @@ test("subsequent permission does not automatically restart a consent-closed plan
     assert.ok(plan);
     assert.equal(plan.status, "cancelled");
     assert.equal(plan.nextTask, null);
+  });
+});
+
+const fullFamilyBody = {
+  ...publicBody,
+  contactConsent: true,
+  family: {
+    guardianName: publicBody.name,
+    guardianDeclaration: true,
+    children: [
+      {
+        firstName: "Synthetic Child One",
+        ageGroup: "3-5"
+      },
+      {
+        firstName: "Synthetic Child Two",
+        ageGroup: "6-11"
+      }
+    ]
+  }
+};
+
+function fullFamilyDependencies(
+  visitors: TableClient,
+  reservations: TableClient,
+  followups: SixWeekFollowupEventsRepository
+): PermanentPublicRegistrationDependencies {
+  return {
+    ...enrollmentDependencies(
+      visitors, reservations, followups
+    ),
+
+    familyEnabled: true,
+
+    recordFamily: input =>
+      recordVisitorFamilyCheckIn(input, {
+        arrival: adult =>
+          recordVisitorArrival(
+            adult,
+            actualLocalArrival(visitors)
+          ),
+
+        saveFamily: attendance =>
+          recordVisitorFamilyAttendance(
+            attendance,
+            { table: visitors }
+          )
+      })
+  };
+}
+
+async function familyPartitionRows(
+  table: TableClient,
+  partition: string
+): Promise<unknown[]> {
+  const rows: unknown[] = [];
+
+  for await (const row of table.listEntities({
+    queryOptions: {
+      filter: `PartitionKey eq '${partition}'`
+    }
+  })) {
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+test("complete family registration durably records adult and children with one staff followup plan", async () => {
+  await withEnrollmentTables(async (
+    visitors, reservations, followups
+  ) => {
+    const deps = fullFamilyDependencies(
+      visitors, reservations, followups
+    );
+
+    const request = {
+      token: publicSession(),
+      submissionId: command.submissionId,
+      body: fullFamilyBody
+    };
+
+    assert.deepEqual(
+      await submitPublic(request, deps),
+      { accepted: true, status: "recorded" }
+    );
+
+    const receipt = await visitors.getEntity<{
+      visitorId: string;
+      registrationDetailsJson: string;
+    }>(
+      "VISITOR_CHECK_IN",
+      request.submissionId
+    );
+
+    const people = await familyPartitionRows(
+      visitors, "VISITOR"
+    );
+
+    const visits = await familyPartitionRows(
+      visitors, "VISITOR_CHECK_IN"
+    );
+
+    const attendance = await familyPartitionRows(
+      visitors, "VISITOR_FAMILY_ATTENDANCE"
+    );
+
+    assert.equal(people.length, 1);
+    assert.equal(visits.length, 1);
+    assert.equal(attendance.length, 1);
+
+    const savedFamily = JSON.stringify(
+      attendance[0]
+    );
+
+    assert.ok(savedFamily.includes(
+      "Synthetic Child One"
+    ));
+
+    assert.ok(savedFamily.includes(
+      "Synthetic Child Two"
+    ));
+
+    assert.ok(savedFamily.includes(
+      "general_church_attendance"
+    ));
+
+    assert.ok(savedFamily.includes(
+      receipt.visitorId
+    ));
+
+    const profile = JSON.parse(
+      receipt.registrationDetailsJson
+    );
+
+    assert.equal(profile.email, publicBody.email);
+    assert.equal(profile.phone, publicBody.phone);
+    assert.equal(profile.contactConsent, true);
+
+    const events = await followups.listByVisitor(
+      receipt.visitorId
+    );
+
+    const plan = projectSixWeekVisitorFollowup(
+      events
+    );
+
+    assert.ok(plan);
+    assert.equal(plan.tasks.length, 6);
+    assert.equal(plan.ownerStaffId, null);
+    assert.equal(events.length, 1);
+
+    // Children are attendance entries, not separate
+    // visitor profiles or six-week contact recipients.
+    assert.equal(
+      (await familyPartitionRows(
+        visitors, "VISITOR"
+      )).length,
+      1
+    );
+  });
+});
+
+test("declined followup permission preserves complete family attendance without a staff contact plan", async () => {
+  await withEnrollmentTables(async (
+    visitors, reservations, followups
+  ) => {
+    const deps = fullFamilyDependencies(
+      visitors, reservations, followups
+    );
+
+    const request = {
+      token: publicSession(),
+      submissionId: command.submissionId,
+      body: {
+        ...fullFamilyBody,
+        contactConsent: false
+      }
+    };
+
+    assert.deepEqual(
+      await submitPublic(request, deps),
+      { accepted: true, status: "recorded" }
+    );
+
+    const receipt = await visitors.getEntity<{
+      visitorId: string;
+      registrationDetailsJson: string;
+    }>(
+      "VISITOR_CHECK_IN",
+      request.submissionId
+    );
+
+    assert.equal(
+      JSON.parse(
+        receipt.registrationDetailsJson
+      ).contactConsent,
+      false
+    );
+
+    assert.equal(
+      (await familyPartitionRows(
+        visitors, "VISITOR_FAMILY_ATTENDANCE"
+      )).length,
+      1
+    );
+
+    assert.equal(
+      (await followups.listByVisitor(
+        receipt.visitorId
+      )).length,
+      0
+    );
+  });
+});
+
+test("family registration retry preserves one attendance record and rejects changed children", async () => {
+  await withEnrollmentTables(async (
+    visitors, reservations, followups
+  ) => {
+    const deps = fullFamilyDependencies(
+      visitors, reservations, followups
+    );
+
+    const request = {
+      token: publicSession(),
+      submissionId: command.submissionId,
+      body: fullFamilyBody
+    };
+
+    assert.deepEqual(
+      await submitPublic(request, deps),
+      { accepted: true, status: "recorded" }
+    );
+
+    const before = await familyPartitionRows(
+      visitors, "VISITOR_FAMILY_ATTENDANCE"
+    );
+
+    assert.deepEqual(
+      await submitPublic(request, deps),
+      { accepted: true, status: "recorded" }
+    );
+
+    const changed = {
+      ...request,
+      body: {
+        ...fullFamilyBody,
+        family: {
+          ...fullFamilyBody.family,
+          children: [
+            {
+              firstName: "Different Synthetic Child",
+              ageGroup: "6-11"
+            }
+          ]
+        }
+      }
+    };
+
+    assert.deepEqual(
+      await submitPublic(changed, deps),
+      {
+        accepted: false,
+        status: "submission_conflict"
+      }
+    );
+
+    const after = await familyPartitionRows(
+      visitors, "VISITOR_FAMILY_ATTENDANCE"
+    );
+
+    assert.deepEqual(after, before);
+    assert.equal(after.length, 1);
+
+    assert.equal(
+      (await familyPartitionRows(
+        visitors, "VISITOR_CHECK_IN"
+      )).length,
+      1
+    );
+
+    assert.equal(
+      await publicRowCount(reservations),
+      3
+    );
+
+    const receipt = await visitors.getEntity<{
+      visitorId: string;
+    }>(
+      "VISITOR_CHECK_IN",
+      request.submissionId
+    );
+
+    assert.equal(
+      (await followups.listByVisitor(
+        receipt.visitorId
+      )).length,
+      1
+    );
+
+    const quotaRows = JSON.stringify(
+      await familyPartitionRows(
+        reservations,
+        // Read all rows separately below to verify privacy.
+        "unused-synthetic-partition"
+      )
+    );
+
+    assert.equal(
+      quotaRows.includes("Synthetic Child One"),
+      false
+    );
+
+    for await (const row of reservations.listEntities()) {
+      const serialized = JSON.stringify(row);
+
+      for (const forbidden of [
+        publicBody.name,
+        publicBody.email,
+        publicBody.phone,
+        "Synthetic Child One",
+        "Synthetic Child Two",
+        request.token
+      ]) {
+        assert.equal(
+          serialized.includes(forbidden),
+          false
+        );
+      }
+    }
+  });
+});
+
+test("lost family persistence acknowledgement does not confirm success and exact retry recovers", async () => {
+  await withEnrollmentTables(async (
+    visitors, reservations, followups
+  ) => {
+    const deps = fullFamilyDependencies(
+      visitors, reservations, followups
+    );
+
+    const request = {
+      token: publicSession(),
+      submissionId: command.submissionId,
+      body: fullFamilyBody
+    };
+
+    let familyCommitted = false;
+
+    const uncertain = await submitPublic(request, {
+      ...deps,
+
+      recordFamily: input =>
+        recordVisitorFamilyCheckIn(input, {
+          arrival: adult =>
+            recordVisitorArrival(
+              adult,
+              actualLocalArrival(visitors)
+            ),
+
+          async saveFamily(attendance) {
+            const saved =
+              await recordVisitorFamilyAttendance(
+                attendance,
+                { table: visitors }
+              );
+
+            assert.equal(saved.status, "saved");
+
+            familyCommitted = true;
+
+            // Simulate losing the acknowledgement after
+            // the real local storage write succeeded.
+            throw new Error(
+              "Synthetic lost family acknowledgement"
+            );
+          }
+        })
+    });
+
+    assert.equal(familyCommitted, true);
+
+    assert.deepEqual(uncertain, {
+      accepted: false,
+      status: "try_later"
+    });
+
+    const receipt = await visitors.getEntity<{
+      visitorId: string;
+    }>(
+      "VISITOR_CHECK_IN",
+      request.submissionId
+    );
+
+    assert.equal(
+      (await followups.listByVisitor(
+        receipt.visitorId
+      )).length,
+      0
+    );
+
+    assert.deepEqual(
+      await submitPublic(request, deps),
+      { accepted: true, status: "recorded" }
+    );
+
+    assert.equal(
+      (await familyPartitionRows(
+        visitors, "VISITOR"
+      )).length,
+      1
+    );
+
+    assert.equal(
+      (await familyPartitionRows(
+        visitors, "VISITOR_CHECK_IN"
+      )).length,
+      1
+    );
+
+    assert.equal(
+      (await familyPartitionRows(
+        visitors, "VISITOR_FAMILY_ATTENDANCE"
+      )).length,
+      1
+    );
+
+    assert.equal(
+      (await followups.listByVisitor(
+        receipt.visitorId
+      )).length,
+      1
+    );
   });
 });

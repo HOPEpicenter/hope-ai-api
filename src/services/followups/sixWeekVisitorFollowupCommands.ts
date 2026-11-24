@@ -1,3 +1,8 @@
+import {
+  readLatestRegistrationConsent,
+  type RegistrationConsent
+} from "./readLatestRegistrationConsent";
+
 import { randomUUID } from "node:crypto";
 import type {
   SixWeekCareOutcome,
@@ -46,6 +51,9 @@ export type SixWeekFollowupCommandDependencies = {
   readActor?: (actorId: string) => Promise<StaffIdentity | null>;
   readAssignee?: (staffId: string) => Promise<StaffIdentity | null>;
   recordCareEvent?: SixWeekCareEventRecorder;
+  readRegistrationConsent?: (
+    visitorId: string
+  ) => Promise<RegistrationConsent>;
 };
 
 export type SixWeekFollowupCommandSuccess = {
@@ -193,6 +201,52 @@ function commandFailure(
   error: string
 ): SixWeekFollowupCommandFailure {
   return { accepted: false, status, error };
+}
+
+/**
+ * Independently enforce durable public consent before
+ * creating new contact-followup work.
+ *
+ * This flag is independent of the public intake flag.
+ * No administrator override can bypass a recorded decline.
+ */
+async function requireCurrentRegistrationConsent(
+  visitorId: string,
+  dependencies: SixWeekFollowupCommandDependencies
+): Promise<SixWeekFollowupCommandFailure | null> {
+  if (process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD
+      !== "true") {
+    return null;
+  }
+
+  try {
+    const consent = await (
+      dependencies.readRegistrationConsent ??
+      readLatestRegistrationConsent
+    )(visitorId);
+
+    if (consent === "declined") {
+      return commandFailure(
+        409,
+        "Visitor declined follow-up permission"
+      );
+    }
+
+    if (consent !== "granted" &&
+        consent !== "legacy_no_evidence") {
+      return commandFailure(
+        503,
+        "Follow-up consent could not be verified"
+      );
+    }
+
+    return null;
+  } catch {
+    return commandFailure(
+      503,
+      "Follow-up consent could not be verified"
+    );
+  }
 }
 
 function requirePlanOwnerAuthorization(
@@ -376,6 +430,13 @@ export async function assignSixWeekFollowupOwner(
     );
   }
 
+  const consentFailure =
+    await requireCurrentRegistrationConsent(
+      visitorId, dependencies
+    );
+
+  if (consentFailure) return consentFailure;
+
   const occurredAt = (
     dependencies.now ?? (() => new Date().toISOString())
   )();
@@ -504,6 +565,13 @@ export async function recordSixWeekTaskOutcome(
       plan: existing
     };
   }
+
+  const consentFailure =
+    await requireCurrentRegistrationConsent(
+      visitorId, dependencies
+    );
+
+  if (consentFailure) return consentFailure;
 
   const occurredAt = (
     dependencies.now ?? (() => new Date().toISOString())
@@ -713,6 +781,17 @@ export async function changeSixWeekFollowupStatus(
   }
   if (input.action === "resume" && existing.status !== "paused") {
     return commandFailure(409, "Only a paused follow-up plan can resume");
+  }
+
+  // Pausing and cancelling remain permitted.
+  // Only resuming requires current consent.
+  if (input.action === "resume") {
+    const consentFailure =
+      await requireCurrentRegistrationConsent(
+        visitorId, dependencies
+      );
+
+    if (consentFailure) return consentFailure;
   }
 
   const occurredAt = (

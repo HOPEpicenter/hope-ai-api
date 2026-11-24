@@ -1,10 +1,11 @@
 import type { TableClient } from "@azure/data-tables";
 import { createPermanentVisitorConsentRepository } from "../../repositories/permanentVisitorConsentRepository";
 import { permitsContactWork } from "../../domain/followups/permanentVisitorConsentAuthority";
-import { createPermanentVisitorRegistrationConsentAdapter } from "./permanentVisitorRegistrationConsentAdapter";
+import { createPermanentVisitorRegistrationConsentAdapter, createPermanentVisitorPreAttendanceWithdrawal } from "./permanentVisitorRegistrationConsentAdapter";
 import type { RecordedPublicVisitEvidence } from "./enrollRecordedPublicVisitor";
 
 export type RegistrationConsentRecorder = ReturnType<typeof createPermanentVisitorRegistrationConsentAdapter>;
+export type PreAttendanceWithdrawalRecorder = ReturnType<typeof createPermanentVisitorPreAttendanceWithdrawal>;
 export type EnrollmentPermissionReader = (evidence: RecordedPublicVisitEvidence) => Promise<"granted" | "blocked" | "unavailable">;
 
 /** Staged runtime composition only; callers must independently authorize
@@ -17,6 +18,7 @@ export function createPermanentVisitorConsentRuntime(visitors: TableClient, cons
       new Date(initialGrantNotBefore).toISOString() !== initialGrantNotBefore) throw new Error("Consent cutover unavailable");
   const repository = createPermanentVisitorConsentRepository(consent);
   const recordConsent = createPermanentVisitorRegistrationConsentAdapter({ visitors, repository, initialGrantNotBefore });
+  const recordPreAttendanceWithdrawal = createPermanentVisitorPreAttendanceWithdrawal({ visitors, repository, initialGrantNotBefore });
   const readEnrollmentPermission: EnrollmentPermissionReader = async evidence => {
     try {
       const operation = await repository.inspectOperation(evidence.visitorId, evidence.submissionId);
@@ -29,5 +31,5 @@ export function createPermanentVisitorConsentRuntime(visitors: TableClient, cons
       return op.kind === "new_profile" && op.initialConsent === true ? "granted" : "blocked";
     } catch { return "unavailable"; }
   };
-  return { recordConsent, readEnrollmentPermission };
+  return { recordConsent, readEnrollmentPermission, recordPreAttendanceWithdrawal };
 }

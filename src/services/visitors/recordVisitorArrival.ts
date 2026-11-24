@@ -50,6 +50,7 @@ export async function recordVisitorArrival(
     createProfile?: typeof createVisitorFromCheckIn;
     record?: typeof recordVisitorCheckIn;
     recordConsent?: import("../followups/permanentVisitorConsentRuntime").RegistrationConsentRecorder;
+    recordPreAttendanceWithdrawal?: import("../followups/permanentVisitorConsentRuntime").PreAttendanceWithdrawalRecorder;
   } = {}
 ): Promise<CheckInResult | { status: "requires_staff_review" }> {
   if (!isVisitorCheckInRequest(command.submissionId, command.serviceId)) {
@@ -151,6 +152,18 @@ export async function recordVisitorArrival(
     if (!created) return { status: "requires_staff_review" };
   }
 
+  // In staged authority mode, a decline must be durably suppressed before
+  // attendance can be written. The exact same operation is reconciled by
+  // the post-attendance adapter. No pre-attendance grant is allowed.
+  if (dependencies.recordConsent && command.profile?.contactConsent === false) {
+    if (!dependencies.recordPreAttendanceWithdrawal || registrationDetailsJson === undefined)
+      throw new Error("Pre-attendance withdrawal boundary unavailable");
+    const suppression = await dependencies.recordPreAttendanceWithdrawal({
+      visitorId: claim.visitorId, submissionId: command.submissionId,
+      serviceId: command.serviceId, registrationDetailsJson
+    });
+    if (suppression.status !== "recorded") throw new Error("Withdrawal suppression unconfirmed");
+  }
   const result = await (dependencies.record ?? recordVisitorCheckIn)({
     submissionId: command.submissionId,
     serviceId: command.serviceId,

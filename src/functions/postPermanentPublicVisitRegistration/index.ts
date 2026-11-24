@@ -190,7 +190,8 @@ async function liveRuntime(): Promise<Runtime> {
           process.env.HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER ?? "")
     : undefined;
   const arrival: typeof recordVisitorArrival = consent
-    ? command => recordVisitorArrival(command, { table: visitors, recordConsent: consent.recordConsent })
+    ? command => recordVisitorArrival(command, { table: visitors, recordConsent: consent.recordConsent,
+        recordPreAttendanceWithdrawal: consent.recordPreAttendanceWithdrawal })
     : recordVisitorArrival;
 
   return {

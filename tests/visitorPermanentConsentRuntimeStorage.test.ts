@@ -65,19 +65,19 @@ test("adult receipt precedes trusted consent and new profile grant",()=>fixture(
   }}); assert.equal(result.status,"recorded"); if(result.status!=="recorded") throw Error("adult receipt required");
   const s=await repository(c).read(result.receipt.visitorId); assert.equal(s.status,"ready"); if(s.status!=="ready") throw Error("authority required"); assert.equal(permitsContactWork(s.state),true);
 }));
-test("unconfirmed consent cannot return successful adult arrival",()=>fixture(async(v,c)=>{
+test("missing withdrawal boundary cannot write or confirm adult attendance",()=>fixture(async(v,c)=>{
   await legacy(v); const input=arrivalInput(randomUUID(),false);
   await assert.rejects(recordVisitorArrival(input,{table:v,resolveIdentity:async()=>({status:"matched",visitorId}),recordConsent:async()=>({status:"unavailable"})}));
-  assert.equal((await v.getEntity("VISITOR_CHECK_IN",input.submissionId)).visitorId,visitorId); await absent(c);
+  await assert.rejects(v.getEntity("VISITOR_CHECK_IN",input.submissionId)); await absent(c);
 }));
 test("family failure preserves withdrawal before family write and retry is idempotent",()=>fixture(async(v,c)=>{
   const first=await visit(v,true,true); const r=runtime(v,c,cutover); assert.deepEqual(await r.recordConsent(first),yes);
   const input={...arrivalInput(randomUUID(),false),family};
-  const deps={arrival:(command:Parameters<typeof recordVisitorArrival>[0])=>recordVisitorArrival(command,{table:v,resolveIdentity:async()=>({status:"matched",visitorId}),recordConsent:r.recordConsent}),saveFamily:async()=>{assert.equal(permitsContactWork(await state(c)),false);throw Error("synthetic family outage");}};
+  const deps={arrival:(command:Parameters<typeof recordVisitorArrival>[0])=>recordVisitorArrival(command,{table:v,resolveIdentity:async()=>({status:"matched",visitorId}),recordConsent:r.recordConsent,recordPreAttendanceWithdrawal:r.recordPreAttendanceWithdrawal}),saveFamily:async()=>{assert.equal(permitsContactWork(await state(c)),false);throw Error("synthetic family outage");}};
   assert.equal((await recordVisitorFamilyCheckIn(input,deps)).status,"family_incomplete"); const s=await state(c); assert.equal(s.pending?.kind,"withdrawal");
   assert.equal((await recordVisitorFamilyCheckIn(input,deps)).status,"family_incomplete"); assert.deepEqual(await state(c),s);
 }));
-test("failed consent stops family save",()=>fixture(async(v,c)=>{
+test("missing withdrawal boundary stops family save",()=>fixture(async(v,c)=>{
   await legacy(v); const input={...arrivalInput(randomUUID(),false),family}; let writes=0;
   await assert.rejects(recordVisitorFamilyCheckIn(input,{arrival:command=>recordVisitorArrival(command,{table:v,resolveIdentity:async()=>({status:"matched",visitorId}),recordConsent:async()=>({status:"unavailable"})}),saveFamily:async()=>{writes++;throw Error("unexpected");}})); assert.equal(writes,0); await absent(c);
 }));

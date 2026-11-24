@@ -33,6 +33,75 @@ function details(raw: unknown) {
 const unavailable = (): Result => ({ status: "unavailable" });
 const recorded = (): Result => ({ status: "recorded" });
 
+/** Before-attendance withdrawal only. The trusted caller must already have
+ * admitted this exact command, resolved identity, and persisted its claim.
+ * No grant, Staff decision, attendance write or cancellation is possible here.
+ * A successful result is historical operation evidence, not current permission.
+ */
+export function createPermanentVisitorPreAttendanceWithdrawal(deps: {
+  visitors: Pick<TableClient,"getEntity">;
+  repository: Pick<Repository,"read"|"apply"|"inspectOperation">;
+  initialGrantNotBefore: string;
+}) {
+  return async function suppress(input: Evidence & { registrationDetailsJson: string }): Promise<Result> {
+    try {
+      if (!object(input) || !exact(input,["visitorId","submissionId","serviceId","registrationDetailsJson"]) ||
+          !id(input.visitorId) || !id(input.serviceId) || typeof input.submissionId !== "string" ||
+          !UUID.test(input.submissionId) || !iso(deps.initialGrantNotBefore)) return unavailable();
+      const { visitorId, submissionId, serviceId } = input;
+      const d = details(input.registrationDetailsJson);
+      if (!d || d.consent !== false) return unavailable();
+      const claim = await deps.visitors.getEntity<Row>("VISITOR_CHECK_IN_CLAIM", submissionId);
+      const profile = await deps.visitors.getEntity<Row>("VISITOR", visitorId);
+      if (claim.partitionKey !== "VISITOR_CHECK_IN_CLAIM" || claim.rowKey !== submissionId ||
+          claim.visitorId !== visitorId || typeof claim.createProfile !== "boolean" || !iso(claim.claimedAt) ||
+          profile.partitionKey !== "VISITOR" || profile.rowKey !== visitorId) return unavailable();
+      const fingerprint = createHash("sha256").update(JSON.stringify([
+        "complete-public-visitor-arrival-v1", serviceId, d.name.toLowerCase(), d.email ?? "", d.phone ?? "", d.raw
+      ])).digest("hex");
+      if (claim.fingerprint !== fingerprint) return unavailable();
+      const ownsCreation = profile.checkInCreationId === submissionId;
+      if (claim.createProfile !== ownsCreation || (ownsCreation && profile.createdAt !== claim.claimedAt)) return unavailable();
+      // Reconcile an already committed operation, never reapply it after a later decision.
+      const prior = await deps.repository.inspectOperation(visitorId, submissionId);
+      if (prior.status === "found") {
+        const op = prior.operation;
+        if (op.kind === "new_profile" && ownsCreation && op.evidenceId === submissionId && op.initialConsent === false) return recorded();
+        if (op.kind === "public_request" && op.requestId === submissionId && op.requestedConsent === false) return recorded();
+        return unavailable();
+      }
+      if (prior.status !== "not_found" || claim.claimedAt < deps.initialGrantNotBefore) return unavailable();
+      // Require current canonical profile evidence on first processing. An
+      // outdated index or changed contact must not authorize a new suppression.
+      const normName = (s: string) => s.normalize("NFC").trim().replace(/\s+/g," ").toLowerCase();
+      if (typeof profile.name !== "string" || normName(profile.name) !== normName(d.name)) return unavailable();
+      if (d.email !== null && (typeof profile.email !== "string" || profile.email.trim().toLowerCase() !== d.email ||
+          (profile.emailLower !== undefined && profile.emailLower !== d.email))) return unavailable();
+      if (d.phone !== null && (typeof profile.phone !== "string" || !/^[0-9\s().+\-]+$/.test(profile.phone) ||
+          profile.phone.replace(/\D/g,"") !== d.phone ||
+          (profile.phoneCanonical !== undefined && profile.phoneCanonical !== d.phone))) return unavailable();
+      let current = await deps.repository.read(visitorId);
+      if (current.status === "not_initialized") {
+        if (ownsCreation) {
+          if (profile.name !== d.name || (profile.email ?? null) !== d.email || (profile.emailLower ?? null) !== d.email ||
+              (profile.phone ?? null) !== d.phone || (profile.phoneCanonical ?? null) !== d.phone) return unavailable();
+          const result = await deps.repository.apply(visitorId, {kind:"new_profile", evidenceId:submissionId, initialConsent:false});
+          return result.status === "committed" || result.status === "replayed" ? recorded() : unavailable();
+        }
+        const bootstrap = await deps.repository.apply(visitorId,{kind:"existing_profile",evidenceId:`bootstrap:${submissionId}`});
+        if (bootstrap.status !== "committed" && bootstrap.status !== "replayed") return unavailable();
+        current = await deps.repository.read(visitorId);
+      }
+      if (current.status !== "ready") return unavailable();
+      const result = await deps.repository.apply(visitorId,{kind:"public_request",requestId:submissionId,
+        expectedRevision:current.state.revision,requestedConsent:false});
+      // A competing command or uncertain write never authorizes attendance.
+      // A later exact retry reconciles the immutable receipt before applying.
+      return result.status === "committed" || result.status === "replayed" ? recorded() : unavailable();
+    } catch { return unavailable(); }
+  };
+}
+
 /** Inactive internal adapter; no default storage, env reads or caller authorization.
  * Trusted callers must have already admitted the registration. The cutover is
  * supplied by a future verified migration boundary, never by a browser.

@@ -62,14 +62,15 @@ export async function visitorSundayCheckIn(
         reply(context, actor.status, { status: "unavailable" });
         return;
       }
-      const date = req.query?.date ?? now.minus({ days: now.weekday % 7 }).toISODate();
-      const sunday = typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
+      const date = req.query?.date ?? now.toISODate();
+      const selected = typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)
         ? DateTime.fromISO(date, { zone: "America/New_York" }) : null;
-      if (!sunday?.isValid || sunday.weekday !== 7) {
+      if (!selected?.isValid || selected.toISODate() !== date) {
         reply(context, 400, { status: "invalid" });
         return;
       }
-      reply(context, 200, { date, ...await (deps.list ?? listSundayCheckIns)(`sunday-${date}`) });
+      const serviceId = `${selected.weekday === 7 ? "sunday" : "visit"}-${date}`;
+      reply(context, 200, { date, ...await (deps.list ?? listSundayCheckIns)(serviceId) });
       return;
     }
 
@@ -81,11 +82,7 @@ export async function visitorSundayCheckIn(
       reply(context, 401, { status: "unavailable" });
       return;
     }
-    if (now.weekday !== 7) {
-      reply(context, 403, { status: "closed" });
-      return;
-    }
-    const serviceId = `sunday-${now.toISODate()}`;
+    const serviceId = `${now.weekday === 7 ? "sunday" : "visit"}-${now.toISODate()}`;
     const body = req.body as Record<string, unknown> | null;
     if (!body || typeof body !== "object" || Array.isArray(body) ||
         Object.keys(body).some(key => !["name", "contactMethod", "contact", "submissionId"].includes(key)) ||

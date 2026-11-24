@@ -63,7 +63,7 @@ test("disabled, unauthorized, invalid, closed and rate-limited requests never re
     await visitorSundayCheckIn(context, { ...request, body: { ...request.body, serviceId: "x" } }, deps);
     assert.equal(context.res?.status, 400);
     await visitorSundayCheckIn(context, request, { ...deps, now: () => DateTime.fromISO("2026-11-30T15:00:00Z") });
-    assert.equal(context.res?.status, 403);
+    assert.equal(context.res?.status, 429);
     await visitorSundayCheckIn(context, request, deps);
     assert.equal(context.res?.status, 429);
   });
@@ -90,5 +90,28 @@ test("the list requires the normal API key and an active Staff actor", async () 
       authorizeStaff: async () => ({ ok: true, actorId: "synthetic-staff" })
     });
     assert.equal(context.res?.status, 200);
+  });
+});
+
+test("weekday visits are saved with a general visit identifier", async () => {
+  await withSettings(async () => {
+    const context: Parameters<typeof visitorSundayCheckIn>[0] = {};
+    await visitorSundayCheckIn(context, request, {
+      now: () => DateTime.fromISO("2026-11-30T15:00:00Z"),
+      reserve: async () => true,
+      record: async command => {
+        assert.equal(command.serviceId, "visit-2026-11-30");
+        return {
+          status: "recorded",
+          receipt: {
+            ...command,
+            visitorId: "synthetic-visitor",
+            recordedAt: "2026-11-30T15:00:00Z"
+          }
+        };
+      }
+    });
+    assert.equal(context.res?.status, 200);
+    assert.deepEqual(context.res?.body, { status: "recorded" });
   });
 });

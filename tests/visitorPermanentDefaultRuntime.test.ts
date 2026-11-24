@@ -5,6 +5,10 @@ import { TableClient } from "@azure/data-tables";
 import {
   readCanonicalVisitorRegistrationHistory as readRegistrationHistory
 } from "../src/services/visitors/readCanonicalVisitorRegistrationHistory";
+import { createHash as familyHistoryHash } from "node:crypto";
+import {
+  readCanonicalVisitorRegistrationFamilyHistory as readFamilyHistory
+} from "../src/services/visitors/readCanonicalVisitorRegistrationFamilyHistory";
 import {
   getVisitorById, listVisitorsRecords
 } from "../src/functions/_shared/visitorsRepository";
@@ -423,6 +427,78 @@ test(
     console.log("RETRY_PRESERVES_ONE_HISTORY_ITEM=True");
     console.log("HISTORY_CONTACT_DATA_EXCLUDED=True");
     console.log("CROSS_PERSON_HISTORY_ISOLATION_VERIFIED=True");
+    {
+      const individual = await readFamilyHistory(adultReceipt.visitorId);
+      const family = await readFamilyHistory(familyReceipt.visitorId);
+      assert.equal(individual.status, "ready", "Individual family absence query failed");
+      assert.equal(family.status, "ready", "Linked family evidence query failed");
+      assert.equal(individual.registrationCount, 1);
+      assert.equal(family.registrationCount, 1);
+      assert.deepEqual(individual.items[0].familyAttendance, { status: "not_confirmed" });
+      const attendance = family.items[0].familyAttendance;
+      assert.equal(attendance.status, "recorded");
+      assert.equal(attendance.childCount, 1);
+      assert.deepEqual(attendance.children, [{ firstName: "Synthetic Child", ageGroup: "6-11" }]);
+      assert.equal(attendance.purpose, "general_church_attendance");
+      assert.equal(attendance.relationshipStatus, "guardian_declared_unverified");
+      assert.equal(family.items[0].submissionId, familySubmission.submissionId);
+      assert.equal(family.items[0].contactConsentAtRegistration, false);
+      assert.deepEqual(Object.keys(attendance).sort(), [
+        "childCount", "children", "purpose", "recordedAt", "relationshipStatus", "status"
+      ]);
+      assert.deepEqual(await readFamilyHistory("synthetic-no-history-99"), {
+        status: "ready", registrationCount: 0, truncated: false, items: []
+      });
+      console.log("ACTUAL_LINKED_FAMILY_HISTORY_VERIFIED=True");
+      console.log("MISSING_FAMILY_NOT_INFERRED_INDIVIDUAL=True");
+      console.log("FAMILY_HISTORY_MINIMAL_CONTRACT_VERIFIED=True");
+      const failedFamilyQuery = {
+        listEntities<T extends object>(options?: Parameters<TableClient["listEntities"]>[0]) {
+          if (options?.queryOptions?.filter?.includes("VISITOR_FAMILY_ATTENDANCE")) {
+            throw new Error("Synthetic family query failure");
+          }
+          return visitors.listEntities<T>(options);
+        }
+      } satisfies Pick<TableClient, "listEntities">;
+      assert.deepEqual(await readFamilyHistory(adultReceipt.visitorId, failedFamilyQuery), {
+        status: "unavailable"
+      });
+      console.log("FAMILY_QUERY_FAILURE_NOT_TREATED_AS_ABSENCE=True");
+
+      const identity = [familySubmission.submissionId, family.items[0].serviceId, familyReceipt.visitorId];
+      const digest = (value: unknown) => familyHistoryHash("sha256")
+        .update(JSON.stringify(value)).digest("hex");
+      const partitionKey = "VISITOR_FAMILY_ATTENDANCE";
+      const rowKey = "family-attendance-" + digest(identity).slice(0, 32);
+      const original = await visitors.getEntity<{
+        fingerprint: string; childrenJson: string; adultVisitorId: string;
+      }>(partitionKey, rowKey);
+      async function change(fields: Record<string, string>) {
+        const row = await visitors.getEntity(partitionKey, rowKey);
+        await visitors.updateEntity({ ...fields, partitionKey, rowKey }, "Merge", { etag: row.etag });
+      }
+      try {
+        await change({ adultVisitorId: adultReceipt.visitorId });
+        assert.deepEqual(await readFamilyHistory(familyReceipt.visitorId), { status: "unavailable" });
+        assert.deepEqual(await readFamilyHistory(adultReceipt.visitorId), individual);
+        await change({ adultVisitorId: original.adultVisitorId, fingerprint: "0".repeat(64) });
+        assert.deepEqual(await readFamilyHistory(familyReceipt.visitorId), { status: "unavailable" });
+        const invalidChildren = JSON.stringify([{ firstName: "Synthetic Child", ageGroup: "unknown" }]);
+        await change({
+          childrenJson: invalidChildren,
+          fingerprint: digest([...identity, "general_church_attendance", "guardian_declared_unverified", invalidChildren])
+        });
+        assert.deepEqual(await readFamilyHistory(familyReceipt.visitorId), { status: "unavailable" });
+      } finally {
+        await change({ adultVisitorId: original.adultVisitorId, childrenJson: original.childrenJson,
+          fingerprint: original.fingerprint });
+      }
+      assert.deepEqual(await readFamilyHistory(familyReceipt.visitorId), family);
+      console.log("CROSS_PERSON_FAMILY_EVIDENCE_DENIED=True");
+      console.log("FAMILY_FINGERPRINT_MISMATCH_DENIED=True");
+      console.log("MALFORMED_CHILD_EVIDENCE_DENIED=True");
+      console.log("ORIGINAL_SYNTHETIC_FAMILY_EVIDENCE_RESTORED=True");
+    }
 
     // Deliberate synthetic interruption: a later receipt is durable,
     // but no cancellation event has been written yet.

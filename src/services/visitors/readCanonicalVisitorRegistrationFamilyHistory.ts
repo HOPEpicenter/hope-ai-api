@@ -82,10 +82,10 @@ function parseChildren(raw: unknown): VisitorFamilyChild[] {
   return children;
 }
 
-async function readFamily(
+export async function readFamily(
   table: FamilyReadTable,
   visitorId: string,
-  receipt: VisitorRegistrationHistoryItem
+  receipt: Pick<VisitorRegistrationHistoryItem, "submissionId" | "serviceId">
 ): Promise<FamilyEvidence> {
   const identity = [receipt.submissionId, receipt.serviceId, visitorId];
   const rowKey = "family-attendance-" + digest(identity).slice(0, 32);

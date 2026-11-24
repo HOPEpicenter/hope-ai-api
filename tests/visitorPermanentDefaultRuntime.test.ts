@@ -826,6 +826,13 @@ test(
     const pending109 = await recoveryJournal109.inspect(interrupted109.submissionId);
     if (pending109.status !== "pending") throw new Error("Incomplete family must remain pending");
     assert.equal(pending109.intent.familyExpected, true);
+    const { inspectPermanentVisitRecovery } = await import("../src/services/visitors/inspectPermanentVisitRecovery");
+    const readOnly110 = { listEntities: visitors.listEntities.bind(visitors) };
+    assert.deepEqual(await inspectPermanentVisitRecovery(interrupted109.submissionId, readOnly110), {
+      status: "ready", ...pending109.intent, stage: "family_attendance_unconfirmed",
+      adultRecorded: true, familyRecorded: false
+    });
+    console.log("ACTUAL_INTERRUPTED_FAMILY_STAGE_VERIFIED=True");
     console.log("INTERRUPTED_FAMILY_DURABLY_IDENTIFIED=True");
     const second109 = await submitPermanentPublicVisitRegistration(interrupted109, {
       ...recoveryDeps109, recordFamily: recordVisitorFamilyCheckIn
@@ -833,6 +840,11 @@ test(
     assert.deepEqual(second109, { accepted: false, status: "try_later" });
     assert.equal(await countRows(visitors, "VISITOR_FAMILY_ATTENDANCE"), beforeFamily109 + 1);
     assert.equal((await recoveryJournal109.inspect(interrupted109.submissionId)).status, "pending");
+    assert.deepEqual(await inspectPermanentVisitRecovery(interrupted109.submissionId, readOnly110), {
+      status: "ready", ...pending109.intent, stage: "completion_unconfirmed",
+      adultRecorded: true, familyRecorded: true
+    });
+    console.log("ACTUAL_COMPLETION_UNCONFIRMED_STAGE_VERIFIED=True");
     console.log("INTERRUPTED_ENROLLMENT_REMAINS_PENDING=True");
     await register(interrupted109);
     assert.equal((await recoveryJournal109.inspect(interrupted109.submissionId)).status, "completed");
@@ -852,5 +864,46 @@ test(
       }
     }
     console.log("JOURNAL_MINIMAL_AND_CONFLICT_SAFE=True");
+    assert.deepEqual(await inspectPermanentVisitRecovery(interrupted109.submissionId, readOnly110), {
+      status: "ready", ...pending109.intent, stage: "completed",
+      adultRecorded: true, familyRecorded: true
+    });
+    assert.deepEqual(await inspectPermanentVisitRecovery(familySubmission.submissionId, readOnly110), {
+      status: "ready", ...familyRecovery109.intent, stage: "completed",
+      adultRecorded: true, familyRecorded: true
+    });
+    console.log("ACTUAL_COMPLETED_RECOVERY_INSPECTION_VERIFIED=True");
+    const orphan110 = { ...pending109.intent, submissionId: randomUUID() };
+    assert.equal(await recoveryJournal109.begin(orphan110), true);
+    assert.deepEqual(await inspectPermanentVisitRecovery(orphan110.submissionId, readOnly110), {
+      status: "ready", ...orphan110, stage: "awaiting_arrival_claim",
+      adultRecorded: false, familyRecorded: false
+    });
+    await visitors.createEntity({ partitionKey: "VISITOR_CHECK_IN_CLAIM", rowKey: orphan110.submissionId,
+      visitorId: randomUUID(), fingerprint: "a".repeat(64), createProfile: true,
+      claimedAt: new Date().toISOString() });
+    assert.deepEqual(await inspectPermanentVisitRecovery(orphan110.submissionId, readOnly110), {
+      status: "ready", ...orphan110, stage: "adult_attendance_unconfirmed",
+      adultRecorded: false, familyRecorded: false
+    });
+    console.log("PRE_ATTENDANCE_RECOVERY_STAGES_VERIFIED=True");
+    assert.equal(await recoveryJournal109.complete(orphan110), true);
+    assert.deepEqual(await inspectPermanentVisitRecovery(orphan110.submissionId, readOnly110), { status: "unavailable" });
+    assert.deepEqual(await inspectPermanentVisitRecovery(randomUUID(), readOnly110), { status: "not_tracked" });
+    assert.deepEqual(await inspectPermanentVisitRecovery("invalid", readOnly110), { status: "unavailable" });
+    const failedRead110 = { listEntities: (() => { throw new Error("Synthetic read outage"); }) as typeof visitors.listEntities };
+    assert.deepEqual(await inspectPermanentVisitRecovery(interrupted109.submissionId, failedRead110), { status: "unavailable" });
+    const originalClaim110 = await visitors.getEntity<{ fingerprint: string }>("VISITOR_CHECK_IN_CLAIM", interrupted109.submissionId);
+    try {
+      await visitors.updateEntity({ partitionKey: "VISITOR_CHECK_IN_CLAIM", rowKey: interrupted109.submissionId, fingerprint: "0".repeat(64) }, "Merge");
+      assert.deepEqual(await inspectPermanentVisitRecovery(interrupted109.submissionId, readOnly110), { status: "unavailable" });
+    } finally {
+      await visitors.updateEntity({ partitionKey: "VISITOR_CHECK_IN_CLAIM", rowKey: interrupted109.submissionId, fingerprint: originalClaim110.fingerprint }, "Merge");
+    }
+    console.log("INCONSISTENT_AND_UNAVAILABLE_RECOVERY_EVIDENCE_DENIED=True");
+    assert.equal(await countRows(visitors, "VISITOR_CHECK_IN"), beforeAdult109 + 1);
+    assert.equal(await countRows(visitors, "VISITOR_FAMILY_ATTENDANCE"), beforeFamily109 + 1);
+    assert.equal(await countRows(visitors, "VISITOR"), beforeProfiles109 + 1);
+    console.log("READ_ONLY_RECOVERY_INSPECTION_VERIFIED=True");
   }
 );

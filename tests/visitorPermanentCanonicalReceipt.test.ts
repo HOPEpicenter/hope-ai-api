@@ -1,4 +1,8 @@
 import {
+  postPermanentPublicVisitRegistration as submissionHttp
+} from "../src/functions/postPermanentPublicVisitRegistration";
+
+import {
   recordVisitorFamilyAttendance
 } from "../src/services/visitors/recordVisitorFamilyAttendance";
 
@@ -2152,4 +2156,527 @@ test("lost family persistence acknowledgement does not confirm success and exact
       1
     );
   });
+});
+
+const submissionBridge =
+  "synthetic-permanent-submission-bridge-key";
+
+const submissionFlags = [
+  "FEATURE_PERMANENT_PUBLIC_VISIT",
+  "FEATURE_PERMANENT_VISITOR_CONSENT_GUARD",
+  "FEATURE_PERMANENT_VISITOR_AUTOMATIC_FOLLOWUP"
+];
+
+type SubmissionHttpDeps = NonNullable<
+  Parameters<typeof submissionHttp>[2]
+>;
+
+type SubmissionHttpRequest =
+  Parameters<typeof submissionHttp>[1];
+
+async function withSubmissionHttpEnvironment(
+  run: () => Promise<void>
+): Promise<void> {
+  const values: Record<string, string> = {
+    FEATURE_PERMANENT_PUBLIC_VISIT: "true",
+    FEATURE_PERMANENT_VISITOR_CONSENT_GUARD: "true",
+    FEATURE_PERMANENT_VISITOR_AUTOMATIC_FOLLOWUP: "true",
+    HOPE_PERMANENT_VISIT_BRIDGE_KEY:
+      submissionBridge,
+    HOPE_PERMANENT_VISIT_SESSION_SECRET:
+      publicSigningSecret,
+    HOPE_PERMANENT_VISIT_CLAIM_SECRET:
+      publicClaimSecret
+  };
+
+  const previous = Object.fromEntries(
+    Object.keys(values).map(key =>
+      [key, process.env[key]]
+    )
+  );
+
+  try {
+    for (const [key, value] of
+      Object.entries(values)) {
+      process.env[key] = value;
+    }
+
+    await run();
+  } finally {
+    for (const [key, value] of
+      Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+}
+
+function submissionHttpFixture(
+  runtime: NonNullable<
+    SubmissionHttpDeps["runtime"]
+  >,
+  overrides: SubmissionHttpDeps = {}
+) {
+  let runtimeCalls = 0;
+
+  const deps: SubmissionHttpDeps = {
+    now: () => publicContext.nowMs,
+    approvedEvents: async () => [],
+    ...overrides,
+
+    runtime: async () => {
+      runtimeCalls++;
+      return runtime();
+    }
+  };
+
+  const request = {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-hope-public-visit-key":
+        submissionBridge
+    },
+    body: {
+      token: publicSession(),
+      submissionId: command.submissionId,
+      body: {
+        ...publicBody,
+        contactConsent: true
+      }
+    }
+  };
+
+  async function call(
+    changes: Partial<SubmissionHttpRequest> = {}
+  ) {
+    const context:
+      Parameters<typeof submissionHttp>[0] = {};
+
+    await submissionHttp(context, {
+      ...request,
+      ...changes
+    }, deps);
+
+    assert.ok(context.res);
+
+    assert.equal(
+      context.res.headers["cache-control"],
+      "no-store"
+    );
+
+    return context.res;
+  }
+
+  return {
+    request,
+    call,
+    runtimeCalls: () => runtimeCalls
+  };
+}
+
+test("public submission HTTP requires all release flags and distinct secrets", async () => {
+  await withSubmissionHttpEnvironment(async () => {
+    const f = submissionHttpFixture(
+      async () => {
+        throw new Error(
+          "Disabled route reached storage"
+        );
+      }
+    );
+
+    for (const flag of submissionFlags) {
+      delete process.env[flag];
+
+      assert.equal(
+        (await f.call()).status,
+        404
+      );
+
+      process.env[flag] = "true";
+    }
+
+    process.env.HOPE_PERMANENT_VISIT_CLAIM_SECRET =
+      publicSigningSecret;
+
+    assert.equal(
+      (await f.call()).status,
+      503
+    );
+
+    assert.equal(f.runtimeCalls(), 0);
+  });
+});
+
+test("public submission HTTP rejects unauthorized malformed and oversized requests before runtime", async () => {
+  await withSubmissionHttpEnvironment(async () => {
+    const f = submissionHttpFixture(
+      async () => {
+        throw new Error(
+          "Invalid request reached storage"
+        );
+      }
+    );
+
+    assert.equal(
+      (await f.call({
+        headers: {}
+      })).status,
+      401
+    );
+
+    assert.equal(
+      (await f.call({
+        method: "GET"
+      })).status,
+      405
+    );
+
+    assert.equal(
+      (await f.call({
+        headers: {
+          ...f.request.headers,
+          "content-type": "text/plain"
+        }
+      })).status,
+      415
+    );
+
+    assert.equal(
+      (await f.call({
+        body: {
+          ...f.request.body,
+          actorId: "synthetic-staff"
+        }
+      })).status,
+      400
+    );
+
+    assert.equal(
+      (await f.call({
+        body: {
+          ...f.request.body,
+          body: {
+            ...publicBody,
+            invitedBy: "x".repeat(20000)
+          }
+        }
+      })).status,
+      413
+    );
+
+    assert.equal(
+      (await f.call({
+        body: {
+          ...f.request.body,
+          token: "invalid-session"
+        }
+      })).status,
+      403
+    );
+
+    assert.equal(
+      (await f.call({
+        body: {
+          ...f.request.body,
+          body: {
+            ...publicBody,
+            contactConsent: "yes"
+          }
+        }
+      })).status,
+      400
+    );
+
+    assert.equal(f.runtimeCalls(), 0);
+  });
+});
+
+test("public submission HTTP records an adult and one followup plan with a minimal receipt", async () => {
+  await withSubmissionHttpEnvironment(() =>
+    withEnrollmentTables(async (
+      visitors, reservations, followups
+    ) => {
+      const f = submissionHttpFixture(
+        async () => enrollmentDependencies(
+          visitors, reservations, followups
+        )
+      );
+
+      for (let index = 0; index < 2; index++) {
+        const response = await f.call();
+
+        assert.equal(response.status, 200);
+
+        assert.deepEqual(response.body, {
+          status: "recorded",
+          accepted: true
+        });
+      }
+
+      const receipt = await visitors.getEntity<{
+        visitorId: string;
+        registrationDetailsJson: string;
+      }>(
+        "VISITOR_CHECK_IN",
+        command.submissionId
+      );
+
+      assert.equal(
+        JSON.parse(
+          receipt.registrationDetailsJson
+        ).contactConsent,
+        true
+      );
+
+      assert.equal(
+        (await followups.listByVisitor(
+          receipt.visitorId
+        )).length,
+        1
+      );
+
+      assert.equal(
+        (await familyPartitionRows(
+          visitors, "VISITOR"
+        )).length,
+        1
+      );
+
+      assert.equal(
+        (await familyPartitionRows(
+          visitors, "VISITOR_CHECK_IN"
+        )).length,
+        1
+      );
+
+      assert.equal(
+        await publicRowCount(reservations),
+        3
+      );
+    })
+  );
+});
+
+test("public submission HTTP records complete family attendance without followup when consent is declined", async () => {
+  await withSubmissionHttpEnvironment(() =>
+    withEnrollmentTables(async (
+      visitors, reservations, followups
+    ) => {
+      const f = submissionHttpFixture(
+        async () => fullFamilyDependencies(
+          visitors, reservations, followups
+        )
+      );
+
+      const response = await f.call({
+        body: {
+          ...f.request.body,
+          body: {
+            ...fullFamilyBody,
+            contactConsent: false
+          }
+        }
+      });
+
+      assert.equal(response.status, 200);
+
+      assert.deepEqual(response.body, {
+        status: "recorded",
+        accepted: true
+      });
+
+      assert.equal(
+        (await familyPartitionRows(
+          visitors,
+          "VISITOR_FAMILY_ATTENDANCE"
+        )).length,
+        1
+      );
+
+      const receipt = await visitors.getEntity<{
+        visitorId: string;
+      }>(
+        "VISITOR_CHECK_IN",
+        command.submissionId
+      );
+
+      assert.equal(
+        (await followups.listByVisitor(
+          receipt.visitorId
+        )).length,
+        0
+      );
+    })
+  );
+});
+
+test("public submission HTTP enforces selected event and session authority", async () => {
+  await withSubmissionHttpEnvironment(async () => {
+    const events = [
+      {
+        id: "synthetic-event-one",
+        date: "2026-11-24",
+        name: "Event One",
+        active: true
+      },
+      {
+        id: "synthetic-event-two",
+        date: "2026-11-24",
+        name: "Event Two",
+        active: true
+      }
+    ];
+
+    const f = submissionHttpFixture(
+      async () => {
+        throw new Error(
+          "Mismatched event reached runtime"
+        );
+      },
+      {
+        approvedEvents: async () => events
+      }
+    );
+
+    const token = publicSession({
+      ...publicContext,
+      approvedEvents: events,
+      selectedEventId: "synthetic-event-one"
+    });
+
+    const missing = await f.call({
+      body: {
+        ...f.request.body,
+        token
+      }
+    });
+
+    assert.equal(missing.status, 409);
+
+    assert.equal(
+      missing.body.status,
+      "selection_required"
+    );
+
+    const mismatch = await f.call({
+      body: {
+        ...f.request.body,
+        token,
+        body: {
+          ...publicBody,
+          eventId: "synthetic-event-two"
+        }
+      }
+    });
+
+    assert.equal(mismatch.status, 403);
+    assert.equal(f.runtimeCalls(), 0);
+  });
+});
+
+test("public submission HTTP never confirms an uncertain writer result and exact retry recovers", async () => {
+  await withSubmissionHttpEnvironment(() =>
+    withEnrollmentTables(async (
+      visitors, reservations, followups
+    ) => {
+      const actual = enrollmentDependencies(
+        visitors, reservations, followups
+      );
+
+      let loseAcknowledgement = true;
+
+      const f = submissionHttpFixture(
+        async () => ({
+          ...actual,
+
+          recordAdult: async input => {
+            const saved = await actual.recordAdult!(
+              input
+            );
+
+            if (loseAcknowledgement) {
+              assert.equal(
+                saved.status, "recorded"
+              );
+
+              throw new Error(
+                "Synthetic uncertain acknowledgement"
+              );
+            }
+
+            return saved;
+          }
+        })
+      );
+
+      const uncertain = await f.call();
+
+      assert.equal(uncertain.status, 503);
+
+      assert.deepEqual(uncertain.body, {
+        status: "try_later",
+        accepted: false
+      });
+
+      const receipt = await visitors.getEntity<{
+        visitorId: string;
+      }>(
+        "VISITOR_CHECK_IN",
+        command.submissionId
+      );
+
+      assert.equal(
+        (await followups.listByVisitor(
+          receipt.visitorId
+        )).length,
+        0
+      );
+
+      loseAcknowledgement = false;
+
+      const recovered = await f.call();
+
+      assert.equal(recovered.status, 200);
+
+      assert.deepEqual(recovered.body, {
+        status: "recorded",
+        accepted: true
+      });
+
+      const conflict = await f.call({
+        body: {
+          ...f.request.body,
+          body: {
+            ...publicBody,
+            contactConsent: false
+          }
+        }
+      });
+
+      assert.equal(conflict.status, 409);
+
+      assert.equal(
+        conflict.body.status,
+        "submission_conflict"
+      );
+
+      assert.equal(
+        (await familyPartitionRows(
+          visitors, "VISITOR_CHECK_IN"
+        )).length,
+        1
+      );
+
+      assert.equal(
+        (await followups.listByVisitor(
+          receipt.visitorId
+        )).length,
+        1
+      );
+    })
+  );
 });

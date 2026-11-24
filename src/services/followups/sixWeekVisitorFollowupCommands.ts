@@ -353,6 +353,9 @@ export async function startSixWeekVisitorFollowup(
     if (assigneeFailure) return assigneeFailure;
   }
 
+  const consentFailure = await requireCurrentRegistrationConsent(visitorId, dependencies);
+  if (consentFailure) return consentFailure;
+
   const occurredAt = (
     dependencies.now ?? (() => new Date().toISOString())
   )();

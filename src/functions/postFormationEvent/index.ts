@@ -1,3 +1,5 @@
+import { requireRegistrationEventContactPermission } from "../../services/followups/requireRegistrationEventContactPermission";
+import type { RegistrationConsentReader } from "../../services/followups/requireCurrentRegistrationContactPermission";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
   ensureFormationTables,
@@ -13,7 +15,14 @@ import {
   resolveFormationMutationActorAuthorization
 } from "../../services/authorization/formationMutationActor";
 
-export async function postFormationEvent(context: any, req: any): Promise<void> {
+export type FormationEventConsentDependencies = {
+  authorizeActor?: typeof resolveFormationMutationActorAuthorization;
+  readRegistrationConsent?: RegistrationConsentReader;
+  recordFormation?: typeof recordFormationEventV1;
+  ensureTables?: typeof ensureFormationTables;
+};
+
+export async function postFormationEvent(context: any, req: any, dependencies: FormationEventConsentDependencies = {}): Promise<void> {
   const requestId = getRequestId(req);
 
   try {
@@ -34,7 +43,7 @@ export async function postFormationEvent(context: any, req: any): Promise<void> 
     const body = req?.body ?? {};
 
     const actorAuth =
-      await resolveFormationMutationActorAuthorization(
+      await (dependencies.authorizeActor ?? resolveFormationMutationActorAuthorization)(
         req,
         body?.type,
         body?.source?.actorId
@@ -52,9 +61,21 @@ export async function postFormationEvent(context: any, req: any): Promise<void> 
       return;
     }
 
-    await ensureFormationTables();
+    const consentFailure = await requireRegistrationEventContactPermission(
+      body?.visitorId, body?.type, body?.data, dependencies.readRegistrationConsent
+    );
+    if (consentFailure) {
+      context.res = {
+        status: consentFailure.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: { ok: false, requestId, error: consentFailure.error }
+      };
+      return;
+    }
 
-    const result = await recordFormationEventV1(body);
+    await (dependencies.ensureTables ?? ensureFormationTables)();
+
+    const result = await (dependencies.recordFormation ?? recordFormationEventV1)(body);
 
     context.res = {
       status: result.accepted ? 201 : 200,

@@ -3,6 +3,9 @@ import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
 import { TableClient } from "@azure/data-tables";
 import {
+  readCanonicalVisitorRegistrationHistory as readRegistrationHistory
+} from "../src/services/visitors/readCanonicalVisitorRegistrationHistory";
+import {
   getVisitorById, listVisitorsRecords
 } from "../src/functions/_shared/visitorsRepository";
 import { AzureTableVisitorsRepository } from "../src/repositories/visitorsRepository";
@@ -385,6 +388,42 @@ test(
     console.log("CONSENTED_SIX_WEEK_READS_VERIFIED=True");
     console.log("DECLINED_FAMILY_NO_PLAN_VERIFIED=True");
 
+    // Exercise the default history reader on receipts produced by
+    // the real canonical registration runtime above.
+    const adultHistory = await readRegistrationHistory(adultReceipt.visitorId);
+    const familyHistory = await readRegistrationHistory(familyReceipt.visitorId);
+    assert.equal(adultHistory.status, "ready");
+    assert.equal(familyHistory.status, "ready");
+    assert.equal(adultHistory.registrationCount, 1);
+    assert.equal(familyHistory.registrationCount, 1);
+    assert.equal(adultHistory.truncated, false);
+    assert.equal(familyHistory.truncated, false);
+    assert.equal(adultHistory.items.length, 1);
+    assert.equal(familyHistory.items.length, 1);
+    assert.equal(adultHistory.items[0].submissionId, adultSubmission.submissionId);
+    assert.equal(familyHistory.items[0].submissionId, familySubmission.submissionId);
+    assert.equal(adultHistory.items[0].visitType, "first");
+    assert.equal(adultHistory.items[0].churchHome, "looking");
+    assert.deepEqual(adultHistory.items[0].interests, ["prayer"]);
+    assert.equal(adultHistory.items[0].contactConsentAtRegistration, true);
+    assert.equal(familyHistory.items[0].contactConsentAtRegistration, false);
+    assert.deepEqual(familyHistory.items[0].interests, ["church_events"]);
+    assert.deepEqual(familyHistory.items[0].churchHome, null);
+    assert.deepEqual(familyHistory.items[0].invitedBy, null);
+    for (const history of [adultHistory, familyHistory]) {
+      assert.deepEqual(Object.keys(history.items[0]).sort(), [
+        "churchHome", "contactConsentAtRegistration", "interests", "invitedBy",
+        "recordedAt", "serviceId", "submissionId", "visitType"
+      ]);
+    }
+    assert.deepEqual(await readRegistrationHistory("synthetic-no-history-98"), {
+      status: "ready", registrationCount: 0, truncated: false, items: []
+    });
+    console.log("ACTUAL_REGISTRATION_HISTORY_VERIFIED=True");
+    console.log("RETRY_PRESERVES_ONE_HISTORY_ITEM=True");
+    console.log("HISTORY_CONTACT_DATA_EXCLUDED=True");
+    console.log("CROSS_PERSON_HISTORY_ISOLATION_VERIFIED=True");
+
     // Deliberate synthetic interruption: a later receipt is durable,
     // but no cancellation event has been written yet.
     const existingReceipt = await visitors.getEntity<{
@@ -398,9 +437,11 @@ test(
       partitionKey: "VISITOR_CHECK_IN",
       rowKey: randomUUID(),
       visitorId: adultReceipt.visitorId,
+      serviceId: adultHistory.items[0].serviceId,
       recordedAt: new Date(priorMs + 1).toISOString(),
       registrationDetailsJson: JSON.stringify({
         ...JSON.parse(existingReceipt.registrationDetailsJson),
+        visitType: "returning",
         contactConsent: false
       })
     };
@@ -421,6 +462,16 @@ test(
     assert.equal(suppressed.items.length, 0);
     assert.deepEqual(await followups.listByVisitor(adultReceipt.visitorId), adultEvents);
     console.log("STALE_ACTIONABLE_PLAN_SUPPRESSED=True");
+    const historical = await readRegistrationHistory(adultReceipt.visitorId);
+    assert.equal(historical.status, "ready");
+    assert.equal(historical.registrationCount, 2);
+    assert.equal(historical.items[0].submissionId, withdrawal.rowKey);
+    assert.equal(historical.items[0].visitType, "returning");
+    assert.equal(historical.items[0].contactConsentAtRegistration, false);
+    assert.equal(historical.items[1].submissionId, adultSubmission.submissionId);
+    assert.equal(historical.items[1].contactConsentAtRegistration, true);
+    assert.deepEqual(await readRegistrationHistory(familyReceipt.visitorId), familyHistory);
+    console.log("STORED_HISTORICAL_CONSENT_DECISIONS_PRESERVED=True");
 
     // Unknown consent must not masquerade as an empty, verified queue.
     await visitors.createEntity({
@@ -439,6 +490,11 @@ test(
     );
     assert.deepEqual(await followups.listByVisitor(adultReceipt.visitorId), adultEvents);
     console.log("UNKNOWN_CONSENT_READS_FAIL_CLOSED=True");
+    assert.deepEqual(await readRegistrationHistory(adultReceipt.visitorId), {
+      status: "unavailable"
+    });
+    assert.deepEqual(await readRegistrationHistory(familyReceipt.visitorId), familyHistory);
+    console.log("MALFORMED_STORED_HISTORY_FAILS_CLOSED=True");
     console.log("FOLLOWUP_EVENT_HISTORY_UNCHANGED=True");
 
     const noEvidenceId = "synthetic-no-registration-evidence";

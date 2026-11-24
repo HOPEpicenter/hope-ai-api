@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
+import { createHmac } from "node:crypto";
 
 import {
   issuePermanentVisitorQrGrant as issue,
@@ -21,6 +22,7 @@ const event = {
 const policy = {
   enabled: true,
   ownerActivated: true,
+    activationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   eventId: event.id,
   date: event.date,
   opensAtMs: Date.parse("2026-11-29T14:00:00Z"),
@@ -213,4 +215,103 @@ test("invalid lifetimes and out-of-window issuance are denied", () => {
     ...context,
     selectedEventId: undefined
   }), null);
+});
+
+
+test("missing or malformed activation identity fails closed", () => {
+  const token = tokenFor();
+
+  for (const activationId of [
+    undefined,
+    "",
+    "invalid-activation"
+  ]) {
+    const invalid = {
+      ...context,
+      policy: {
+        ...context.policy!,
+        activationId
+      }
+    };
+
+    assert.equal(issue(secret, invalid), null);
+    assert.equal(verify(token, secret, invalid), null);
+  }
+});
+
+test("reactivation with a new identity cannot revive an old grant", () => {
+  const oldToken = tokenFor();
+
+  const deactivated = {
+    ...context,
+    policy: {
+      ...context.policy!,
+      ownerActivated: false
+    }
+  };
+
+  assert.equal(
+    verify(oldToken, secret, deactivated),
+    null
+  );
+
+  const reactivated = {
+    ...context,
+    policy: {
+      ...context.policy!,
+      ownerActivated: true,
+      activationId:
+        "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    }
+  };
+
+  // Event and registration window remain identical.
+  assert.equal(
+    verify(oldToken, secret, reactivated),
+    null
+  );
+
+  const newToken = issue(secret, reactivated);
+
+  assert.ok(newToken);
+  assert.ok(newToken.startsWith("q3."));
+
+  assert.ok(
+    verify(newToken, secret, reactivated)
+  );
+
+  assert.equal(
+    verify(newToken, secret, context),
+    null
+  );
+});
+
+test("correctly signed pre-activation q2 credential is rejected", () => {
+  const token = tokenFor();
+  const payload = token.split(".")[1];
+
+  const claims = JSON.parse(
+    Buffer.from(payload, "base64url").toString("utf8")
+  ) as Record<string, unknown>;
+
+  delete claims.activation;
+  claims.v = 2;
+
+  const oldPayload = Buffer.from(
+    JSON.stringify(claims),
+    "utf8"
+  ).toString("base64url");
+
+  const signed = `q2.${oldPayload}`;
+
+  const signature = createHmac("sha256", secret)
+    .update(signed, "utf8")
+    .digest("base64url");
+
+  const legacy = `${signed}.${signature}`;
+
+  assert.equal(
+    verify(legacy, secret, context),
+    null
+  );
 });

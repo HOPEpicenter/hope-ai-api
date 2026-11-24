@@ -11,7 +11,7 @@ import {
 
 import type { VisitorEvent } from "./resolveVisitorEventContext";
 
-const PREFIX = "q2";
+const PREFIX = "q3";
 const PURPOSE = "permanent-visitor-guest-admission";
 const MAX_LIFETIME_SECONDS = 3600;
 const MAX_TOKEN_LENGTH = 1024;
@@ -76,6 +76,13 @@ export function issuePermanentVisitorQrGrant(
       return null;
     }
 
+    const activationId = context.policy?.activationId;
+
+    if (typeof activationId !== "string" ||
+        !UUID4.test(activationId)) {
+      return null;
+    }
+
     const event = assessPermanentVisitorAdmissionEvent(context);
 
     if (!event.admitted) {
@@ -95,7 +102,8 @@ export function issuePermanentVisitorQrGrant(
     }
 
     const claims = {
-      v: 2,
+      v: 3,
+      activation: activationId,
       purpose: PURPOSE,
       event: event.serviceId,
       date: event.date,
@@ -140,6 +148,13 @@ export function verifyPermanentVisitorQrGrant(
         !validSecret(secret) ||
         typeof token !== "string" ||
         token.length > MAX_TOKEN_LENGTH) {
+      return null;
+    }
+
+    const activationId = context.policy?.activationId;
+
+    if (typeof activationId !== "string" ||
+        !UUID4.test(activationId)) {
       return null;
     }
 
@@ -188,8 +203,9 @@ export function verifyPermanentVisitorQrGrant(
     const data = claims as Record<string, unknown>;
 
     if (Object.keys(data).sort().join(",") !==
-          "closes,date,event,exp,iat,jti,opens,purpose,v" ||
-        data.v !== 2 ||
+          "activation,closes,date,event,exp,iat,jti,opens,purpose,v" ||
+        data.v !== 3 ||
+        data.activation !== activationId ||
         data.purpose !== PURPOSE ||
         data.event !== event.serviceId ||
         data.date !== event.date ||

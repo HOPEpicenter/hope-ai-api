@@ -33,6 +33,7 @@ const context: PermanentQrGrantContext = {
   policy: {
     enabled: true,
     ownerActivated: true,
+    activationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     eventId: event.id,
     date: event.date,
     opensAtMs: Date.parse("2026-11-29T14:00:00Z"),
@@ -462,4 +463,86 @@ test("unknown storage failure and invalid claim secret fail closed", async () =>
   });
 
   assert.equal(f.rows.size, 0);
+});
+
+
+test("reactivation rejects old grants without resetting reservation capacity", async () => {
+  const f = fixture();
+
+  const oldToken = grant();
+
+  const original = {
+    token: oldToken,
+    command
+  };
+
+  f.deps.capacity = 1;
+
+  assert.deepEqual(
+    await reserve(original, f.deps),
+    { admitted: true, status: "reserved" }
+  );
+
+  const reactivated: PermanentQrGrantContext = {
+    ...context,
+    policy: {
+      ...context.policy!,
+      activationId:
+        "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    }
+  };
+
+  const deps = {
+    ...f.deps,
+    context: reactivated
+  };
+
+  assert.deepEqual(
+    await reserve(original, deps),
+    { admitted: false, status: "denied" }
+  );
+
+  const newToken = grant(reactivated);
+
+  // Reactivation cannot erase an earlier submission claim.
+  assert.deepEqual(
+    await reserve({
+      token: newToken,
+      command
+    }, deps),
+    { admitted: false, status: "conflict" }
+  );
+
+  // Reactivation also cannot reset the same-minute quota.
+  assert.deepEqual(
+    await reserve({
+      token: newToken,
+      command: secondCommand
+    }, deps),
+    {
+      admitted: false,
+      status: "capacity_exhausted"
+    }
+  );
+
+  assert.equal(f.rows.size, 3);
+
+  // Normal capacity becomes available in the next minute.
+  const later: PermanentQrGrantContext = {
+    ...reactivated,
+    nowMs: reactivated.nowMs + 60000
+  };
+
+  assert.deepEqual(
+    await reserve({
+      token: grant(later),
+      command: secondCommand
+    }, {
+      ...deps,
+      context: later
+    }),
+    { admitted: true, status: "reserved" }
+  );
+
+  assert.equal(f.rows.size, 6);
 });

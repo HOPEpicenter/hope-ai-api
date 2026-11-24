@@ -414,6 +414,7 @@ test("local Azurite verifies durable atomic reservation behavior", {
         policy: {
           enabled: true,
           ownerActivated: true,
+    activationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
           eventId: event.id,
           date: event.date,
           opensAtMs: Date.parse("2026-11-29T14:00:00Z"),

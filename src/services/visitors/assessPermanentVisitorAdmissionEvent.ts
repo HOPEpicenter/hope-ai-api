@@ -15,6 +15,10 @@ import {
 export type PermanentVisitorAdmissionPolicy = Readonly<{
   enabled?: boolean;
   ownerActivated?: boolean;
+
+  // Trusted activation identity. QR admission requires
+  // a fresh identity for every owner reactivation.
+  activationId?: string;
   eventId: string;
   date: string;
   opensAtMs: number;

@@ -2,6 +2,7 @@ import {
   isPublicVisitorConsentWithdrawal
 } from "../domain/followups/projectSixWeekVisitorFollowup";
 
+import { assertContactWriterNotHeld } from "../services/followups/permanentVisitorContactWriterHold";
 import type { TableClient } from "@azure/data-tables";
 import type {
   SixWeekFollowupEvent,
@@ -76,6 +77,7 @@ export class SixWeekFollowupEventsRepository {
   }
 
   async append(event: SixWeekFollowupEvent): Promise<boolean> {
+    assertContactWriterNotHeld("six_week", event.type, event.data);
     const table: TableClient = await this.tableFor();
 
     try {

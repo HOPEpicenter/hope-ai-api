@@ -1,3 +1,4 @@
+import { contactWriterHoldEnabled, CONTACT_WRITER_HOLD_MESSAGE } from "./permanentVisitorContactWriterHold";
 import { requireCurrentRegistrationContactPermission } from "./requireCurrentRegistrationContactPermission";
 
 // A known decline is not actionable; uncertainty is not an empty queue.
@@ -5,6 +6,6 @@ import { requireCurrentRegistrationContactPermission } from "./requireCurrentReg
 export async function mayExposeRegistrationContactWork(visitorId: string): Promise<boolean> {
   const failure = await requireCurrentRegistrationContactPermission(visitorId);
   if (!failure) return true;
-  if (failure.status === 409) return false;
+  if (failure.status === 409 || (contactWriterHoldEnabled() && failure.error === CONTACT_WRITER_HOLD_MESSAGE)) return false;
   throw new Error("Current registration consent could not be verified");
 }

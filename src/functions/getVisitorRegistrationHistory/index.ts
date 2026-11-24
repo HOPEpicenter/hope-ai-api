@@ -1,6 +1,7 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { readHighRiskStaffVisibility } from "../_shared/highRiskStaffActor";
 import { readCanonicalVisitorRegistrationFamilyHistory } from "../../services/visitors/readCanonicalVisitorRegistrationFamilyHistory";
+import { contactWriterHoldEnabled } from "../../services/followups/permanentVisitorContactWriterHold";
 import { readLatestRegistrationConsent } from "../../services/followups/readLatestRegistrationConsent";
 
 type Dependencies = {
@@ -50,7 +51,9 @@ export async function getVisitorRegistrationHistory(
     const decision = await (deps.readConsent ?? readLatestRegistrationConsent)(visitorId);
     // Preserve the existing dashboard wire contract. Pending verification is
     // not a verified decline; hide contact controls without erasing history.
-    const currentConsent = decision === "pending_verification" ? "unavailable" : decision;
+    const currentConsent = decision === "pending_verification" ||
+      (contactWriterHoldEnabled() && (decision === "granted" || decision === "legacy_no_evidence"))
+      ? "unavailable" : decision;
     if (!["granted", "declined", "legacy_no_evidence", "unavailable"].includes(currentConsent)) {
       unavailable(); return;
     }

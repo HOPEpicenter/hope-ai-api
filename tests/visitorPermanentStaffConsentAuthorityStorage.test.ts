@@ -49,7 +49,7 @@ test("disabled authority preserves legacy receipt reading and disabled guard",()
   for(const flag of [undefined,"false","TRUE",""]) await environment({[authority]:flag},async()=>{assert.equal(await read(id),"granted");assert.equal(await guard(id),null);});
   await environment({[authority]:undefined,[oldGuard]:undefined},async()=>assert.equal(await guard(id,async()=>"declined"),null));
 }));
-test("durable grant ignores old receipt decline",()=>fixture(async(c,v)=>{await init(c,true);await legacy(v,false);assert.equal(await read(id),"granted");assert.equal(await guard(id),null);assert.equal(await expose(id),true);}));
+test("durable grant ignores old receipt decline",()=>fixture(async(c,v)=>{await init(c,true);await legacy(v,false);assert.equal(await read(id),"granted");assert.equal((await guard(id))?.status,503);assert.equal(await expose(id),false);}));
 test("durable decline ignores old receipt grant",()=>fixture(async(c,v)=>{await init(c,false);await legacy(v,true);assert.equal(await read(id),"declined");assert.equal((await guard(id))?.status,409);assert.equal(await expose(id),false);}));
 test("pending withdrawal suppresses without changing effective grant",()=>fixture(async(c)=>{const r=await init(c,true);await request(r,false);assert.equal(await read(id),"pending_verification");assert.equal((await guard(id))?.status,409);assert.equal(await expose(id),false);const s=await r.read(id);assert.equal(s.status,"ready");if(s.status!=="ready")throw Error("state");assert.equal(s.state.effective,"granted");}));
 test("pending grant never authorizes contact",()=>fixture(async(c)=>{const r=await init(c,false);await request(r,true);assert.equal(await read(id),"pending_verification");assert.equal((await guard(id))?.status,409);}));

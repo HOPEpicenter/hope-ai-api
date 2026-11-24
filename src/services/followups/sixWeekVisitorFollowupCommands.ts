@@ -1,3 +1,4 @@
+import { contactWriterHoldEnabled, CONTACT_WRITER_HOLD_MESSAGE } from "./permanentVisitorContactWriterHold";
 import {
   readLatestRegistrationConsent,
   registrationConsentAuthorityEnabled,
@@ -236,6 +237,9 @@ async function requireCurrentRegistrationConsent(
       );
     }
 
+    if (consent === "granted" && contactWriterHoldEnabled()) {
+      return commandFailure(503, CONTACT_WRITER_HOLD_MESSAGE);
+    }
     if (consent !== "granted" &&
         (consent !== "legacy_no_evidence" || registrationConsentAuthorityEnabled())) {
       return commandFailure(

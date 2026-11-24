@@ -1,3 +1,4 @@
+import { assertContactWriterNotHeld } from "../../services/followups/permanentVisitorContactWriterHold";
 import { getTableClient as getHopeTableClient } from "./tableClient";
 import { compareTimelineNewestFirst } from "../../shared/timeline/timelineOrdering";
 import { TableClient } from "@azure/data-tables";
@@ -689,6 +690,7 @@ export async function recordFormationEventV1(body: unknown): Promise<{
     source.actorId
   );
 
+  assertContactWriterNotHeld("care", type, data);
   const eventsTable = getFormationEventsTableClient();
   const profilesTable = getFormationProfilesTableClient();
 

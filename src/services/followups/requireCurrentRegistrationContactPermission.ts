@@ -1,3 +1,4 @@
+import { contactWriterHoldEnabled, CONTACT_WRITER_HOLD_MESSAGE } from "./permanentVisitorContactWriterHold";
 import {
   readLatestRegistrationConsent,
   registrationConsentAuthorityEnabled,
@@ -31,6 +32,9 @@ export async function requireCurrentRegistrationContactPermission(
     }
     if (consent === "declined") {
       return { accepted: false, status: 409, error: "Visitor declined follow-up permission" };
+    }
+    if (consent === "granted" && contactWriterHoldEnabled()) {
+      return { accepted: false, status: 503, error: CONTACT_WRITER_HOLD_MESSAGE };
     }
     if (consent === "granted" ||
         (consent === "legacy_no_evidence" && !registrationConsentAuthorityEnabled())) {

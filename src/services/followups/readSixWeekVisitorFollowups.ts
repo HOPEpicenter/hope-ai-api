@@ -8,6 +8,7 @@ import {
   getVisitorById,
   type FunctionVisitor
 } from "../../functions/_shared/visitorsRepository";
+import { contactWriterHoldEnabled } from "./permanentVisitorContactWriterHold";
 import { readLatestRegistrationConsent, registrationConsentAuthorityEnabled,
   registrationConsentGuardEnabled } from "./readLatestRegistrationConsent";
 
@@ -22,7 +23,7 @@ async function mayExposeActionablePlan(
   const consent = await readLatestRegistrationConsent(plan.visitorId);
 
   if (consent === "declined" || consent === "pending_verification") return false;
-  if (consent === "granted") return true;
+  if (consent === "granted") return !contactWriterHoldEnabled();
   if (consent === "legacy_no_evidence" && !registrationConsentAuthorityEnabled() &&
       plan.startedBy !== "system:permanent-visitor-registration") {
     return true;

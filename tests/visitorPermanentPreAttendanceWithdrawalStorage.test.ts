@@ -62,7 +62,7 @@ test("public Yes never calls pre-withdrawal or releases pending suppression",()=
 }));
 test("old interrupted withdrawal retry cannot reapply after verified resolution",()=>fixture(async(v,c)=>{
   await seed(v,c);const command=input();await assert.rejects(arrival(command,{...deps(v,c),record:async()=>{throw Error("synthetic outage");}}));const pending=await state(c);assert.equal((await decide(c,command.submissionId,pending.revision)).status,"committed");const resolved=await state(c);
-  assert.equal((await arrival(command,deps(v,c))).status,"recorded");assert.deepEqual(await state(c),resolved);assert.equal(await guard(id),null);
+  assert.equal((await arrival(command,deps(v,c))).status,"recorded");assert.deepEqual(await state(c),resolved);assert.equal((await guard(id))?.status,503);
 }));
 test("new withdrawal invalidates an earlier Staff decision even before attendance",()=>fixture(async(v,c)=>{
   await seed(v,c);const first=input();await arrival(first,deps(v,c));const pending=await state(c);const second=input();await assert.rejects(arrival(second,{...deps(v,c),record:async()=>{throw Error("synthetic outage");}}));assert.equal((await decide(c,first.submissionId,pending.revision)).status,"rejected");assert.equal((await state(c)).pending?.requestId,second.submissionId);assert.equal((await guard(id))?.status,409);

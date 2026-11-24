@@ -1,5 +1,6 @@
 
 
+import { contactWriterHoldEnabled, CONTACT_WRITER_HOLD_MESSAGE } from "./permanentVisitorContactWriterHold";
 import {
   readLatestRegistrationConsent,
   registrationConsentAuthorityEnabled,
@@ -74,6 +75,9 @@ export async function startConsentProtectedSixWeekFollowup(
       };
     }
 
+    if (consent === "granted" && contactWriterHoldEnabled()) {
+      return { accepted: false, status: 503, error: CONTACT_WRITER_HOLD_MESSAGE };
+    }
     if (consent !== "granted" &&
         (consent !== "legacy_no_evidence" || registrationConsentAuthorityEnabled())) {
       return {

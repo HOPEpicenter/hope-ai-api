@@ -37,7 +37,14 @@ const command = {
   submissionId: "11111111-1111-4111-8111-111111111111",
   serviceId: "visit-2026-11-24",
   name: "Synthetic Public Visitor",
-  email: "synthetic@example.invalid"
+  email: "synthetic@example.invalid",
+  profile: {
+    visitType: "first" as const,
+    churchHome: "looking" as const,
+    interests: ["prayer"] as const,
+    invitedBy: "Synthetic Inviter",
+    contactConsent: true
+  }
 };
 
 const secondCommand = {
@@ -396,4 +403,50 @@ test("automatic public admission persists and resumes through actual local Table
   } finally {
     await client.deleteTable();
   }
+});
+
+test("every accepted public profile field is bound to the durable claim", async () => {
+  const f = fixture();
+  const token = session();
+
+  assert.deepEqual(
+    await reserve({ token, command }, f.deps),
+    { admitted: true, status: "reserved" }
+  );
+
+  for (const changed of [
+    { visitType: "returning" as const },
+    { churchHome: "no" as const },
+    { interests: ["church_events"] as const },
+    { invitedBy: "Different Inviter" },
+    { contactConsent: false }
+  ]) {
+    assert.deepEqual(
+      await reserve({
+        token,
+        command: {
+          ...command,
+          profile: {
+            ...command.profile,
+            ...changed
+          }
+        }
+      }, f.deps),
+      { admitted: false, status: "conflict" }
+    );
+  }
+
+  assert.equal(f.transactions(), 1);
+
+  const rows = JSON.stringify([...f.rows.values()]);
+
+  assert.equal(
+    rows.includes(command.profile.invitedBy),
+    false
+  );
+
+  assert.deepEqual(
+    await reserve({ token, command }, f.deps),
+    { admitted: true, status: "resumed" }
+  );
 });

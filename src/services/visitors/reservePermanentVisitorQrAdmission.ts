@@ -1,3 +1,7 @@
+import type {
+  PublicVisitCommand
+} from "./preparePermanentPublicVisitRegistration";
+
 import {
   verifyPermanentPublicVisitSession
 } from "./permanentPublicVisitSession";
@@ -188,17 +192,24 @@ type SharedVerifiedGrant = Readonly<{
 }>;
 
 async function reservePermanentVisitorAdmissionCore<
-  C extends { nowMs: number }
+  C extends { nowMs: number },
+  T extends Command = Command
 >(
-  input: Parameters<
-    typeof reservePermanentVisitorQrAdmission
-  >[0],
+  input: Readonly<{
+    token: unknown;
+    command: T;
+  }>,
   deps: SharedAdmissionDependencies<C>,
   verifyGrant: (
     token: unknown,
     secret: unknown,
     context: C
-  ) => SharedVerifiedGrant | null
+  ) => SharedVerifiedGrant | null,
+  hashCommand: (
+    command: T,
+    date: string,
+    secret: string
+  ) => string = fingerprint
 ): Promise<PermanentQrAdmissionResult> {
   try {
     const capacity = deps.capacity ?? 30;
@@ -243,7 +254,7 @@ async function reservePermanentVisitorAdmissionCore<
     const submissionKey =
       `submission__${command.submissionId}`;
 
-    const claimHash = fingerprint(
+    const claimHash = hashCommand(
       command,
       grant.date,
       deps.claimSecret
@@ -400,15 +411,47 @@ async function reservePermanentVisitorAdmissionCore<
 export type PermanentPublicAdmissionDependencies =
   SharedAdmissionDependencies<PermanentPublicVisitContext>;
 
+function fingerprintPublicRegistration(
+  command: PublicVisitCommand,
+  date: string,
+  secret: string
+): string {
+  // Preserve identity and family binding, adding all
+  // public profile fields under a separate hash domain.
+  const profile = command.profile;
+
+  if (!profile ||
+      typeof profile.contactConsent !== "boolean") {
+    throw new Error("Complete public profile required");
+  }
+
+  return createHmac("sha256", secret)
+    .update(JSON.stringify([
+      "permanent-public-visit-complete-claim-v1",
+      fingerprint(command, date, secret),
+      profile.visitType,
+      profile.churchHome,
+      profile.interests,
+      profile.invitedBy,
+      profile.contactConsent
+    ]), "utf8")
+    .digest("hex");
+}
+
 export async function reservePermanentPublicVisitAdmission(
-  input: Parameters<
-    typeof reservePermanentVisitorQrAdmission
-  >[0],
+  input: Readonly<{
+    token: unknown;
+    command: PublicVisitCommand;
+  }>,
   deps: PermanentPublicAdmissionDependencies = {}
 ): Promise<PermanentQrAdmissionResult> {
-  return reservePermanentVisitorAdmissionCore<PermanentPublicVisitContext>(
+  return reservePermanentVisitorAdmissionCore<
+    PermanentPublicVisitContext,
+    PublicVisitCommand
+  >(
     input,
     deps,
-    verifyPermanentPublicVisitSession
+    verifyPermanentPublicVisitSession,
+    fingerprintPublicRegistration
   );
 }

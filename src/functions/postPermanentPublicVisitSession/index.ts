@@ -23,6 +23,12 @@ import {
   type SessionCapacityResult
 } from "../../services/visitors/reservePermanentPublicSessionCapacity";
 
+import {
+  reservePermanentPublicVisitRequest,
+  type PublicVisitRequestOperation,
+  type PublicVisitRequestBudgetResult
+} from "../../services/visitors/reservePermanentPublicVisitRequest";
+
 type Request = {
   method?: string;
   headers?: Record<string, unknown> | Headers;
@@ -38,6 +44,11 @@ type Context = {
 };
 
 type Dependencies = {
+  reserveRequest?: (
+    operation: PublicVisitRequestOperation,
+    nowMs: number
+  ) => Promise<PublicVisitRequestBudgetResult>;
+
   now?: () => number;
   approvedEvents?: (
     date: string
@@ -196,6 +207,30 @@ export async function postPermanentPublicVisitSession(
     if (!date) {
       reply(context, 503, { status: "unavailable" });
       return;
+    }
+
+    // Additional request protection is staged
+    // independently of the existing admission limits.
+    if (process.env.FEATURE_PERMANENT_PUBLIC_VISIT_REQUEST_BUDGET
+          === "true") {
+      const budget = deps.reserveRequest
+        ? await deps.reserveRequest(
+            "session", nowMs
+          )
+        : await reservePermanentPublicVisitRequest(
+            getTableClient("PermanentVisitorSessionQuota"),
+            "session",
+            nowMs
+          );
+
+      if (budget !== "reserved") {
+        reply(
+          context,
+          budget === "capacity_exhausted" ? 429 : 503,
+          { status: "try_later" }
+        );
+        return;
+      }
     }
 
     const approvedEvents = await (

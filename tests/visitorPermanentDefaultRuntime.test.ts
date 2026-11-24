@@ -951,5 +951,77 @@ test(
     assert.equal(await countRows(visitors, "VISITOR"), beforeProfiles109 + 1);
     console.log("READ_ONLY_RECOVERY_DISCOVERY_VERIFIED=True");
     console.log("READ_ONLY_RECOVERY_INSPECTION_VERIFIED=True");
+    const { inspectPermanentVisitIdentityReservation } = await import("../src/services/visitors/inspectPermanentVisitIdentityReservation");
+    const { recordVisitorArrival: arrival116 } = await import("../src/services/visitors/recordVisitorArrival");
+    const { createVisitorFromCheckIn: create116 } = await import("../src/functions/_shared/visitorsRepository");
+    const stopBeforeProfile116 = new Proxy(visitors, {
+      get(target, property) {
+        if (property === "createEntity") return async (entity: { partitionKey: string; rowKey: string }) => {
+          if (entity.partitionKey === "VISITOR") throw new Error("Synthetic profile interruption");
+          return target.createEntity(entity);
+        };
+        const value = Reflect.get(target, property, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      }
+    });
+    const profiles116 = await countRows(visitors, "VISITOR");
+    const receipts116 = await countRows(visitors, "VISITOR_CHECK_IN");
+    for (const dual of [false, true]) {
+      const suffix = dual ? "dual" : "single";
+      const email = `recovery-116-${suffix}@example.invalid`;
+      const phone = dual ? "2015550116" : "";
+      const request116 = { token: await obtainSession(), submissionId: randomUUID(), body: {
+        ...adultSubmission.body, name: `Synthetic Identity Recovery ${suffix}`, email, phone, contactConsent: false
+      } };
+      const pending116 = await submitPermanentPublicVisitRegistration(request116, {
+        ...recoveryDeps109,
+        recordAdult: command => arrival116(command, { createProfile: (_table, input) => create116(stopBeforeProfile116, input) })
+      });
+      assert.deepEqual(pending116, { accepted: false, status: "try_later" });
+      const claim116 = await visitors.getEntity<{ visitorId: string }>("VISITOR_CHECK_IN_CLAIM", request116.submissionId);
+      const emailIndex116 = await visitors.getEntity<{ visitorId: string }>("EMAIL", encodeURIComponent(email));
+      assert.equal(emailIndex116.visitorId, claim116.visitorId);
+      if (dual) {
+        const phoneIndex116 = await visitors.getEntity<{ visitorId: string }>("PHONE", phone);
+        assert.equal(phoneIndex116.visitorId, claim116.visitorId);
+      }
+      await assert.rejects(visitors.getEntity("VISITOR", claim116.visitorId), { statusCode: 404 });
+      assert.deepEqual(await inspectPermanentVisitIdentityReservation(request116.submissionId, readOnly110), {
+        status: "ready", stage: "reservation_without_profile", emailReservationObserved: true, phoneReservationObserved: dual
+      });
+      const competitor116 = { ...request116, token: await obtainSession(), submissionId: randomUUID() };
+      assert.deepEqual(await submitPermanentPublicVisitRegistration(competitor116, {
+        ...recoveryDeps109, recordAdult: arrival116
+      }), { accepted: false, status: "requires_staff_review" });
+      const competingClaim116 = await visitors.getEntity<{ visitorId: string }>("VISITOR_CHECK_IN_CLAIM", competitor116.submissionId);
+      assert.notEqual(competingClaim116.visitorId, claim116.visitorId);
+      assert.equal((await visitors.getEntity<{ visitorId: string }>("EMAIL", encodeURIComponent(email))).visitorId, claim116.visitorId);
+      assert.deepEqual(await inspectPermanentVisitIdentityReservation(competitor116.submissionId, readOnly110), {
+        status: "ready", stage: "no_reservation_observed", emailReservationObserved: false, phoneReservationObserved: false
+      });
+      assert.deepEqual(await inspectPermanentVisitIdentityReservation(request116.submissionId, failedRead110), { status: "unavailable" });
+      const receiptInterrupted116 = await submitPermanentPublicVisitRegistration(request116, {
+        ...recoveryDeps109,
+        recordAdult: command => arrival116(command, { record: async () => { throw new Error("Synthetic receipt interruption"); } })
+      });
+      assert.deepEqual(receiptInterrupted116, { accepted: false, status: "try_later" });
+      assert.deepEqual(await inspectPermanentVisitIdentityReservation(request116.submissionId, readOnly110), {
+        status: "ready", stage: "created_profile_without_receipt", emailReservationObserved: true, phoneReservationObserved: dual
+      });
+      assert.equal((await visitors.getEntity<{ checkInCreationId: string }>("VISITOR", claim116.visitorId)).checkInCreationId, request116.submissionId);
+      assert.equal((await recoveryJournal109.inspect(request116.submissionId)).status, "pending");
+      await register(request116);
+      await register(request116);
+      assert.equal((await visitors.getEntity<{ visitorId: string }>("VISITOR_CHECK_IN", request116.submissionId)).visitorId, claim116.visitorId);
+      assert.equal((await recoveryJournal109.inspect(request116.submissionId)).status, "completed");
+      assert.deepEqual(await inspectPermanentVisitIdentityReservation(request116.submissionId, readOnly110), { status: "not_applicable" });
+      assert.equal(await countRows(visitors, "VISITOR"), profiles116 + (dual ? 2 : 1));
+      assert.equal(await countRows(visitors, "VISITOR_CHECK_IN"), receipts116 + (dual ? 2 : 1));
+    }
+    console.log("ACTUAL_SINGLE_AND_DUAL_ORPHAN_RESERVATIONS_IDENTIFIED=True");
+    console.log("COMPETING_SUBMISSION_CANNOT_TAKE_RESERVATION=True");
+    console.log("PROFILE_WITHOUT_RECEIPT_IDENTIFIED=True");
+    console.log("EXACT_ORIGINAL_RETRY_RECOVERS_PROFILE_AND_RECEIPT=True");
+    console.log("IDENTITY_INSPECTION_STORAGE_FAILURE_DENIED=True");
   }
 );

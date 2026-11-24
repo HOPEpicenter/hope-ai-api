@@ -712,6 +712,10 @@ jobs:
             }
           }
 
+      - name: Permanent visitor backend regressions
+        shell: pwsh
+        run: ./scripts/test-permanent-visitor-backend.ps1
+
       - name: Express smoke (Azurite owned by script)
         shell: pwsh
         env:

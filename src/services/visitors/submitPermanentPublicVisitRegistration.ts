@@ -1,3 +1,12 @@
+import type {
+  RecordedPublicVisitEvidence,
+  PublicVisitorEnrollmentResult
+} from "../followups/enrollRecordedPublicVisitor";
+
+import {
+  resolvePermanentPublicVisitEvent
+} from "./resolvePermanentPublicVisitEvent";
+
 import {
   preparePermanentPublicVisitRegistration,
   type PublicVisitCommand
@@ -29,6 +38,10 @@ type AdultCommand = Exclude<
 export type PermanentPublicRegistrationDependencies =
   PermanentPublicAdmissionDependencies & {
     familyEnabled?: boolean;
+    automaticFollowupEnabled?: boolean;
+    enrollFollowup?: (
+      evidence: RecordedPublicVisitEvidence
+    ) => Promise<PublicVisitorEnrollmentResult>;
     recordAdult?: (
       command: AdultCommand
     ) => ReturnType<typeof recordVisitorArrival>;
@@ -108,6 +121,21 @@ export async function submitPermanentPublicVisitRegistration(
 
     const command = prepared.command;
 
+    const event = resolvePermanentPublicVisitEvent({
+      ...deps.context,
+      selectedEventId: command.serviceId
+    });
+
+    if (event.status !== "ready") {
+      return reject("unavailable");
+    }
+
+    if (deps.automaticFollowupEnabled === true &&
+        command.profile.contactConsent === true &&
+        typeof deps.enrollFollowup !== "function") {
+      return reject("unavailable");
+    }
+
     // Verify writer availability before consuming
     // admission capacity.
     if ("family" in command) {
@@ -153,11 +181,34 @@ export async function submitPermanentPublicVisitRegistration(
       : await deps.recordAdult!(command);
 
     switch (result.status) {
-      case "recorded":
+      case "recorded": {
+        // Enroll only after complete canonical persistence.
+        // An incomplete family result never reaches here.
+        if (deps.automaticFollowupEnabled === true &&
+            command.profile.contactConsent === true) {
+          const visitorId = "receipt" in result
+            ? result.receipt.visitorId
+            : result.adultVisitorId;
+
+          const enrollment = await deps.enrollFollowup!({
+            visitorId,
+            submissionId: command.submissionId,
+            serviceId: command.serviceId,
+            visitDate: event.date
+          });
+
+          if (enrollment !== "enrolled" &&
+              enrollment !== "existing" &&
+              enrollment !== "not_eligible") {
+            return reject("try_later");
+          }
+        }
+
         return {
           accepted: true,
           status: "recorded"
         };
+      }
 
       case "invalid":
         return reject("invalid");

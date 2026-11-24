@@ -1,4 +1,16 @@
 import {
+  enrollRecordedPublicVisitor
+} from "../src/services/followups/enrollRecordedPublicVisitor";
+
+import {
+  SixWeekFollowupEventsRepository
+} from "../src/repositories/sixWeekFollowupEventsRepository";
+
+import {
+  projectSixWeekVisitorFollowup
+} from "../src/domain/followups/projectSixWeekVisitorFollowup";
+
+import {
   submitPermanentPublicVisitRegistration as submitPublic,
   type PermanentPublicRegistrationDependencies
 } from "../src/services/visitors/submitPermanentPublicVisitRegistration";
@@ -1115,6 +1127,272 @@ test("selected event must match the automatic session authority", async () => {
         }
       }, deps),
       { accepted: true, status: "recorded" }
+    );
+  });
+});
+
+async function withEnrollmentTables(
+  run: (
+    visitors: TableClient,
+    reservations: TableClient,
+    followups: SixWeekFollowupEventsRepository
+  ) => Promise<void>
+): Promise<void> {
+  await withPublicTables((visitors, reservations) =>
+    withTable(events =>
+      run(
+        visitors,
+        reservations,
+        new SixWeekFollowupEventsRepository(events)
+      )
+    )
+  );
+}
+
+function enrollmentDependencies(
+  visitors: TableClient,
+  reservations: TableClient,
+  followups: SixWeekFollowupEventsRepository
+): PermanentPublicRegistrationDependencies {
+  return {
+    ...publicDependencies(visitors, reservations),
+    automaticFollowupEnabled: true,
+    enrollFollowup: evidence =>
+      enrollRecordedPublicVisitor(evidence, {
+        enabled: true,
+        visitors,
+        repository: followups
+      })
+  };
+}
+
+test("consented public registration durably creates exactly one unassigned six-week staff plan", async () => {
+  await withEnrollmentTables(async (
+    visitors, reservations, followups
+  ) => {
+    const deps = enrollmentDependencies(
+      visitors, reservations, followups
+    );
+
+    const request = {
+      token: publicSession(),
+      submissionId: command.submissionId,
+      body: {
+        ...publicBody,
+        contactConsent: true
+      }
+    };
+
+    assert.deepEqual(
+      await submitPublic(request, deps),
+      { accepted: true, status: "recorded" }
+    );
+
+    const receipt = await visitors.getEntity<{
+      visitorId: string;
+    }>("VISITOR_CHECK_IN", request.submissionId);
+
+    const events = await followups.listByVisitor(
+      receipt.visitorId
+    );
+
+    assert.equal(events.length, 1);
+
+    const plan = projectSixWeekVisitorFollowup(
+      events,
+      "2026-11-24T20:00:00.000Z"
+    );
+
+    assert.ok(plan);
+    assert.equal(plan.tasks.length, 6);
+    assert.equal(plan.ownerStaffId, null);
+    assert.equal(plan.needsOwner, true);
+    assert.equal(plan.contactConsent, true);
+    assert.equal(plan.firstVisitDate, "2026-11-24");
+    assert.equal(
+      plan.startedBy,
+      "system:permanent-visitor-registration"
+    );
+
+    assert.deepEqual(
+      await submitPublic(request, deps),
+      { accepted: true, status: "recorded" }
+    );
+
+    assert.equal(
+      (await followups.listByVisitor(
+        receipt.visitorId
+      )).length,
+      1
+    );
+  });
+});
+
+test("declined public consent records attendance without creating follow-up events", async () => {
+  await withEnrollmentTables(async (
+    visitors, reservations, followups
+  ) => {
+    const deps = enrollmentDependencies(
+      visitors, reservations, followups
+    );
+
+    assert.deepEqual(
+      await submitPublic({
+        token: publicSession(),
+        submissionId: command.submissionId,
+        body: {
+          ...publicBody,
+          contactConsent: false
+        }
+      }, deps),
+      { accepted: true, status: "recorded" }
+    );
+
+    const receipt = await visitors.getEntity<{
+      visitorId: string;
+    }>("VISITOR_CHECK_IN", command.submissionId);
+
+    assert.equal(
+      (await followups.listByVisitor(
+        receipt.visitorId
+      )).length,
+      0
+    );
+  });
+});
+
+test("automatic enrollment cannot occur without the matching durable visit receipt", async () => {
+  await withEnrollmentTables(async (
+    visitors, reservations, followups
+  ) => {
+    const result = await enrollRecordedPublicVisitor({
+      visitorId: "synthetic-unrecorded-visitor",
+      submissionId: command.submissionId,
+      serviceId: command.serviceId,
+      visitDate: "2026-11-24"
+    }, {
+      enabled: true,
+      visitors,
+      repository: followups
+    });
+
+    assert.equal(result, "unavailable");
+
+    assert.equal(
+      (await followups.listByVisitor(
+        "synthetic-unrecorded-visitor"
+      )).length,
+      0
+    );
+  });
+});
+
+test("uncertain enrollment can resume from the same recorded submission without another visit", async () => {
+  await withEnrollmentTables(async (
+    visitors, reservations, followups
+  ) => {
+    const deps = enrollmentDependencies(
+      visitors, reservations, followups
+    );
+
+    const request = {
+      token: publicSession(),
+      submissionId: command.submissionId,
+      body: {
+        ...publicBody,
+        contactConsent: true
+      }
+    };
+
+    assert.deepEqual(
+      await submitPublic(request, {
+        ...deps,
+        enrollFollowup: async () => "unavailable"
+      }),
+      { accepted: false, status: "try_later" }
+    );
+
+    const receipt = await visitors.getEntity<{
+      visitorId: string;
+    }>("VISITOR_CHECK_IN", request.submissionId);
+
+    assert.deepEqual(
+      await submitPublic(request, deps),
+      { accepted: true, status: "recorded" }
+    );
+
+    let visits = 0;
+
+    for await (const row of visitors.listEntities()) {
+      if (row.partitionKey === "VISITOR_CHECK_IN") {
+        visits++;
+      }
+    }
+
+    assert.equal(visits, 1);
+
+    assert.equal(
+      (await followups.listByVisitor(
+        receipt.visitorId
+      )).length,
+      1
+    );
+  });
+});
+
+test("concurrent automatic enrollment uses the existing unique plan-start boundary", async () => {
+  await withEnrollmentTables(async (
+    visitors, reservations, followups
+  ) => {
+    const request = {
+      token: publicSession(),
+      submissionId: command.submissionId,
+      body: {
+        ...publicBody,
+        contactConsent: true
+      }
+    };
+
+    assert.deepEqual(
+      await submitPublic(
+        request,
+        publicDependencies(visitors, reservations)
+      ),
+      { accepted: true, status: "recorded" }
+    );
+
+    const receipt = await visitors.getEntity<{
+      visitorId: string;
+    }>("VISITOR_CHECK_IN", request.submissionId);
+
+    const evidence = {
+      visitorId: receipt.visitorId,
+      submissionId: request.submissionId,
+      serviceId: command.serviceId,
+      visitDate: "2026-11-24"
+    };
+
+    const deps = {
+      enabled: true,
+      visitors,
+      repository: followups
+    };
+
+    const outcomes = await Promise.all([
+      enrollRecordedPublicVisitor(evidence, deps),
+      enrollRecordedPublicVisitor(evidence, deps)
+    ]);
+
+    assert.deepEqual(
+      outcomes.sort(),
+      ["enrolled", "existing"]
+    );
+
+    assert.equal(
+      (await followups.listByVisitor(
+        receipt.visitorId
+      )).length,
+      1
     );
   });
 });

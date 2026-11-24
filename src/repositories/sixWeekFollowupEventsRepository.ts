@@ -55,8 +55,17 @@ function isConflict(error: any): boolean {
 }
 
 export class SixWeekFollowupEventsRepository {
+  constructor(
+    private readonly isolatedTable?: TableClient
+  ) {}
+
+  private async tableFor(): Promise<TableClient> {
+    return this.isolatedTable ??
+      await getTableClient(TABLE_NAME);
+  }
+
   async append(event: SixWeekFollowupEvent): Promise<boolean> {
-    const table: TableClient = await getTableClient(TABLE_NAME);
+    const table: TableClient = await this.tableFor();
 
     try {
       await table.createEntity<SixWeekFollowupEventEntity>({
@@ -78,7 +87,7 @@ export class SixWeekFollowupEventsRepository {
   }
 
   async listByVisitor(visitorId: string): Promise<SixWeekFollowupEvent[]> {
-    const table: TableClient = await getTableClient(TABLE_NAME);
+    const table: TableClient = await this.tableFor();
     const events: SixWeekFollowupEvent[] = [];
     const escaped = visitorId.replace(/'/g, "''");
     const filter = `PartitionKey eq '${escaped}'`;
@@ -93,7 +102,7 @@ export class SixWeekFollowupEventsRepository {
   }
 
   async listAll(): Promise<SixWeekFollowupEvent[]> {
-    const table: TableClient = await getTableClient(TABLE_NAME);
+    const table: TableClient = await this.tableFor();
     const events: SixWeekFollowupEvent[] = [];
 
     for await (const entity of table.listEntities<SixWeekFollowupEventEntity>()) {

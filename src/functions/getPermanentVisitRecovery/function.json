@@ -1,0 +1,8 @@
+{
+  "bindings": [
+    { "authLevel": "anonymous", "type": "httpTrigger", "direction": "in", "name": "req", "methods": ["get"], "route": "admin/visitor-registration-recovery/{submissionId}" },
+    { "type": "http", "direction": "out", "name": "res" }
+  ],
+  "scriptFile": "../dist/functions/getPermanentVisitRecovery/index.js",
+  "entryPoint": "getPermanentVisitRecovery"
+}

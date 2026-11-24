@@ -1023,5 +1023,73 @@ test(
     console.log("PROFILE_WITHOUT_RECEIPT_IDENTIFIED=True");
     console.log("EXACT_ORIGINAL_RETRY_RECOVERS_PROFILE_AND_RECEIPT=True");
     console.log("IDENTITY_INSPECTION_STORAGE_FAILURE_DENIED=True");
+    const { reconcilePermanentVisitCompletion } = await import("../src/services/visitors/reconcilePermanentVisitCompletion");
+    const reconcile117 = (id: string) => reconcilePermanentVisitCompletion(id, { enabled: true, visitors, repository: followups });
+    assert.equal(await reconcilePermanentVisitCompletion(randomUUID()), "disabled");
+    assert.equal(await reconcile117(randomUUID()), "requires_review");
+    const adultWriter117 = (await import("../src/services/visitors/recordVisitorArrival")).recordVisitorArrival;
+    const family117 = { token: await obtainSession(), submissionId: randomUUID(), body: {
+      ...familySubmission.body, name: "Synthetic Family Reconciliation", email: "recovery-117-family@example.invalid", phone: "2015550117",
+      family: { ...familySubmission.body.family, guardianName: "Synthetic Family Reconciliation" }
+    } };
+    const incomplete117 = await submitPermanentPublicVisitRegistration(family117, {
+      ...recoveryDeps109, recordFamily: command => recordVisitorFamilyCheckIn(command, {
+        saveFamily: async () => { throw new Error("Synthetic family interruption"); }
+      })
+    });
+    assert.deepEqual(incomplete117, { accepted: false, status: "try_later" });
+    const completionBefore117 = await countRows(visitors, "PUBLIC_VISIT_RECOVERY_COMPLETE");
+    const familyBefore117 = await countRows(visitors, "VISITOR_FAMILY_ATTENDANCE");
+    const eventsBefore117 = await countRows(tables.VisitorFollowupEvents);
+    assert.equal(await reconcile117(family117.submissionId), "requires_review");
+    assert.equal(await countRows(visitors, "PUBLIC_VISIT_RECOVERY_COMPLETE"), completionBefore117);
+    assert.equal(await countRows(visitors, "VISITOR_FAMILY_ATTENDANCE"), familyBefore117);
+    assert.equal(await countRows(tables.VisitorFollowupEvents), eventsBefore117);
+    console.log("MISSING_FAMILY_RECONCILIATION_DENIED=True");
+    assert.deepEqual(await submitPermanentPublicVisitRegistration(family117, {
+      ...recoveryDeps109, recordFamily: recordVisitorFamilyCheckIn
+    }), { accepted: false, status: "try_later" });
+    assert.equal((await recoveryJournal109.inspect(family117.submissionId)).status, "pending");
+    const familyReceipt117 = await visitors.getEntity<{ visitorId: string }>("VISITOR_CHECK_IN", family117.submissionId);
+    assert.equal(await reconcile117(family117.submissionId), "completed");
+    assert.equal(await reconcile117(family117.submissionId), "already_completed");
+    assert.equal((await followups.listByVisitor(familyReceipt117.visitorId)).length, 0);
+    console.log("DECLINED_FAMILY_COMPLETION_WITHOUT_PLAN_VERIFIED=True");
+    for (const withdrawn of [false, true]) {
+      const suffix = withdrawn ? "withdrawn" : "granted";
+      const request117 = { token: await obtainSession(), submissionId: randomUUID(), body: {
+        ...adultSubmission.body, name: `Synthetic Reconciliation ${suffix}`, email: `recovery-117-${suffix}@example.invalid`, phone: "", contactConsent: true
+      } };
+      assert.deepEqual(await submitPermanentPublicVisitRegistration(request117, {
+        ...recoveryDeps109, recordAdult: adultWriter117
+      }), { accepted: false, status: "try_later" });
+      const receipt117 = await visitors.getEntity<{ visitorId: string }>("VISITOR_CHECK_IN", request117.submissionId);
+      assert.equal((await followups.listByVisitor(receipt117.visitorId)).length, 0);
+      if (withdrawn) {
+        await register({ token: await obtainSession(), submissionId: randomUUID(), body: {
+          ...request117.body, visitType: "returning", contactConsent: false
+        } });
+      }
+      const before117 = await countRows(visitors, "VISITOR_CHECK_IN");
+      const profiles117 = await countRows(visitors, "VISITOR");
+      const journals117 = await countRows(visitors, "PUBLIC_VISIT_RECOVERY_COMPLETE");
+      assert.equal(await reconcilePermanentVisitCompletion(request117.submissionId, {
+        enabled: true, visitors, repository: { append: async () => { throw new Error("Synthetic unavailable"); }, listByVisitor: async () => { throw new Error("Synthetic unavailable"); } }
+      }), "unavailable");
+      assert.equal((await recoveryJournal109.inspect(request117.submissionId)).status, "pending");
+      assert.equal(await countRows(visitors, "PUBLIC_VISIT_RECOVERY_COMPLETE"), journals117);
+      assert.equal(await reconcile117(request117.submissionId), "completed");
+      assert.equal(await reconcile117(request117.submissionId), "already_completed");
+      assert.equal(await countRows(visitors, "VISITOR_CHECK_IN"), before117);
+      assert.equal(await countRows(visitors, "VISITOR"), profiles117);
+      assert.equal(await countRows(visitors, "PUBLIC_VISIT_RECOVERY_COMPLETE"), journals117 + 1);
+      const events117 = await followups.listByVisitor(receipt117.visitorId);
+      assert.equal(events117.length, withdrawn ? 0 : 1);
+      if (!withdrawn) assert.equal(projectSixWeekVisitorFollowup(events117)?.tasks.length, 6);
+    }
+    console.log("CONSENTED_COMPLETION_RECOVERED_WITHOUT_ORIGINAL_TOKEN=True");
+    console.log("LATEST_WITHDRAWAL_PREVENTS_RECOVERY_ENROLLMENT=True");
+    console.log("FAILED_ENROLLMENT_LEAVES_JOURNAL_PENDING=True");
+    console.log("RECONCILIATION_REPLAY_NO_DUPLICATE_ATTENDANCE_OR_PLAN=True");
   }
 );

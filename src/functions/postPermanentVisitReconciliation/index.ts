@@ -3,7 +3,10 @@ import { getTableClient } from "../_shared/tableClient";
 import { SixWeekFollowupEventsRepository } from "../../repositories/sixWeekFollowupEventsRepository";
 import { reconcilePermanentVisitCompletion } from "../../services/visitors/reconcilePermanentVisitCompletion";
 
+import { executeAuditedVisitReconciliation, type ReconciliationAuditTable } from "../../services/visitors/executeAuditedVisitReconciliation";
+
 type Dependencies = {
+  auditTable?: ReconciliationAuditTable;
   readStaff?: Parameters<typeof requireAdminStaffActorForFunction>[1];
   reconcile?: (submissionId: string) => ReturnType<typeof reconcilePermanentVisitCompletion>;
 };
@@ -40,9 +43,11 @@ export async function postPermanentVisitReconciliation(context: any, req: any, d
         (body as Record<string, unknown>).confirmation !== "reconcile_saved_attendance") {
       reply(400, { ok: false, error: "EXACT_RECONCILIATION_CONFIRMATION_REQUIRED" }); return;
     }
-    const result = await (deps.reconcile ?? (id => reconcilePermanentVisitCompletion(id, {
-      enabled: true, visitors: getTableClient("Visitors"), repository: new SixWeekFollowupEventsRepository()
-    })))(submissionId);
+    const result = await executeAuditedVisitReconciliation(
+      deps.auditTable ?? getTableClient("Visitors"), auth.actorId, submissionId,
+      () => (deps.reconcile ?? (id => reconcilePermanentVisitCompletion(id, {
+        enabled: true, visitors: getTableClient("Visitors"), repository: new SixWeekFollowupEventsRepository()
+      })))(submissionId));
     if (result === "completed" || result === "already_completed") {
       reply(200, { ok: true, submissionId, status: result }); return;
     }

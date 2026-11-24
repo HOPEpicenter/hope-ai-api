@@ -16,13 +16,16 @@ type CheckInCommand = {
   submissionId: string;
   visitorId: string;
   serviceId: string;
+  // Trusted, validated registration details only.
+  registrationDetailsJson?: string;
 };
 
-type CheckInReceipt = CheckInCommand & { recordedAt: string };
+type CheckInReceipt = Omit<CheckInCommand, "registrationDetailsJson"> & { recordedAt: string };
 
 type CheckInEntity = Omit<CheckInReceipt, "submissionId"> & {
   partitionKey: string;
   rowKey: string;
+  registrationDetailsJson?: string;
 };
 
 type Dependencies = {
@@ -42,7 +45,9 @@ function readReceipt(row: CheckInEntity, command: CheckInCommand): CheckInResult
   ) {
     throw new Error("Invalid stored visitor check-in.");
   }
-  if (row.visitorId !== command.visitorId || row.serviceId !== command.serviceId) {
+  if (row.visitorId !== command.visitorId ||
+      row.serviceId !== command.serviceId ||
+      row.registrationDetailsJson !== command.registrationDetailsJson) {
     return { status: "submission_conflict" };
   }
   return {
@@ -80,6 +85,15 @@ export async function recordVisitorCheckIn(
     return { status: "invalid" };
   }
 
+  if (command.registrationDetailsJson !== undefined &&
+      (typeof command.registrationDetailsJson !== "string" ||
+       command.registrationDetailsJson.length === 0 ||
+       Buffer.byteLength(
+         command.registrationDetailsJson, "utf8"
+       ) > 8192)) {
+    return { status: "invalid" };
+  }
+
   const table = dependencies.table ?? getTableClient("Visitors");
   await ensureTableExists(table);
   const previous = await readCheckIn(table, command.submissionId);
@@ -99,6 +113,12 @@ export async function recordVisitorCheckIn(
     rowKey: command.submissionId,
     visitorId: visitor.visitorId,
     serviceId: command.serviceId,
+    ...(command.registrationDetailsJson !== undefined
+      ? {
+          registrationDetailsJson:
+            command.registrationDetailsJson
+        }
+      : {}),
     recordedAt: (dependencies.now ?? (() => new Date()))().toISOString()
   };
   try {

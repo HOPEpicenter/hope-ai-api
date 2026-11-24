@@ -1,3 +1,7 @@
+import type {
+  PublicVisitProfile
+} from "./preparePermanentPublicVisitRegistration";
+
 import {
   recordVisitorArrival
 } from "./recordVisitorArrival";
@@ -22,6 +26,7 @@ type FamilyCheckInInput = {
   name: string;
   email?: string;
   phone?: string;
+  profile?: PublicVisitProfile;
   family: unknown;
 };
 
@@ -95,7 +100,10 @@ export async function recordVisitorFamilyCheckIn(
     serviceId: input.serviceId,
     name: input.name,
     email: input.email,
-    phone: input.phone
+    phone: input.phone,
+    ...(input.profile !== undefined
+      ? { profile: input.profile }
+      : {})
   });
 
   if (adult.status !== "recorded") {

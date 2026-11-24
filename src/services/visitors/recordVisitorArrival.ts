@@ -1,3 +1,7 @@
+import type {
+  PublicVisitProfile
+} from "./preparePermanentPublicVisitRegistration";
+
 import { createHash, randomUUID } from "node:crypto";
 import type { TableClient } from "@azure/data-tables";
 import { getTableClient } from "../../functions/_shared/tableClient";
@@ -16,6 +20,7 @@ type Arrival = {
   name: string;
   email?: string;
   phone?: string;
+  profile?: PublicVisitProfile;
 };
 
 type Claim = {
@@ -59,8 +64,40 @@ export async function recordVisitorArrival(
     (command.phone?.trim() && !/^\d{7,15}$/.test(phone))
   ) return { status: "invalid" };
 
+  // Keep submitted contact details separate from verified
+  // canonical identity indexes. Consent is visit-scoped.
+  const registrationDetailsJson =
+    command.profile === undefined
+      ? undefined
+      : JSON.stringify({
+          version: 1,
+          name,
+          email: email || null,
+          phone: phone || null,
+          visitType: command.profile.visitType,
+          churchHome: command.profile.churchHome,
+          interests: command.profile.interests,
+          invitedBy: command.profile.invitedBy,
+          contactConsent: command.profile.contactConsent
+        });
+
+  // Preserve the legacy fingerprint for existing callers.
+  // Complete public arrivals additionally bind every
+  // validated registration detail to the submission.
+  const identityFields = [
+    command.serviceId, name.toLowerCase(), email, phone
+  ];
+
   const fingerprint = createHash("sha256")
-    .update(JSON.stringify([command.serviceId, name.toLowerCase(), email, phone]))
+    .update(JSON.stringify(
+      registrationDetailsJson === undefined
+        ? identityFields
+        : [
+            "complete-public-visitor-arrival-v1",
+            ...identityFields,
+            registrationDetailsJson
+          ]
+    ))
     .digest("hex");
   const table = dependencies.table ?? getTableClient("Visitors");
   await ensureTableExists(table);
@@ -109,6 +146,9 @@ export async function recordVisitorArrival(
   return (dependencies.record ?? recordVisitorCheckIn)({
     submissionId: command.submissionId,
     serviceId: command.serviceId,
-    visitorId: claim.visitorId
+    visitorId: claim.visitorId,
+    ...(registrationDetailsJson !== undefined
+      ? { registrationDetailsJson }
+      : {})
   }, { table });
 }

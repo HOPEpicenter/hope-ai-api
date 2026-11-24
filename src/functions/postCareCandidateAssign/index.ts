@@ -1,3 +1,7 @@
+import {
+  requireCurrentRegistrationContactPermission,
+  type RegistrationConsentReader
+} from "../../services/followups/requireCurrentRegistrationContactPermission";
 import { randomUUID } from "node:crypto";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
@@ -27,9 +31,17 @@ function toCareProfileInput(profile: FunctionFormationProfileEntity) {
   };
 }
 
+export type CareAssignConsentDependencies = {
+  requireActor?: typeof requireCareOwnerActor;
+  requireAssignee?: typeof requireCareOwnerAssignee;
+  getVisitor?: typeof getVisitorById;
+  readRegistrationConsent?: RegistrationConsentReader;
+};
+
 export async function postCareCandidateAssign(
   context: any,
-  req: any
+  req: any,
+  dependencies: CareAssignConsentDependencies = {}
 ): Promise<void> {
   const requestId = getRequestId(req);
 
@@ -71,7 +83,7 @@ export async function postCareCandidateAssign(
     }
 
     const actorAuthorization =
-      await requireCareOwnerActor(req);
+      await (dependencies.requireActor ?? requireCareOwnerActor)(req);
 
     if (!actorAuthorization.ok) {
       context.res = {
@@ -86,7 +98,7 @@ export async function postCareCandidateAssign(
     }
 
     const assigneeAuthorization =
-      await requireCareOwnerAssignee(assignedTo);
+      await (dependencies.requireAssignee ?? requireCareOwnerAssignee)(assignedTo);
 
     if (!assigneeAuthorization.ok) {
       context.res = {
@@ -99,7 +111,19 @@ export async function postCareCandidateAssign(
 
     const actorId = actorAuthorization.actor.staffId;
 
-    const visitor = await getVisitorById(visitorId);
+    const consentFailure = await requireCurrentRegistrationContactPermission(
+      visitorId, dependencies.readRegistrationConsent
+    );
+    if (consentFailure) {
+      context.res = {
+        status: consentFailure.status,
+        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+        body: { ok: false, requestId, error: consentFailure.error }
+      };
+      return;
+    }
+
+    const visitor = await (dependencies.getVisitor ?? getVisitorById)(visitorId);
 
     if (!visitor) {
       context.res = {
@@ -111,6 +135,18 @@ export async function postCareCandidateAssign(
     }
 
     await ensureFormationTables();
+
+    const latestConsentFailure = await requireCurrentRegistrationContactPermission(
+      visitorId, dependencies.readRegistrationConsent
+    );
+    if (latestConsentFailure) {
+      context.res = {
+        status: latestConsentFailure.status,
+        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+        body: { ok: false, requestId, error: latestConsentFailure.error }
+      };
+      return;
+    }
 
     const eventResult = await recordFormationEventV1({
       v: 1,

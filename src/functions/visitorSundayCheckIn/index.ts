@@ -4,6 +4,7 @@ import { requireApiKeyForFunction } from "../_shared/apiKey";
 import { resolveSixWeekActorAuthorization } from "../_shared/sixWeekStaffActor";
 import { recordVisitorArrival } from "../../services/visitors/recordVisitorArrival";
 import { isVisitorCheckInRequest } from "../../services/visitors/recordVisitorCheckIn";
+import { listApprovedVisitorEvents } from "../../services/visitors/listApprovedVisitorEvents";
 import {
   resolveVisitorEventContext,
   type VisitorEvent
@@ -22,7 +23,7 @@ type Dependencies = {
   record?: typeof recordVisitorArrival;
   reserve?: typeof reserveSundayCheckIn;
   list?: typeof listSundayCheckIns;
-  approvedEvents?: () => Promise<readonly VisitorEvent[]>;
+  approvedEvents?: (date: string) => Promise<readonly VisitorEvent[]>;
   authorizeStaff?: typeof resolveSixWeekActorAuthorization;
 };
 
@@ -76,7 +77,7 @@ export async function visitorSundayCheckIn(
       const event = resolveVisitorEventContext({
         date,
         selectedEventId: req.query?.eventId as string | undefined,
-        approvedEvents: await (deps.approvedEvents ?? (async () => []))()
+        approvedEvents: await (deps.approvedEvents ?? listApprovedVisitorEvents)(date)
       });
       if (event.status !== "resolved") {
         reply(context, event.status === "selection_required" ? 409 : 400,
@@ -116,7 +117,7 @@ export async function visitorSundayCheckIn(
     const event = resolveVisitorEventContext({
       date: now.toISODate()!,
       selectedEventId: body.eventId as string | undefined,
-      approvedEvents: await (deps.approvedEvents ?? (async () => []))()
+      approvedEvents: await (deps.approvedEvents ?? listApprovedVisitorEvents)(now.toISODate()!)
     });
     if (event.status !== "resolved") {
       reply(context, event.status === "selection_required" ? 409 : 400,

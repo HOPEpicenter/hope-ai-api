@@ -1,7 +1,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DateTime } from "luxon";
-import { visitorSundayCheckIn } from "../../src/functions/visitorSundayCheckIn";
+import { visitorSundayCheckIn as actualVisitorSundayCheckIn } from "../../src/functions/visitorSundayCheckIn";
+
+/**
+ * HTTP tests use a synthetic, empty approved-event directory by default.
+ * Tests involving selected events override this dependency explicitly.
+ * Production continues to read the real backend-owned directory.
+ */
+const visitorSundayCheckIn: typeof actualVisitorSundayCheckIn =
+  (context, request, dependencies = {}) =>
+    actualVisitorSundayCheckIn(context, request, {
+      approvedEvents: async () => [],
+      ...dependencies
+    });
 
 const bridgeKey = "check-in-bridge-test-key-with-more-than-32-characters";
 const staffKey = "staff-api-test-key";
@@ -182,5 +194,26 @@ test("staff can retrieve a selected approved event", async () => {
       }
     });
     assert.equal(context.res?.status, 200);
+  });
+});
+test("event directory failure prevents visitor recording", async () => {
+  await withSettings(async () => {
+    const context: Parameters<typeof visitorSundayCheckIn>[0] = {};
+
+    await visitorSundayCheckIn(context, request, {
+      now: () => DateTime.fromISO("2026-11-29T15:00:00Z"),
+      approvedEvents: async () => {
+        throw new Error("Synthetic directory unavailable");
+      },
+      reserve: async () => {
+        throw new Error("Unexpected rate reservation");
+      },
+      record: async () => {
+        throw new Error("Unexpected visitor write");
+      }
+    });
+
+    assert.equal(context.res?.status, 503);
+    assert.deepEqual(context.res?.body, { status: "try_later" });
   });
 });

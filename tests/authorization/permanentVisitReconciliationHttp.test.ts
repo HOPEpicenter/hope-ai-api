@@ -144,3 +144,55 @@ test("denied requests create no audit and execution failure records only minimal
   assert.equal(added[0].actorId,actor); assert.equal(added[0].submissionId,id);
   assert.ok(!JSON.stringify(added).includes("synthetic secret error"));
 });
+
+import { discoverReconciliationAudit } from "../../src/services/visitors/discoverReconciliationAudit";
+const reviewDate = "2026-01-10";
+const reviewStamp = reviewDate + "T10:00:00.000Z";
+function reviewId(n: number) { return `aaaaaaaa-aaaa-4aaa-8aaa-${String(n).padStart(12,"0")}`; }
+async function seedReview(n: number, outcome?: string, recordedAt = reviewStamp, outcomeActor = actor) {
+  const common = { rowKey: reviewId(n), version: 1, actorId: actor, submissionId: id, operation: "reconcile_saved_attendance", recordedAt };
+  await auditTable.createEntity({ ...common, partitionKey: intentPartition });
+  if (outcome !== undefined) await auditTable.createEntity({ ...common, partitionKey: outcomePartition, actorId: outcomeActor, outcome });
+}
+test("actual audit review distinguishes missing outcome from every recorded outcome and paginates",async()=>{
+  await seedReview(1); await seedReview(2,"completed"); await seedReview(3,"already_completed"); await seedReview(4,"requires_review"); await seedReview(5,"unavailable");
+  await seedReview(6,"completed","2026-01-11T00:00:00.000Z");
+  const before = [await rows(intentPartition),await rows(outcomePartition)];
+  const first = await discoverReconciliationAudit({utcDate:reviewDate,limit:2},auditTable);
+  assert.equal(first.status,"ready"); if(first.status!=="ready") throw new Error("first page required");
+  assert.equal(first.scanned,2); assert.equal(first.nextCursor,reviewId(2));
+  assert.deepEqual(first.items[0],{operationId:reviewId(1),actorId:actor,submissionId:id,recordedAt:reviewStamp,status:"outcome_unconfirmed"});
+  assert.deepEqual(first.items[1],{operationId:reviewId(2),actorId:actor,submissionId:id,recordedAt:reviewStamp,status:"outcome_recorded",outcome:"completed",outcomeRecordedAt:reviewStamp});
+  const second = await discoverReconciliationAudit({utcDate:reviewDate,cursor:reviewId(2)},auditTable);
+  assert.equal(second.status,"ready"); if(second.status!=="ready") throw new Error("second page required");
+  assert.equal(second.nextCursor,null); assert.deepEqual(second.items.map(x=>x.operationId),[reviewId(3),reviewId(4),reviewId(5)]);
+  assert.deepEqual(second.items.map(x=>x.status==="outcome_recorded"?x.outcome:x.status),["already_completed","requires_review","unavailable"]);
+  assert.deepEqual([await rows(intentPartition),await rows(outcomePartition)],before);
+});
+test("actual missing audit outcome remains discoverable even after recorded replay",async()=>{
+  const before = await rows(intentPartition);
+  const f=fixture({auditTable:{getEntity:auditTable.getEntity.bind(auditTable),createEntity:async row=>{
+    if(row.partitionKey===outcomePartition) throw new Error("synthetic missing outcome"); return auditTable.createEntity(row);
+  }}});
+  assert.equal((await run(req(),f.deps)).status,503);
+  const added=(await rows(intentPartition)).filter(r=>!before.some(x=>x.rowKey===r.rowKey)); assert.equal(added.length,1);
+  assert.equal((await run(req(),fixture({reconcile:async()=>"already_completed"}).deps)).status,200);
+  const review=await discoverReconciliationAudit({utcDate:String(added[0].recordedAt).slice(0,10)},auditTable);
+  assert.equal(review.status,"ready"); if(review.status!=="ready") throw new Error("review required");
+  assert.equal(review.items.find(x=>x.operationId===added[0].rowKey)?.status,"outcome_unconfirmed");
+});
+test("cross-actor and malformed audit outcomes fail closed without partial page",async()=>{
+  await seedReview(7,"completed","2026-01-12T00:00:00.000Z","other-actor");
+  await seedReview(8,"unexpected","2026-01-13T00:00:00.000Z");
+  for(const utcDate of ["2026-01-12","2026-01-13"]) assert.deepEqual(await discoverReconciliationAudit({utcDate},auditTable),{status:"unavailable"});
+});
+test("invalid audit query and unavailable storage do not become missing outcomes",async()=>{
+  const broken = {listEntities:(()=>{throw new Error("synthetic outage");}) as typeof auditTable.listEntities};
+  for(const input of [{utcDate:"2026-02-30"},{utcDate:reviewDate,cursor:"bad"},{utcDate:reviewDate,limit:21}]) assert.deepEqual(await discoverReconciliationAudit(input,broken),{status:"invalid"});
+  assert.deepEqual(await discoverReconciliationAudit({utcDate:reviewDate},broken),{status:"unavailable"});
+  const failOutcome = {listEntities:((options?: Parameters<typeof auditTable.listEntities>[0])=>{
+    if(options?.queryOptions?.filter?.includes(outcomePartition)) throw new Error("synthetic outcome outage");
+    return auditTable.listEntities(options);
+  }) as typeof auditTable.listEntities};
+  assert.deepEqual(await discoverReconciliationAudit({utcDate:reviewDate},failOutcome),{status:"unavailable"});
+});

@@ -112,20 +112,27 @@ async function withTable(
     "HopeVisitor67C" +
     randomUUID().replace(/-/g, "");
 
+  const isolated = process.env.HOPE_VISITOR_91_LOCAL_CONNECTION;
+  const connection = isolated ?? "UseDevelopmentStorage=true";
   const table = TableClient.fromConnectionString(
-    "UseDevelopmentStorage=true",
-    tableName
+    connection, tableName, { allowInsecureConnection: true }
   );
 
   const endpoint = new URL(table.url);
-
   assert.equal(endpoint.protocol, "http:");
   assert.equal(endpoint.hostname, "127.0.0.1");
-  assert.equal(endpoint.port, "10002");
-  assert.equal(
-    endpoint.pathname.replace(/\/$/, ""),
-    "/devstoreaccount1"
-  );
+
+  if (isolated !== undefined) {
+    const port = process.env.HOPE_VISITOR_91_LOCAL_PORT;
+    assert.ok(port);
+    assert.match(port, /^\d+$/);
+    assert.notEqual(port, "10002");
+    assert.equal(endpoint.port, port);
+    assert.equal(endpoint.pathname.replace(/\/$/, ""), "/hopevisitor91");
+  } else {
+    assert.equal(endpoint.port, "10002");
+    assert.equal(endpoint.pathname.replace(/\/$/, ""), "/devstoreaccount1");
+  }
 
   await table.createTable();
 
@@ -2179,6 +2186,7 @@ async function withSubmissionHttpEnvironment(
 ): Promise<void> {
   const values: Record<string, string> = {
     FEATURE_PERMANENT_PUBLIC_VISIT: "true",
+    FEATURE_PERMANENT_PUBLIC_VISIT_REQUEST_BUDGET: "true",
     FEATURE_PERMANENT_VISITOR_CONSENT_GUARD: "true",
     FEATURE_PERMANENT_VISITOR_AUTOMATIC_FOLLOWUP: "true",
     HOPE_PERMANENT_VISIT_BRIDGE_KEY:
@@ -2223,6 +2231,7 @@ function submissionHttpFixture(
   let runtimeCalls = 0;
 
   const deps: SubmissionHttpDeps = {
+    reserveRequest: async () => "reserved",
     now: () => publicContext.nowMs,
     approvedEvents: async () => [],
     ...overrides,

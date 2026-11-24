@@ -30,6 +30,7 @@ const headers = {
 };
 
 process.env.FEATURE_PERMANENT_PUBLIC_VISIT = "true";
+process.env.FEATURE_PERMANENT_PUBLIC_VISIT_REQUEST_BUDGET = "true";
 process.env.FEATURE_PERMANENT_VISITOR_AUTOMATIC_FOLLOWUP = "true";
 process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD = "true";
 process.env.HOPE_PERMANENT_VISIT_BRIDGE_KEY = bridge;
@@ -46,8 +47,13 @@ function fixture(
 ) {
   let reads = 0;
   let writes = 0;
+  let budgetCalls = 0;
 
   const deps: Dependencies = {
+    reserveRequest: async () => {
+      budgetCalls++;
+      return "reserved";
+    },
     now: () => nowMs,
 
     approvedEvents: async date => {
@@ -88,7 +94,8 @@ function fixture(
   return {
     call,
     reads: () => reads,
-    writes: () => writes
+    writes: () => writes,
+    budgetCalls: () => budgetCalls
   };
 }
 
@@ -202,6 +209,7 @@ test("multiple events require selection before consuming issuance capacity", asy
   );
   assert.equal("token" in choice.body, false);
   assert.equal(f.writes(), 0);
+  assert.equal(f.budgetCalls(), 1);
 
   const selected = await f.call({
     body: {
@@ -223,6 +231,7 @@ test("multiple events require selection before consuming issuance capacity", asy
   ));
 
   assert.equal(f.writes(), 1);
+  assert.equal(f.budgetCalls(), 2);
 });
 
 test("invalid event or browser-supplied authority is denied", async () => {
@@ -300,20 +309,27 @@ test("global issuance limit survives concurrent independent clients and minute r
     "HopeVisitor69" +
     randomUUID().replace(/-/g, "");
 
+  const isolated = process.env.HOPE_VISITOR_91_LOCAL_CONNECTION;
+  const connection = isolated ?? "UseDevelopmentStorage=true";
   const table = TableClient.fromConnectionString(
-    "UseDevelopmentStorage=true",
-    tableName
+    connection, tableName, { allowInsecureConnection: true }
   );
 
   const endpoint = new URL(table.url);
-
   assert.equal(endpoint.protocol, "http:");
   assert.equal(endpoint.hostname, "127.0.0.1");
-  assert.equal(endpoint.port, "10002");
-  assert.equal(
-    endpoint.pathname.replace(/\/$/, ""),
-    "/devstoreaccount1"
-  );
+
+  if (isolated !== undefined) {
+    const port = process.env.HOPE_VISITOR_91_LOCAL_PORT;
+    assert.ok(port);
+    assert.match(port, /^\d+$/);
+    assert.notEqual(port, "10002");
+    assert.equal(endpoint.port, port);
+    assert.equal(endpoint.pathname.replace(/\/$/, ""), "/hopevisitor91");
+  } else {
+    assert.equal(endpoint.port, "10002");
+    assert.equal(endpoint.pathname.replace(/\/$/, ""), "/devstoreaccount1");
+  }
 
   await table.createTable();
 
@@ -321,8 +337,9 @@ test("global issuance limit survives concurrent independent clients and minute r
     const clients = Array.from(
       { length: 5 },
       () => TableClient.fromConnectionString(
-        "UseDevelopmentStorage=true",
-        tableName
+        connection,
+        tableName,
+        { allowInsecureConnection: true }
       )
     );
 
@@ -358,7 +375,7 @@ test("global issuance limit survives concurrent independent clients and minute r
 
       assert.deepEqual(
         Object.keys(row).filter(key =>
-          !["etag", "timestamp"].includes(key)
+          !["etag", "timestamp", "odata.metadata"].includes(key)
         ).sort(),
         ["partitionKey", "rowKey", "version"]
       );

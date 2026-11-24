@@ -575,3 +575,63 @@ test("allowed session requests retain existing calendar and issuance authority",
     ]);
   });
 });
+
+test("session route requires enabled request budget before any processing", async () => {
+  await withSettings(async () => {
+    for (const value of [undefined, "false", "TRUE", "1"]) {
+      const key = "FEATURE_PERMANENT_PUBLIC_VISIT_REQUEST_BUDGET";
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+
+      const context: Context = {};
+      let calls = 0;
+      await postPermanentPublicVisitSession(
+        context, { method: "POST", headers, body: {} },
+        {
+          now: () => now,
+          reserveRequest: async () => { calls++; return "reserved"; },
+          approvedEvents: async () => { calls++; return []; },
+          reserve: async () => { calls++; return "reserved"; }
+        }
+      );
+      assert.equal(context.res?.status, 503);
+      assert.deepEqual(context.res?.body, { status: "unavailable" });
+      assert.equal(calls, 0);
+    }
+  });
+});
+
+test("registration route requires enabled request budget before any processing", async () => {
+  await withSettings(async () => {
+    for (const value of [undefined, "false", "TRUE", "1"]) {
+      const key = "FEATURE_PERMANENT_PUBLIC_VISIT_REQUEST_BUDGET";
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+
+      const context: Context = {};
+      let calls = 0;
+      await postPermanentPublicVisitRegistration(
+        context,
+        {
+          method: "POST", headers,
+          body: {
+            token: "synthetic-token",
+            submissionId: "11111111-1111-4111-8111-111111111111",
+            body: {}
+          }
+        },
+        {
+          now: () => now,
+          reserveRequest: async () => { calls++; return "reserved"; },
+          approvedEvents: async () => { calls++; return []; },
+          runtime: async () => { calls++; throw new Error("Unexpected runtime"); }
+        }
+      );
+      assert.equal(context.res?.status, 503);
+      assert.deepEqual(context.res?.body, {
+        status: "unavailable", accepted: false
+      });
+      assert.equal(calls, 0);
+    }
+  });
+});

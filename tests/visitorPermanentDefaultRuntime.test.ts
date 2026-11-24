@@ -91,6 +91,8 @@ test(
 
     process.env.FEATURE_PERMANENT_PUBLIC_VISIT =
       "true";
+    process.env.FEATURE_PERMANENT_PUBLIC_VISIT_REQUEST_BUDGET =
+      "true";
 
     process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD =
       "true";
@@ -298,10 +300,22 @@ test(
       6
     );
 
+    assert.equal(await countRows(tables.PermanentVisitorSessionQuota), 4);
+    const quota = tables.PermanentVisitorSessionQuota;
+    const minute = Math.floor(Date.parse("2026-11-24T19:00:00Z") / 60000);
+    for (const [operation, count] of [
+      ["session", 2], ["registration", 3]
+    ] as const) {
+      const row = await quota.getEntity(
+        `pv-request-v1-${operation}-${minute}`, "budget"
+      );
+      assert.equal(row.version, 1);
+      assert.equal(row.count, count);
+    }
     assert.equal(
-      await countRows(tables.PermanentVisitorSessionQuota),
-      2
+      await countRows(quota, `pv-session-v1-${minute}`), 2
     );
+    console.log("MANDATORY_REQUEST_COUNTERS_VERIFIED=True");
 
     const followups =
       new SixWeekFollowupEventsRepository();

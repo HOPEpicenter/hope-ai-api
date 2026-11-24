@@ -222,6 +222,13 @@ export async function postPermanentPublicVisitRegistration(
     return;
   }
 
+  // Permanent registration cannot bypass its request protection.
+  if (process.env.FEATURE_PERMANENT_PUBLIC_VISIT_REQUEST_BUDGET
+        !== "true") {
+    reply(context, 503, { status: "unavailable", accepted: false });
+    return;
+  }
+
   if (request.method !== "POST") {
     reply(context, 405, { status: "unavailable" });
     return;
@@ -310,10 +317,8 @@ export async function postPermanentPublicVisitRegistration(
       return;
     }
 
-    // Additional request protection is staged
-    // independently of the existing admission limits.
-    if (process.env.FEATURE_PERMANENT_PUBLIC_VISIT_REQUEST_BUDGET
-          === "true") {
+    // Mandatory request protection precedes the calendar lookup.
+    {
       const budget = deps.reserveRequest
         ? await deps.reserveRequest(
             "registration", nowMs

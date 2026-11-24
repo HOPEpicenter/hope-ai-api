@@ -2,6 +2,13 @@ import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
 import { TableClient } from "@azure/data-tables";
+import {
+  getVisitorById, listVisitorsRecords
+} from "../src/functions/_shared/visitorsRepository";
+import { AzureTableVisitorsRepository } from "../src/repositories/visitorsRepository";
+import {
+  readSixWeekVisitorFollowup, readSixWeekVisitorFollowupQueue
+} from "../src/services/followups/readSixWeekVisitorFollowups";
 
 import {
   postPermanentPublicVisitSession as issue
@@ -344,5 +351,125 @@ test(
       await countRows(tables.VisitorFollowupEvents),
       1
     );
+
+    // Actual canonical read models used by the staff surfaces.
+    const directory = await listVisitorsRecords({ limit: 25 });
+    assert.equal(directory.items.length, 2);
+    assert.equal(new Set(directory.items.map(v => v.visitorId)).size, 2);
+
+    const canonicalRepository = new AzureTableVisitorsRepository();
+    for (const [id, expectedName] of [
+      [adultReceipt.visitorId, adultSubmission.body.name],
+      [familyReceipt.visitorId, familySubmission.body.name]
+    ] as const) {
+      assert.equal(directory.items.filter(v => v.visitorId === id).length, 1);
+      assert.equal((await getVisitorById(id))?.name, expectedName);
+      assert.equal((await canonicalRepository.getById(id))?.name, expectedName);
+    }
+
+    const asOf = "2026-11-25T19:00:00.000Z";
+    const staffPlan = await readSixWeekVisitorFollowup(adultReceipt.visitorId, asOf);
+    assert.ok(staffPlan);
+    assert.equal(staffPlan.tasks.length, 6);
+    assert.equal(staffPlan.ownerStaffId, null);
+    assert.equal(await readSixWeekVisitorFollowup(familyReceipt.visitorId, asOf), null);
+
+    const queue = await readSixWeekVisitorFollowupQueue(asOf);
+    assert.equal(queue.count, 1);
+    assert.equal(queue.needsOwner, 1);
+    assert.equal(queue.items[0].visitorId, adultReceipt.visitorId);
+    assert.equal(queue.items[0].email, adultSubmission.body.email);
+    assert.equal(queue.items[0].plan.tasks.length, 6);
+
+    console.log("CANONICAL_PEOPLE_READS_VERIFIED=True");
+    console.log("CONSENTED_SIX_WEEK_READS_VERIFIED=True");
+    console.log("DECLINED_FAMILY_NO_PLAN_VERIFIED=True");
+
+    // Deliberate synthetic interruption: a later receipt is durable,
+    // but no cancellation event has been written yet.
+    const existingReceipt = await visitors.getEntity<{
+      recordedAt: string;
+      registrationDetailsJson: string;
+    }>("VISITOR_CHECK_IN", adultSubmission.submissionId);
+    const priorMs = Date.parse(existingReceipt.recordedAt);
+    assert.ok(Number.isFinite(priorMs));
+
+    const withdrawal = {
+      partitionKey: "VISITOR_CHECK_IN",
+      rowKey: randomUUID(),
+      visitorId: adultReceipt.visitorId,
+      recordedAt: new Date(priorMs + 1).toISOString(),
+      registrationDetailsJson: JSON.stringify({
+        ...JSON.parse(existingReceipt.registrationDetailsJson),
+        contactConsent: false
+      })
+    };
+    await visitors.createEntity(withdrawal);
+
+    // Read protection must operate even though the raw plan remains active.
+    const raw = projectSixWeekVisitorFollowup(
+      await followups.listByVisitor(adultReceipt.visitorId), asOf
+    );
+    assert.equal(raw?.status, "active");
+    await assert.rejects(
+      () => readSixWeekVisitorFollowup(adultReceipt.visitorId, asOf),
+      /permission withdrawn/
+    );
+    const suppressed = await readSixWeekVisitorFollowupQueue(asOf);
+    assert.equal(suppressed.count, 0);
+    assert.equal(suppressed.needsOwner, 0);
+    assert.equal(suppressed.items.length, 0);
+    assert.deepEqual(await followups.listByVisitor(adultReceipt.visitorId), adultEvents);
+    console.log("STALE_ACTIONABLE_PLAN_SUPPRESSED=True");
+
+    // Unknown consent must not masquerade as an empty, verified queue.
+    await visitors.createEntity({
+      ...withdrawal,
+      rowKey: randomUUID(),
+      recordedAt: new Date(priorMs + 2).toISOString(),
+      registrationDetailsJson: "invalid-synthetic-json"
+    });
+    await assert.rejects(
+      () => readSixWeekVisitorFollowup(adultReceipt.visitorId, asOf),
+      /consent could not be verified/
+    );
+    await assert.rejects(
+      () => readSixWeekVisitorFollowupQueue(asOf),
+      /consent could not be verified/
+    );
+    assert.deepEqual(await followups.listByVisitor(adultReceipt.visitorId), adultEvents);
+    console.log("UNKNOWN_CONSENT_READS_FAIL_CLOSED=True");
+    console.log("FOLLOWUP_EVENT_HISTORY_UNCHANGED=True");
+
+    const noEvidenceId = "synthetic-no-registration-evidence";
+    const legacyEvents = adultEvents.map(event => ({
+      ...event,
+      visitorId: noEvidenceId,
+      actorId: "synthetic-staff"
+    }));
+    const legacyRepo = {
+      listByVisitor: async () => legacyEvents,
+      listAll: async () => legacyEvents
+    };
+    const legacyPlan = await readSixWeekVisitorFollowup(noEvidenceId, asOf, {
+      repository: legacyRepo
+    });
+    assert.equal(legacyPlan?.status, "active");
+
+    const missingEvidenceEvents = adultEvents.map(event => ({
+      ...event,
+      visitorId: noEvidenceId
+    }));
+    await assert.rejects(
+      () => readSixWeekVisitorFollowup(noEvidenceId, asOf, {
+        repository: {
+          listByVisitor: async () => missingEvidenceEvents,
+          listAll: async () => missingEvidenceEvents
+        }
+      }),
+      /consent could not be verified/
+    );
+    console.log("LEGACY_PLAN_READ_COMPATIBILITY_VERIFIED=True");
+    console.log("PUBLIC_PLAN_WITHOUT_CONSENT_EVIDENCE_DENIED=True");
   }
 );

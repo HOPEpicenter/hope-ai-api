@@ -8,6 +8,28 @@ import {
   getVisitorById,
   type FunctionVisitor
 } from "../../functions/_shared/visitorsRepository";
+import { readLatestRegistrationConsent } from "./readLatestRegistrationConsent";
+
+async function mayExposeActionablePlan(
+  plan: SixWeekVisitorFollowupPlan
+): Promise<boolean> {
+  if (process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD !== "true" ||
+      (plan.status !== "active" && plan.status !== "paused")) {
+    return true;
+  }
+
+  const consent = await readLatestRegistrationConsent(plan.visitorId);
+
+  if (consent === "declined") return false;
+  if (consent === "granted") return true;
+  if (consent === "legacy_no_evidence" &&
+      plan.startedBy !== "system:permanent-visitor-registration") {
+    return true;
+  }
+
+  // Do not present actionable tasks when consent cannot be verified.
+  throw new Error("Current registration consent could not be verified");
+}
 
 export type SixWeekFollowupQueueItem = {
   visitorId: string;
@@ -61,10 +83,17 @@ export async function readSixWeekVisitorFollowup(
   const repository =
     dependencies.repository ?? new SixWeekFollowupEventsRepository();
 
-  return projectSixWeekVisitorFollowup(
+  const plan = projectSixWeekVisitorFollowup(
     await repository.listByVisitor(normalizedVisitorId),
     normalizeAsOf(asOf)
   );
+
+  if (plan && !(await mayExposeActionablePlan(plan))) {
+    // Not a missing plan: do not imply that a new plan may be started.
+    throw new Error("Follow-up permission withdrawn; plan needs reconciliation");
+  }
+
+  return plan;
 }
 
 export async function readSixWeekVisitorFollowupQueue(
@@ -82,10 +111,22 @@ export async function readSixWeekVisitorFollowupQueue(
     plan.status === "active" || plan.status === "paused"
   );
 
+  // Preserve the canonical event stream; suppress stale work at read time.
+  // An unknown consent result makes the queue unavailable rather than
+  // publishing incomplete counts as verified.
+  const permitted = await Promise.all(
+    plans.map(async plan => ({
+      plan,
+      allowed: await mayExposeActionablePlan(plan)
+    }))
+  );
+  const visiblePlans = permitted.filter(entry => entry.allowed)
+    .map(entry => entry.plan);
+
   const readVisitor = dependencies.getVisitor ?? getVisitorById;
 
   const resolved = await Promise.all(
-    plans.map(async plan => ({
+    visiblePlans.map(async plan => ({
       plan,
       visitor: await readVisitor(plan.visitorId)
     }))

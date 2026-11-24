@@ -25,6 +25,8 @@ import type {
   recordVisitorFamilyCheckIn
 } from "./recordVisitorFamilyCheckIn";
 
+import type { PermanentVisitRecoveryJournal, PermanentVisitRecoveryIntent } from "./permanentVisitRecoveryJournal";
+
 type FamilyCommand = Extract<
   PublicVisitCommand,
   { family: unknown }
@@ -38,6 +40,9 @@ type AdultCommand = Exclude<
 export type PermanentPublicRegistrationDependencies =
   PermanentPublicAdmissionDependencies & {
     familyEnabled?: boolean;
+    // The live public runtime always supplies this journal. Legacy isolated
+    // dependency-injected callers may omit it; no browser input can set it.
+    recoveryJournal?: PermanentVisitRecoveryJournal;
     automaticFollowupEnabled?: boolean;
     enrollFollowup?: (
       evidence: RecordedPublicVisitEvidence
@@ -175,6 +180,15 @@ export async function submitPermanentPublicVisitRegistration(
       }
     }
 
+    const recoveryIntent: PermanentVisitRecoveryIntent = {
+      submissionId: command.submissionId, serviceId: command.serviceId,
+      visitDate: event.date, familyExpected: "family" in command,
+      followupExpected: deps.automaticFollowupEnabled === true
+    };
+    if (deps.recoveryJournal && !(await deps.recoveryJournal.begin(recoveryIntent))) {
+      return reject("try_later");
+    }
+
     const result = "family" in command
       ? await deps.recordFamily!(command)
       : await deps.recordAdult!(command);
@@ -200,6 +214,10 @@ export async function submitPermanentPublicVisitRegistration(
               enrollment !== "not_eligible") {
             return reject("try_later");
           }
+        }
+
+        if (deps.recoveryJournal && !(await deps.recoveryJournal.complete(recoveryIntent))) {
+          return reject("try_later");
         }
 
         return {

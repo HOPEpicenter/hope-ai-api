@@ -777,5 +777,80 @@ test(
     );
     console.log("LEGACY_PLAN_READ_COMPATIBILITY_VERIFIED=True");
     console.log("PUBLIC_PLAN_WITHOUT_CONSENT_EVIDENCE_DENIED=True");
+    const { createPermanentVisitRecoveryJournal } = await import("../src/services/visitors/permanentVisitRecoveryJournal");
+    const recoveryJournal109 = createPermanentVisitRecoveryJournal(visitors);
+    const adultRecovery109 = await recoveryJournal109.inspect(adultSubmission.submissionId);
+    const familyRecovery109 = await recoveryJournal109.inspect(familySubmission.submissionId);
+    assert.equal(adultRecovery109.status, "completed");
+    assert.equal(familyRecovery109.status, "completed");
+    if (adultRecovery109.status !== "completed" || familyRecovery109.status !== "completed") throw new Error("Missing completed journal");
+    assert.equal(adultRecovery109.intent.familyExpected, false);
+    assert.equal(familyRecovery109.intent.familyExpected, true);
+    assert.equal(familyRecovery109.intent.followupExpected, true);
+    assert.equal(await countRows(visitors, "PUBLIC_VISIT_RECOVERY_INTENT"), 2);
+    assert.equal(await countRows(visitors, "PUBLIC_VISIT_RECOVERY_COMPLETE"), 2);
+    console.log("DEFAULT_RUNTIME_DURABLE_JOURNAL_VERIFIED=True");
+
+    const { submitPermanentPublicVisitRegistration } = await import("../src/services/visitors/submitPermanentPublicVisitRegistration");
+    const { createPermanentVisitorQrReservationStore } = await import("../src/repositories/permanentVisitorQrReservationStore");
+    const { recordVisitorFamilyCheckIn } = await import("../src/services/visitors/recordVisitorFamilyCheckIn");
+    const interrupted109 = {
+      token: await obtainSession(), submissionId: randomUUID(),
+      body: {
+        ...familySubmission.body, name: "Synthetic Recovery Guardian",
+        email: "recovery-109@example.invalid", phone: "2015550109",
+        family: { ...familySubmission.body.family, guardianName: "Synthetic Recovery Guardian" }
+      }
+    };
+    const recoveryDeps109 = {
+      enabled: true, familyEnabled: true, automaticFollowupEnabled: true,
+      context: { enabled: true, nowMs: deps.now(), approvedEvents: [] },
+      store: createPermanentVisitorQrReservationStore(tables.PermanentVisitorAdmission),
+      signingSecret: process.env.HOPE_PERMANENT_VISIT_SESSION_SECRET!,
+      claimSecret: process.env.HOPE_PERMANENT_VISIT_CLAIM_SECRET!,
+      recoveryJournal: recoveryJournal109,
+      enrollFollowup: async (): Promise<never> => { throw new Error("Synthetic enrollment interruption"); }
+    };
+    const beforeAdult109 = await countRows(visitors, "VISITOR_CHECK_IN");
+    const beforeFamily109 = await countRows(visitors, "VISITOR_FAMILY_ATTENDANCE");
+    const beforeProfiles109 = await countRows(visitors, "VISITOR");
+    const first109 = await submitPermanentPublicVisitRegistration(interrupted109, {
+      ...recoveryDeps109,
+      recordFamily: command => recordVisitorFamilyCheckIn(command, {
+        saveFamily: async () => { throw new Error("Synthetic family interruption"); }
+      })
+    });
+    assert.deepEqual(first109, { accepted: false, status: "try_later" });
+    assert.equal(await countRows(visitors, "VISITOR_CHECK_IN"), beforeAdult109 + 1);
+    assert.equal(await countRows(visitors, "VISITOR_FAMILY_ATTENDANCE"), beforeFamily109);
+    const pending109 = await recoveryJournal109.inspect(interrupted109.submissionId);
+    if (pending109.status !== "pending") throw new Error("Incomplete family must remain pending");
+    assert.equal(pending109.intent.familyExpected, true);
+    console.log("INTERRUPTED_FAMILY_DURABLY_IDENTIFIED=True");
+    const second109 = await submitPermanentPublicVisitRegistration(interrupted109, {
+      ...recoveryDeps109, recordFamily: recordVisitorFamilyCheckIn
+    });
+    assert.deepEqual(second109, { accepted: false, status: "try_later" });
+    assert.equal(await countRows(visitors, "VISITOR_FAMILY_ATTENDANCE"), beforeFamily109 + 1);
+    assert.equal((await recoveryJournal109.inspect(interrupted109.submissionId)).status, "pending");
+    console.log("INTERRUPTED_ENROLLMENT_REMAINS_PENDING=True");
+    await register(interrupted109);
+    assert.equal((await recoveryJournal109.inspect(interrupted109.submissionId)).status, "completed");
+    assert.equal(await countRows(visitors, "VISITOR_CHECK_IN"), beforeAdult109 + 1);
+    assert.equal(await countRows(visitors, "VISITOR_FAMILY_ATTENDANCE"), beforeFamily109 + 1);
+    assert.equal(await countRows(visitors, "VISITOR"), beforeProfiles109 + 1);
+    assert.equal(await countRows(visitors, "PUBLIC_VISIT_RECOVERY_INTENT"), 3);
+    assert.equal(await countRows(visitors, "PUBLIC_VISIT_RECOVERY_COMPLETE"), 3);
+    console.log("EXACT_RETRY_COMPLETES_JOURNAL_WITHOUT_DUPLICATES=True");
+    assert.equal(await recoveryJournal109.begin({ ...pending109.intent, familyExpected: false }), false);
+    assert.equal(await recoveryJournal109.complete({ ...pending109.intent, submissionId: randomUUID() }), false);
+    assert.equal((await recoveryJournal109.inspect(randomUUID())).status, "not_tracked");
+    for (const partition of ["PUBLIC_VISIT_RECOVERY_INTENT", "PUBLIC_VISIT_RECOVERY_COMPLETE"]) {
+      for await (const row of visitors.listEntities({ queryOptions: { filter: `PartitionKey eq '${partition}'` } })) {
+        const allowed = new Set(["partitionKey", "rowKey", "version", "recordedAt", "submissionId", "serviceId", "visitDate", "familyExpected", "followupExpected", "etag", "timestamp"]);
+        assert.ok(Object.keys(row).every(key => allowed.has(key)));
+      }
+    }
+    console.log("JOURNAL_MINIMAL_AND_CONFLICT_SAFE=True");
   }
 );

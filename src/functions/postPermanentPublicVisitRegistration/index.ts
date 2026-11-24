@@ -50,6 +50,7 @@ type Context = {
 type Runtime = Pick<
   PermanentPublicRegistrationDependencies,
   "store" |
+  "recoveryJournal" |
   "recordAdult" |
   "recordFamily" |
   "enrollFollowup"
@@ -175,6 +176,9 @@ async function liveRuntime(): Promise<Runtime> {
   );
 
   const visitors = getTableClient("Visitors");
+  const { createPermanentVisitRecoveryJournal } = await import(
+    "../../services/visitors/permanentVisitRecoveryJournal"
+  );
 
   const followups =
     new SixWeekFollowupEventsRepository();
@@ -184,6 +188,8 @@ async function liveRuntime(): Promise<Runtime> {
       createPermanentVisitorQrReservationStore(
         reservations
       ),
+
+    recoveryJournal: createPermanentVisitRecoveryJournal(visitors),
 
     recordAdult: recordVisitorArrival,
 

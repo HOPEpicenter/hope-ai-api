@@ -1,4 +1,21 @@
 import {
+  submitPermanentPublicVisitRegistration as submitPublic,
+  type PermanentPublicRegistrationDependencies
+} from "../src/services/visitors/submitPermanentPublicVisitRegistration";
+
+import {
+  issuePermanentPublicVisitSession
+} from "../src/services/visitors/permanentPublicVisitSession";
+
+import {
+  createPermanentVisitorQrReservationStore
+} from "../src/repositories/permanentVisitorQrReservationStore";
+
+import type {
+  PermanentPublicVisitContext
+} from "../src/services/visitors/resolvePermanentPublicVisitEvent";
+
+import {
   createVisitorFromCheckIn,
   getVisitorById
 } from "../src/functions/_shared/visitorsRepository";
@@ -623,5 +640,481 @@ test("concurrent claims for the same contacts cannot publish two visitor profile
     }
 
     assert.equal(profiles, 1);
+  });
+});
+
+const publicSigningSecret =
+  "synthetic-public-pipeline-signing-secret";
+
+const publicClaimSecret =
+  "synthetic-public-pipeline-independent-claim-secret";
+
+const publicContext: PermanentPublicVisitContext = {
+  enabled: true,
+  nowMs: Date.parse("2026-11-24T19:00:00Z"),
+  approvedEvents: []
+};
+
+const publicBody = {
+  name: command.name,
+  email: command.email,
+  phone: command.phone,
+  visitType: "first",
+  churchHome: "looking",
+  interests: ["prayer", "church_events"],
+  invitedBy: "Synthetic Inviter",
+  contactConsent: false
+};
+
+function publicSession(
+  context = publicContext
+): string {
+  const token = issuePermanentPublicVisitSession(
+    publicSigningSecret,
+    context
+  );
+
+  assert.ok(token);
+
+  return token;
+}
+
+function publicDependencies(
+  visitors: TableClient,
+  reservations: TableClient
+): PermanentPublicRegistrationDependencies {
+  return {
+    enabled: true,
+    familyEnabled: true,
+    context: publicContext,
+    signingSecret: publicSigningSecret,
+    claimSecret: publicClaimSecret,
+    capacity: 10,
+    store:
+      createPermanentVisitorQrReservationStore(
+        reservations
+      ),
+    recordAdult: input =>
+      recordVisitorArrival(
+        input,
+        actualLocalArrival(visitors)
+      )
+  };
+}
+
+async function withPublicTables(
+  run: (
+    visitors: TableClient,
+    reservations: TableClient
+  ) => Promise<void>
+): Promise<void> {
+  await withTable(visitors =>
+    withTable(reservations =>
+      run(visitors, reservations)
+    )
+  );
+}
+
+async function publicRowCount(
+  table: TableClient
+): Promise<number> {
+  let count = 0;
+
+  for await (const _ of table.listEntities()) {
+    count++;
+  }
+
+  return count;
+}
+
+test("complete public registration saves new and returning visitors through actual local storage", async () => {
+  await withPublicTables(async (
+    visitors, reservations
+  ) => {
+    const deps = publicDependencies(
+      visitors, reservations
+    );
+
+    const firstRequest = {
+      token: publicSession(),
+      submissionId: command.submissionId,
+      body: publicBody
+    };
+
+    assert.deepEqual(
+      await submitPublic(firstRequest, deps),
+      { accepted: true, status: "recorded" }
+    );
+
+    const first = await visitors.getEntity<{
+      visitorId: string;
+      registrationDetailsJson: string;
+    }>(
+      "VISITOR_CHECK_IN",
+      firstRequest.submissionId
+    );
+
+    const details = JSON.parse(
+      first.registrationDetailsJson
+    );
+
+    assert.equal(details.email, publicBody.email);
+    assert.equal(details.phone, publicBody.phone);
+    assert.equal(details.visitType, "first");
+    assert.equal(details.churchHome, "looking");
+    assert.equal(details.contactConsent, false);
+    assert.equal(
+      details.invitedBy,
+      publicBody.invitedBy
+    );
+
+    assert.deepEqual(
+      details.interests,
+      ["church_events", "prayer"]
+    );
+
+    // Declined consent did not block attendance.
+    // Exact retry does not create another visit.
+    assert.deepEqual(
+      await submitPublic(firstRequest, deps),
+      { accepted: true, status: "recorded" }
+    );
+
+    assert.equal(
+      await publicRowCount(reservations),
+      3
+    );
+
+    const laterContext = {
+      ...publicContext,
+      nowMs: Date.parse("2026-11-25T19:00:00Z")
+    };
+
+    const returningRequest = {
+      token: publicSession(laterContext),
+      submissionId:
+        "22222222-2222-4222-8222-222222222222",
+      body: {
+        ...publicBody,
+        visitType: "returning",
+        contactConsent: true
+      }
+    };
+
+    assert.deepEqual(
+      await submitPublic(returningRequest, {
+        ...deps,
+        context: laterContext
+      }),
+      { accepted: true, status: "recorded" }
+    );
+
+    const returning = await visitors.getEntity<{
+      visitorId: string;
+      serviceId: string;
+      registrationDetailsJson: string;
+    }>(
+      "VISITOR_CHECK_IN",
+      returningRequest.submissionId
+    );
+
+    assert.equal(
+      returning.visitorId,
+      first.visitorId
+    );
+
+    assert.equal(
+      returning.serviceId,
+      "visit-2026-11-25"
+    );
+
+    assert.equal(
+      JSON.parse(
+        returning.registrationDetailsJson
+      ).contactConsent,
+      true
+    );
+
+    let people = 0;
+    let visits = 0;
+
+    for await (const row of visitors.listEntities()) {
+      if (row.partitionKey === "VISITOR") people++;
+      if (row.partitionKey === "VISITOR_CHECK_IN") visits++;
+    }
+
+    assert.equal(people, 1);
+    assert.equal(visits, 2);
+
+    assert.equal(
+      await publicRowCount(reservations),
+      6
+    );
+  });
+});
+
+test("invalid or disabled public registration never reaches a canonical writer", async () => {
+  await withPublicTables(async (
+    visitors, reservations
+  ) => {
+    const deps = publicDependencies(
+      visitors, reservations
+    );
+
+    const request = {
+      token: publicSession(),
+      submissionId: command.submissionId,
+      body: publicBody
+    };
+
+    const invalid = await submitPublic({
+      ...request,
+      body: {
+        ...publicBody,
+        contactConsent: "yes"
+      }
+    }, deps);
+
+    assert.deepEqual(invalid, {
+      accepted: false,
+      status: "invalid"
+    });
+
+    assert.deepEqual(
+      await submitPublic(request, {
+        ...deps,
+        enabled: false
+      }),
+      {
+        accepted: false,
+        status: "unavailable"
+      }
+    );
+
+    assert.deepEqual(
+      await submitPublic({
+        ...request,
+        token: "invalid-session"
+      }, deps),
+      {
+        accepted: false,
+        status: "admission_denied"
+      }
+    );
+
+    assert.equal(
+      await publicRowCount(visitors),
+      0
+    );
+
+    assert.equal(
+      await publicRowCount(reservations),
+      0
+    );
+  });
+});
+
+test("changing consent on an admitted submission cannot overwrite the original visit", async () => {
+  await withPublicTables(async (
+    visitors, reservations
+  ) => {
+    const deps = publicDependencies(
+      visitors, reservations
+    );
+
+    const request = {
+      token: publicSession(),
+      submissionId: command.submissionId,
+      body: publicBody
+    };
+
+    assert.deepEqual(
+      await submitPublic(request, deps),
+      { accepted: true, status: "recorded" }
+    );
+
+    assert.deepEqual(
+      await submitPublic({
+        ...request,
+        body: {
+          ...publicBody,
+          contactConsent: true
+        }
+      }, deps),
+      {
+        accepted: false,
+        status: "submission_conflict"
+      }
+    );
+
+    const row = await visitors.getEntity<{
+      registrationDetailsJson: string;
+    }>(
+      "VISITOR_CHECK_IN",
+      request.submissionId
+    );
+
+    assert.equal(
+      JSON.parse(
+        row.registrationDetailsJson
+      ).contactConsent,
+      false
+    );
+  });
+});
+
+test("missing family writer does not consume admission capacity and incomplete family is not confirmed", async () => {
+  await withPublicTables(async (
+    visitors, reservations
+  ) => {
+    const deps = publicDependencies(
+      visitors, reservations
+    );
+
+    const request = {
+      token: publicSession(),
+      submissionId: command.submissionId,
+      body: {
+        ...publicBody,
+        family: {
+          guardianName: publicBody.name,
+          guardianDeclaration: true,
+          children: [
+            {
+              firstName: "Synthetic Child",
+              ageGroup: "6-11"
+            }
+          ]
+        }
+      }
+    };
+
+    assert.deepEqual(
+      await submitPublic(request, deps),
+      {
+        accepted: false,
+        status: "unavailable"
+      }
+    );
+
+    assert.equal(
+      await publicRowCount(reservations),
+      0
+    );
+
+    const incomplete = await submitPublic(
+      request,
+      {
+        ...deps,
+        recordFamily: input =>
+          recordVisitorFamilyCheckIn(input, {
+            arrival: adult =>
+              recordVisitorArrival(
+                adult,
+                actualLocalArrival(visitors)
+              ),
+            async saveFamily() {
+              throw new Error(
+                "Synthetic family storage failure"
+              );
+            }
+          })
+      }
+    );
+
+    assert.deepEqual(incomplete, {
+      accepted: false,
+      status: "try_later"
+    });
+
+    // Adult attendance may already exist.
+    // The public result still must not be recorded.
+    const adult = await visitors.getEntity(
+      "VISITOR_CHECK_IN",
+      request.submissionId
+    );
+
+    assert.equal(
+      adult.rowKey,
+      request.submissionId
+    );
+  });
+});
+
+test("selected event must match the automatic session authority", async () => {
+  await withPublicTables(async (
+    visitors, reservations
+  ) => {
+    const context = {
+      ...publicContext,
+      approvedEvents: [
+        {
+          id: "synthetic-event-one",
+          date: "2026-11-24",
+          name: "Synthetic Event One",
+          active: true
+        },
+        {
+          id: "synthetic-event-two",
+          date: "2026-11-24",
+          name: "Synthetic Event Two",
+          active: true
+        }
+      ]
+    };
+
+    const deps = {
+      ...publicDependencies(
+        visitors, reservations
+      ),
+      context
+    };
+
+    const request = {
+      token: publicSession({
+        ...context,
+        selectedEventId: "synthetic-event-one"
+      }),
+      submissionId: command.submissionId,
+      body: publicBody
+    };
+
+    assert.deepEqual(
+      await submitPublic(request, deps),
+      {
+        accepted: false,
+        status: "selection_required"
+      }
+    );
+
+    assert.deepEqual(
+      await submitPublic({
+        ...request,
+        body: {
+          ...publicBody,
+          eventId: "synthetic-event-two"
+        }
+      }, deps),
+      {
+        accepted: false,
+        status: "admission_denied"
+      }
+    );
+
+    assert.equal(
+      await publicRowCount(reservations),
+      0
+    );
+
+    assert.deepEqual(
+      await submitPublic({
+        ...request,
+        body: {
+          ...publicBody,
+          eventId: "synthetic-event-one"
+        }
+      }, deps),
+      { accepted: true, status: "recorded" }
+    );
   });
 });

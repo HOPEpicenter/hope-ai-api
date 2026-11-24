@@ -47,7 +47,10 @@ export async function getVisitorRegistrationHistory(
     }
     const history = await (deps.readHistory ?? readCanonicalVisitorRegistrationFamilyHistory)(visitorId);
     if (history.status !== "ready") { unavailable(); return; }
-    const currentConsent = await (deps.readConsent ?? readLatestRegistrationConsent)(visitorId);
+    const decision = await (deps.readConsent ?? readLatestRegistrationConsent)(visitorId);
+    // Preserve the existing dashboard wire contract. Pending verification is
+    // not a verified decline; hide contact controls without erasing history.
+    const currentConsent = decision === "pending_verification" ? "unavailable" : decision;
     if (!["granted", "declined", "legacy_no_evidence", "unavailable"].includes(currentConsent)) {
       unavailable(); return;
     }

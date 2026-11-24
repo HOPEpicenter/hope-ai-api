@@ -2,6 +2,7 @@
 
 import {
   readLatestRegistrationConsent,
+  registrationConsentAuthorityEnabled,
   type RegistrationConsent
 } from "./readLatestRegistrationConsent";
 
@@ -62,6 +63,9 @@ export async function startConsentProtectedSixWeekFollowup(
       deps.readConsent ?? readLatestRegistrationConsent
     )(visitorId);
 
+    if (consent === "pending_verification") {
+      return { accepted: false, status: 409, error: "Visitor consent verification pending" };
+    }
     if (consent === "declined") {
       return {
         accepted: false,
@@ -71,7 +75,7 @@ export async function startConsentProtectedSixWeekFollowup(
     }
 
     if (consent !== "granted" &&
-        consent !== "legacy_no_evidence") {
+        (consent !== "legacy_no_evidence" || registrationConsentAuthorityEnabled())) {
       return {
         accepted: false,
         status: 503,

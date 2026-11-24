@@ -1,5 +1,7 @@
 import {
   readLatestRegistrationConsent,
+  registrationConsentAuthorityEnabled,
+  registrationConsentGuardEnabled,
   type RegistrationConsent
 } from "./readLatestRegistrationConsent";
 
@@ -19,15 +21,19 @@ export async function requireCurrentRegistrationContactPermission(
   visitorId: string,
   readConsent: RegistrationConsentReader = readLatestRegistrationConsent
 ): Promise<RegistrationContactFailure | null> {
-  if (process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD !== "true") {
+  if (!registrationConsentGuardEnabled()) {
     return null;
   }
   try {
     const consent = await readConsent(visitorId);
+    if (consent === "pending_verification") {
+      return { accepted: false, status: 409, error: "Visitor consent verification pending" };
+    }
     if (consent === "declined") {
       return { accepted: false, status: 409, error: "Visitor declined follow-up permission" };
     }
-    if (consent === "granted" || consent === "legacy_no_evidence") {
+    if (consent === "granted" ||
+        (consent === "legacy_no_evidence" && !registrationConsentAuthorityEnabled())) {
       return null;
     }
   } catch {

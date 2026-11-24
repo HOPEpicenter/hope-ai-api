@@ -1,5 +1,7 @@
 import {
   readLatestRegistrationConsent,
+  registrationConsentAuthorityEnabled,
+  registrationConsentGuardEnabled,
   type RegistrationConsent
 } from "./readLatestRegistrationConsent";
 
@@ -214,8 +216,7 @@ async function requireCurrentRegistrationConsent(
   visitorId: string,
   dependencies: SixWeekFollowupCommandDependencies
 ): Promise<SixWeekFollowupCommandFailure | null> {
-  if (process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD
-      !== "true") {
+  if (!registrationConsentGuardEnabled()) {
     return null;
   }
 
@@ -225,6 +226,9 @@ async function requireCurrentRegistrationConsent(
       readLatestRegistrationConsent
     )(visitorId);
 
+    if (consent === "pending_verification") {
+      return commandFailure(409, "Visitor consent verification pending");
+    }
     if (consent === "declined") {
       return commandFailure(
         409,
@@ -233,7 +237,7 @@ async function requireCurrentRegistrationConsent(
     }
 
     if (consent !== "granted" &&
-        consent !== "legacy_no_evidence") {
+        (consent !== "legacy_no_evidence" || registrationConsentAuthorityEnabled())) {
       return commandFailure(
         503,
         "Follow-up consent could not be verified"

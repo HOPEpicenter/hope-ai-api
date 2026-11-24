@@ -8,21 +8,22 @@ import {
   getVisitorById,
   type FunctionVisitor
 } from "../../functions/_shared/visitorsRepository";
-import { readLatestRegistrationConsent } from "./readLatestRegistrationConsent";
+import { readLatestRegistrationConsent, registrationConsentAuthorityEnabled,
+  registrationConsentGuardEnabled } from "./readLatestRegistrationConsent";
 
 async function mayExposeActionablePlan(
   plan: SixWeekVisitorFollowupPlan
 ): Promise<boolean> {
-  if (process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD !== "true" ||
+  if (!registrationConsentGuardEnabled() ||
       (plan.status !== "active" && plan.status !== "paused")) {
     return true;
   }
 
   const consent = await readLatestRegistrationConsent(plan.visitorId);
 
-  if (consent === "declined") return false;
+  if (consent === "declined" || consent === "pending_verification") return false;
   if (consent === "granted") return true;
-  if (consent === "legacy_no_evidence" &&
+  if (consent === "legacy_no_evidence" && !registrationConsentAuthorityEnabled() &&
       plan.startedBy !== "system:permanent-visitor-registration") {
     return true;
   }

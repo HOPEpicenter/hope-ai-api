@@ -904,6 +904,52 @@ test(
     assert.equal(await countRows(visitors, "VISITOR_CHECK_IN"), beforeAdult109 + 1);
     assert.equal(await countRows(visitors, "VISITOR_FAMILY_ATTENDANCE"), beforeFamily109 + 1);
     assert.equal(await countRows(visitors, "VISITOR"), beforeProfiles109 + 1);
+    const { discoverPermanentVisitRecovery } = await import("../src/services/visitors/discoverPermanentVisitRecovery");
+    const date113 = pending109.intent.visitDate;
+    const pending113 = { ...pending109.intent, submissionId: randomUUID() };
+    const other113 = { ...pending113, submissionId: randomUUID(), visitDate: "2026-11-23" };
+    assert.notEqual(other113.visitDate, date113);
+    assert.equal(await recoveryJournal109.begin(pending113), true);
+    assert.equal(await recoveryJournal109.begin(other113), true);
+    const found113: string[] = [];
+    let cursor113: string | undefined;
+    let total113 = 0;
+    let pages113 = 0;
+    do {
+      const page113 = await discoverPermanentVisitRecovery({ visitDate: date113, cursor: cursor113, limit: 1 }, readOnly110);
+      if (page113.status !== "ready") throw new Error("Expected discovery page");
+      assert.equal(page113.scanned, 1);
+      assert.equal(page113.visitDate, date113);
+      total113 += page113.scanned;
+      for (const entry of page113.items) {
+        found113.push(entry.submissionId);
+        if (entry.submissionId === pending113.submissionId) {
+          assert.deepEqual(entry, { status: "ready", ...pending113, stage: "awaiting_arrival_claim", adultRecorded: false, familyRecorded: false });
+        } else {
+          assert.deepEqual(entry, { status: "unavailable", submissionId: orphan110.submissionId });
+        }
+      }
+      if (page113.nextCursor !== null) assert.ok(page113.nextCursor > (cursor113 ?? ""));
+      cursor113 = page113.nextCursor ?? undefined;
+      if (++pages113 > 10) throw new Error("Discovery cursor did not advance");
+    } while (cursor113 !== undefined);
+    assert.equal(total113, 5);
+    assert.equal(pages113, 5);
+    assert.deepEqual(found113.sort(), [pending113.submissionId, orphan110.submissionId].sort());
+    console.log("ACTUAL_RECOVERY_DISCOVERY_PAGINATION_VERIFIED=True");
+    console.log("COMPLETED_EXCLUDED_AND_INCONSISTENT_RETAINED=True");
+    const otherPage113 = await discoverPermanentVisitRecovery({ visitDate: other113.visitDate }, readOnly110);
+    assert.deepEqual(otherPage113, { status: "ready", visitDate: other113.visitDate, scanned: 1,
+      items: [{ status: "ready", ...other113, stage: "awaiting_arrival_claim", adultRecorded: false, familyRecorded: false }], nextCursor: null });
+    assert.deepEqual(await discoverPermanentVisitRecovery({ visitDate: "2026-02-30" }, failedRead110), { status: "invalid" });
+    assert.deepEqual(await discoverPermanentVisitRecovery({ visitDate: date113, cursor: "'" }, failedRead110), { status: "invalid" });
+    assert.deepEqual(await discoverPermanentVisitRecovery({ visitDate: date113, limit: 21 }, failedRead110), { status: "invalid" });
+    assert.deepEqual(await discoverPermanentVisitRecovery({ visitDate: date113 }, failedRead110), { status: "unavailable" });
+    console.log("DISCOVERY_DATE_ISOLATION_AND_FAILURE_BOUNDARY_VERIFIED=True");
+    assert.equal(await countRows(visitors, "VISITOR_CHECK_IN"), beforeAdult109 + 1);
+    assert.equal(await countRows(visitors, "VISITOR_FAMILY_ATTENDANCE"), beforeFamily109 + 1);
+    assert.equal(await countRows(visitors, "VISITOR"), beforeProfiles109 + 1);
+    console.log("READ_ONLY_RECOVERY_DISCOVERY_VERIFIED=True");
     console.log("READ_ONLY_RECOVERY_INSPECTION_VERIFIED=True");
   }
 );

@@ -115,3 +115,72 @@ test("weekday visits are saved with a general visit identifier", async () => {
     assert.deepEqual(context.res?.body, { status: "recorded" });
   });
 });
+test("an approved event is passed to canonical visitor recording", async () => {
+  await withSettings(async () => {
+    const context: Parameters<typeof visitorSundayCheckIn>[0] = {};
+    const events = [
+      { id: "worship-2026-11-29", date: "2026-11-29", name: "Worship", active: true },
+      { id: "prayer-2026-11-29", date: "2026-11-29", name: "Prayer", active: true }
+    ];
+    await visitorSundayCheckIn(context, {
+      ...request, body: { ...request.body, eventId: "prayer-2026-11-29" }
+    }, {
+      now: () => DateTime.fromISO("2026-11-29T15:00:00Z"),
+      approvedEvents: async () => events,
+      reserve: async () => true,
+      record: async command => {
+        assert.equal(command.serviceId, "prayer-2026-11-29");
+        return { status: "recorded", receipt: {
+          ...command, visitorId: "synthetic-visitor",
+          recordedAt: "2026-11-29T15:00:00Z"
+        }};
+      }
+    });
+    assert.equal(context.res?.status, 200);
+  });
+});
+
+test("unapproved and ambiguous events never write a visit", async () => {
+  await withSettings(async () => {
+    const events = [
+      { id: "worship", date: "2026-11-29", name: "Worship", active: true },
+      { id: "prayer", date: "2026-11-29", name: "Prayer", active: true }
+    ];
+    const deps = {
+      now: () => DateTime.fromISO("2026-11-29T15:00:00Z"),
+      approvedEvents: async () => events,
+      reserve: async () => { throw new Error("unexpected reservation"); },
+      record: async () => { throw new Error("unexpected write"); }
+    };
+    const ambiguous: Parameters<typeof visitorSundayCheckIn>[0] = {};
+    await visitorSundayCheckIn(ambiguous, request, deps);
+    assert.equal(ambiguous.res?.status, 409);
+
+    const unknown: Parameters<typeof visitorSundayCheckIn>[0] = {};
+    await visitorSundayCheckIn(unknown, {
+      ...request, body: { ...request.body, eventId: "invented" }
+    }, deps);
+    assert.equal(unknown.res?.status, 400);
+  });
+});
+
+test("staff can retrieve a selected approved event", async () => {
+  await withSettings(async () => {
+    const context: Parameters<typeof visitorSundayCheckIn>[0] = {};
+    await visitorSundayCheckIn(context, {
+      method: "GET",
+      headers: { "x-api-key": staffKey },
+      query: { date: "2026-11-29", eventId: "prayer" }
+    }, {
+      approvedEvents: async () => [
+        { id: "prayer", date: "2026-11-29", name: "Prayer", active: true }
+      ],
+      authorizeStaff: async () => ({ ok: true, actorId: "synthetic-staff" }),
+      list: async id => {
+        assert.equal(id, "prayer");
+        return { items: [], truncated: false };
+      }
+    });
+    assert.equal(context.res?.status, 200);
+  });
+});

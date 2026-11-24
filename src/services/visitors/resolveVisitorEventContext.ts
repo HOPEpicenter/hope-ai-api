@@ -83,7 +83,7 @@ export function resolveVisitorEventContext(input: {
   // General attendance remains available without a scheduled event.
   return {
     status: "resolved",
-    serviceId: `visit-${date}`,
-    name: "General Visit"
+    serviceId: `${new Date(`${date}T00:00:00Z`).getUTCDay() === 0 ? "sunday" : "visit"}-${date}`,
+    name: new Date(`${date}T00:00:00Z`).getUTCDay() === 0 ? "Sunday Visit" : "General Visit"
   };
 }

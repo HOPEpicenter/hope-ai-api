@@ -108,7 +108,8 @@ export async function recordVisitorArrival(
     });
     if (identity.status === "invalid") return { status: "invalid" };
     if (identity.status === "requires_staff_review" ||
-        (identity.status === "unmatched" && email && phone)) {
+        (identity.status === "unmatched" && email && phone &&
+         command.profile === undefined)) {
       return { status: "requires_staff_review" };
     }
     const proposed: Claim = {
@@ -130,14 +131,20 @@ export async function recordVisitorArrival(
   if (claim.fingerprint !== fingerprint) return { status: "submission_conflict" };
 
   if (claim.createProfile) {
-    // For a new profile, claim one contact method so there's only one
-    // canonical index reservation to recover after an interrupted write.
-    if (email && phone) return { status: "requires_staff_review" };
+    // Only the complete public registration contract
+    // enables dual-contact creation. Legacy callers
+    // retain their existing identity behavior.
+    if (email && phone && command.profile === undefined) {
+      return { status: "requires_staff_review" };
+    }
     const created = await (dependencies.createProfile ?? createVisitorFromCheckIn)(table, {
       name,
       visitorId: claim.visitorId,
       submissionId: command.submissionId,
       contact: email ? { kind: "EMAIL", value: email } : { kind: "PHONE", value: phone },
+      ...(email && phone && command.profile !== undefined
+        ? { secondaryPhone: phone }
+        : {}),
       now: claim.claimedAt
     });
     if (!created) return { status: "requires_staff_review" };

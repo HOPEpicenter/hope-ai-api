@@ -1,3 +1,12 @@
+import {
+  createVisitorFromCheckIn,
+  getVisitorById
+} from "../src/functions/_shared/visitorsRepository";
+
+import {
+  resolveVisitorCheckInIdentity
+} from "../src/services/visitors/recordReturningVisitorCheckIn";
+
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
@@ -333,10 +342,16 @@ test("family arrival forwards complete profile without confirming incomplete att
   });
 });
 
-test("unmatched dual-contact identity remains protected pending writer integration", async () => {
+test("legacy unmatched dual-contact identity remains protected", async () => {
   await withTable(async table => {
     const result = await recordVisitorArrival(
-      command,
+      {
+        submissionId: command.submissionId,
+        serviceId: command.serviceId,
+        name: command.name,
+        email: command.email,
+        phone: command.phone
+      },
       {
         ...arrivalDependencies(table),
         resolveIdentity: async () =>
@@ -362,5 +377,251 @@ test("unmatched dual-contact identity remains protected pending writer integrati
     }
 
     assert.equal(rows.length, 0);
+  });
+});
+
+type LocalContact = {
+  rowKey: string;
+  name?: string;
+  email?: string;
+  emailLower?: string;
+  phone?: string;
+  phoneCanonical?: string;
+};
+
+function actualLocalArrival(
+  table: TableClient
+): ArrivalDeps {
+  const readLocalVisitor: VisitorReader =
+    async id => getVisitorById(id, {
+      getTableClient: () => table,
+      ensureTableExists: async () => {}
+    });
+
+  return {
+    table,
+    resolveIdentity: input =>
+      resolveVisitorCheckInIdentity(input, {
+        readContacts: () =>
+          table.listEntities<LocalContact>({
+            queryOptions: {
+              filter: "PartitionKey eq 'VISITOR'"
+            }
+          }),
+        readVisitor: readLocalVisitor
+      }),
+    createProfile: createVisitorFromCheckIn,
+    record: (input, deps) =>
+      recordVisitorCheckIn(input, {
+        ...deps,
+        table,
+        readVisitor: readLocalVisitor
+      })
+  };
+}
+
+const newDualContact = {
+  visitorId: "synthetic-new-dual-contact",
+  submissionId: command.submissionId,
+  name: command.name,
+  contact: {
+    kind: "EMAIL" as const,
+    value: command.email
+  },
+  secondaryPhone: command.phone,
+  now: "2026-11-24T19:00:00.000Z"
+};
+
+test("new dual-contact public visitor is created once and recognized on a later visit", async () => {
+  await withTable(async table => {
+    const deps = actualLocalArrival(table);
+
+    const first = await recordVisitorArrival(
+      command, deps
+    );
+
+    assert.equal(first.status, "recorded");
+
+    if (first.status !== "recorded") {
+      throw new Error("Expected saved visit");
+    }
+
+    const id = first.receipt.visitorId;
+
+    const person = await table.getEntity<{
+      email: string;
+      phone: string;
+    }>("VISITOR", id);
+
+    assert.equal(person.email, command.email);
+    assert.equal(person.phone, command.phone);
+
+    for (const [partition, value] of [
+      ["EMAIL", command.email],
+      ["PHONE", command.phone]
+    ]) {
+      const index = await table.getEntity<{
+        visitorId: string;
+      }>(
+        partition,
+        encodeURIComponent(value)
+      );
+
+      assert.equal(index.visitorId, id);
+    }
+
+    assert.deepEqual(
+      await recordVisitorArrival(command, deps),
+      first
+    );
+
+    const returning = await recordVisitorArrival({
+      ...command,
+      submissionId: "22222222-2222-4222-8222-222222222222",
+      serviceId: "visit-2026-11-25"
+    }, deps);
+
+    assert.equal(returning.status, "recorded");
+
+    if (returning.status === "recorded") {
+      assert.equal(returning.receipt.visitorId, id);
+    }
+
+    let profiles = 0;
+
+    for await (const _ of table.listEntities({
+      queryOptions: {
+        filter: "PartitionKey eq 'VISITOR'"
+      }
+    })) {
+      profiles++;
+    }
+
+    assert.equal(profiles, 1);
+  });
+});
+
+test("a conflicting contact index cannot be transferred or create a new profile", async () => {
+  await withTable(async table => {
+    await table.createEntity({
+      partitionKey: "PHONE",
+      rowKey: encodeURIComponent(command.phone),
+      visitorId: "synthetic-other-owner",
+      createdAt: newDualContact.now
+    });
+
+    assert.equal(
+      await createVisitorFromCheckIn(
+        table, newDualContact
+      ),
+      false
+    );
+
+    const index = await table.getEntity<{
+      visitorId: string;
+    }>("PHONE", encodeURIComponent(command.phone));
+
+    assert.equal(
+      index.visitorId,
+      "synthetic-other-owner"
+    );
+
+    const rows: unknown[] = [];
+
+    for await (const row of table.listEntities()) {
+      rows.push(row);
+    }
+
+    // Known conflict was found before any new reservation.
+    assert.equal(rows.length, 1);
+  });
+});
+
+test("an interrupted first-index reservation can resume under the same claim", async () => {
+  await withTable(async table => {
+    await table.createEntity({
+      partitionKey: "EMAIL",
+      rowKey: encodeURIComponent(command.email),
+      visitorId: newDualContact.visitorId,
+      createdAt: newDualContact.now
+    });
+
+    assert.equal(
+      await createVisitorFromCheckIn(
+        table, newDualContact
+      ),
+      true
+    );
+
+    assert.equal(
+      await createVisitorFromCheckIn(
+        table, newDualContact
+      ),
+      true
+    );
+
+    const rows: unknown[] = [];
+
+    for await (const row of table.listEntities()) {
+      rows.push(row);
+    }
+
+    assert.equal(rows.length, 3);
+
+    // A different submission cannot reuse the marker.
+    assert.equal(
+      await createVisitorFromCheckIn(table, {
+        ...newDualContact,
+        submissionId: "33333333-3333-4333-8333-333333333333"
+      }),
+      false
+    );
+  });
+});
+
+test("concurrent claims for the same contacts cannot publish two visitor profiles", async () => {
+  await withTable(async table => {
+    const first = newDualContact;
+
+    const second = {
+      ...first,
+      visitorId: "synthetic-competing-visitor",
+      submissionId: "44444444-4444-4444-8444-444444444444"
+    };
+
+    const results = await Promise.all([
+      createVisitorFromCheckIn(table, first),
+      createVisitorFromCheckIn(table, second)
+    ]);
+
+    assert.equal(
+      results.filter(value => value === true).length,
+      1
+    );
+
+    const winner = results[0] ? first : second;
+
+    const email = await table.getEntity<{
+      visitorId: string;
+    }>("EMAIL", encodeURIComponent(command.email));
+
+    const phone = await table.getEntity<{
+      visitorId: string;
+    }>("PHONE", encodeURIComponent(command.phone));
+
+    assert.equal(email.visitorId, winner.visitorId);
+    assert.equal(phone.visitorId, winner.visitorId);
+
+    let profiles = 0;
+
+    for await (const _ of table.listEntities({
+      queryOptions: {
+        filter: "PartitionKey eq 'VISITOR'"
+      }
+    })) {
+      profiles++;
+    }
+
+    assert.equal(profiles, 1);
   });
 });

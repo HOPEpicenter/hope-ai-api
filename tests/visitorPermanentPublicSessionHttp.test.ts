@@ -30,9 +30,11 @@ const headers = {
 };
 
 process.env.FEATURE_PERMANENT_PUBLIC_VISIT = "true";
+process.env.FEATURE_PERMANENT_VISITOR_AUTOMATIC_FOLLOWUP = "true";
 process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD = "true";
 process.env.HOPE_PERMANENT_VISIT_BRIDGE_KEY = bridge;
 process.env.HOPE_PERMANENT_VISIT_SESSION_SECRET = signing;
+process.env.HOPE_PERMANENT_VISIT_CLAIM_SECRET = "synthetic-independent-admission-claim-secret";
 
 type Request = Parameters<typeof handler>[1];
 type Dependencies = NonNullable<
@@ -95,7 +97,8 @@ test("disabled issuance and disabled consent guard deny requests before storage"
 
   for (const flag of [
     "FEATURE_PERMANENT_PUBLIC_VISIT",
-    "FEATURE_PERMANENT_VISITOR_CONSENT_GUARD"
+    "FEATURE_PERMANENT_VISITOR_CONSENT_GUARD",
+    "FEATURE_PERMANENT_VISITOR_AUTOMATIC_FOLLOWUP"
   ]) {
     const previous = process.env[flag];
 
@@ -364,5 +367,39 @@ test("global issuance limit survives concurrent independent clients and minute r
     assert.equal(rows.length, 3);
   } finally {
     await table.deleteTable();
+  }
+});
+
+test("session issuance requires an independent admission claim secret", async () => {
+  const key = "HOPE_PERMANENT_VISIT_CLAIM_SECRET";
+  const previous = process.env[key];
+
+  try {
+    for (const invalid of [
+      undefined,
+      bridge,
+      signing,
+      "short"
+    ]) {
+      if (invalid === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = invalid;
+      }
+
+      const f = fixture();
+      const result = await f.call();
+
+      assert.equal(result.status, 503);
+      assert.equal("token" in result.body, false);
+      assert.equal(f.reads(), 0);
+      assert.equal(f.writes(), 0);
+    }
+  } finally {
+    if (previous === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = previous;
+    }
   }
 });

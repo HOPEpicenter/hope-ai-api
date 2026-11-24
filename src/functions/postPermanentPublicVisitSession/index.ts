@@ -122,6 +122,8 @@ export async function postPermanentPublicVisitSession(
   if (process.env.FEATURE_PERMANENT_PUBLIC_VISIT
         !== "true" ||
       process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD
+        !== "true" ||
+      process.env.FEATURE_PERMANENT_VISITOR_AUTOMATIC_FOLLOWUP
         !== "true") {
     reply(context, 404, { status: "unavailable" });
     return;
@@ -138,9 +140,17 @@ export async function postPermanentPublicVisitSession(
   const signingSecret =
     process.env.HOPE_PERMANENT_VISIT_SESSION_SECRET;
 
+  const claimSecret =
+    process.env.HOPE_PERMANENT_VISIT_CLAIM_SECRET;
+
   if (!validSecret(bridgeKey) ||
       !validSecret(signingSecret) ||
-      bridgeKey === signingSecret) {
+      !validSecret(claimSecret) ||
+      new Set([
+        bridgeKey, signingSecret, claimSecret
+      ]).size !== 3 ||
+      Buffer.byteLength(signingSecret, "utf8") > 512 ||
+      Buffer.byteLength(claimSecret, "utf8") > 512) {
     reply(context, 503, { status: "unavailable" });
     return;
   }

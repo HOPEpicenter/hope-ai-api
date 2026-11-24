@@ -247,8 +247,8 @@ test("contention retries are bounded", async () => {
     "unavailable"
   );
 
-  assert.equal(table.reads - reads, 4);
-  assert.equal(table.writes - writes, 4);
+  assert.equal(table.reads - reads, 16);
+  assert.equal(table.writes - writes, 16);
 });
 
 test("storage failures and uncertain writes fail closed", async () => {

@@ -103,11 +103,11 @@ if (process.env.HOPE_VISITOR_88_ACCEPTANCE !== "true") {
       result => result === "unavailable"
     ).length;
 
-    assert.ok(reserved > 0);
+    assert.equal(reserved, 16);
 
     assert.equal(
-      reserved + unavailable,
-      16
+      unavailable,
+      0
     );
 
     const persisted = await read("session", now);

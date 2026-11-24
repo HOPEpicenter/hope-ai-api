@@ -1,3 +1,5 @@
+import { randomInt } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import type { TableClient } from "@azure/data-tables";
 
 export type PublicVisitRequestOperation =
@@ -20,7 +22,15 @@ export const PUBLIC_VISIT_REQUEST_LIMITS =
     registration: 180
   });
 
-const MAX_ATTEMPTS = 4;
+const MAX_ATTEMPTS = 16;
+
+async function waitForContention(
+  attempt: number
+): Promise<void> {
+  if (attempt + 1 < MAX_ATTEMPTS) {
+    await delay(randomInt(5, 26));
+  }
+}
 
 function statusIs(
   error: unknown,
@@ -96,6 +106,7 @@ export async function reservePermanentPublicVisitRequest(
         return "reserved";
       } catch (createError) {
         if (statusIs(createError, 409)) {
+          await waitForContention(attempt);
           continue;
         }
 
@@ -136,6 +147,7 @@ export async function reservePermanentPublicVisitRequest(
       return "reserved";
     } catch (error) {
       if (statusIs(error, 412)) {
+        await waitForContention(attempt);
         continue;
       }
 

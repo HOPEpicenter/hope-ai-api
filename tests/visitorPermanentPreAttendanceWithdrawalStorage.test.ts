@@ -499,6 +499,211 @@ test("real public registration reaches durable six-week Staff workflow", () =>
       console.log("REAL_REGISTERED_VISITOR_TASK_COMPLETION=True");
       console.log("RECOVERY_COMPLETION_VERIFIED=True");
 
+      // Exercise complete family registration through the
+      // same proven admission, consent and recovery pipeline.
+      const { recordVisitorFamilyAttendance } =
+        await import("../src/services/visitors/recordVisitorFamilyAttendance");
+
+      const familyToken = issuePermanentPublicVisitSession(
+        signingSecret, scheduledContext
+      );
+
+      assert.ok(familyToken);
+
+      const familyRequest = {
+        token: familyToken,
+        submissionId: randomUUID(),
+        body: {
+          name: "Synthetic Family Guardian",
+          email: "family-guardian@example.invalid",
+          visitType: "first",
+          contactConsent: true,
+          family: {
+            guardianName: "Synthetic Family Guardian",
+            guardianDeclaration: true,
+            children: [
+              { firstName: "Synthetic Child", ageGroup: "6-11" },
+              { firstName: "Second Child", ageGroup: "12-17" }
+            ]
+          }
+        }
+      };
+
+      let familyWriteUnavailable = true;
+
+      const familyDeps = {
+        ...deps,
+        context: scheduledContext,
+        familyEnabled: true,
+
+        recordFamily: (
+          command: Parameters<typeof familyArrival>[0]
+        ) => familyArrival(command, {
+          arrival: deps.recordAdult,
+          saveFamily: attendance => {
+            if (familyWriteUnavailable) {
+              throw Error("Synthetic family storage outage");
+            }
+
+            return recordVisitorFamilyAttendance(
+              attendance, { table: v }
+            );
+          }
+        })
+      };
+
+      const incompleteFamily =
+        await submitPermanentPublicVisitRegistration(
+          familyRequest, familyDeps
+        );
+
+      assert.deepEqual(incompleteFamily, {
+        accepted: false,
+        status: "try_later"
+      });
+
+      const familyAdultReceipt = await v.getEntity<{
+        visitorId: string;
+        serviceId: string;
+      }>("VISITOR_CHECK_IN", familyRequest.submissionId);
+
+      const guardianId = familyAdultReceipt.visitorId;
+
+      assert.equal(
+        familyAdultReceipt.serviceId,
+        "synthetic-scheduled-event"
+      );
+
+      assert.equal(
+        (await journal.inspect(familyRequest.submissionId)).status,
+        "pending"
+      );
+
+      assert.equal(
+        (await followups.listByVisitor(guardianId)).length,
+        0
+      );
+
+      assert.equal(
+        await countPartition("VISITOR_FAMILY_ATTENDANCE"),
+        0
+      );
+
+      console.log("INCOMPLETE_FAMILY_NOT_CONFIRMED=True");
+      console.log("NO_PREMATURE_FAMILY_ENROLLMENT=True");
+
+      // Restore the synthetic storage writer and retry
+      // the exact original public submission.
+      familyWriteUnavailable = false;
+
+      const recoveredFamily =
+        await submitPermanentPublicVisitRegistration(
+          familyRequest, familyDeps
+        );
+
+      assert.deepEqual(recoveredFamily, {
+        accepted: true,
+        status: "recorded"
+      }, `Unexpected family status: ${recoveredFamily.status}`);
+
+      const familyRows = [];
+
+      for await (const row of v.listEntities<{
+        submissionId: string;
+        serviceId: string;
+        adultVisitorId: string;
+        childrenJson: string;
+      }>({
+        queryOptions: {
+          filter: "PartitionKey eq 'VISITOR_FAMILY_ATTENDANCE'"
+        }
+      })) {
+        familyRows.push(row);
+      }
+
+      assert.equal(familyRows.length, 1);
+
+      assert.equal(
+        familyRows[0].submissionId,
+        familyRequest.submissionId
+      );
+
+      assert.equal(
+        familyRows[0].adultVisitorId,
+        guardianId
+      );
+
+      assert.equal(
+        familyRows[0].serviceId,
+        familyAdultReceipt.serviceId
+      );
+
+      assert.deepEqual(
+        JSON.parse(familyRows[0].childrenJson),
+        familyRequest.body.family.children
+      );
+
+      const guardianEvents =
+        await followups.listByVisitor(guardianId);
+
+      assert.equal(guardianEvents.length, 1);
+
+      const guardianPlan =
+        projectSixWeekVisitorFollowup(guardianEvents);
+
+      assert.ok(guardianPlan);
+      assert.equal(guardianPlan.tasks.length, 6);
+
+      assert.equal(
+        (await journal.inspect(familyRequest.submissionId)).status,
+        "completed"
+      );
+
+      // There are three adult profiles and no separate
+      // child visitor profiles or child follow-up plans.
+      assert.equal(await countPartition("VISITOR"), 3);
+      assert.equal(await countPartition("VISITOR_CHECK_IN"), 3);
+
+      assert.deepEqual(
+        await submitPermanentPublicVisitRegistration(
+          familyRequest, familyDeps
+        ),
+        { accepted: true, status: "recorded" }
+      );
+
+      assert.equal(await countPartition("VISITOR"), 3);
+      assert.equal(await countPartition("VISITOR_CHECK_IN"), 3);
+      assert.equal(
+        await countPartition("VISITOR_FAMILY_ATTENDANCE"),
+        1
+      );
+
+      assert.deepEqual(
+        await followups.listByVisitor(guardianId),
+        guardianEvents
+      );
+
+      const finalQueue = await readSixWeekVisitorFollowupQueue(
+        undefined, {
+          repository: followups,
+          getVisitor: readLocalVisitor
+        }
+      );
+
+      assert.equal(finalQueue.count, 2);
+
+      assert.deepEqual(
+        finalQueue.items.map(item => item.visitorId).sort(),
+        [visitorId, guardianId].sort()
+      );
+
+      console.log("FAMILY_ATTENDANCE_DURABLY_SAVED=True");
+      console.log("FAMILY_EXACT_RETRY_RECOVERED=True");
+      console.log("FAMILY_DUPLICATES_PREVENTED=True");
+      console.log("GUARDIAN_SIX_WEEK_ENROLLMENT_VERIFIED=True");
+      console.log("NO_CHILD_VISITOR_PROFILES_CREATED=True");
+      console.log("FAMILY_RECOVERY_JOURNAL_COMPLETED=True");
+
     } finally {
       await reservations.deleteTable();
     }

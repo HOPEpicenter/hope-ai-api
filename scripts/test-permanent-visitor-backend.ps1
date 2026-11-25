@@ -19,6 +19,7 @@
         'tests/visitorPermanentCanonicalReceipt.test.ts'
         'tests/visitorPermanentDefaultRuntime.test.ts'
         'tests/visitorPermanentPublicRegistration.test.ts'
+        'tests/visitorPermanentPilotActivation.test.ts'
         'tests/visitorPermanentPublicSessionHttp.test.ts'
         'tests/visitorPermanentPublicVisitEvent.test.ts'
         'tests/visitorPermanentPublicVisitSession.test.ts'
@@ -57,6 +58,9 @@
     $settings = @{
         HOPE_API_KEY = 'synthetic-ci-staff-key'
         FEATURE_PERMANENT_VISITOR_CONSENT_GUARD = $null
+        FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY = $null
+        FEATURE_PERMANENT_VISITOR_ISOLATED_PILOT = $null
+        HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER = $null
         HOPE_ADMIN_API_KEY = 'synthetic-ci-admin-key'
         HOPE_ADMIN_STAFF_IDS = 'synthetic-ci-admin'
         HOPE_PERMANENT_VISIT_BRIDGE_KEY = 'synthetic-ci-bridge-key'
@@ -205,7 +209,7 @@
                 Reset-TestStorageEnvironment
             }
         }
-        Write-Output 'THIRTY_SIX_REQUIRED_BACKEND_TEST_FILES_PASSED=True'
+        Write-Output 'THIRTY_SEVEN_REQUIRED_BACKEND_TEST_FILES_PASSED=True'
         Write-Output "BACKEND_CI_FOCUSED_PASS_COUNT=$total"
         Write-Output 'FIVE_ISOLATED_STORAGE_TEST_FILES_PASSED=True'
         Write-Output 'NO_REQUIRED_TEST_SKIPPED=True'

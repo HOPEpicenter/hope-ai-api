@@ -10,6 +10,16 @@
         @{ File='tests/visitorPermanentFollowupConsent.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=7 }
         @{ File='tests/visitorPermanentPublicAdmission.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=8 }
         @{ File='tests/visitorPermanentQrReservationStore.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=13 }
+        @{ File='tests/visitorPermanentAtomicEnrollmentStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=3; Authority='true' }
+        @{ File='tests/visitorPermanentConsentRepositoryStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=$null; Authority='true' }
+        @{ File='tests/visitorPermanentConsentRuntimeStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=13; Authority='true' }
+        @{ File='tests/visitorPermanentContactWriterHoldStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=14; Authority='true' }
+        @{ File='tests/visitorPermanentLegacyConsentMigrationStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=$null; Authority='true' }
+        @{ File='tests/visitorPermanentPreAttendanceWithdrawalStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=14; Authority='true' }
+        @{ File='tests/visitorPermanentRegistrationConsentAdapterStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=$null; Authority='true' }
+        @{ File='tests/visitorPermanentStaffConsentAuthorityStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=17; Authority='true' }
+        @{ File='tests/visitorPermanentStaffContactIntentStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=$null; Authority='true' }
+        @{ File='tests/visitorPermanentStaffOwnerClaimStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=9; Authority='true' }
     )
     $temp = Join-Path $root ('node_modules/.hope-visitor-storage-ci-' + [guid]::NewGuid().ToString('N'))
     $build = Join-Path $temp 'build'
@@ -28,6 +38,13 @@
         APPINSIGHTS_INSTRUMENTATIONKEY = $null
         OTEL_SDK_DISABLED = 'true'
         FEATURE_PERMANENT_VISITOR_CONSENT_GUARD = 'true'
+        FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY = $null
+        FEATURE_PERMANENT_VISITOR_ISOLATED_PILOT = $null
+        FEATURE_PERMANENT_VISITOR_STAFF_CONSENT_DECISION = $null
+        FEATURE_PERMANENT_PUBLIC_VISIT = $null
+        HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER = $null
+        FORMATION_EVENTS_TABLE = $null
+        GLOBAL_TIMELINE_TABLE = $null
         AZURITE_ACCOUNTS = $null
         STORAGE_CONNECTION_STRING = $null
         AzureWebJobsStorage = $null
@@ -68,6 +85,21 @@
         $total = 0
         foreach ($case in $cases) {
             $file = $case.File
+
+            # Keep existing legacy tests in their original mode.
+            # Enable authority only for the corrective fixtures.
+            if ($case.ContainsKey('Authority')) {
+                $env:FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY = 'true'
+                $env:FEATURE_PERMANENT_VISITOR_CONSENT_GUARD = 'false'
+                $env:HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER = '2020-01-01T00:00:00.000Z'
+            } else {
+                $env:FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY = $null
+                $env:FEATURE_PERMANENT_VISITOR_CONSENT_GUARD = 'true'
+                $env:HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER = $null
+            }
+
+            $env:FORMATION_EVENTS_TABLE = "HopeCare$([guid]::NewGuid().ToString('N'))"
+            $env:GLOBAL_TIMELINE_TABLE = "HopeTimeline$([guid]::NewGuid().ToString('N'))"
             $owned = Join-Path $temp ('storage-' + [guid]::NewGuid().ToString('N'))
             New-Item -ItemType Directory -Path $owned | Out-Null
             $storageProcess = $null
@@ -90,7 +122,7 @@
                 if ($account -eq 'hopevisitor133') { $env:HOPE_VISITOR_57_LOCAL_ACCEPTANCE = 'true' }
                 $storageProcess = Start-Process -FilePath $node -ArgumentList @(
                     "`"$azurite`"", '--tableHost', '127.0.0.1', '--tablePort', "$port",
-                    '--location', "`"$owned`"", '--silent', '--disableTelemetry'
+                    '--location', "`"$owned`"", '--silent', '--disableTelemetry', '--skipApiVersionCheck'
                 ) -RedirectStandardOutput (Join-Path $owned 'stdout.txt') -RedirectStandardError (Join-Path $owned 'stderr.txt') -PassThru
                 $ready = $false
                 for ($i = 0; $i -lt 80; $i++) {
@@ -124,7 +156,7 @@
                 foreach ($name in @('tests','pass','fail','cancelled','skipped','todo')) {
                     if (-not $counts.ContainsKey($name)) { throw "TEST_SUMMARY_MISSING=$file/$name" }
                 }
-                if ($counts.tests -ne $case.Count -or $counts.pass -ne $counts.tests -or $counts.fail -ne 0 -or $counts.cancelled -ne 0 -or $counts.skipped -ne 0 -or $counts.todo -ne 0) { throw "REQUIRED_TEST_NOT_FULLY_EXECUTED=$file" }
+                if ($counts.tests -lt 1 -or ($null -ne $case.Count -and $counts.tests -ne $case.Count) -or $counts.pass -ne $counts.tests -or $counts.fail -ne 0 -or $counts.cancelled -ne 0 -or $counts.skipped -ne 0 -or $counts.todo -ne 0) { throw "REQUIRED_TEST_NOT_FULLY_EXECUTED=$file" }
                 $total += [int]$counts.pass
             } finally {
                 if ($null -ne $storageProcess) {
@@ -135,7 +167,7 @@
                 Reset-StorageEnvironment
             }
         }
-        Write-Output 'FIVE_REMAINING_STORAGE_FIXTURES_PASSED=True'
+        Write-Output 'ALL_REQUIRED_STORAGE_FIXTURES_PASSED=True'
         Write-Output "REMAINING_STORAGE_TEST_PASS_COUNT=$total"
         Write-Output 'NO_REQUIRED_TEST_SKIPPED=True'
     } finally {

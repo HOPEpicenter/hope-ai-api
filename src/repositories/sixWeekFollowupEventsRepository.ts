@@ -46,6 +46,21 @@ function rowKeyFor(event: SixWeekFollowupEvent): string {
   return `${event.occurredAt}__${event.eventId}`;
 }
 
+export function toSixWeekFollowupEventEntity(
+  event: SixWeekFollowupEvent
+): SixWeekFollowupEventEntity {
+  return {
+    partitionKey: event.visitorId,
+    rowKey: rowKeyFor(event),
+    eventId: event.eventId,
+    visitorId: event.visitorId,
+    type: event.type,
+    occurredAt: event.occurredAt,
+    actorId: event.actorId,
+    dataJson: JSON.stringify(event.data)
+  };
+}
+
 function fromEntity(
   entity: SixWeekFollowupEventEntity
 ): SixWeekFollowupEvent {
@@ -81,16 +96,9 @@ export class SixWeekFollowupEventsRepository {
     const table: TableClient = await this.tableFor();
 
     try {
-      await table.createEntity<SixWeekFollowupEventEntity>({
-        partitionKey: event.visitorId,
-        rowKey: rowKeyFor(event),
-        eventId: event.eventId,
-        visitorId: event.visitorId,
-        type: event.type,
-        occurredAt: event.occurredAt,
-        actorId: event.actorId,
-        dataJson: JSON.stringify(event.data)
-      });
+      await table.createEntity(
+        toSixWeekFollowupEventEntity(event)
+      );
 
       return true;
     } catch (error: any) {
@@ -108,6 +116,7 @@ export class SixWeekFollowupEventsRepository {
     for await (const entity of table.listEntities<SixWeekFollowupEventEntity>({
       queryOptions: { filter }
     })) {
+      if (entity.rowKey?.startsWith("consent-v1:")) continue;
       events.push(fromEntity(entity));
     }
 
@@ -119,6 +128,7 @@ export class SixWeekFollowupEventsRepository {
     const events: SixWeekFollowupEvent[] = [];
 
     for await (const entity of table.listEntities<SixWeekFollowupEventEntity>()) {
+      if (entity.rowKey?.startsWith("consent-v1:")) continue;
       events.push(fromEntity(entity));
     }
 

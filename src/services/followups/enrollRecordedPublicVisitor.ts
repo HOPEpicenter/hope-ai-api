@@ -41,6 +41,10 @@ type Dependencies = {
   enabled?: boolean;
   visitors?: TableClient;
   readEnrollmentPermission?: import("./permanentVisitorConsentRuntime").EnrollmentPermissionReader;
+  appendAuthorizedEnrollment?: (
+    evidence: RecordedPublicVisitEvidence,
+    event: SixWeekFollowupEvent
+  ) => Promise<PublicVisitorEnrollmentResult>;
   repository?: Pick<
     SixWeekFollowupEventsRepository,
     "append" | "listByVisitor"
@@ -288,7 +292,21 @@ export async function enrollRecordedPublicVisitor(
       }
     };
 
-    const created = await repository.append(event);
+    let created: boolean;
+
+    if (deps.appendAuthorizedEnrollment) {
+      if (!deps.readEnrollmentPermission) return "unavailable";
+
+      const result = await deps.appendAuthorizedEnrollment(evidence, event);
+
+      if (result !== "enrolled" && result !== "existing") {
+        return result;
+      }
+
+      created = result === "enrolled";
+    } else {
+      created = await repository.append(event);
+    }
 
     const persisted = await repository.listByVisitor(
       evidence.visitorId

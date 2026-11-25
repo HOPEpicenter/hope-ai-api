@@ -13,10 +13,10 @@ export type EnrollmentPermissionReader = (evidence: RecordedPublicVisitEvidence)
  * A public registration may start a plan only from its exact initial grant;
  * later permission changes belong to the authorized Staff workflow.
  */
-export function createPermanentVisitorConsentRuntime(visitors: TableClient, consent: TableClient, initialGrantNotBefore: string) {
+export function createPermanentVisitorConsentRuntime(visitors: TableClient, consent: TableClient, initialGrantNotBefore: string, sharedSixWeek = false) {
   if (typeof initialGrantNotBefore !== "string" || !Number.isFinite(Date.parse(initialGrantNotBefore)) ||
       new Date(initialGrantNotBefore).toISOString() !== initialGrantNotBefore) throw new Error("Consent cutover unavailable");
-  const repository = createPermanentVisitorConsentRepository(consent);
+  const repository = createPermanentVisitorConsentRepository(consent, sharedSixWeek);
   const recordConsent = createPermanentVisitorRegistrationConsentAdapter({ visitors, repository, initialGrantNotBefore });
   const recordPreAttendanceWithdrawal = createPermanentVisitorPreAttendanceWithdrawal({ visitors, repository, initialGrantNotBefore });
   const readEnrollmentPermission: EnrollmentPermissionReader = async evidence => {
@@ -31,5 +31,12 @@ export function createPermanentVisitorConsentRuntime(visitors: TableClient, cons
       return op.kind === "new_profile" && op.initialConsent === true ? "granted" : "blocked";
     } catch { return "unavailable"; }
   };
-  return { recordConsent, readEnrollmentPermission, recordPreAttendanceWithdrawal };
+  return {
+    recordConsent,
+    readEnrollmentPermission,
+    recordPreAttendanceWithdrawal,
+    appendAuthorizedEnrollment: sharedSixWeek
+      ? repository.appendPublicEnrollment
+      : undefined
+  };
 }

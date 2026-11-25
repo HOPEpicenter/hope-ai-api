@@ -1,3 +1,13 @@
+import { toSixWeekFollowupEventEntity } from "./sixWeekFollowupEventsRepository";
+import {
+  PUBLIC_VISITOR_SYSTEM_ORIGIN,
+  type SixWeekFollowupEvent
+} from "../domain/followups/projectSixWeekVisitorFollowup";
+import type {
+  RecordedPublicVisitEvidence,
+  PublicVisitorEnrollmentResult
+} from "../services/followups/enrollRecordedPublicVisitor";
+
 import type { TableClient, TransactionAction } from "@azure/data-tables";
 import {
   initializeConsentAuthority, isConsentAuthority, transitionConsentAuthority,
@@ -24,7 +34,7 @@ type Receipt = {
 type Head = { schemaVersion: 1; stateJson: string; lastOperationId: string };
 type LoadedHead = { state: ConsentAuthority; etag: string; lastOperationId: string };
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
-const HEAD = "head";
+
 function validId(v: unknown): v is string { return typeof v === "string" && ID.test(v); }
 function record(v: unknown): Record<string, unknown> | null {
   return v !== null && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : null;
@@ -48,8 +58,8 @@ function normalize(input: unknown): Operation | null {
 }
 function initial(op: Operation): op is Initialization { return op.kind === "new_profile" || op.kind === "existing_profile"; }
 function opId(op: Operation): string { return initial(op) ? op.evidenceId : op.kind === "public_request" ? op.requestId : op.decisionId; }
-function partition(id: string): string { return `consent-v1:${id}`; }
-function key(id: string): string { return `op:${id}`; }
+
+
 function json(v: unknown): string { return JSON.stringify(v); }
 function parseState(v: unknown): ConsentAuthority {
   if (typeof v !== "string" || v.length > 4096) throw new Error("Invalid consent state encoding");
@@ -87,13 +97,23 @@ function rejected(reason: Extract<ApplyResult, {status: "rejected"}>["reason"]):
  * An operation ID is unique per visitor across all command kinds. Retry the
  * exact command; never rewrite expectedRevision of a committed operation.
  */
-export function createPermanentVisitorConsentRepository(table: Port) {
+export function createPermanentVisitorConsentRepository(
+  table: Port,
+  sharedSixWeek = false
+) {
+  const namespace = sharedSixWeek ? "consent-v1:" : "";
+  const HEAD = `${namespace}head`;
+  const partition = (id: string) =>
+    sharedSixWeek ? id : `consent-v1:${id}`;
+  const key = (id: string) => `${namespace}op:${id}`;
   async function get<T extends object>(pk: string, rk: string) {
     try { return await table.getEntity<T>(pk, rk); }
     catch (e) { if (missing(e)) return null; throw e; }
   }
   async function empty(pk: string): Promise<boolean> {
-    for await (const _ of table.listEntities({ queryOptions: { filter: `PartitionKey eq '${pk}'`, select: ["RowKey"] } })) return false;
+    for await (const row of table.listEntities({ queryOptions: { filter: `PartitionKey eq '${pk}'`, select: ["RowKey"] } })) {
+      if (!sharedSixWeek || row.rowKey?.startsWith(namespace)) return false;
+    }
     return true;
   }
   async function receipt(pk: string, id: string): Promise<{ operation: Operation; before: ConsentAuthority | null; after: ConsentAuthority } | null> {
@@ -212,7 +232,7 @@ export function createPermanentVisitorConsentRepository(table: Port) {
   function contactPermitted(state: ConsentAuthority): boolean {
     return state.effective === "granted" && state.pending === null;
   }
-  const contactKey = (id: string) => `contact:${id}`;
+  const contactKey = (id: string) => `${namespace}contact:${id}`;
   async function inspectContact(pk: string, intent: ContactIntent): Promise<ContactResult> {
     const row = await get<ContactRow>(pk, contactKey(intent.operationId));
     if (!row) return result("not_found");
@@ -266,5 +286,97 @@ export function createPermanentVisitorConsentRepository(table: Port) {
       return result("unavailable");
     } catch { return result("unavailable"); }
   }
-  return { read, apply, inspectOperation, recordContactIntent, inspectContactIntent };
+  /**
+   * Trusted internal public enrollment only.
+   * Consent and plan creation share one atomic transaction.
+   * Historical intent evidence is never execution authority.
+   */
+  async function appendPublicEnrollment(
+    evidence: RecordedPublicVisitEvidence,
+    event: SixWeekFollowupEvent
+  ): Promise<PublicVisitorEnrollmentResult> {
+    try {
+      if (!sharedSixWeek ||
+          !validId(evidence.visitorId) ||
+          !validId(evidence.submissionId) ||
+          event.visitorId !== evidence.visitorId ||
+          event.eventId !== `evt-public-${evidence.submissionId}` ||
+          event.type !== "six_week_followup.plan_started" ||
+          event.actorId !== PUBLIC_VISITOR_SYSTEM_ORIGIN ||
+          event.data.firstVisitDate !== evidence.visitDate ||
+          event.data.ownerStaffId !== null ||
+          event.data.contactConsent !== true ||
+          event.data.preferredContactMethod !== null ||
+          !validTime(event.occurredAt)) {
+        return "unavailable";
+      }
+
+      const pk = partition(evidence.visitorId);
+      const initialGrant = await receipt(pk, evidence.submissionId);
+      const current = await head(pk);
+
+      if (!initialGrant || !current ||
+          initialGrant.after.revision > current.state.revision) {
+        return "unavailable";
+      }
+
+      if (initialGrant.operation.kind !== "new_profile" ||
+          initialGrant.operation.initialConsent !== true ||
+          !contactPermitted(current.state)) {
+        return "not_eligible";
+      }
+
+      const unchanged = {
+        partitionKey: pk,
+        rowKey: HEAD,
+        schemaVersion: 1,
+        stateJson: json(current.state),
+        lastOperationId: current.lastOperationId
+      };
+
+      const entity = toSixWeekFollowupEventEntity(event);
+
+      try {
+        await table.submitTransaction([
+          ["update", unchanged, "Replace", { etag: current.etag }],
+          ["create", entity]
+        ]);
+
+        return "enrolled";
+      } catch {
+        // Never automatically rebase after a consent conflict.
+        const observed = await head(pk);
+
+        if (!observed) return "unavailable";
+
+        if (!contactPermitted(observed.state)) {
+          return "not_eligible";
+        }
+
+        const existing = await get<typeof entity>(pk, entity.rowKey);
+
+        if (existing &&
+            existing.partitionKey === pk &&
+            existing.rowKey === entity.rowKey &&
+            existing.eventId === entity.eventId &&
+            existing.visitorId === entity.visitorId &&
+            existing.type === entity.type &&
+            existing.actorId === entity.actorId &&
+            existing.occurredAt === entity.occurredAt &&
+            existing.dataJson === entity.dataJson) {
+          return "existing";
+        }
+
+        return "unavailable";
+      }
+    } catch {
+      return "unavailable";
+    }
+  }
+
+  return {
+    read, apply, inspectOperation,
+    recordContactIntent, inspectContactIntent,
+    appendPublicEnrollment
+  };
 }

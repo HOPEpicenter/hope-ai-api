@@ -383,20 +383,44 @@ export function createPermanentVisitorConsentRepository(
    * No administrator override, generic writer exemption,
    * consent mutation or automatic communication occurs here.
    */
-  async function appendStaffOwnerClaim(
-    event: SixWeekFollowupEvent
+  async function appendStaffPlanMutation(
+    event: SixWeekFollowupEvent,
+    mode: "owner_claim" | "task_without_contact"
   ): Promise<"claimed" | "conflict" | "blocked" | "unavailable"> {
     try {
       if (!sharedSixWeek ||
           !validId(event.visitorId) ||
           !validId(event.eventId) ||
           !validId(event.actorId) ||
-          event.type !== "six_week_followup.owner_assigned" ||
           event.actorId === PUBLIC_VISITOR_SYSTEM_ORIGIN ||
-          event.data.ownerStaffId !== event.actorId ||
-          Object.keys(event.data).length !== 1 ||
           !validTime(event.occurredAt)) {
         return "unavailable";
+      }
+
+      if (mode === "owner_claim") {
+        if (event.type !== "six_week_followup.owner_assigned" ||
+            event.data.ownerStaffId !== event.actorId ||
+            Object.keys(event.data).length !== 1) {
+          return "unavailable";
+        }
+      } else {
+        if ((event.type !== "six_week_followup.task_completed" &&
+             event.type !== "six_week_followup.task_skipped") ||
+            typeof event.data.weekNumber !== "number" ||
+            !Number.isInteger(event.data.weekNumber) ||
+            event.data.weekNumber < 1 ||
+            event.data.weekNumber > 6 ||
+            event.data.contactMethod !== "none" ||
+            event.data.careOutcome !== null ||
+            typeof event.data.outcome !== "string" ||
+            !event.data.outcome.trim() ||
+            event.data.outcome.length > 160 ||
+            (event.data.notes !== null &&
+              (typeof event.data.notes !== "string" ||
+               event.data.notes.length > 2000)) ||
+            Object.keys(event.data).length !== 5) {
+          return "unavailable";
+        }
       }
 
       const pk = partition(event.visitorId);
@@ -437,10 +461,28 @@ export function createPermanentVisitorConsentRepository(
       const plan = projectSixWeekVisitorFollowup(events);
 
       if (!plan ||
-          plan.ownerStaffId ||
           plan.status === "cancelled" ||
           plan.status === "completed") {
         return "conflict";
+      }
+
+      if (mode === "owner_claim") {
+        if (plan.ownerStaffId) return "conflict";
+      } else {
+        if (plan.status !== "active" ||
+            plan.ownerStaffId !== event.actorId) {
+          return "conflict";
+        }
+
+        const task = plan.tasks.find(
+          item => item.weekNumber === event.data.weekNumber
+        );
+
+        if (!task ||
+            task.status === "completed" ||
+            task.status === "skipped") {
+          return "conflict";
+        }
       }
 
       const unchangedConsent = {
@@ -475,10 +517,25 @@ export function createPermanentVisitorConsentRepository(
     }
   }
 
+  async function appendStaffOwnerClaim(event: SixWeekFollowupEvent) {
+    return appendStaffPlanMutation(event, "owner_claim");
+  }
+
+  async function appendStaffTaskWithoutContact(
+    event: SixWeekFollowupEvent
+  ): Promise<"recorded" | "conflict" | "blocked" | "unavailable"> {
+    const result = await appendStaffPlanMutation(
+      event, "task_without_contact"
+    );
+
+    return result === "claimed" ? "recorded" : result;
+  }
+
   return {
     read, apply, inspectOperation,
     recordContactIntent, inspectContactIntent,
     appendPublicEnrollment,
-    appendStaffOwnerClaim
+    appendStaffOwnerClaim,
+    appendStaffTaskWithoutContact
   };
 }

@@ -110,6 +110,21 @@ export class SixWeekFollowupEventsRepository {
     ).appendStaffOwnerClaim(event);
   }
 
+  async recordConsentProtectedTaskWithoutContact(
+    event: SixWeekFollowupEvent
+  ): Promise<"recorded" | "conflict" | "blocked" | "unavailable"> {
+    if (!contactWriterHoldEnabled()) return "unavailable";
+
+    const table = await this.tableFor();
+
+    const { createPermanentVisitorConsentRepository } =
+      await import("./permanentVisitorConsentRepository");
+
+    return createPermanentVisitorConsentRepository(
+      table, true
+    ).appendStaffTaskWithoutContact(event);
+  }
+
   async append(event: SixWeekFollowupEvent): Promise<boolean> {
     assertContactWriterNotHeld("six_week", event.type, event.data);
     const table: TableClient = await this.tableFor();

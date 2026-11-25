@@ -4,7 +4,7 @@ import type { TransactionAction } from "@azure/data-tables";
 import { createIsolatedVisitorTestTable } from "./permanentVisitorIsolatedTestTable";
 import { createPermanentVisitorConsentRepository } from "../src/repositories/permanentVisitorConsentRepository";
 import { SixWeekFollowupEventsRepository } from "../src/repositories/sixWeekFollowupEventsRepository";
-import { assignSixWeekFollowupOwner } from "../src/services/followups/sixWeekVisitorFollowupCommands";
+import { assignSixWeekFollowupOwner, recordSixWeekTaskOutcome } from "../src/services/followups/sixWeekVisitorFollowupCommands";
 import {
   PUBLIC_VISITOR_SYSTEM_ORIGIN,
   projectSixWeekVisitorFollowup,
@@ -21,7 +21,10 @@ for (const scenario of [
   "authorized_claim",
   "competing_claims",
   "withdrawal_race",
-  "cancellation_race"
+  "cancellation_race",
+  "task_without_contact",
+  "task_withdrawal_race",
+  "task_contact_remains_held"
 ] as const) {
   test(`atomic Staff owner claim: ${scenario}`, async () => {
     const table = createIsolatedVisitorTestTable("VisitorFollowupEvents");
@@ -109,6 +112,147 @@ for (const scenario of [
           assert.equal(events.filter(e =>
             e.type === "six_week_followup.owner_assigned"
           ).length, 1);
+
+        } else if (
+          scenario === "task_without_contact" ||
+          scenario === "task_withdrawal_race" ||
+          scenario === "task_contact_remains_held"
+        ) {
+          const actorId = "synthetic-staff-a";
+
+          assert.equal((await claim(actorId)).accepted, true);
+
+          const taskStamp = "2026-11-24T14:00:00.000Z";
+          let careWrites = 0;
+
+          function recordTask(
+            weekNumber: number,
+            contactMethod: "none" | "call",
+            actor = actorId,
+            disposition: "completed" | "skipped" = "completed"
+          ) {
+            return recordSixWeekTaskOutcome({
+              visitorId,
+              actorId: actor,
+              weekNumber,
+              disposition,
+              contactMethod,
+              outcome: "Synthetic outcome",
+              notes: null
+            }, {
+              repository,
+              now: () => taskStamp,
+              newEventId: () => `synthetic-task-${weekNumber}`,
+              readActor: async id => ({
+                staffId: id,
+                status: "active"
+              }),
+              recordCareEvent: async () => {
+                careWrites++;
+                throw Error("Unexpected Care contact write");
+              }
+            });
+          }
+
+          if (scenario === "task_without_contact") {
+            const unauthorized = await recordTask(
+              1, "none", "synthetic-staff-b"
+            );
+
+            assert.equal(unauthorized.accepted, false);
+
+            const first = await recordTask(1, "none");
+            assert.equal(first.accepted, true);
+
+            if (first.accepted) {
+              assert.equal(first.plan.tasks[0].status, "completed");
+            }
+
+            const replay = await recordTask(1, "none");
+            assert.equal(replay.accepted, true);
+
+            if (replay.accepted) {
+              assert.equal(replay.created, false);
+            }
+
+            const second = await recordTask(
+              2, "none", actorId, "skipped"
+            );
+
+            assert.equal(second.accepted, true);
+
+            if (second.accepted) {
+              assert.equal(second.plan.tasks[1].status, "skipped");
+            }
+
+            const events = await repository.listByVisitor(visitorId);
+
+            assert.equal(events.filter(e =>
+              e.type === "six_week_followup.task_completed" ||
+              e.type === "six_week_followup.task_skipped"
+            ).length, 2);
+
+          } else if (scenario === "task_contact_remains_held") {
+            const result = await recordTask(1, "call");
+
+            assert.equal(result.accepted, false);
+
+            const events = await repository.listByVisitor(visitorId);
+            assert.equal(events.filter(e =>
+              e.type === "six_week_followup.task_completed"
+            ).length, 0);
+
+          } else {
+            let injected = false;
+
+            const racingAuthority =
+              createPermanentVisitorConsentRepository({
+                getEntity: table.getEntity.bind(table),
+                listEntities: table.listEntities.bind(table),
+                submitTransaction: async (actions: TransactionAction[]) => {
+                  assert.equal(injected, false);
+                  injected = true;
+
+                  assert.equal((await authority.apply(visitorId, {
+                    kind: "public_request",
+                    requestId: "task-race-withdrawal",
+                    expectedRevision: 1,
+                    requestedConsent: false
+                  })).status, "committed");
+
+                  return table.submitTransaction(actions);
+                }
+              }, true);
+
+            const result =
+              await racingAuthority.appendStaffTaskWithoutContact({
+                visitorId,
+                actorId,
+                eventId: "synthetic-racing-task",
+                occurredAt: taskStamp,
+                type: "six_week_followup.task_completed",
+                data: {
+                  weekNumber: 1,
+                  contactMethod: "none",
+                  outcome: "Synthetic outcome",
+                  careOutcome: null,
+                  notes: null
+                }
+              });
+
+            assert.equal(injected, true);
+            assert.notEqual(result, "recorded");
+
+            const denied = await recordTask(1, "none");
+            assert.equal(denied.accepted, false);
+
+            const events = await repository.listByVisitor(visitorId);
+            assert.equal(events.filter(e =>
+              e.type === "six_week_followup.task_completed"
+            ).length, 0);
+          }
+
+          assert.equal(careWrites, 0);
 
         } else if (scenario === "competing_claims") {
           const results = await Promise.all([

@@ -40,7 +40,7 @@ type FollowupRepository = Pick<
   "append" | "listByVisitor"
 > & Partial<Pick<
   SixWeekFollowupEventsRepository,
-  "claimConsentProtectedOwner"
+  "claimConsentProtectedOwner" | "recordConsentProtectedTaskWithoutContact"
 >>;
 
 type StaffIdentity = {
@@ -219,7 +219,7 @@ function commandFailure(
 async function requireCurrentRegistrationConsent(
   visitorId: string,
   dependencies: SixWeekFollowupCommandDependencies,
-  coordinatedOwnerClaim = false
+  coordinatedSixWeekWrite = false
 ): Promise<SixWeekFollowupCommandFailure | null> {
   if (!registrationConsentGuardEnabled()) {
     return null;
@@ -241,7 +241,7 @@ async function requireCurrentRegistrationConsent(
       );
     }
 
-    if (consent === "granted" && contactWriterHoldEnabled() && !coordinatedOwnerClaim) {
+    if (consent === "granted" && contactWriterHoldEnabled() && !coordinatedSixWeekWrite) {
       return commandFailure(503, CONTACT_WRITER_HOLD_MESSAGE);
     }
     if (consent !== "granted" &&
@@ -629,9 +629,16 @@ export async function recordSixWeekTaskOutcome(
     };
   }
 
+  const coordinatedTask =
+    contactWriterHoldEnabled() &&
+    existing.ownerStaffId === actorId &&
+    input.contactMethod === "none" &&
+    !careOutcome &&
+    typeof repository.recordConsentProtectedTaskWithoutContact === "function";
+
   const consentFailure =
     await requireCurrentRegistrationConsent(
-      visitorId, dependencies
+      visitorId, dependencies, coordinatedTask
     );
 
   if (consentFailure) return consentFailure;
@@ -661,6 +668,47 @@ export async function recordSixWeekTaskOutcome(
       notes
     }
   };
+
+  if (coordinatedTask &&
+      repository.recordConsentProtectedTaskWithoutContact) {
+    const write =
+      await repository.recordConsentProtectedTaskWithoutContact(event);
+
+    if (write === "blocked") {
+      return commandFailure(409, "Visitor follow-up permission unavailable");
+    }
+
+    if (write === "conflict") {
+      return commandFailure(409, "Follow-up plan or consent changed");
+    }
+
+    if (write !== "recorded") {
+      return commandFailure(503, "Task outcome could not be confirmed");
+    }
+
+    const plan = projectSixWeekVisitorFollowup(
+      await repository.listByVisitor(visitorId), occurredAt
+    );
+
+    const recorded = plan?.tasks.find(
+      item => item.weekNumber === input.weekNumber
+    );
+
+    if (!plan ||
+        recorded?.status !== input.disposition) {
+      return commandFailure(503, "Task outcome projection could not be confirmed");
+    }
+
+    // No Care contact is created for a no-contact task.
+    return {
+      accepted: true,
+      status: 202,
+      created: true,
+      eventId: event.eventId,
+      eventType: event.type,
+      plan
+    };
+  }
 
   const result = await appendAndProject({
     repository,

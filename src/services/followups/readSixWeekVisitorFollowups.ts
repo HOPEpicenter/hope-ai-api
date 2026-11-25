@@ -12,34 +12,50 @@ import { contactWriterHoldEnabled } from "./permanentVisitorContactWriterHold";
 import { readLatestRegistrationConsent, registrationConsentAuthorityEnabled,
   registrationConsentGuardEnabled } from "./readLatestRegistrationConsent";
 
-async function mayExposeActionablePlan(
+type PlanVisibility = "visible" | "restricted" | "unverified";
+
+async function assessPlanVisibility(
   plan: SixWeekVisitorFollowupPlan
-): Promise<boolean> {
+): Promise<PlanVisibility> {
   if (!registrationConsentGuardEnabled() ||
       (plan.status !== "active" && plan.status !== "paused")) {
-    return true;
+    return "visible";
   }
 
   const consent = await readLatestRegistrationConsent(plan.visitorId);
 
-  if (consent === "declined" || consent === "pending_verification") return false;
+  if (consent === "declined" || consent === "pending_verification") {
+    return "restricted";
+  }
+
   if (consent === "granted") {
-    if (!contactWriterHoldEnabled()) return true;
+    if (!contactWriterHoldEnabled()) return "visible";
 
-    // The permanent public enrollment, owner claim and task
-    // outcome writers now coordinate with canonical consent.
-    // Do not release unrelated legacy or paused workflows.
     return registrationConsentAuthorityEnabled() &&
-      (plan.status === "active" || plan.status === "paused") &&
-      plan.startedBy === "system:permanent-visitor-registration";
-  }
-  if (consent === "legacy_no_evidence" && !registrationConsentAuthorityEnabled() &&
-      plan.startedBy !== "system:permanent-visitor-registration") {
-    return true;
+      plan.startedBy === "system:permanent-visitor-registration"
+      ? "visible"
+      : "restricted";
   }
 
-  // Do not present actionable tasks when consent cannot be verified.
-  throw new Error("Current registration consent could not be verified");
+  if (consent === "legacy_no_evidence" &&
+      !registrationConsentAuthorityEnabled() &&
+      plan.startedBy !== "system:permanent-visitor-registration") {
+    return "visible";
+  }
+
+  return "unverified";
+}
+
+async function mayExposeActionablePlan(
+  plan: SixWeekVisitorFollowupPlan
+): Promise<boolean> {
+  const visibility = await assessPlanVisibility(plan);
+
+  if (visibility === "unverified") {
+    throw new Error("Current registration consent could not be verified");
+  }
+
+  return visibility === "visible";
 }
 
 export type SixWeekFollowupQueueItem = {
@@ -57,6 +73,10 @@ export type SixWeekFollowupQueue = {
   overdue: number;
   needsOwner: number;
   items: SixWeekFollowupQueueItem[];
+  consentReview?: {
+    restrictedCount: number;
+    unverifiedCount: number;
+  };
 };
 
 type ReadRepository = Pick<
@@ -140,17 +160,31 @@ export async function readSixWeekVisitorFollowupQueue(
     plan.status === "active" || plan.status === "paused"
   );
 
-  // Preserve the canonical event stream; suppress stale work at read time.
-  // An unknown consent result makes the queue unavailable rather than
-  // publishing incomplete counts as verified.
-  const permitted = await Promise.all(
+  // Keep verified work available without granting permission to
+  // restricted or unverified plans. Disclose excluded coverage.
+  const assessed = await Promise.all(
     plans.map(async plan => ({
       plan,
-      allowed: await mayExposeActionablePlan(plan)
+      visibility: await assessPlanVisibility(plan)
     }))
   );
-  const visiblePlans = permitted.filter(entry => entry.allowed)
-    .map(entry => entry.plan);
+
+  const restrictedCount = assessed.filter(
+    entry => entry.visibility === "restricted"
+  ).length;
+
+  const unverifiedCount = assessed.filter(
+    entry => entry.visibility === "unverified"
+  ).length;
+
+  // Preserve existing behavior outside the new authority mode.
+  if (!registrationConsentAuthorityEnabled() && unverifiedCount > 0) {
+    throw new Error("Current registration consent could not be verified");
+  }
+
+  const visiblePlans = assessed.filter(
+    entry => entry.visibility === "visible"
+  ).map(entry => entry.plan);
 
   const readVisitor = dependencies.getVisitor ?? getVisitorById;
 
@@ -184,6 +218,9 @@ export async function readSixWeekVisitorFollowupQueue(
       item => item.plan.nextTask?.status === "overdue"
     ).length,
     needsOwner: items.filter(item => item.plan.needsOwner).length,
-    items
+    items,
+    ...(registrationConsentAuthorityEnabled()
+      ? { consentReview: { restrictedCount, unverifiedCount } }
+      : {})
   };
 }

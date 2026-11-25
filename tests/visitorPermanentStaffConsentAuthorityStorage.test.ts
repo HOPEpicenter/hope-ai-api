@@ -68,3 +68,93 @@ function createPermanentVisitorConsentRepository(
 ) {
   return baseRepository(table, true);
 }
+
+
+test("mixed queue preserves verified public work without releasing legacy or unverified plans", () =>
+  fixture(async c => {
+    await init(c, true);
+
+    const missingId = "synthetic-unverified-legacy";
+    const declinedId = "synthetic-declined-public";
+    const heldId = "synthetic-held-legacy";
+
+    const authority =
+      createPermanentVisitorConsentRepository(c);
+
+    assert.equal((await authority.apply(declinedId, {
+      kind: "new_profile",
+      evidenceId: "synthetic-declined-init",
+      initialConsent: false
+    })).status, "committed");
+
+    assert.equal((await authority.apply(heldId, {
+      kind: "new_profile",
+      evidenceId: "synthetic-held-init",
+      initialConsent: true
+    })).status, "committed");
+
+    const publicActor =
+      "system:permanent-visitor-registration";
+
+    const makePlan = (
+      visitorId: string,
+      actorId: string
+    ): SixWeekFollowupEvent => ({
+      eventId: `synthetic-plan-${visitorId}`,
+      visitorId,
+      actorId,
+      type: "six_week_followup.plan_started",
+      occurredAt: stamp,
+      data: {
+        firstVisitDate: "2026-11-24",
+        ownerStaffId: null,
+        contactConsent: true,
+        preferredContactMethod: null
+      }
+    });
+
+    const events = [
+      makePlan(id, publicActor),
+      makePlan(missingId, "synthetic-legacy-staff"),
+      makePlan(declinedId, publicActor),
+      makePlan(heldId, "synthetic-legacy-staff")
+    ];
+
+    const enriched: string[] = [];
+
+    const result = await queue(stamp, {
+      repository: {
+        listAll: async () => events,
+        listByVisitor: async visitorId =>
+          events.filter(event => event.visitorId === visitorId)
+      },
+      getVisitor: async visitorId => {
+        enriched.push(visitorId);
+
+        return {
+          visitorId,
+          name: "Synthetic visitor",
+          email: "synthetic@example.invalid",
+          phone: "5550100",
+          createdAt: stamp,
+          updatedAt: stamp
+        };
+      }
+    });
+
+    assert.equal(result.count, 1);
+    assert.equal(result.items.length, 1);
+    assert.equal(result.items[0].visitorId, id);
+
+    assert.deepEqual(result.consentReview, {
+      restrictedCount: 2,
+      unverifiedCount: 1
+    });
+
+    assert.deepEqual(enriched, [id]);
+    assert.equal(events.length, 4);
+
+    console.log("MIXED_QUEUE_VERIFIED_WORK_PRESERVED=True");
+    console.log("UNVERIFIED_AND_RESTRICTED_COUNTS_VERIFIED=True");
+  })
+);

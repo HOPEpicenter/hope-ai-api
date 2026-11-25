@@ -1,4 +1,12 @@
 import {
+  readSixWeekVisitorFollowup,
+  readSixWeekVisitorFollowupQueue
+} from "../src/services/followups/readSixWeekVisitorFollowups";
+import type {
+  FunctionVisitor
+} from "../src/functions/_shared/visitorsRepository";
+
+import {
   getFormationEventsTableClient,
   getFormationProfilesTableClient,
   getFormationProfileByVisitorId
@@ -131,7 +139,68 @@ for (const scenario of [
         ) {
           const actorId = "synthetic-staff-a";
 
+          const queueAsOf = "2026-11-24T14:00:00.000Z";
+          let visitorReads = 0;
+
+          const queueDependencies = {
+            repository,
+            getVisitor: async () => {
+              visitorReads++;
+              const visitor: FunctionVisitor = {
+                visitorId,
+                name: "Synthetic visitor",
+                email: "synthetic@example.invalid",
+                phone: "5550100",
+                createdAt: queueAsOf,
+                updatedAt: queueAsOf
+              };
+
+              return visitor;
+            }
+          };
+
+          if (scenario === "task_without_contact" ||
+              scenario === "task_withdrawal_race") {
+
+            const unclaimed = await readSixWeekVisitorFollowup(
+              visitorId, queueAsOf, { repository }
+            );
+
+            assert.equal(unclaimed?.status, "active");
+            assert.equal(unclaimed?.needsOwner, true);
+
+            const queue = await readSixWeekVisitorFollowupQueue(
+              queueAsOf, queueDependencies
+            );
+
+            assert.equal(queue.count, 1);
+            assert.equal(queue.needsOwner, 1);
+            assert.equal(queue.items[0].visitorId, visitorId);
+            assert.equal(visitorReads, 1);
+
+            console.log("UNCLAIMED_PUBLIC_PLAN_VISIBLE=True");
+          }
+
           assert.equal((await claim(actorId)).accepted, true);
+
+          if (scenario === "task_without_contact") {
+            const claimed = await readSixWeekVisitorFollowup(
+              visitorId, queueAsOf, { repository }
+            );
+
+            assert.equal(claimed?.ownerStaffId, actorId);
+            assert.equal(claimed?.needsOwner, false);
+
+            const queue = await readSixWeekVisitorFollowupQueue(
+              queueAsOf, queueDependencies
+            );
+
+            assert.equal(queue.count, 1);
+            assert.equal(queue.needsOwner, 0);
+            assert.equal(queue.items[0].plan.ownerStaffId, actorId);
+
+            console.log("CLAIMED_PUBLIC_PLAN_VISIBLE=True");
+          }
 
           const taskStamp = "2026-11-24T14:00:00.000Z";
           let careWrites = 0;
@@ -587,6 +656,23 @@ for (const scenario of [
 
             const denied = await recordTask(1, "none");
             assert.equal(denied.accepted, false);
+
+            visitorReads = 0;
+
+            const suppressed = await readSixWeekVisitorFollowupQueue(
+              queueAsOf, queueDependencies
+            );
+
+            assert.equal(suppressed.count, 0);
+            assert.equal(visitorReads, 0);
+
+            await assert.rejects(
+              readSixWeekVisitorFollowup(
+                visitorId, queueAsOf, { repository }
+              )
+            );
+
+            console.log("WITHDRAWN_PUBLIC_PLAN_SUPPRESSED=True");
 
             const events = await repository.listByVisitor(visitorId);
             assert.equal(events.filter(e =>

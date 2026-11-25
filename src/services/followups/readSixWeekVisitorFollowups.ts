@@ -23,7 +23,16 @@ async function mayExposeActionablePlan(
   const consent = await readLatestRegistrationConsent(plan.visitorId);
 
   if (consent === "declined" || consent === "pending_verification") return false;
-  if (consent === "granted") return !contactWriterHoldEnabled();
+  if (consent === "granted") {
+    if (!contactWriterHoldEnabled()) return true;
+
+    // The permanent public enrollment, owner claim and task
+    // outcome writers now coordinate with canonical consent.
+    // Do not release unrelated legacy or paused workflows.
+    return registrationConsentAuthorityEnabled() &&
+      plan.status === "active" &&
+      plan.startedBy === "system:permanent-visitor-registration";
+  }
   if (consent === "legacy_no_evidence" && !registrationConsentAuthorityEnabled() &&
       plan.startedBy !== "system:permanent-visitor-registration") {
     return true;

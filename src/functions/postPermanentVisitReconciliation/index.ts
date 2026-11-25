@@ -51,10 +51,13 @@ export async function postPermanentVisitReconciliation(context: any, req: any, d
         const visitors = getTableClient("Visitors");
         const consent = process.env.FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY === "true"
           ? (await import("../../services/followups/permanentVisitorConsentRuntime"))
-              .createPermanentVisitorConsentRuntime(visitors, getTableClient("PermanentVisitorConsent"),
-                process.env.HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER ?? "")
+              .createPermanentVisitorConsentRuntime(visitors, getTableClient("VisitorFollowupEvents"),
+                process.env.HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER ?? "", true)
           : undefined;
         return reconcilePermanentVisitCompletion(id, {
+          ...(consent ? {
+            appendAuthorizedEnrollment: consent.appendAuthorizedEnrollment
+          } : {}),
           enabled: true, visitors, repository: new SixWeekFollowupEventsRepository(),
           ...(consent ?? {})
         });

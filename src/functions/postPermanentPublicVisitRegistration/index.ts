@@ -186,8 +186,8 @@ async function liveRuntime(): Promise<Runtime> {
   // are implemented. No consent table client is constructed while disabled.
   const consent = process.env.FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY === "true"
     ? (await import("../../services/followups/permanentVisitorConsentRuntime"))
-        .createPermanentVisitorConsentRuntime(visitors, getTableClient("PermanentVisitorConsent"),
-          process.env.HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER ?? "")
+        .createPermanentVisitorConsentRuntime(visitors, getTableClient("VisitorFollowupEvents"),
+          process.env.HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER ?? "", true)
     : undefined;
   const arrival: typeof recordVisitorArrival = consent
     ? command => recordVisitorArrival(command, { table: visitors, recordConsent: consent.recordConsent,
@@ -213,7 +213,10 @@ async function liveRuntime(): Promise<Runtime> {
         enabled: true,
         visitors,
         repository: followups,
-        ...(consent ? { readEnrollmentPermission: consent.readEnrollmentPermission } : {})
+        ...(consent ? {
+          readEnrollmentPermission: consent.readEnrollmentPermission,
+          appendAuthorizedEnrollment: consent.appendAuthorizedEnrollment
+        } : {})
       })
   };
 }

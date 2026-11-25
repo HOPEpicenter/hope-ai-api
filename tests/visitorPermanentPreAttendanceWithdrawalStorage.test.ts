@@ -3,8 +3,8 @@ import { strict as assert } from "node:assert";
 import { randomUUID } from "node:crypto";
 import type { TableClient } from "@azure/data-tables";
 import { createIsolatedVisitorTestTable } from "./permanentVisitorIsolatedTestTable";
-import { createPermanentVisitorConsentRepository as repository } from "../src/repositories/permanentVisitorConsentRepository";
-import { createPermanentVisitorConsentRuntime as runtime } from "../src/services/followups/permanentVisitorConsentRuntime";
+import { createPermanentVisitorConsentRepository as baseRepository } from "../src/repositories/permanentVisitorConsentRepository";
+import { createPermanentVisitorConsentRuntime as baseRuntime } from "../src/services/followups/permanentVisitorConsentRuntime";
 import { recordVisitorArrival as arrival } from "../src/services/visitors/recordVisitorArrival";
 import { recordVisitorFamilyCheckIn as familyArrival } from "../src/services/visitors/recordVisitorFamilyCheckIn";
 import { requireCurrentRegistrationContactPermission as guard } from "../src/services/followups/requireCurrentRegistrationContactPermission";
@@ -22,7 +22,7 @@ async function environment<T>(values:Record<string,string|undefined>,run:()=>Pro
   finally{for(const [k,v] of saved){if(v===undefined)delete process.env[k];else process.env[k]=v;}}
 }
 async function fixture(run:(v:TableClient,c:TableClient)=>Promise<void>){
-  const v=createIsolatedVisitorTestTable("Visitors"),c=createIsolatedVisitorTestTable("PermanentVisitorConsent");
+  const v=createIsolatedVisitorTestTable("Visitors"),c=createIsolatedVisitorTestTable("VisitorFollowupEvents");
   await v.createTable();try{await c.createTable();try{await environment({[authority]:"true",[oldGuard]:"false",[cutoverKey]:cutoff},()=>run(v,c));}finally{await c.deleteTable();}}finally{await v.deleteTable();}
 }
 async function seed(v:TableClient,c:TableClient,granted=true){
@@ -84,3 +84,11 @@ test("disabled legacy arrival does not write consent authority",()=>fixture(asyn
   await seed(v,c);const before=await state(c);await environment({[authority]:undefined,[oldGuard]:undefined},async()=>{assert.equal((await arrival(input(),{table:v,resolveIdentity:matched})).status,"recorded");});assert.deepEqual(await state(c),before);
 }));
 test("both HTTP activation fences still deny before runtime and Staff lookup",async()=>environment({[authority]:"true",[oldGuard]:"true",FEATURE_PERMANENT_PUBLIC_VISIT:"true",FEATURE_PERMANENT_VISITOR_AUTOMATIC_FOLLOWUP:"true",FEATURE_PERMANENT_VISIT_RECOVERY_RECONCILIATION:"true",FEATURE_PERMANENT_VISIT_RECOVERY_INSPECTION:"true"},async()=>{const pub:Parameters<typeof publicEndpoint>[0]={};const admin:{res?:{status:number}}={};await publicEndpoint(pub,{method:"POST"},{runtime:async()=>{throw Error("unexpected runtime");}});await recoveryEndpoint(admin,{method:"POST"},{readStaff:async()=>{throw Error("unexpected Staff lookup");}});assert.equal(pub.res?.status,503);assert.equal(admin.res?.status,503);}));
+
+function repository(table: Parameters<typeof baseRepository>[0]) {
+  return baseRepository(table, true);
+}
+
+function runtime(...args: Parameters<typeof baseRuntime>) {
+  return baseRuntime(args[0], args[1], args[2], true);
+}

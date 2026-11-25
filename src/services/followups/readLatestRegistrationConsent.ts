@@ -40,7 +40,7 @@ async function readAuthority(visitorId: string): Promise<RegistrationConsent> {
     const cutover = process.env.HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER;
     if (!cutover || !Number.isFinite(Date.parse(cutover)) ||
         new Date(cutover).toISOString() !== cutover) return "unavailable";
-    const repository = createPermanentVisitorConsentRepository(getTableClient("PermanentVisitorConsent"));
+    const repository = createPermanentVisitorConsentRepository(getTableClient("VisitorFollowupEvents"), true);
     const current = await repository.read(visitorId);
     if (current.status !== "ready") return "unavailable";
     if (current.state.pending !== null) return "pending_verification";

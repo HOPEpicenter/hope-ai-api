@@ -9,6 +9,9 @@ type Dependencies = {
   enabled?: boolean;
   visitors?: TableClient;
   recordConsent?: import("../followups/permanentVisitorConsentRuntime").RegistrationConsentRecorder;
+  appendAuthorizedEnrollment?: NonNullable<
+    Parameters<typeof enrollRecordedPublicVisitor>[1]
+  >["appendAuthorizedEnrollment"];
   readEnrollmentPermission?: import("../followups/permanentVisitorConsentRuntime").EnrollmentPermissionReader;
   repository?: Pick<SixWeekFollowupEventsRepository, "append" | "listByVisitor">;
 };
@@ -66,7 +69,8 @@ export async function reconcilePermanentVisitCompletion(
     const result = await enrollRecordedPublicVisitor({
       visitorId: receipt.visitorId, submissionId, serviceId: intent.serviceId, visitDate: intent.visitDate
     }, { enabled: true, visitors: table, repository: deps.repository,
-      readEnrollmentPermission: deps.readEnrollmentPermission });
+      readEnrollmentPermission: deps.readEnrollmentPermission,
+      appendAuthorizedEnrollment: deps.appendAuthorizedEnrollment });
     if (result !== "enrolled" && result !== "existing" && result !== "not_eligible") return "unavailable";
     // Recheck canonical attendance before claiming pipeline completion.
     const after = await inspectPermanentVisitRecovery(submissionId, table);

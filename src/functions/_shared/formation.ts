@@ -1,4 +1,9 @@
-import { assertContactWriterNotHeld } from "../../services/followups/permanentVisitorContactWriterHold";
+import { isDeepStrictEqual } from "node:util";
+import {
+  PUBLIC_VISITOR_SYSTEM_ORIGIN
+} from "../../domain/followups/projectSixWeekVisitorFollowup";
+
+import { assertContactWriterNotHeld, contactWriterHoldEnabled } from "../../services/followups/permanentVisitorContactWriterHold";
 import { getTableClient as getHopeTableClient } from "./tableClient";
 import { compareTimelineNewestFirst } from "../../shared/timeline/timelineOrdering";
 import { TableClient } from "@azure/data-tables";
@@ -668,7 +673,162 @@ async function applyFormationEventToProfile(params: {
     });
   }
 }
-export async function recordFormationEventV1(body: unknown): Promise<{
+export async function recordFormationEventV1(body: unknown) {
+  return recordFormationEventV1Internal(body);
+}
+
+function sameHistoricalJson(a: unknown, b: unknown): boolean {
+  return isDeepStrictEqual(
+    JSON.parse(JSON.stringify(a)),
+    JSON.parse(JSON.stringify(b))
+  );
+}
+
+/**
+ * Internal historical synchronization only.
+ * The caller's envelope must exactly match data derived from
+ * an existing committed six-week event.
+ */
+export async function recordCommittedSixWeekCareEvent(body: unknown) {
+  if (!contactWriterHoldEnabled()) {
+    throw new Error("Historical Care synchronization unavailable");
+  }
+
+  const envelope = validateFormationEventEnvelopeV1Strict(body);
+  const visitorId = String(envelope.visitorId).trim();
+  const data = asObject(envelope.data);
+  const type = String(envelope.type).trim();
+  const sourceId = String(data.sixWeekEventId ?? "").trim();
+
+  const validId = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+  if (!validId.test(visitorId) || !validId.test(sourceId)) {
+    throw new Error("Invalid historical Care evidence");
+  }
+
+  const { SixWeekFollowupEventsRepository } =
+    await import("../../repositories/sixWeekFollowupEventsRepository");
+
+  const events = await new SixWeekFollowupEventsRepository()
+    .listByVisitor(visitorId);
+
+  const matching = events.filter(
+    event => event.eventId === sourceId
+  );
+
+  if (matching.length !== 1) {
+    throw new Error("Committed six-week evidence not found");
+  }
+
+  const event = matching[0];
+
+  if (event.visitorId !== visitorId ||
+      !validId.test(event.actorId) ||
+      event.actorId === PUBLIC_VISITOR_SYSTEM_ORIGIN) {
+    throw new Error("Invalid historical Care actor evidence");
+  }
+
+  const historical = event.type ===
+    "six_week_followup.task_care_outcome_recorded";
+
+  const tasks = historical
+    ? events.filter(item =>
+        item.eventId === data.sixWeekSourceTaskEventId
+      )
+    : [event];
+
+  if (tasks.length !== 1) {
+    throw new Error("Historical task evidence not found");
+  }
+
+  const task = tasks[0];
+  const weekNumber = Number(task.data.weekNumber);
+
+  if (task.visitorId !== visitorId ||
+      task.type !== "six_week_followup.task_completed" ||
+      !Number.isInteger(weekNumber) ||
+      weekNumber < 1 || weekNumber > 6 ||
+      !["call", "email", "in_person"].includes(
+        String(task.data.contactMethod)
+      ) ||
+      typeof task.data.outcome !== "string" ||
+      !task.data.outcome.trim()) {
+    throw new Error("Committed contact evidence is invalid");
+  }
+
+  const source = resolveMutationSource({
+    system: "six_week_followup",
+    actorId: event.actorId
+  });
+
+  let expected: Record<string, unknown>;
+
+  if (type === "FOLLOWUP_CONTACTED" && !historical) {
+    expected = {
+      v: 1,
+      eventId: `${event.eventId}:care-contact`,
+      visitorId,
+      type,
+      occurredAt: event.occurredAt,
+      source,
+      data: {
+        method: task.data.contactMethod,
+        result: task.data.outcome,
+        notes: task.data.notes ?? null,
+        sixWeekWeekNumber: weekNumber,
+        sixWeekEventId: event.eventId
+      }
+    };
+  } else if (type === "FOLLOWUP_OUTCOME_RECORDED" &&
+             weekNumber === 6 &&
+             Number(event.data.weekNumber) === 6 &&
+             (event.data.careOutcome === "connected" ||
+              event.data.careOutcome === "closed")) {
+    const notes = [
+      task.data.outcome,
+      task.data.notes,
+      ...(historical ? [event.data.notes] : [])
+    ].map(value => String(value ?? "").trim())
+      .filter(Boolean).join("\n\n");
+
+    expected = {
+      v: 1,
+      eventId: `${event.eventId}:care-outcome`,
+      visitorId,
+      type,
+      occurredAt: event.occurredAt,
+      source,
+      data: {
+        outcome: event.data.careOutcome,
+        notes,
+        sixWeekWeekNumber: 6,
+        sixWeekEventId: event.eventId,
+        ...(historical
+          ? { sixWeekSourceTaskEventId: task.eventId }
+          : {})
+      }
+    };
+  } else {
+    throw new Error("Historical Care operation not supported");
+  }
+
+  if (String(envelope.eventId) !== expected.eventId ||
+      normalizeIso(envelope.occurredAt, "occurredAt") !==
+        expected.occurredAt ||
+      !sameHistoricalJson(asObject(envelope.source), expected.source) ||
+      !sameHistoricalJson(data, expected.data)) {
+    throw new Error("Historical Care evidence does not match");
+  }
+
+  // This private path receives reconstructed durable evidence,
+  // never an unverified caller-provided execution permission.
+  return recordFormationEventV1Internal(expected, true);
+}
+
+async function recordFormationEventV1Internal(
+  body: unknown,
+  verifiedHistorical = false
+): Promise<{
   accepted: boolean;
   id: string;
   visitorId: string;
@@ -685,12 +845,14 @@ export async function recordFormationEventV1(body: unknown): Promise<{
   const source = asObject(envelope.source);
   const data = asObject(envelope.data);
 
-  await requireActiveFormationMutationActor(
-    type,
-    source.actorId
-  );
+  if (!verifiedHistorical) {
+    await requireActiveFormationMutationActor(
+      type,
+      source.actorId
+    );
 
-  assertContactWriterNotHeld("care", type, data);
+    assertContactWriterNotHeld("care", type, data);
+  }
   const eventsTable = getFormationEventsTableClient();
   const profilesTable = getFormationProfilesTableClient();
 
@@ -745,6 +907,133 @@ export async function recordFormationEventV1(body: unknown): Promise<{
       };
       break;
     }
+  }
+
+  if (verifiedHistorical) {
+    const expectedEvent = {
+      partitionKey: visitorId,
+      rowKey,
+      visitorId,
+      type,
+      occurredAt,
+      recordedAt: new Date().toISOString(),
+      idempotencyKey: eventId,
+      metadata: JSON.stringify({ source, data }),
+      channel: "api",
+      summary: type
+    };
+
+    let inserted = false;
+
+    if (!existingEvent) {
+      try {
+        await eventsTable.createEntity(expectedEvent);
+        existingEvent = expectedEvent;
+        inserted = true;
+      } catch (error: any) {
+        if (error?.statusCode !== 409) throw error;
+
+        existingEvent = await eventsTable.getEntity<any>(
+          visitorId, rowKey
+        );
+      }
+    }
+
+    if (existingEvent.partitionKey !== visitorId ||
+        existingEvent.rowKey !== rowKey ||
+        existingEvent.visitorId !== visitorId ||
+        existingEvent.type !== type ||
+        existingEvent.occurredAt !== occurredAt ||
+        existingEvent.idempotencyKey !== eventId ||
+        !sameHistoricalJson(
+          JSON.parse(existingEvent.metadata),
+          { source, data }
+        )) {
+      throw new Error("Conflicting historical Care record");
+    }
+
+    // Repeat the existing idempotent timeline insertion even
+    // when the Care event already exists.
+    await new GlobalTimelineRepository().append({
+      eventId,
+      visitorId,
+      stream: "formation",
+      type,
+      occurredAt,
+      summary: existingEvent.summary ?? null,
+      source: resolveMutationSource({
+        system: existingEvent.channel
+      }).system,
+      raw: {
+        ...expectedEvent,
+        recordedAt: existingEvent.recordedAt
+      }
+    });
+
+    // Repair missing projection effects without replacing a
+    // profile that changed after the read.
+    const existingProfile =
+      await getFormationProfileByVisitorId(
+        profilesTable, visitorId
+      );
+
+    const profile: FunctionFormationProfileEntity = {
+      ...(existingProfile ?? {}),
+      partitionKey: "VISITOR",
+      rowKey: visitorId,
+      visitorId
+    };
+
+    const shouldAdvance = shouldAdvanceEventState(
+      occurredAt,
+      eventId,
+      existingProfile?.lastEventAt,
+      (existingProfile as any)?.lastEventId
+    );
+
+    await applyFormationEventToProfile({
+      profile,
+      visitorId,
+      type,
+      occurredAt,
+      eventId,
+      data,
+      source,
+      shouldAdvance
+    });
+
+    if (toComparableProfileState(existingProfile) !==
+        toComparableProfileState(profile)) {
+      profile.updatedAt = new Date().toISOString();
+
+      const serialized = serializeGroups(profile);
+      const { etag, timestamp, ...entity } = serialized;
+
+      if (existingProfile) {
+        const currentEtag = (existingProfile as any).etag;
+
+        if (typeof currentEtag !== "string" ||
+            !currentEtag || currentEtag === "*") {
+          throw new Error("Historical profile checkpoint unavailable");
+        }
+
+        await profilesTable.updateEntity(
+          entity, "Merge", { etag: currentEtag }
+        );
+      } else {
+        await profilesTable.createEntity(entity);
+      }
+    }
+
+    return {
+      accepted: inserted,
+      id: eventId,
+      visitorId,
+      type,
+      occurredAt,
+      rowKey,
+      profile
+    };
   }
 
   if (!existingEvent) {

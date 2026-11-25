@@ -110,7 +110,7 @@ export class SixWeekFollowupEventsRepository {
     ).appendStaffOwnerClaim(event);
   }
 
-  async recordConsentProtectedTaskWithoutContact(
+  async recordConsentProtectedTaskOutcome(
     event: SixWeekFollowupEvent
   ): Promise<"recorded" | "conflict" | "blocked" | "unavailable"> {
     if (!contactWriterHoldEnabled()) return "unavailable";
@@ -122,7 +122,7 @@ export class SixWeekFollowupEventsRepository {
 
     return createPermanentVisitorConsentRepository(
       table, true
-    ).appendStaffTaskWithoutContact(event);
+    ).appendStaffTaskOutcome(event);
   }
 
   async append(event: SixWeekFollowupEvent): Promise<boolean> {

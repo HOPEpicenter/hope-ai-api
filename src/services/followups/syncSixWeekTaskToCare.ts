@@ -2,7 +2,11 @@ import type {
   SixWeekCareOutcome,
   SixWeekFollowupEvent
 } from "../../domain/followups/projectSixWeekVisitorFollowup";
-import { recordFormationEventV1 } from "../../functions/_shared/formation";
+import {
+  recordFormationEventV1,
+  recordCommittedSixWeekCareEvent
+} from "../../functions/_shared/formation";
+import { contactWriterHoldEnabled } from "./permanentVisitorContactWriterHold";
 import { resolveMutationSource } from "../events/resolveMutationSource";
 
 export type SixWeekCareEventRecorder = (body: unknown) => Promise<unknown>;
@@ -66,7 +70,10 @@ export async function syncHistoricalSixWeekTaskCareOutcomeToCare(
   }
 
   const recordCareEvent =
-    dependencies.recordCareEvent ?? recordFormationEventV1;
+    dependencies.recordCareEvent ??
+      (contactWriterHoldEnabled()
+        ? recordCommittedSixWeekCareEvent
+        : recordFormationEventV1);
 
   await recordCareEvent({
     v: 1,
@@ -114,7 +121,10 @@ export async function syncSixWeekTaskToCare(
 
   const weekNumber = Number(event.data.weekNumber);
   const recordCareEvent =
-    dependencies.recordCareEvent ?? recordFormationEventV1;
+    dependencies.recordCareEvent ??
+      (contactWriterHoldEnabled()
+        ? recordCommittedSixWeekCareEvent
+        : recordFormationEventV1);
   const source = resolveMutationSource({
     system: "six_week_followup",
     actorId: event.actorId

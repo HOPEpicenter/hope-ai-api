@@ -1,3 +1,12 @@
+import {
+  getFormationEventsTableClient,
+  getFormationProfilesTableClient,
+  getFormationProfileByVisitorId
+} from "../src/functions/_shared/formation";
+import {
+  GlobalTimelineRepository
+} from "../src/repositories/globalTimelineRepository";
+
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import type { TransactionAction } from "@azure/data-tables";
@@ -24,7 +33,8 @@ for (const scenario of [
   "cancellation_race",
   "task_without_contact",
   "task_withdrawal_race",
-  "task_contact_remains_held"
+  "task_contact_recovery",
+  "task_contact_week_six"
 ] as const) {
   test(`atomic Staff owner claim: ${scenario}`, async () => {
     const table = createIsolatedVisitorTestTable("VisitorFollowupEvents");
@@ -116,7 +126,8 @@ for (const scenario of [
         } else if (
           scenario === "task_without_contact" ||
           scenario === "task_withdrawal_race" ||
-          scenario === "task_contact_remains_held"
+          scenario === "task_contact_recovery" ||
+          scenario === "task_contact_week_six"
         ) {
           const actorId = "synthetic-staff-a";
 
@@ -127,9 +138,10 @@ for (const scenario of [
 
           function recordTask(
             weekNumber: number,
-            contactMethod: "none" | "call",
+            contactMethod: "none" | "call" | "in_person",
             actor = actorId,
-            disposition: "completed" | "skipped" = "completed"
+            disposition: "completed" | "skipped" = "completed",
+            careOutcome?: "connected" | "closed"
           ) {
             return recordSixWeekTaskOutcome({
               visitorId,
@@ -138,19 +150,25 @@ for (const scenario of [
               disposition,
               contactMethod,
               outcome: "Synthetic outcome",
-              notes: null
+              notes: null,
+              careOutcome
             }, {
               repository,
-              now: () => taskStamp,
+              now: () =>
+                scenario === "task_contact_week_six" && weekNumber === 6
+                  ? "2026-11-24T15:00:00.000Z"
+                  : taskStamp,
               newEventId: () => `synthetic-task-${weekNumber}`,
               readActor: async id => ({
                 staffId: id,
                 status: "active"
               }),
-              recordCareEvent: async () => {
-                careWrites++;
-                throw Error("Unexpected Care contact write");
-              }
+              ...(scenario === "task_contact_recovery" || scenario === "task_contact_week_six" ? {} : {
+                recordCareEvent: async () => {
+                  careWrites++;
+                  throw Error("Unexpected Care contact write");
+                }
+              })
             });
           }
 
@@ -192,15 +210,339 @@ for (const scenario of [
               e.type === "six_week_followup.task_skipped"
             ).length, 2);
 
-          } else if (scenario === "task_contact_remains_held") {
-            const result = await recordTask(1, "call");
+          } else if (
+            scenario === "task_contact_recovery" ||
+            scenario === "task_contact_week_six"
+          ) {
+            const care = getFormationEventsTableClient();
+            const profiles = getFormationProfilesTableClient();
 
-            assert.equal(result.accepted, false);
+            for (const client of [care, profiles]) {
+              const endpoint = new URL(client.url);
 
-            const events = await repository.listByVisitor(visitorId);
-            assert.equal(events.filter(e =>
-              e.type === "six_week_followup.task_completed"
-            ).length, 0);
+              assert.equal(endpoint.hostname, "127.0.0.1");
+              assert.equal(
+                endpoint.port, process.env.HOPE_VISITOR_133_PORT
+              );
+            }
+
+            await care.createTable();
+
+            try {
+              await profiles.createTable();
+
+              try {
+                if (scenario === "task_contact_week_six") {
+                  // Complete the earlier weeks using the
+                  // existing consent-protected Staff command.
+                  for (let week = 1; week <= 4; week++) {
+                    assert.equal(
+                      (await recordTask(week, "none")).accepted,
+                      true
+                    );
+                  }
+
+                  const inPerson =
+                    await recordTask(5, "in_person");
+
+                  assert.equal(inPerson.accepted, true);
+
+                  const originalProfile =
+                    await getFormationProfileByVisitorId(
+                      profiles, visitorId
+                    );
+
+                  assert.equal(
+                    originalProfile?.lastFollowupContactedAt,
+                    taskStamp
+                  );
+
+                  // Inject a real concurrent profile update
+                  // immediately before the conditional write.
+                  const prototype =
+                    Object.getPrototypeOf(profiles) as typeof profiles;
+
+                  const originalUpdate = prototype.updateEntity;
+                  let concurrentUpdateInjected = false;
+
+                  prototype.updateEntity = async function (
+                    this: typeof profiles,
+                    ...args: Parameters<typeof originalUpdate>
+                  ) {
+                    if (!concurrentUpdateInjected &&
+                        this.url === profiles.url &&
+                        args[0].partitionKey === "VISITOR" &&
+                        args[0].rowKey === visitorId) {
+
+                      // The six-week transaction must already
+                      // be durable before a Care profile race
+                      // is introduced.
+                      const committedEvents =
+                        await repository.listByVisitor(visitorId);
+
+                      const committedWeekSix =
+                        committedEvents.filter(event =>
+                          event.type ===
+                            "six_week_followup.task_completed" &&
+                          event.data.weekNumber === 6 &&
+                          event.eventId === "synthetic-task-6"
+                        );
+
+                      assert.equal(committedWeekSix.length, 1);
+
+                      console.log(
+                        "WEEK_SIX_DURABLE_BEFORE_PROFILE_RACE=True"
+                      );
+
+                      concurrentUpdateInjected = true;
+
+                      const concurrentEdit = {
+                        partitionKey: "VISITOR",
+                        rowKey: visitorId,
+                        displayName: "Concurrent synthetic edit"
+                      };
+
+                      // Target the actual profile table,
+                      // not whichever client was intercepted.
+                      await originalUpdate.call(
+                        profiles, concurrentEdit, "Merge"
+                      );
+                    }
+
+                    return originalUpdate.apply(this, args);
+                  };
+
+                  try {
+                    const first = await recordTask(
+                      6, "call", actorId,
+                      "completed", "connected"
+                    );
+
+                    assert.equal(first.accepted, false);
+
+                    if (!first.accepted) {
+                      assert.equal(first.status, 503);
+                    }
+
+                    assert.equal(concurrentUpdateInjected, true);
+                  } finally {
+                    prototype.updateEntity = originalUpdate;
+                  }
+
+                  const durableEvents =
+                    await repository.listByVisitor(visitorId);
+
+                  const defaultProjection =
+                    projectSixWeekVisitorFollowup(durableEvents);
+
+                  const durablePlan = projectSixWeekVisitorFollowup(
+                    durableEvents,
+                    "2026-11-24T15:00:00.000Z"
+                  );
+
+                  // Synthetic status-only diagnostics.
+                  if (durablePlan?.status !== "completed" ||
+                      defaultProjection?.status !== durablePlan.status) {
+                    console.log("WEEK_SIX_DIAGNOSTIC=" +
+                      JSON.stringify({
+                        defaultStatus: defaultProjection?.status,
+                        explicitStatus: durablePlan?.status,
+                        completedTaskCount:
+                          durablePlan?.completedTaskCount,
+                        remainingTaskCount:
+                          durablePlan?.remainingTaskCount,
+                        tasks: durablePlan?.tasks.map(task => ({
+                          week: task.weekNumber,
+                          status: task.status
+                        })),
+                        events: durableEvents.map(event => ({
+                          type: event.type,
+                          week: event.data.weekNumber ?? null,
+                          occurredAt: event.occurredAt
+                        }))
+                      }));
+                  }
+
+                  assert.equal(durablePlan?.status, "completed");
+                  assert.equal(durablePlan.completedTaskCount, 6);
+                  assert.equal(durablePlan.remainingTaskCount, 0);
+                  assert.equal(durablePlan.nextTask, null);
+
+                  // Retry must work even though the plan
+                  // is already completed.
+                  const retry = await recordTask(
+                    6, "call", actorId,
+                    "completed", "connected"
+                  );
+
+                  assert.equal(retry.accepted, true);
+
+                  if (retry.accepted) {
+                    assert.equal(retry.created, false);
+                    assert.equal(retry.plan.status, "completed");
+                    assert.equal(
+                      retry.plan.tasks[5].careOutcome,
+                      "connected"
+                    );
+                  }
+
+                  const repaired =
+                    await getFormationProfileByVisitorId(
+                      profiles, visitorId
+                    );
+
+                  assert.equal(
+                    repaired?.displayName,
+                    "Concurrent synthetic edit"
+                  );
+
+                  assert.equal(
+                    repaired?.lastFollowupContactedAt,
+                    "2026-11-24T15:00:00.000Z"
+                  );
+
+                  const expectedIds = [
+                    "synthetic-task-5:care-contact",
+                    "synthetic-task-6:care-contact",
+                    "synthetic-task-6:care-outcome"
+                  ];
+
+                  const page =
+                    await new GlobalTimelineRepository().read(200);
+
+                  for (const eventId of expectedIds) {
+                    assert.equal(page.items.filter(item =>
+                      item.eventId === eventId
+                    ).length, 1);
+                  }
+
+                  // Repeating the completed outcome must
+                  // not duplicate any Care records.
+                  assert.equal((await recordTask(
+                    6, "call", actorId,
+                    "completed", "connected"
+                  )).accepted, true);
+
+                  const careRows: string[] = [];
+
+                  for await (const row of care.listEntities()) {
+                    careRows.push(String(row.idempotencyKey));
+                  }
+
+                  assert.deepEqual(
+                    careRows.sort(),
+                    [...expectedIds].sort()
+                  );
+
+                  await assert.rejects(
+                    repository.append(ownerEvent)
+                  );
+
+                  return;
+                }
+
+                const originalAppend =
+                  GlobalTimelineRepository.prototype.append;
+
+                let injected = false;
+
+                GlobalTimelineRepository.prototype.append =
+                  async function () {
+                    injected = true;
+                    throw Error("Synthetic timeline outage");
+                  };
+
+                try {
+                  const first = await recordTask(1, "call");
+
+                  assert.equal(first.accepted, false);
+                  if (!first.accepted) {
+                    assert.equal(first.status, 503);
+                  }
+
+                  assert.equal(injected, true);
+                } finally {
+                  GlobalTimelineRepository.prototype.append =
+                    originalAppend;
+                }
+
+                const recorded =
+                  await repository.listByVisitor(visitorId);
+
+                assert.equal(recorded.filter(e =>
+                  e.type === "six_week_followup.task_completed"
+                ).length, 1);
+
+                // The Care event exists, but the injected
+                // failure prevented subsequent synchronization.
+                const before: unknown[] = [];
+
+                for await (const row of care.listEntities()) {
+                  before.push(row);
+                }
+
+                assert.equal(before.length, 1);
+
+                // Exact Staff retry repairs the missing writes.
+                const retry = await recordTask(1, "call");
+
+                assert.equal(retry.accepted, true);
+
+                if (retry.accepted) {
+                  assert.equal(retry.created, false);
+                }
+
+                const profile =
+                  await getFormationProfileByVisitorId(
+                    profiles, visitorId
+                  );
+
+                assert.equal(
+                  profile?.lastFollowupContactedAt, taskStamp
+                );
+
+                const page =
+                  await new GlobalTimelineRepository().read(200);
+
+                assert.equal(page.items.filter(item =>
+                  item.eventId === "synthetic-task-1:care-contact"
+                ).length, 1);
+
+                // Withdrawal still prevents new contact work,
+                // but cannot erase a committed historical fact.
+                assert.equal((await authority.apply(visitorId, {
+                  kind: "public_request",
+                  requestId: "contact-recovery-withdrawal",
+                  expectedRevision: 1,
+                  requestedConsent: false
+                })).status, "committed");
+
+                assert.equal(
+                  (await recordTask(1, "call")).accepted, true
+                );
+
+                assert.equal(
+                  (await recordTask(2, "call")).accepted, false
+                );
+
+                const conflicting =
+                  await recordTask(1, "none");
+
+                assert.equal(conflicting.accepted, false);
+
+                const after: unknown[] = [];
+
+                for await (const row of care.listEntities()) {
+                  after.push(row);
+                }
+
+                assert.equal(after.length, 1);
+              } finally {
+                await profiles.deleteTable();
+              }
+            } finally {
+              await care.deleteTable();
+            }
 
           } else {
             let injected = false;
@@ -225,7 +567,7 @@ for (const scenario of [
               }, true);
 
             const result =
-              await racingAuthority.appendStaffTaskWithoutContact({
+              await racingAuthority.appendStaffTaskOutcome({
                 visitorId,
                 actorId,
                 eventId: "synthetic-racing-task",

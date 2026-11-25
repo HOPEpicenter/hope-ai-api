@@ -385,7 +385,7 @@ export function createPermanentVisitorConsentRepository(
    */
   async function appendStaffPlanMutation(
     event: SixWeekFollowupEvent,
-    mode: "owner_claim" | "task_without_contact"
+    mode: "owner_claim" | "task_outcome"
   ): Promise<"claimed" | "conflict" | "blocked" | "unavailable"> {
     try {
       if (!sharedSixWeek ||
@@ -410,8 +410,17 @@ export function createPermanentVisitorConsentRepository(
             !Number.isInteger(event.data.weekNumber) ||
             event.data.weekNumber < 1 ||
             event.data.weekNumber > 6 ||
-            event.data.contactMethod !== "none" ||
-            event.data.careOutcome !== null ||
+            !["none", "call", "email", "in_person"].includes(
+              String(event.data.contactMethod)
+            ) ||
+            (event.type === "six_week_followup.task_skipped" &&
+              event.data.contactMethod !== "none") ||
+            (event.type === "six_week_followup.task_completed" &&
+              event.data.weekNumber === 6 &&
+              event.data.contactMethod !== "none"
+                ? event.data.careOutcome !== "connected" &&
+                  event.data.careOutcome !== "closed"
+                : event.data.careOutcome !== null) ||
             typeof event.data.outcome !== "string" ||
             !event.data.outcome.trim() ||
             event.data.outcome.length > 160 ||
@@ -521,11 +530,11 @@ export function createPermanentVisitorConsentRepository(
     return appendStaffPlanMutation(event, "owner_claim");
   }
 
-  async function appendStaffTaskWithoutContact(
+  async function appendStaffTaskOutcome(
     event: SixWeekFollowupEvent
   ): Promise<"recorded" | "conflict" | "blocked" | "unavailable"> {
     const result = await appendStaffPlanMutation(
-      event, "task_without_contact"
+      event, "task_outcome"
     );
 
     return result === "claimed" ? "recorded" : result;
@@ -536,6 +545,6 @@ export function createPermanentVisitorConsentRepository(
     recordContactIntent, inspectContactIntent,
     appendPublicEnrollment,
     appendStaffOwnerClaim,
-    appendStaffTaskWithoutContact
+    appendStaffTaskOutcome
   };
 }

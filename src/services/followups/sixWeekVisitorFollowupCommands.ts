@@ -40,7 +40,7 @@ type FollowupRepository = Pick<
   "append" | "listByVisitor"
 > & Partial<Pick<
   SixWeekFollowupEventsRepository,
-  "claimConsentProtectedOwner" | "recordConsentProtectedTaskWithoutContact"
+  "claimConsentProtectedOwner" | "recordConsentProtectedTaskOutcome"
 >>;
 
 type StaffIdentity = {
@@ -588,16 +588,21 @@ export async function recordSixWeekTaskOutcome(
     input.administrativeOverrideVerified
   );
   if (authorizationFailure) return authorizationFailure;
-  if (existing.status === "paused") {
-    return commandFailure(409, "Follow-up plan is paused");
-  }
-  if (existing.status === "completed" || existing.status === "cancelled") {
-    return commandFailure(409, "Follow-up plan is closed");
-  }
-
   const task = existing.tasks.find(
     item => item.weekNumber === input.weekNumber
   );
+
+  const historicalRetry =
+    contactWriterHoldEnabled() &&
+    (task?.status === "completed" || task?.status === "skipped");
+
+  if (!historicalRetry && existing.status === "paused") {
+    return commandFailure(409, "Follow-up plan is paused");
+  }
+  if (!historicalRetry &&
+      (existing.status === "completed" || existing.status === "cancelled")) {
+    return commandFailure(409, "Follow-up plan is closed");
+  }
 
   if (!task) return commandFailure(404, "Follow-up task not found");
   if (task.status === "completed" || task.status === "skipped") {
@@ -609,6 +614,37 @@ export async function recordSixWeekTaskOutcome(
           event.type === "six_week_followup.task_skipped") &&
         Number(event.data.weekNumber) === input.weekNumber
     );
+
+    if (contactWriterHoldEnabled()) {
+      if (!storedTaskEvent ||
+          task.status !== input.disposition ||
+          storedTaskEvent.data.contactMethod !== input.contactMethod ||
+          storedTaskEvent.data.outcome !== outcome ||
+          (storedTaskEvent.data.notes ?? null) !== notes ||
+          (storedTaskEvent.data.careOutcome ?? null) !==
+            (isSixWeekCareOutcome(careOutcome) ? careOutcome : null)) {
+        return commandFailure(409, "Recorded task outcome differs");
+      }
+
+      try {
+        await syncSixWeekTaskToCare(storedTaskEvent, {
+          recordCareEvent: dependencies.recordCareEvent
+        });
+      } catch {
+        return commandFailure(
+          503, "Task recorded; Care synchronization pending"
+        );
+      }
+
+      return {
+        accepted: true,
+        status: 200,
+        created: false,
+        eventId: storedTaskEvent.eventId,
+        eventType: storedTaskEvent.type,
+        plan: existing
+      };
+    }
 
     if (storedTaskEvent) {
       await syncSixWeekTaskToCare(storedTaskEvent, {
@@ -632,9 +668,10 @@ export async function recordSixWeekTaskOutcome(
   const coordinatedTask =
     contactWriterHoldEnabled() &&
     existing.ownerStaffId === actorId &&
-    input.contactMethod === "none" &&
-    !careOutcome &&
-    typeof repository.recordConsentProtectedTaskWithoutContact === "function";
+    ((input.contactMethod === "none" && !careOutcome) ||
+      (input.disposition === "completed" &&
+       input.contactMethod !== "none")) &&
+    typeof repository.recordConsentProtectedTaskOutcome === "function";
 
   const consentFailure =
     await requireCurrentRegistrationConsent(
@@ -670,9 +707,9 @@ export async function recordSixWeekTaskOutcome(
   };
 
   if (coordinatedTask &&
-      repository.recordConsentProtectedTaskWithoutContact) {
+      repository.recordConsentProtectedTaskOutcome) {
     const write =
-      await repository.recordConsentProtectedTaskWithoutContact(event);
+      await repository.recordConsentProtectedTaskOutcome(event);
 
     if (write === "blocked") {
       return commandFailure(409, "Visitor follow-up permission unavailable");
@@ -699,7 +736,16 @@ export async function recordSixWeekTaskOutcome(
       return commandFailure(503, "Task outcome projection could not be confirmed");
     }
 
-    // No Care contact is created for a no-contact task.
+    try {
+      await syncSixWeekTaskToCare(event, {
+        recordCareEvent: dependencies.recordCareEvent
+      });
+    } catch {
+      return commandFailure(
+        503, "Task recorded; Care synchronization pending"
+      );
+    }
+
     return {
       accepted: true,
       status: 202,

@@ -167,6 +167,10 @@ for (const scenario of [
             );
 
             assert.equal(unclaimed?.status, "active");
+            assert.equal(
+              unclaimed?.staffWorkflow,
+              "consent_protected_public"
+            );
             assert.equal(unclaimed?.needsOwner, true);
 
             const queue = await readSixWeekVisitorFollowupQueue(
@@ -189,6 +193,10 @@ for (const scenario of [
             );
 
             assert.equal(claimed?.ownerStaffId, actorId);
+            assert.equal(
+              claimed?.staffWorkflow,
+              "consent_protected_public"
+            );
             assert.equal(claimed?.needsOwner, false);
 
             const queue = await readSixWeekVisitorFollowupQueue(

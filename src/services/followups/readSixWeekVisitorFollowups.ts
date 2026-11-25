@@ -87,7 +87,9 @@ export async function readSixWeekVisitorFollowup(
   visitorId: string,
   asOf?: string,
   dependencies: SixWeekFollowupReadDependencies = {}
-): Promise<SixWeekVisitorFollowupPlan | null> {
+): Promise<(SixWeekVisitorFollowupPlan & {
+  staffWorkflow?: "consent_protected_public";
+}) | null> {
   const normalizedVisitorId = String(visitorId ?? "").trim();
   if (!normalizedVisitorId) return null;
 
@@ -102,6 +104,22 @@ export async function readSixWeekVisitorFollowup(
   if (plan && !(await mayExposeActionablePlan(plan))) {
     // Not a missing plan: do not imply that a new plan may be started.
     throw new Error("Follow-up permission withdrawn; plan needs reconciliation");
+  }
+
+  // This is a presentation capability, not a mutation
+  // credential. The read above has already verified consent.
+  if (
+    plan &&
+    registrationConsentAuthorityEnabled() &&
+    registrationConsentGuardEnabled() &&
+    contactWriterHoldEnabled() &&
+    plan.status === "active" &&
+    plan.startedBy === "system:permanent-visitor-registration"
+  ) {
+    return {
+      ...plan,
+      staffWorkflow: "consent_protected_public"
+    };
   }
 
   return plan;

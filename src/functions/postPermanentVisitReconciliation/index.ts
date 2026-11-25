@@ -1,3 +1,4 @@
+import { permanentVisitorActivationPermitted } from "../../services/visitors/permanentVisitorPilotActivation";
 import { requireAdminStaffActorForFunction } from "../_shared/adminStaffActor";
 import { getTableClient } from "../_shared/tableClient";
 import { SixWeekFollowupEventsRepository } from "../../repositories/sixWeekFollowupEventsRepository";
@@ -23,8 +24,8 @@ export async function postPermanentVisitReconciliation(context: any, req: any, d
   }
   if (process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD !== "true" ||
       process.env.FEATURE_PERMANENT_VISITOR_AUTOMATIC_FOLLOWUP !== "true") { unavailable(); return; }
-  // STEP 148B activation fence: same boundary as public registration.
-  if (process.env.FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY === "true") { unavailable(); return; }
+  // Recovery must obey the same isolated activation boundary.
+  if (!permanentVisitorActivationPermitted()) { unavailable(); return; }
   try {
     const adminKey = (process.env.HOPE_ADMIN_API_KEY ?? "").trim();
     if (adminKey && [process.env.HOPE_API_KEY, process.env.HOPE_PERMANENT_VISIT_BRIDGE_KEY,

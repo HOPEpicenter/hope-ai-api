@@ -1,3 +1,4 @@
+import { permanentVisitorActivationPermitted } from "../../services/visitors/permanentVisitorPilotActivation";
 import { timingSafeEqual } from "node:crypto";
 import { DateTime } from "luxon";
 
@@ -245,8 +246,8 @@ export async function postPermanentPublicVisitRegistration(
     return;
   }
 
-  // STEP 148B activation fence: do not enable before Staff guard cutover.
-  if (process.env.FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY === "true") {
+  // Consent-authority activation is restricted to the isolated pilot.
+  if (!permanentVisitorActivationPermitted()) {
     reply(context, 503, { status: "unavailable", accepted: false });
     return;
   }

@@ -1,0 +1,22 @@
+{
+  "bindings": [
+    {
+      "authLevel": "anonymous",
+      "type": "httpTrigger",
+      "direction": "in",
+      "name": "req",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "route": "admin/visitors/{visitorId}/registration-consent"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ],
+  "scriptFile": "../dist/functions/permanentVisitorStaffConsent/index.js",
+  "entryPoint": "permanentVisitorStaffConsent"
+}

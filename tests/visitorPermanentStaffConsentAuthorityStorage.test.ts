@@ -437,3 +437,242 @@ test("authority-mode Staff HTTP lifecycle uses canonical actors and durable comm
     }
   })
 );
+
+test("administrator consent decisions are authorized durable and revision bound", () =>
+  fixture(async c => {
+    const { permanentVisitorStaffConsent } =
+      await import("../src/functions/permanentVisitorStaffConsent");
+
+    const visitorId = "synthetic-admin-consent-visitor";
+    const adminId = "synthetic-consent-admin";
+    const adminKey = "synthetic-consent-admin-key-only";
+
+    const feature =
+      "FEATURE_PERMANENT_VISITOR_STAFF_CONSENT_DECISION";
+
+    const repository =
+      createPermanentVisitorConsentRepository(c);
+
+    const readStaff = async (staffId: string) => {
+      if (![adminId, "synthetic-inactive-admin"].includes(staffId)) {
+        return null;
+      }
+
+      return {
+        staffId,
+        displayName: "Synthetic Administrator",
+        roleLabel: "Administrator",
+        status: staffId === adminId
+          ? "active" as const
+          : "inactive" as const,
+        createdAt: stamp,
+        updatedAt: stamp,
+        lastEventId: "synthetic-admin-event",
+        entraTenantId: null,
+        entraObjectId: null,
+        email: null,
+        phone: null,
+        ministryAreaId: null
+      };
+    };
+
+    const initial = await repository.apply(visitorId, {
+      kind: "existing_profile",
+      evidenceId: "synthetic-existing-profile"
+    });
+
+    assert.equal(initial.status, "committed");
+
+    const requested = await repository.apply(visitorId, {
+      kind: "public_request",
+      expectedRevision: 1,
+      requestId: "synthetic-grant-request",
+      requestedConsent: true
+    });
+
+    assert.equal(requested.status, "committed");
+
+    const decision = {
+      expectedRevision: 2,
+      decisionId: "synthetic-verified-grant",
+      pendingRequestId: "synthetic-grant-request",
+      decision: "granted",
+      confirmation: "visitor_choice_verified"
+    };
+
+    async function invoke(
+      method: string,
+      body?: Record<string, unknown>,
+      suppliedKey = adminKey,
+      actorId = adminId
+    ) {
+      const ctx: any = {};
+
+      await permanentVisitorStaffConsent(ctx, {
+        method,
+        params: { visitorId },
+        headers: {
+          "x-admin-api-key": suppliedKey,
+          "x-hope-admin-actor-id": actorId
+        },
+        body
+      }, {
+        readStaff,
+        repository
+      });
+
+      return ctx.res;
+    }
+
+    await environment({
+      [feature]: "false",
+      HOPE_ADMIN_API_KEY: adminKey,
+      HOPE_ADMIN_STAFF_IDS: `${adminId},synthetic-inactive-admin`,
+      HOPE_API_KEY: "synthetic-distinct-api-key"
+    }, async () => {
+      assert.equal((await invoke("GET")).status, 404);
+    });
+
+    await environment({
+      [feature]: "true",
+      HOPE_ADMIN_API_KEY: adminKey,
+      HOPE_ADMIN_STAFF_IDS: `${adminId},synthetic-inactive-admin`,
+      HOPE_API_KEY: "synthetic-distinct-api-key"
+    }, async () => {
+      const before = await repository.read(visitorId);
+
+      for (const response of [
+        await invoke("POST", decision, "wrong-key"),
+        await invoke("POST", decision, adminKey, "unknown-admin"),
+        await invoke("POST", decision, adminKey, "synthetic-inactive-admin")
+      ]) {
+        assert.ok(
+          [401, 403].includes(response.status),
+          `Unexpected authorization response: ${response.status}`
+        );
+      }
+
+      assert.deepEqual(
+        await repository.read(visitorId),
+        before
+      );
+
+      console.log("UNAUTHORIZED_CONSENT_DECISIONS_DENIED=True");
+
+      const pending = await invoke("GET");
+
+      assert.equal(pending.status, 200);
+      assert.equal(pending.body.effective, "unknown");
+      assert.equal(pending.body.revision, 2);
+      assert.equal(
+        pending.body.pending.requestId,
+        "synthetic-grant-request"
+      );
+
+      assert.equal((await invoke("POST", {
+        ...decision,
+        actorId: "forged-actor"
+      })).status, 400);
+
+      assert.equal((await invoke("POST", {
+        ...decision,
+        confirmation: "unverified"
+      })).status, 400);
+
+      assert.equal((await invoke("POST", {
+        ...decision,
+        expectedRevision: 1
+      })).status, 409);
+
+      assert.equal((await invoke("POST", {
+        ...decision,
+        pendingRequestId: "wrong-request"
+      })).status, 409);
+
+      assert.deepEqual(
+        await repository.read(visitorId),
+        before
+      );
+
+      const granted = await invoke("POST", decision);
+
+      assert.equal(granted.status, 200);
+      assert.equal(granted.body.status, "committed");
+      assert.equal(granted.body.recordedRevision, 3);
+
+      const receipt = await repository.inspectOperation(
+        visitorId, decision.decisionId
+      );
+
+      assert.equal(receipt.status, "found");
+
+      if (receipt.status === "found") {
+        assert.equal(
+          receipt.operation.kind,
+          "verified_staff_decision"
+        );
+
+        if (receipt.operation.kind === "verified_staff_decision") {
+          assert.equal(receipt.operation.actorId, adminId);
+        }
+      }
+
+      const replayed = await invoke("POST", decision);
+
+      assert.equal(replayed.status, 200);
+      assert.equal(replayed.body.status, "replayed");
+      assert.equal(replayed.body.recordedRevision, 3);
+
+      const withdrawal = await repository.apply(visitorId, {
+        kind: "public_request",
+        expectedRevision: 3,
+        requestId: "synthetic-new-withdrawal",
+        requestedConsent: false
+      });
+
+      assert.equal(withdrawal.status, "committed");
+
+      const historicalReplay = await invoke("POST", decision);
+
+      assert.equal(historicalReplay.status, 200);
+      assert.equal(historicalReplay.body.status, "replayed");
+
+      const withdrawn = await invoke("GET");
+
+      assert.equal(withdrawn.body.revision, 4);
+      assert.equal(withdrawn.body.pending.kind, "withdrawal");
+
+      const declined = await invoke("POST", {
+        expectedRevision: 4,
+        decisionId: "synthetic-verified-decline",
+        pendingRequestId: "synthetic-new-withdrawal",
+        decision: "declined",
+        confirmation: "visitor_choice_verified"
+      });
+
+      assert.equal(declined.status, 200);
+
+      const finalState = await invoke("GET");
+
+      assert.equal(finalState.body.effective, "declined");
+      assert.equal(finalState.body.pending, null);
+      assert.equal(finalState.body.revision, 5);
+
+      const { SixWeekFollowupEventsRepository } =
+        await import("../src/repositories/sixWeekFollowupEventsRepository");
+
+      const plans = new SixWeekFollowupEventsRepository(c);
+
+      assert.equal(
+        (await plans.listByVisitor(visitorId)).length,
+        0
+      );
+
+      console.log("ADMIN_CONSENT_DECISION_VERIFIED=True");
+      console.log("EXACT_DECISION_REPLAY_VERIFIED=True");
+      console.log("STALE_DECISION_DENIED=True");
+      console.log("NEW_WITHDRAWAL_PRESERVED=True");
+      console.log("NO_AUTOMATIC_PLAN_CREATION_VERIFIED=True");
+    });
+  })
+);

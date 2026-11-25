@@ -92,3 +92,415 @@ function repository(table: Parameters<typeof baseRepository>[0]) {
 function runtime(...args: Parameters<typeof baseRuntime>) {
   return baseRuntime(args[0], args[1], args[2], true);
 }
+
+
+test("real public registration reaches durable six-week Staff workflow", () =>
+  fixture(async (v, c) => {
+    const { submitPermanentPublicVisitRegistration } =
+      await import("../src/services/visitors/submitPermanentPublicVisitRegistration");
+
+    const { issuePermanentPublicVisitSession } =
+      await import("../src/services/visitors/permanentPublicVisitSession");
+
+    const { createPermanentVisitorQrReservationStore } =
+      await import("../src/repositories/permanentVisitorQrReservationStore");
+
+    const { createPermanentVisitRecoveryJournal } =
+      await import("../src/services/visitors/permanentVisitRecoveryJournal");
+
+    const { enrollRecordedPublicVisitor } =
+      await import("../src/services/followups/enrollRecordedPublicVisitor");
+
+    const { SixWeekFollowupEventsRepository } =
+      await import("../src/repositories/sixWeekFollowupEventsRepository");
+
+    const { projectSixWeekVisitorFollowup } =
+      await import("../src/domain/followups/projectSixWeekVisitorFollowup");
+
+    const { resolveVisitorCheckInIdentity } =
+      await import("../src/services/visitors/recordReturningVisitorCheckIn");
+
+    const { recordVisitorCheckIn } =
+      await import("../src/services/visitors/recordVisitorCheckIn");
+
+    const { getVisitorById } =
+      await import("../src/functions/_shared/visitorsRepository");
+
+    const {
+      assignSixWeekFollowupOwner,
+      recordSixWeekTaskOutcome
+    } = await import("../src/services/followups/sixWeekVisitorFollowupCommands");
+
+    const { readSixWeekVisitorFollowupQueue } =
+      await import("../src/services/followups/readSixWeekVisitorFollowups");
+
+    const reservations =
+      createIsolatedVisitorTestTable("PermanentVisitorAdmission");
+
+    await reservations.createTable();
+
+    try {
+      const consent = runtime(v, c, cutoff);
+      const followups = new SixWeekFollowupEventsRepository(c);
+      const journal = createPermanentVisitRecoveryJournal(v);
+      const consentRepository = repository(c);
+
+      const signingSecret =
+        "synthetic-integrated-session-signing-secret-only";
+
+      const claimSecret =
+        "synthetic-integrated-independent-claim-secret-only";
+
+      const context = {
+        enabled: true,
+        nowMs: Date.parse("2026-11-24T19:00:00Z"),
+        approvedEvents: []
+      };
+
+      type LocalContact = {
+        rowKey: string;
+        name?: string;
+        email?: string;
+        emailLower?: string;
+        phone?: string;
+        phoneCanonical?: string;
+      };
+
+      const readLocalVisitor = (visitorId: string) =>
+        getVisitorById(visitorId, {
+          getTableClient: () => v,
+          ensureTableExists: async () => {}
+        });
+
+      const deps = {
+        enabled: true,
+        context,
+        signingSecret,
+        claimSecret,
+        capacity: 10,
+        store: createPermanentVisitorQrReservationStore(reservations),
+        recoveryJournal: journal,
+        automaticFollowupEnabled: true,
+
+        recordAdult: (command: Parameters<typeof arrival>[0]) =>
+          arrival(command, {
+            table: v,
+            resolveIdentity: input =>
+              resolveVisitorCheckInIdentity(input, {
+                readContacts: () =>
+                  v.listEntities<LocalContact>({
+                    queryOptions: {
+                      filter: "PartitionKey eq 'VISITOR'"
+                    }
+                  }),
+                readVisitor: readLocalVisitor
+              }),
+            record: (input, options) =>
+              recordVisitorCheckIn(input, {
+                ...options,
+                table: v,
+                readVisitor: readLocalVisitor
+              }),
+            recordConsent: consent.recordConsent,
+            recordPreAttendanceWithdrawal:
+              consent.recordPreAttendanceWithdrawal
+          }),
+
+        enrollFollowup: (
+          evidence: Parameters<typeof enrollRecordedPublicVisitor>[0]
+        ) => enrollRecordedPublicVisitor(evidence, {
+          enabled: true,
+          visitors: v,
+          repository: followups,
+          readEnrollmentPermission: consent.readEnrollmentPermission,
+          appendAuthorizedEnrollment: consent.appendAuthorizedEnrollment
+        })
+      };
+
+      const token = issuePermanentPublicVisitSession(
+        signingSecret, context
+      );
+
+      assert.ok(token);
+
+      const firstRequest = {
+        token,
+        submissionId: randomUUID(),
+        body: {
+          name: "Synthetic Consenting Visitor",
+          email: "consenting@example.invalid",
+          phone: "2015550123",
+          visitType: "first",
+          churchHome: "looking",
+          interests: ["prayer", "church_events"],
+          invitedBy: "Synthetic Inviter",
+          contactConsent: true
+        }
+      };
+
+      const first = await submitPermanentPublicVisitRegistration(
+        firstRequest, deps
+      );
+
+      assert.deepEqual(first, {
+        accepted: true,
+        status: "recorded"
+      }, `Unexpected registration status: ${first.status}`);
+
+      const receipt = await v.getEntity<{
+        visitorId: string;
+        serviceId: string;
+        registrationDetailsJson: string;
+      }>("VISITOR_CHECK_IN", firstRequest.submissionId);
+
+      const visitorId = receipt.visitorId;
+
+      assert.equal(receipt.serviceId, "visit-2026-11-24");
+      assert.equal(
+        JSON.parse(receipt.registrationDetailsJson).contactConsent,
+        true
+      );
+
+      assert.ok(await readLocalVisitor(visitorId));
+
+      assert.equal(
+        (await journal.inspect(firstRequest.submissionId)).status,
+        "completed"
+      );
+
+      const authorityState =
+        await consentRepository.read(visitorId);
+
+      assert.equal(authorityState.status, "ready");
+
+      if (authorityState.status !== "ready") {
+        throw Error("Consent authority unavailable");
+      }
+
+      assert.equal(authorityState.state.effective, "granted");
+      assert.equal(authorityState.state.pending, null);
+
+      const enrolled = await followups.listByVisitor(visitorId);
+
+      assert.equal(enrolled.length, 1);
+      assert.equal(enrolled[0].type, "six_week_followup.plan_started");
+
+      const plan = projectSixWeekVisitorFollowup(enrolled);
+
+      assert.ok(plan);
+      assert.equal(plan.tasks.length, 6);
+      assert.equal(plan.ownerStaffId, null);
+
+      console.log("REAL_VISITOR_AND_ATTENDANCE_SAVED=True");
+      console.log("GENERAL_VISIT_ASSOCIATION_VERIFIED=True");
+      console.log("REAL_AUTOMATIC_SIX_WEEK_ENROLLMENT_VERIFIED=True");
+
+      // Exact public retry must preserve the original plan.
+      assert.deepEqual(
+        await submitPermanentPublicVisitRegistration(firstRequest, deps),
+        { accepted: true, status: "recorded" }
+      );
+
+      assert.deepEqual(
+        await followups.listByVisitor(visitorId),
+        enrolled
+      );
+
+      assert.deepEqual(
+        await consentRepository.read(visitorId),
+        authorityState
+      );
+
+      async function countPartition(partition: string) {
+        let count = 0;
+
+        for await (const row of v.listEntities({
+          queryOptions: {
+            filter: `PartitionKey eq '${partition}'`
+          }
+        })) {
+          assert.equal(row.partitionKey, partition);
+          count++;
+        }
+
+        return count;
+      }
+
+      assert.equal(await countPartition("VISITOR"), 1);
+      assert.equal(await countPartition("VISITOR_CHECK_IN"), 1);
+
+      console.log("EXACT_PUBLIC_RETRY_NO_DUPLICATES=True");
+
+      // A separate visitor declines consent at a scheduled event.
+      const scheduledContext = {
+        ...context,
+        approvedEvents: [{
+          id: "synthetic-scheduled-event",
+          date: "2026-11-24",
+          name: "Synthetic Scheduled Event",
+          active: true
+        }]
+      };
+
+      const secondToken = issuePermanentPublicVisitSession(
+        signingSecret, scheduledContext
+      );
+
+      assert.ok(secondToken);
+
+      const secondRequest = {
+        token: secondToken,
+        submissionId: randomUUID(),
+        body: {
+          name: "Synthetic Declining Visitor",
+          email: "declining@example.invalid",
+          visitType: "first",
+          contactConsent: false
+        }
+      };
+
+      const second = await submitPermanentPublicVisitRegistration(
+        secondRequest, {
+          ...deps,
+          context: scheduledContext
+        }
+      );
+
+      assert.deepEqual(second, {
+        accepted: true,
+        status: "recorded"
+      }, `Unexpected declined registration status: ${second.status}`);
+
+      const secondReceipt = await v.getEntity<{
+        visitorId: string;
+        serviceId: string;
+        registrationDetailsJson: string;
+      }>("VISITOR_CHECK_IN", secondRequest.submissionId);
+
+      assert.notEqual(secondReceipt.visitorId, visitorId);
+      assert.equal(
+        secondReceipt.serviceId,
+        "synthetic-scheduled-event"
+      );
+
+      assert.equal(
+        JSON.parse(secondReceipt.registrationDetailsJson).contactConsent,
+        false
+      );
+
+      const declined = await consentRepository.read(
+        secondReceipt.visitorId
+      );
+
+      assert.equal(declined.status, "ready");
+
+      if (declined.status !== "ready") {
+        throw Error("Decline authority unavailable");
+      }
+
+      assert.equal(declined.state.effective, "declined");
+
+      assert.equal(
+        (await followups.listByVisitor(secondReceipt.visitorId)).length,
+        0
+      );
+
+      assert.equal(
+        (await journal.inspect(secondRequest.submissionId)).status,
+        "completed"
+      );
+
+      assert.equal(await countPartition("VISITOR"), 2);
+      assert.equal(await countPartition("VISITOR_CHECK_IN"), 2);
+
+      console.log("SCHEDULED_EVENT_ASSOCIATION_VERIFIED=True");
+      console.log("DECLINED_VISITOR_ATTENDANCE_WITHOUT_TASKS=True");
+
+      // The real newly registered visitor must now appear
+      // in the existing Staff work queue.
+      const queue = await readSixWeekVisitorFollowupQueue(
+        undefined, {
+          repository: followups,
+          getVisitor: readLocalVisitor
+        }
+      );
+
+      assert.equal(queue.count, 1);
+      assert.equal(queue.items[0].visitorId, visitorId);
+      assert.equal(queue.needsOwner, 1);
+
+      const staffId = "synthetic-journey-staff";
+
+      const readStaff = async (id: string) =>
+        id === staffId ? {
+          staffId: id,
+          status: "active" as const,
+          roleLabel: "Care Team",
+          displayName: "Synthetic Staff",
+          createdAt: cutoff,
+          updatedAt: cutoff,
+          lastEventId: "synthetic-staff-event",
+          entraTenantId: null,
+          entraObjectId: null,
+          email: null,
+          phone: null,
+          ministryAreaId: null
+        } : null;
+
+      let sequence = 0;
+      const commandTime = Date.now() + 1000;
+
+      const staffDeps = {
+        repository: followups,
+        readActor: readStaff,
+        readAssignee: readStaff,
+        now: () => new Date(
+          commandTime + (++sequence * 1000)
+        ).toISOString()
+      };
+
+      const claimed = await assignSixWeekFollowupOwner({
+        visitorId,
+        actorId: staffId,
+        ownerStaffId: staffId
+      }, staffDeps);
+
+      assert.equal(claimed.accepted, true);
+
+      if (!claimed.accepted) {
+        throw Error("Staff claim rejected");
+      }
+
+      assert.equal(claimed.plan.ownerStaffId, staffId);
+
+      const completed = await recordSixWeekTaskOutcome({
+        visitorId,
+        actorId: staffId,
+        weekNumber: 1,
+        disposition: "completed",
+        contactMethod: "none",
+        outcome: "Synthetic administrative task completed"
+      }, staffDeps);
+
+      assert.equal(completed.accepted, true);
+
+      if (!completed.accepted) {
+        throw Error("Staff task rejected");
+      }
+
+      assert.equal(completed.plan.tasks[0].status, "completed");
+
+      const events = await followups.listByVisitor(visitorId);
+
+      assert.equal(events.length, 3);
+
+      console.log("REAL_REGISTRATION_REACHES_STAFF_QUEUE=True");
+      console.log("REAL_REGISTERED_VISITOR_OWNER_CLAIM=True");
+      console.log("REAL_REGISTERED_VISITOR_TASK_COMPLETION=True");
+      console.log("RECOVERY_COMPLETION_VERIFIED=True");
+
+    } finally {
+      await reservations.deleteTable();
+    }
+  })
+);

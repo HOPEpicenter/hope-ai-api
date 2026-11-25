@@ -30,7 +30,7 @@ async function mayExposeActionablePlan(
     // outcome writers now coordinate with canonical consent.
     // Do not release unrelated legacy or paused workflows.
     return registrationConsentAuthorityEnabled() &&
-      plan.status === "active" &&
+      (plan.status === "active" || plan.status === "paused") &&
       plan.startedBy === "system:permanent-visitor-registration";
   }
   if (consent === "legacy_no_evidence" && !registrationConsentAuthorityEnabled() &&
@@ -113,7 +113,7 @@ export async function readSixWeekVisitorFollowup(
     registrationConsentAuthorityEnabled() &&
     registrationConsentGuardEnabled() &&
     contactWriterHoldEnabled() &&
-    plan.status === "active" &&
+    (plan.status === "active" || plan.status === "paused") &&
     plan.startedBy === "system:permanent-visitor-registration"
   ) {
     return {

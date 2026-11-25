@@ -385,7 +385,7 @@ export function createPermanentVisitorConsentRepository(
    */
   async function appendStaffPlanMutation(
     event: SixWeekFollowupEvent,
-    mode: "owner_claim" | "task_outcome"
+    mode: "owner_claim" | "task_outcome" | "resume"
   ): Promise<"claimed" | "conflict" | "blocked" | "unavailable"> {
     try {
       if (!sharedSixWeek ||
@@ -397,7 +397,16 @@ export function createPermanentVisitorConsentRepository(
         return "unavailable";
       }
 
-      if (mode === "owner_claim") {
+      if (mode === "resume") {
+        if (
+          event.type !== "six_week_followup.plan_resumed" ||
+          Object.keys(event.data).length !== 1 ||
+          (event.data.reason !== null &&
+            typeof event.data.reason !== "string")
+        ) {
+          return "unavailable";
+        }
+      } else if (mode === "owner_claim") {
         if (event.type !== "six_week_followup.owner_assigned" ||
             event.data.ownerStaffId !== event.actorId ||
             Object.keys(event.data).length !== 1) {
@@ -475,7 +484,15 @@ export function createPermanentVisitorConsentRepository(
         return "conflict";
       }
 
-      if (mode === "owner_claim") {
+      if (mode === "resume") {
+        if (
+          plan.status !== "paused" ||
+          plan.ownerStaffId !== event.actorId ||
+          plan.startedBy !== PUBLIC_VISITOR_SYSTEM_ORIGIN
+        ) {
+          return "conflict";
+        }
+      } else if (mode === "owner_claim") {
         if (plan.ownerStaffId) return "conflict";
       } else {
         if (plan.status !== "active" ||
@@ -540,11 +557,19 @@ export function createPermanentVisitorConsentRepository(
     return result === "claimed" ? "recorded" : result;
   }
 
+  async function appendStaffPlanResume(
+    event: SixWeekFollowupEvent
+  ): Promise<"recorded" | "conflict" | "blocked" | "unavailable"> {
+    const result = await appendStaffPlanMutation(event, "resume");
+    return result === "claimed" ? "recorded" : result;
+  }
+
   return {
     read, apply, inspectOperation,
     recordContactIntent, inspectContactIntent,
     appendPublicEnrollment,
     appendStaffOwnerClaim,
-    appendStaffTaskOutcome
+    appendStaffTaskOutcome,
+    appendStaffPlanResume
   };
 }

@@ -40,7 +40,7 @@ type FollowupRepository = Pick<
   "append" | "listByVisitor"
 > & Partial<Pick<
   SixWeekFollowupEventsRepository,
-  "claimConsentProtectedOwner" | "recordConsentProtectedTaskOutcome"
+  "claimConsentProtectedOwner" | "recordConsentProtectedTaskOutcome" | "resumeConsentProtectedPlan"
 >>;
 
 type StaffIdentity = {
@@ -940,12 +940,19 @@ export async function changeSixWeekFollowupStatus(
     return commandFailure(409, "Only a paused follow-up plan can resume");
   }
 
-  // Pausing and cancelling remain permitted.
-  // Only resuming requires current consent.
+  // Restrictive actions remain available. Resuming requires
+  // canonical consent and an atomic transition by the owner.
+  const coordinatedResume =
+    input.action === "resume" &&
+    contactWriterHoldEnabled() &&
+    existing.startedBy === "system:permanent-visitor-registration" &&
+    existing.ownerStaffId === actorId &&
+    typeof repository.resumeConsentProtectedPlan === "function";
+
   if (input.action === "resume") {
     const consentFailure =
       await requireCurrentRegistrationConsent(
-        visitorId, dependencies
+        visitorId, dependencies, coordinatedResume
       );
 
     if (consentFailure) return consentFailure;
@@ -962,17 +969,53 @@ export async function changeSixWeekFollowupStatus(
         ? "six_week_followup.plan_resumed"
         : "six_week_followup.plan_cancelled";
 
+  const event: SixWeekFollowupEvent = {
+    eventId: (dependencies.newEventId ?? defaultEventId)(),
+    visitorId,
+    type: eventType,
+    occurredAt,
+    actorId,
+    data: { reason }
+  };
+
+  if (coordinatedResume && repository.resumeConsentProtectedPlan) {
+    const result = await repository.resumeConsentProtectedPlan(event);
+
+    if (result === "blocked") {
+      return commandFailure(409, "Current visitor consent does not permit resumption");
+    }
+
+    if (result === "conflict") {
+      return commandFailure(409, "Follow-up plan changed; reload before resuming");
+    }
+
+    if (result !== "recorded") {
+      return commandFailure(503, "Follow-up resumption unavailable");
+    }
+
+    const plan = projectSixWeekVisitorFollowup(
+      await repository.listByVisitor(visitorId),
+      occurredAt
+    );
+
+    if (!plan || plan.status !== "active") {
+      return commandFailure(503, "Follow-up resumption requires reconciliation");
+    }
+
+    return {
+      accepted: true,
+      status: 202,
+      created: true,
+      eventId: event.eventId,
+      eventType: event.type,
+      plan
+    };
+  }
+
   return appendAndProject({
     repository,
     asOf: occurredAt,
     successStatus: 202,
-    event: {
-      eventId: (dependencies.newEventId ?? defaultEventId)(),
-      visitorId,
-      type: eventType,
-      occurredAt,
-      actorId,
-      data: { reason }
-    }
+    event
   });
 }

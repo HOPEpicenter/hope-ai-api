@@ -1,4 +1,8 @@
 import {
+  changeSixWeekFollowupStatus as changeStatusForAcceptance
+} from "../src/services/followups/sixWeekVisitorFollowupCommands";
+
+import {
   readSixWeekVisitorFollowup,
   readSixWeekVisitorFollowupQueue
 } from "../src/services/followups/readSixWeekVisitorFollowups";
@@ -40,6 +44,7 @@ for (const scenario of [
   "withdrawal_race",
   "cancellation_race",
   "task_without_contact",
+  "task_resume_withdrawal_race",
   "task_withdrawal_race",
   "task_contact_recovery",
   "task_contact_week_six"
@@ -132,7 +137,7 @@ for (const scenario of [
           ).length, 1);
 
         } else if (
-          scenario === "task_without_contact" ||
+          (scenario === "task_without_contact" || scenario === "task_resume_withdrawal_race") ||
           scenario === "task_withdrawal_race" ||
           scenario === "task_contact_recovery" ||
           scenario === "task_contact_week_six"
@@ -140,6 +145,26 @@ for (const scenario of [
           const actorId = "synthetic-staff-a";
 
           const queueAsOf = "2026-11-24T14:00:00.000Z";
+
+          const changeStatus = (
+            action: "pause" | "resume",
+            staffId: string = actorId
+          ) => changeStatusForAcceptance({
+            visitorId,
+            actorId: staffId,
+            action,
+            reason: action === "pause" ? "Synthetic pause" : null
+          }, {
+            repository,
+            readActor: async id => ({
+              staffId: id,
+              status: "active" as const
+            }),
+            now: () => action === "pause"
+              ? "2026-11-24T13:20:00.000Z"
+              : "2026-11-24T13:30:00.000Z",
+            newEventId: () => `synthetic-status-${action}`
+          });
           let visitorReads = 0;
 
           const queueDependencies = {
@@ -159,7 +184,7 @@ for (const scenario of [
             }
           };
 
-          if (scenario === "task_without_contact" ||
+          if ((scenario === "task_without_contact" || scenario === "task_resume_withdrawal_race") ||
               scenario === "task_withdrawal_race") {
 
             const unclaimed = await readSixWeekVisitorFollowup(
@@ -187,7 +212,7 @@ for (const scenario of [
 
           assert.equal((await claim(actorId)).accepted, true);
 
-          if (scenario === "task_without_contact") {
+          if ((scenario === "task_without_contact" || scenario === "task_resume_withdrawal_race")) {
             const claimed = await readSixWeekVisitorFollowup(
               visitorId, queueAsOf, { repository }
             );
@@ -208,6 +233,127 @@ for (const scenario of [
             assert.equal(queue.items[0].plan.ownerStaffId, actorId);
 
             console.log("CLAIMED_PUBLIC_PLAN_VISIBLE=True");
+
+            const paused = await changeStatus("pause");
+            assert.equal(paused.accepted, true);
+            if (paused.accepted) {
+              assert.equal(paused.plan.status, "paused");
+            }
+
+            const pausedPlan = await readSixWeekVisitorFollowup(
+              visitorId, queueAsOf, { repository }
+            );
+
+            assert.equal(pausedPlan?.status, "paused");
+            assert.equal(
+              pausedPlan?.staffWorkflow,
+              "consent_protected_public"
+            );
+
+            assert.equal(
+              (await changeStatus("resume", "other-staff")).accepted,
+              false
+            );
+
+            if (scenario === "task_resume_withdrawal_race") {
+              const raceTable =
+                createIsolatedVisitorTestTable("VisitorFollowupEvents");
+
+              const { createPermanentVisitorConsentRepository } =
+                await import("../src/repositories/permanentVisitorConsentRepository");
+
+              const raceAuthority =
+                createPermanentVisitorConsentRepository(raceTable, true);
+
+              const prototype = Object.getPrototypeOf(raceTable) as typeof raceTable;
+
+              const originalSubmit = prototype.submitTransaction;
+
+              let injected = false;
+              let withdrawalCommitted = false;
+
+              prototype.submitTransaction = async function(
+                this: typeof raceTable,
+                ...args: Parameters<typeof originalSubmit>
+              ) {
+                const resumeWrite = args[0].some(action =>
+                  action[0] === "create" &&
+                  typeof action[1] === "object" &&
+                  action[1] !== null &&
+                  "type" in action[1] &&
+                  action[1].type === "six_week_followup.plan_resumed" &&
+                  action[1].partitionKey === visitorId
+                );
+
+                if (!injected && resumeWrite) {
+                  injected = true;
+
+                  const withdrawal = await raceAuthority.apply(
+                    visitorId,
+                    {
+                      kind: "public_request",
+                      expectedRevision: 1,
+                      requestId: "synthetic-resume-race-withdrawal",
+                      requestedConsent: false
+                    }
+                  );
+
+                  withdrawalCommitted =
+                    withdrawal.status === "committed";
+                }
+
+                return originalSubmit.apply(this, args);
+              };
+
+              try {
+                const result = await changeStatus("resume");
+
+                assert.equal(injected, true);
+                assert.equal(withdrawalCommitted, true);
+                assert.equal(result.accepted, false);
+
+                if (!result.accepted) {
+                  assert.equal(result.status, 409);
+                }
+              } finally {
+                prototype.submitTransaction = originalSubmit;
+              }
+
+              const events = await repository.listByVisitor(visitorId);
+
+              assert.equal(events.filter(event =>
+                event.type === "six_week_followup.plan_resumed"
+              ).length, 0);
+
+              assert.equal(
+                projectSixWeekVisitorFollowup(events)?.status,
+                "paused"
+              );
+
+              await assert.rejects(
+                readSixWeekVisitorFollowup(
+                  visitorId, queueAsOf, { repository }
+                )
+              );
+
+              console.log("CONCURRENT_RESUME_WITHDRAWAL_DENIED=True");
+              return;
+            }
+
+            const resumed = await changeStatus("resume");
+
+            assert.equal(resumed.accepted, true);
+            if (resumed.accepted) {
+              assert.equal(resumed.plan.status, "active");
+              assert.equal(resumed.plan.ownerStaffId, actorId);
+            }
+
+            assert.equal(
+              (await changeStatus("resume")).accepted,
+              false
+            );
+
+            console.log("AUTHORIZED_PAUSE_RESUME_VERIFIED=True");
           }
 
           const taskStamp = "2026-11-24T14:00:00.000Z";
@@ -681,6 +827,24 @@ for (const scenario of [
             );
 
             console.log("WITHDRAWN_PUBLIC_PLAN_SUPPRESSED=True");
+
+            const paused = await changeStatus("pause");
+            assert.equal(paused.accepted, true);
+
+            const deniedResume = await changeStatus("resume");
+            assert.equal(deniedResume.accepted, false);
+
+            const statusEvents =
+              await repository.listByVisitor(visitorId);
+
+            assert.equal(
+              statusEvents.filter(event =>
+                event.type === "six_week_followup.plan_resumed"
+              ).length,
+              0
+            );
+
+            console.log("WITHDRAWN_PLAN_RESUME_DENIED=True");
 
             const events = await repository.listByVisitor(visitorId);
             assert.equal(events.filter(e =>

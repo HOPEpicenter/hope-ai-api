@@ -110,6 +110,21 @@ export class SixWeekFollowupEventsRepository {
     ).appendStaffOwnerClaim(event);
   }
 
+  async resumeConsentProtectedPlan(
+    event: SixWeekFollowupEvent
+  ): Promise<"recorded" | "conflict" | "blocked" | "unavailable"> {
+    if (!contactWriterHoldEnabled()) return "unavailable";
+
+    const table = await this.tableFor();
+
+    const { createPermanentVisitorConsentRepository } =
+      await import("./permanentVisitorConsentRepository");
+
+    return createPermanentVisitorConsentRepository(
+      table, true
+    ).appendStaffPlanResume(event);
+  }
+
   async recordConsentProtectedTaskOutcome(
     event: SixWeekFollowupEvent
   ): Promise<"recorded" | "conflict" | "blocked" | "unavailable"> {

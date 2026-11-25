@@ -1,4 +1,6 @@
-import { toSixWeekFollowupEventEntity } from "./sixWeekFollowupEventsRepository";
+import { projectSixWeekVisitorFollowup } from "../domain/followups/projectSixWeekVisitorFollowup";
+
+import { toSixWeekFollowupEventEntity, fromEntity } from "./sixWeekFollowupEventsRepository";
 import {
   PUBLIC_VISITOR_SYSTEM_ORIGIN,
   type SixWeekFollowupEvent
@@ -374,9 +376,109 @@ export function createPermanentVisitorConsentRepository(
     }
   }
 
+  /**
+   * A narrow trusted Staff operation, invoked only after
+   * existing active actor and assignee authorization checks.
+   *
+   * No administrator override, generic writer exemption,
+   * consent mutation or automatic communication occurs here.
+   */
+  async function appendStaffOwnerClaim(
+    event: SixWeekFollowupEvent
+  ): Promise<"claimed" | "conflict" | "blocked" | "unavailable"> {
+    try {
+      if (!sharedSixWeek ||
+          !validId(event.visitorId) ||
+          !validId(event.eventId) ||
+          !validId(event.actorId) ||
+          event.type !== "six_week_followup.owner_assigned" ||
+          event.actorId === PUBLIC_VISITOR_SYSTEM_ORIGIN ||
+          event.data.ownerStaffId !== event.actorId ||
+          Object.keys(event.data).length !== 1 ||
+          !validTime(event.occurredAt)) {
+        return "unavailable";
+      }
+
+      const pk = partition(event.visitorId);
+      const current = await head(pk);
+
+      if (!current) return "unavailable";
+      if (!contactPermitted(current.state)) return "blocked";
+
+      type EventEntity = ReturnType<typeof toSixWeekFollowupEventEntity>;
+
+      const start = await get<EventEntity>(
+        pk, "0000__plan-started"
+      );
+
+      if (!start ||
+          typeof start.etag !== "string" ||
+          !start.etag ||
+          start.etag === "*" ||
+          start.type !== "six_week_followup.plan_started" ||
+          start.visitorId !== event.visitorId) {
+        return "unavailable";
+      }
+
+      const events: SixWeekFollowupEvent[] = [];
+
+      for await (const row of table.listEntities<EventEntity>({
+        queryOptions: { filter: `PartitionKey eq '${pk}'` }
+      })) {
+        if (row.rowKey?.startsWith(namespace)) continue;
+
+        if (row.visitorId !== event.visitorId) {
+          return "unavailable";
+        }
+
+        events.push(fromEntity(row));
+      }
+
+      const plan = projectSixWeekVisitorFollowup(events);
+
+      if (!plan ||
+          plan.ownerStaffId ||
+          plan.status === "cancelled" ||
+          plan.status === "completed") {
+        return "conflict";
+      }
+
+      const unchangedConsent = {
+        partitionKey: pk,
+        rowKey: HEAD,
+        schemaVersion: 1,
+        stateJson: json(current.state),
+        lastOperationId: current.lastOperationId
+      };
+
+      try {
+        await table.submitTransaction([
+          ["update", unchangedConsent,
+            "Replace", { etag: current.etag }],
+          ["update", toSixWeekFollowupEventEntity(fromEntity(start)),
+            "Replace", { etag: start.etag }],
+          ["create", toSixWeekFollowupEventEntity(event)]
+        ]);
+
+        return "claimed";
+      } catch (error) {
+        // Never silently rebase a claim against newer consent
+        // or a changed plan.
+        const status = (error as { statusCode?: number })?.statusCode;
+
+        if (status === 409 || status === 412) return "conflict";
+
+        return "unavailable";
+      }
+    } catch {
+      return "unavailable";
+    }
+  }
+
   return {
     read, apply, inspectOperation,
     recordContactIntent, inspectContactIntent,
-    appendPublicEnrollment
+    appendPublicEnrollment,
+    appendStaffOwnerClaim
   };
 }

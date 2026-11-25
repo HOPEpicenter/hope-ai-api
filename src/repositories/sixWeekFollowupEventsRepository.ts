@@ -2,7 +2,7 @@ import {
   isPublicVisitorConsentWithdrawal
 } from "../domain/followups/projectSixWeekVisitorFollowup";
 
-import { assertContactWriterNotHeld } from "../services/followups/permanentVisitorContactWriterHold";
+import { assertContactWriterNotHeld, contactWriterHoldEnabled } from "../services/followups/permanentVisitorContactWriterHold";
 import type { TableClient } from "@azure/data-tables";
 import type {
   SixWeekFollowupEvent,
@@ -61,7 +61,7 @@ export function toSixWeekFollowupEventEntity(
   };
 }
 
-function fromEntity(
+export function fromEntity(
   entity: SixWeekFollowupEventEntity
 ): SixWeekFollowupEvent {
   return {
@@ -91,14 +91,55 @@ export class SixWeekFollowupEventsRepository {
       await getTableClient(TABLE_NAME);
   }
 
+  /**
+   * Trusted Staff command boundary.
+   * Ordinary append remains subject to the existing writer hold.
+   */
+  async claimConsentProtectedOwner(
+    event: SixWeekFollowupEvent
+  ): Promise<"claimed" | "conflict" | "blocked" | "unavailable"> {
+    if (!contactWriterHoldEnabled()) return "unavailable";
+
+    const table = await this.tableFor();
+
+    const { createPermanentVisitorConsentRepository } =
+      await import("./permanentVisitorConsentRepository");
+
+    return createPermanentVisitorConsentRepository(
+      table, true
+    ).appendStaffOwnerClaim(event);
+  }
+
   async append(event: SixWeekFollowupEvent): Promise<boolean> {
     assertContactWriterNotHeld("six_week", event.type, event.data);
     const table: TableClient = await this.tableFor();
 
     try {
-      await table.createEntity(
-        toSixWeekFollowupEventEntity(event)
-      );
+      if (contactWriterHoldEnabled()) {
+        // Restrictive operations remain available, but must
+        // coordinate with any concurrent authorized owner claim.
+        const start = await table.getEntity<SixWeekFollowupEventEntity>(
+          event.visitorId, "0000__plan-started"
+        );
+
+        if (typeof start.etag !== "string" ||
+            !start.etag ||
+            start.etag === "*" ||
+            start.type !== "six_week_followup.plan_started" ||
+            start.visitorId !== event.visitorId) {
+          throw new Error("Canonical plan checkpoint unavailable");
+        }
+
+        await table.submitTransaction([
+          ["update", toSixWeekFollowupEventEntity(fromEntity(start)),
+            "Replace", { etag: start.etag }],
+          ["create", toSixWeekFollowupEventEntity(event)]
+        ]);
+      } else {
+        await table.createEntity(
+          toSixWeekFollowupEventEntity(event)
+        );
+      }
 
       return true;
     } catch (error: any) {

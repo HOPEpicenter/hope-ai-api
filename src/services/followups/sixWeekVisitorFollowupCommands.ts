@@ -38,7 +38,10 @@ import {
 type FollowupRepository = Pick<
   SixWeekFollowupEventsRepository,
   "append" | "listByVisitor"
->;
+> & Partial<Pick<
+  SixWeekFollowupEventsRepository,
+  "claimConsentProtectedOwner"
+>>;
 
 type StaffIdentity = {
   staffId: string;
@@ -215,7 +218,8 @@ function commandFailure(
  */
 async function requireCurrentRegistrationConsent(
   visitorId: string,
-  dependencies: SixWeekFollowupCommandDependencies
+  dependencies: SixWeekFollowupCommandDependencies,
+  coordinatedOwnerClaim = false
 ): Promise<SixWeekFollowupCommandFailure | null> {
   if (!registrationConsentGuardEnabled()) {
     return null;
@@ -237,7 +241,7 @@ async function requireCurrentRegistrationConsent(
       );
     }
 
-    if (consent === "granted" && contactWriterHoldEnabled()) {
+    if (consent === "granted" && contactWriterHoldEnabled() && !coordinatedOwnerClaim) {
       return commandFailure(503, CONTACT_WRITER_HOLD_MESSAGE);
     }
     if (consent !== "granted" &&
@@ -441,9 +445,15 @@ export async function assignSixWeekFollowupOwner(
     );
   }
 
+  const coordinatedClaim =
+    contactWriterHoldEnabled() &&
+    !existing.ownerStaffId &&
+    ownerStaffId === actorId &&
+    typeof repository.claimConsentProtectedOwner === "function";
+
   const consentFailure =
     await requireCurrentRegistrationConsent(
-      visitorId, dependencies
+      visitorId, dependencies, coordinatedClaim
     );
 
   if (consentFailure) return consentFailure;
@@ -451,6 +461,48 @@ export async function assignSixWeekFollowupOwner(
   const occurredAt = (
     dependencies.now ?? (() => new Date().toISOString())
   )();
+
+  if (coordinatedClaim && repository.claimConsentProtectedOwner) {
+    const event: SixWeekFollowupEvent = {
+      eventId: (dependencies.newEventId ?? defaultEventId)(),
+      visitorId,
+      type: "six_week_followup.owner_assigned",
+      occurredAt,
+      actorId,
+      data: { ownerStaffId }
+    };
+
+    const result = await repository.claimConsentProtectedOwner(event);
+
+    if (result === "blocked") {
+      return commandFailure(409, "Visitor follow-up permission unavailable");
+    }
+
+    if (result === "conflict") {
+      return commandFailure(409, "Follow-up plan or consent changed");
+    }
+
+    if (result !== "claimed") {
+      return commandFailure(503, "Owner claim could not be confirmed");
+    }
+
+    const plan = projectSixWeekVisitorFollowup(
+      await repository.listByVisitor(visitorId), occurredAt
+    );
+
+    if (!plan || plan.ownerStaffId !== actorId) {
+      return commandFailure(503, "Owner claim projection could not be confirmed");
+    }
+
+    return {
+      accepted: true,
+      status: 202,
+      created: true,
+      eventId: event.eventId,
+      eventType: event.type,
+      plan
+    };
+  }
 
   return appendAndProject({
     repository,

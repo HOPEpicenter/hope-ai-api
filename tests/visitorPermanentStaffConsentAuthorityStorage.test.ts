@@ -158,3 +158,282 @@ test("mixed queue preserves verified public work without releasing legacy or unv
     console.log("UNVERIFIED_AND_RESTRICTED_COUNTS_VERIFIED=True");
   })
 );
+
+test("authority-mode Staff HTTP lifecycle uses canonical actors and durable commands", () =>
+  fixture(async c => {
+    const { SixWeekFollowupEventsRepository } =
+      await import("../src/repositories/sixWeekFollowupEventsRepository");
+
+    const {
+      assignSixWeekFollowupOwner,
+      changeSixWeekFollowupStatus,
+      recordSixWeekTaskOutcome
+    } = await import("../src/services/followups/sixWeekVisitorFollowupCommands");
+
+    const { resolveSixWeekActorAuthorization } =
+      await import("../src/functions/_shared/sixWeekStaffActor");
+
+    const { postSixWeekVisitorFollowupOwner } =
+      await import("../src/functions/postSixWeekVisitorFollowupOwner");
+
+    const { postSixWeekVisitorFollowupStatus } =
+      await import("../src/functions/postSixWeekVisitorFollowupStatus");
+
+    const { postSixWeekVisitorFollowupTaskOutcome } =
+      await import("../src/functions/postSixWeekVisitorFollowupTaskOutcome");
+
+    const visitorId = "synthetic-http-visitor";
+    const ownerId = "synthetic-http-owner";
+    const otherId = "synthetic-http-other";
+    const submissionId = "synthetic-http-registration";
+
+    const authority =
+      createPermanentVisitorConsentRepository(c);
+
+    const repository =
+      new SixWeekFollowupEventsRepository(c);
+
+    const initialized = await authority.apply(visitorId, {
+      kind: "new_profile",
+      evidenceId: submissionId,
+      initialConsent: true
+    });
+
+    assert.equal(initialized.status, "committed");
+
+    const evidence = {
+      visitorId,
+      submissionId,
+      serviceId: "synthetic-general-visit",
+      visitDate: stamp.slice(0, 10)
+    };
+
+    const started: SixWeekFollowupEvent = {
+      eventId: `evt-public-${submissionId}`,
+      visitorId,
+      type: "six_week_followup.plan_started",
+      occurredAt: stamp,
+      actorId: "system:permanent-visitor-registration",
+      data: {
+        firstVisitDate: evidence.visitDate,
+        ownerStaffId: null,
+        contactConsent: true,
+        preferredContactMethod: null
+      }
+    };
+
+    assert.equal(
+      await authority.appendPublicEnrollment(evidence, started),
+      "enrolled"
+    );
+
+    const readStaff = async (staffId: string) => {
+      if (![ownerId, otherId, "synthetic-http-inactive"].includes(staffId)) {
+        return null;
+      }
+
+      return {
+        staffId,
+        displayName: "Synthetic Staff",
+        roleLabel: "Care Team",
+        status: staffId === "synthetic-http-inactive"
+          ? "inactive" as const : "active" as const,
+        createdAt: stamp,
+        updatedAt: stamp,
+        lastEventId: "synthetic-staff-event",
+        entraTenantId: null,
+        entraObjectId: null,
+        email: null,
+        phone: null,
+        ministryAreaId: null
+      };
+    };
+
+    let eventCounter = 0;
+
+    const dependencies = {
+      repository,
+      readActor: readStaff,
+      readAssignee: readStaff,
+      newEventId: () => `synthetic-http-event-${++eventCounter}`,
+      now: () => new Date(
+        Date.parse(stamp) + (eventCounter + 1) * 1000
+      ).toISOString()
+    };
+
+    const resolveActor = (
+      req: Parameters<typeof resolveSixWeekActorAuthorization>[0]
+    ) => resolveSixWeekActorAuthorization(
+      req,
+      readStaff,
+      async () => ({ ok: true, actorId: null })
+    );
+
+    const previousKey = process.env.HOPE_API_KEY;
+
+    process.env.HOPE_API_KEY = "local-test-key-only";
+
+    function request(
+      actorId: string | null,
+      body: Record<string, unknown>,
+      weekNumber = 1,
+      apiKey = "local-test-key-only"
+    ) {
+      return {
+        headers: {
+          "x-api-key": apiKey,
+          ...(actorId
+            ? { "x-hope-staff-actor-id": actorId }
+            : {})
+        },
+        params: { visitorId, weekNumber: String(weekNumber) },
+        body
+      };
+    }
+
+    function context(): any {
+      return {
+        res: undefined,
+        log: Object.assign(() => undefined, {
+          error: () => undefined,
+          warn: () => undefined,
+          info: () => undefined
+        })
+      };
+    }
+
+    async function owner(req: ReturnType<typeof request>) {
+      const ctx = context();
+
+      await postSixWeekVisitorFollowupOwner(ctx, req, {
+        resolveActor,
+        assignOwner: input =>
+          assignSixWeekFollowupOwner(input, dependencies)
+      });
+
+      return ctx.res;
+    }
+
+    async function status(req: ReturnType<typeof request>) {
+      const ctx = context();
+
+      await postSixWeekVisitorFollowupStatus(ctx, req, {
+        resolveActor,
+        command: input =>
+          changeSixWeekFollowupStatus(input, dependencies)
+      });
+
+      return ctx.res;
+    }
+
+    async function task(req: ReturnType<typeof request>) {
+      const ctx = context();
+
+      await postSixWeekVisitorFollowupTaskOutcome(ctx, req, {
+        resolveActor,
+        command: input =>
+          recordSixWeekTaskOutcome(input, dependencies)
+      });
+
+      return ctx.res;
+    }
+
+    try {
+      assert.equal((await owner(request(
+        ownerId, { ownerStaffId: ownerId }, 1, "wrong-key"
+      ))).status, 401);
+
+      assert.equal((await owner(request(
+        null, { ownerStaffId: ownerId, actorId: ownerId }
+      ))).status, 401);
+
+      assert.equal((await owner(request(
+        "synthetic-http-inactive", { ownerStaffId: ownerId }
+      ))).status, 403);
+
+      assert.equal(
+        (await repository.listByVisitor(visitorId)).length,
+        1
+      );
+
+      const claimed = await owner(request(ownerId, {
+        ownerStaffId: ownerId,
+        actorId: otherId
+      }));
+
+      assert.equal(claimed.status, 202);
+      assert.equal(claimed.body.plan.ownerStaffId, ownerId);
+
+      const outcome = {
+        disposition: "completed",
+        contactMethod: "none",
+        outcome: "Synthetic task completed",
+        actorId: ownerId
+      };
+
+      assert.equal(
+        (await task(request(otherId, outcome))).status,
+        403
+      );
+
+      const completed = await task(request(ownerId, outcome));
+
+      assert.equal(completed.status, 202);
+      assert.equal(completed.body.plan.tasks[0].status, "completed");
+
+      const paused = await status(request(ownerId, {
+        action: "pause",
+        reason: "Synthetic pause"
+      }));
+
+      assert.equal(paused.status, 202);
+      assert.equal(paused.body.plan.status, "paused");
+
+      const resumed = await status(request(ownerId, {
+        action: "resume"
+      }));
+
+      assert.equal(resumed.status, 202);
+      assert.equal(resumed.body.plan.status, "active");
+
+      const withdrawn = await authority.apply(visitorId, {
+        kind: "public_request",
+        expectedRevision: 1,
+        requestId: "synthetic-http-withdrawal",
+        requestedConsent: false
+      });
+
+      assert.equal(withdrawn.status, "committed");
+
+      const before = await repository.listByVisitor(visitorId);
+
+      assert.equal(
+        (await task(request(ownerId, outcome, 2))).status,
+        409
+      );
+
+      const after = await repository.listByVisitor(visitorId);
+
+      assert.deepEqual(after, before);
+
+      const taskEvent = after.find(event =>
+        event.type === "six_week_followup.task_completed"
+      );
+
+      assert.equal(taskEvent?.actorId, ownerId);
+
+      console.log("AUTHORITY_HTTP_OWNER_CLAIM_VERIFIED=True");
+      console.log("AUTHORITY_HTTP_TASK_OUTCOME_VERIFIED=True");
+      console.log("AUTHORITY_HTTP_PAUSE_RESUME_VERIFIED=True");
+      console.log("AUTHORITY_HTTP_WITHDRAWAL_DENIAL_VERIFIED=True");
+      console.log("CANONICAL_HTTP_ACTOR_VERIFIED=True");
+
+    } finally {
+      if (previousKey === undefined) {
+        delete process.env.HOPE_API_KEY;
+      } else {
+        process.env.HOPE_API_KEY = previousKey;
+      }
+    }
+  })
+);

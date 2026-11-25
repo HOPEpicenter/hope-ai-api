@@ -9,9 +9,15 @@ import {
   logFunctionError
 } from "../../shared/observability/functionObservability";
 
+type HttpDependencies = {
+  resolveActor?: typeof resolveSixWeekActorAuthorization;
+  command?: typeof recordSixWeekTaskOutcome;
+};
+
 export async function postSixWeekVisitorFollowupTaskOutcome(
   context: any,
-  req: any
+  req: any,
+  dependencies: HttpDependencies = {}
 ): Promise<void> {
   const requestId = getRequestId(req);
 
@@ -31,7 +37,7 @@ export async function postSixWeekVisitorFollowupTaskOutcome(
     }
 
     const body = req?.body ?? {};
-    const actorAuth = await resolveSixWeekActorAuthorization(req);
+    const actorAuth = await (dependencies.resolveActor ?? resolveSixWeekActorAuthorization)(req);
 
     if (!actorAuth.ok) {
       context.res = {
@@ -42,7 +48,7 @@ export async function postSixWeekVisitorFollowupTaskOutcome(
       return;
     }
 
-    const result = await recordSixWeekTaskOutcome({
+    const result = await (dependencies.command ?? recordSixWeekTaskOutcome)({
       visitorId: req?.params?.visitorId,
       weekNumber: Number(req?.params?.weekNumber),
       disposition: body.disposition,

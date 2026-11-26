@@ -44,9 +44,40 @@ async function probeIsolatedStaffStorage(context: any): Promise<void> {
       body: { code: "STAFF_STORAGE_READ_ALLOWED" }
     };
   } catch (error: unknown) {
-    const storageError = error as { statusCode?: unknown; code?: unknown } | null;
-    if (storageError?.statusCode !== 403 ||
-        storageError.code !== "AuthorizationPermissionMismatch") {
+    const storageError = error as {
+      statusCode?: unknown;
+      code?: unknown;
+      response?: {
+        status?: unknown;
+        headers?: { get?: (name: string) => unknown };
+      };
+    } | null;
+    const statusCode = storageError?.statusCode;
+    const responseStatus = storageError?.response?.status;
+    const code = storageError?.code;
+    const headers = storageError?.response?.headers;
+    const headerCode = typeof headers?.get === "function"
+      ? headers.get("x-ms-error-code")
+      : undefined;
+    const mismatch = "AuthorizationPermissionMismatch";
+    if (
+      (statusCode !== 403 && responseStatus !== 403) ||
+      (statusCode !== undefined && statusCode !== 403) ||
+      (responseStatus !== undefined && responseStatus !== 403) ||
+      (code !== mismatch && headerCode !== mismatch) ||
+      (code !== undefined && code !== mismatch) ||
+      (headerCode !== undefined && headerCode !== mismatch)
+    ) {
+      const safeStatus = (status: unknown): number | string =>
+        typeof status === "number" &&
+        [400, 401, 403, 404, 408, 429, 500, 502, 503, 504].includes(status)
+          ? status
+          : status === undefined ? "unavailable" : "other";
+      context.log.warn(JSON.stringify({
+        operation: "staffStorageProbe",
+        statusCode: safeStatus(statusCode),
+        responseStatus: safeStatus(responseStatus)
+      }));
       throw error;
     }
 

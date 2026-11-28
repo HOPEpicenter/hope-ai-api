@@ -298,6 +298,257 @@ export function createPermanentVisitorConsentRepository(
    * visitor and assignee authorization.
    * Consent and plan creation commit together.
    */
+  type CareAssignment = {
+    operationId: string;
+    actorId: string;
+    assigneeId: string;
+    expectedRevision: number;
+  };
+
+  type CommittedCareAssignment = CareAssignment & {
+    visitorId: string;
+    occurredAt: string;
+    consentOperationId: string;
+  };
+
+  type CareAssignmentRead =
+    | { status: "found"; assignment: CommittedCareAssignment }
+    | { status: "not_found" | "unavailable" };
+
+  type CareAssignmentResult =
+    | {
+        status: "committed" | "replayed";
+        assignment: CommittedCareAssignment;
+      }
+    | {
+        status: "blocked" | "stale" | "conflict" |
+          "invalid" | "unavailable";
+      };
+
+  function normalizeCareAssignment(
+    input: unknown
+  ): CareAssignment | null {
+    const v = record(input);
+
+    if (!v || !exact(v, [
+      "operationId", "actorId", "assigneeId", "expectedRevision"
+    ]) ||
+        !validId(v.operationId) ||
+        !validId(v.actorId) ||
+        !validId(v.assigneeId) ||
+        v.actorId === PUBLIC_VISITOR_SYSTEM_ORIGIN ||
+        v.assigneeId === PUBLIC_VISITOR_SYSTEM_ORIGIN ||
+        !revision(v.expectedRevision)) {
+      return null;
+    }
+
+    return {
+      operationId: v.operationId,
+      actorId: v.actorId,
+      assigneeId: v.assigneeId,
+      expectedRevision: v.expectedRevision
+    };
+  }
+
+  const careAssignmentKey = (id: string) =>
+    `${namespace}care-assignment:${id}`;
+
+  /**
+   * Read immutable historical evidence, never permission
+   * for present-day contact or a new mutation.
+   */
+  async function readCommittedCareAssignment(
+    visitorId: string,
+    operationId: string
+  ): Promise<CareAssignmentRead> {
+    try {
+      if (!sharedSixWeek ||
+          !validId(visitorId) ||
+          !validId(operationId)) {
+        return { status: "unavailable" };
+      }
+
+      const pk = partition(visitorId);
+
+      const row = await get<{
+        schemaVersion: number;
+        commandJson: string;
+        consentOperationId: string;
+        occurredAt: string;
+      }>(pk, careAssignmentKey(operationId));
+
+      if (!row) return { status: "not_found" };
+
+      if (row.partitionKey !== pk ||
+          row.rowKey !== careAssignmentKey(operationId) ||
+          row.schemaVersion !== 1 ||
+          typeof row.commandJson !== "string" ||
+          row.commandJson.length > 4096 ||
+          !validId(row.consentOperationId) ||
+          !validTime(row.occurredAt)) {
+        return { status: "unavailable" };
+      }
+
+      const command = normalizeCareAssignment(
+        JSON.parse(row.commandJson)
+      );
+
+      if (!command ||
+          command.operationId !== operationId ||
+          json(command) !== row.commandJson) {
+        return { status: "unavailable" };
+      }
+
+      const anchor = await receipt(
+        pk, row.consentOperationId
+      );
+
+      const current = await head(pk);
+
+      if (!anchor ||
+          !contactPermitted(anchor.after) ||
+          anchor.after.revision !== command.expectedRevision ||
+          !current ||
+          current.state.revision < command.expectedRevision ||
+          (current.state.revision === command.expectedRevision &&
+           current.lastOperationId !== row.consentOperationId)) {
+        return { status: "unavailable" };
+      }
+
+      return {
+        status: "found",
+        assignment: {
+          ...command,
+          visitorId,
+          occurredAt: row.occurredAt,
+          consentOperationId: row.consentOperationId
+        }
+      };
+    } catch {
+      return { status: "unavailable" };
+    }
+  }
+
+  /**
+   * Trusted internal Staff command boundary.
+   * The service must independently authorize the actor,
+   * assignee and visitor before invoking this method.
+   *
+   * This commits the assignment itself, not a reservation
+   * or a reusable contact permission.
+   */
+  async function appendStaffCareAssignment(
+    visitorId: string,
+    input: unknown
+  ): Promise<CareAssignmentResult> {
+    try {
+      const command = normalizeCareAssignment(input);
+
+      if (!sharedSixWeek || !validId(visitorId) || !command) {
+        return { status: "invalid" };
+      }
+
+      function reconcile(
+        observed: CareAssignmentRead,
+        status: "committed" | "replayed"
+      ): CareAssignmentResult | null {
+        if (observed.status === "not_found") return null;
+
+        if (observed.status !== "found") {
+          return { status: "unavailable" };
+        }
+
+        const stored = normalizeCareAssignment({
+          operationId: observed.assignment.operationId,
+          actorId: observed.assignment.actorId,
+          assigneeId: observed.assignment.assigneeId,
+          expectedRevision: observed.assignment.expectedRevision
+        });
+
+        if (!stored || json(stored) !== json(command)) {
+          return { status: "conflict" };
+        }
+
+        return {
+          status,
+          assignment: observed.assignment
+        };
+      }
+
+      const prior = reconcile(
+        await readCommittedCareAssignment(
+          visitorId, command.operationId
+        ),
+        "replayed"
+      );
+
+      if (prior) return prior;
+
+      const pk = partition(visitorId);
+      const current = await head(pk);
+
+      if (!current) return { status: "unavailable" };
+
+      if (current.state.revision !== command.expectedRevision) {
+        return { status: "stale" };
+      }
+
+      if (!contactPermitted(current.state)) {
+        return { status: "blocked" };
+      }
+
+      const unchanged = {
+        partitionKey: pk,
+        rowKey: HEAD,
+        schemaVersion: 1,
+        stateJson: json(current.state),
+        lastOperationId: current.lastOperationId
+      };
+
+      const assignment = {
+        partitionKey: pk,
+        rowKey: careAssignmentKey(command.operationId),
+        schemaVersion: 1,
+        commandJson: json(command),
+        consentOperationId: current.lastOperationId,
+        occurredAt: new Date().toISOString()
+      };
+
+      let acknowledged = true;
+
+      try {
+        await table.submitTransaction([
+          ["update", unchanged, "Replace", {
+            etag: current.etag
+          }],
+          ["create", assignment]
+        ]);
+      } catch {
+        acknowledged = false;
+      }
+
+      const confirmed = reconcile(
+        await readCommittedCareAssignment(
+          visitorId, command.operationId
+        ),
+        acknowledged ? "committed" : "replayed"
+      );
+
+      if (confirmed) return confirmed;
+
+      const latest = await head(pk);
+
+      if (latest &&
+          latest.state.revision !== command.expectedRevision) {
+        return { status: "stale" };
+      }
+
+      return { status: "unavailable" };
+    } catch {
+      return { status: "unavailable" };
+    }
+  }
+
   async function appendStaffEnrollment(
     event: SixWeekFollowupEvent
   ): Promise<"created" | "conflict" | "blocked" | "unavailable"> {
@@ -661,6 +912,8 @@ export function createPermanentVisitorConsentRepository(
     recordContactIntent, inspectContactIntent,
     appendPublicEnrollment,
     appendStaffEnrollment,
+    appendStaffCareAssignment,
+    readCommittedCareAssignment,
     appendStaffOwnerClaim,
     appendStaffTaskOutcome,
     appendStaffPlanResume

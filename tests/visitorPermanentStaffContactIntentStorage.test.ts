@@ -32,3 +32,187 @@ test("corrupted intent evidence fails closed without replacement",()=>fixture(as
 test("missing consent anchor or corrupted head cannot validate intent",()=>fixture(async c=>{await grant(c);const r=repo(c);await r.recordContactIntent(id,intent);await c.deleteEntity(pk,"op:initial");assert.deepEqual(await r.inspectContactIntent(id,intent),status("unavailable"));assert.deepEqual(await r.recordContactIntent(id,intent),status("unavailable"));}));
 test("missing authority missing table and invalid inputs fail closed",()=>fixture(async c=>{const r=repo(c);assert.deepEqual(await r.recordContactIntent(id,intent),status("unavailable"));for(const invalid of [{...intent,actorId:""},{...intent,scope:"unknown"},{...intent,commandDigest:"bad"},{...intent,expectedRevision:0},{...intent,extra:true}])assert.deepEqual(await r.recordContactIntent(id,invalid),status("invalid"));assert.deepEqual(await r.recordContactIntent("bad/id",intent),status("invalid"));const missing=repo(createIsolatedVisitorTestTable("Missing"+randomUUID().replace(/-/g,"")));assert.deepEqual(await missing.recordContactIntent(id,intent),status("unavailable"));}));
 test("intent evidence cannot transfer between visitor partitions",()=>fixture(async c=>{await grant(c);const r=repo(c);await r.recordContactIntent(id,intent);await r.apply("other",init);assert.deepEqual(await r.inspectContactIntent("other",intent),status("not_found"));assert.deepEqual(await r.recordContactIntent("other",intent),status("recorded"));await r.apply(id,no(1));assert.deepEqual(await r.inspectContactIntent("other",intent),status("current"));assert.deepEqual(await r.inspectContactIntent(id,intent),status("stale"));}));
+
+test("atomic pastoral care assignment commits exact historical evidence", () =>
+  fixture(async c => {
+    const authority = repo(c, true);
+
+    const visitorId = "synthetic-care-visitor";
+    const declinedId = "synthetic-care-declined";
+    const pendingId = "synthetic-care-pending";
+    const racingId = "synthetic-care-racing";
+    const recoveryId = "synthetic-care-recovery";
+
+    const command = {
+      operationId: "synthetic-care-assignment",
+      actorId: "synthetic-authorized-staff",
+      assigneeId: "synthetic-care-owner",
+      expectedRevision: 1
+    };
+
+    for (const target of [
+      visitorId, declinedId, pendingId, racingId, recoveryId
+    ]) {
+      assert.equal((await authority.apply(target, {
+        kind: "new_profile",
+        evidenceId: "synthetic-care-initial",
+        initialConsent: target !== declinedId
+      })).status, "committed");
+    }
+
+    assert.equal((await authority.apply(
+      pendingId, no(1)
+    )).status, "committed");
+
+    for (const target of [declinedId, pendingId]) {
+      const denied = await authority.appendStaffCareAssignment(
+        target, {
+          ...command,
+          expectedRevision: target === pendingId ? 2 : 1
+        }
+      );
+
+      assert.equal(denied.status, "blocked");
+
+      assert.deepEqual(
+        await authority.readCommittedCareAssignment(
+          target, command.operationId
+        ),
+        { status: "not_found" }
+      );
+    }
+
+    assert.equal((await authority.appendStaffCareAssignment(
+      "synthetic-missing-care-visitor", command
+    )).status, "unavailable");
+
+    assert.equal((await authority.appendStaffCareAssignment(
+      visitorId, {
+        ...command,
+        actorId: "system:permanent-visitor-registration"
+      }
+    )).status, "invalid");
+
+    console.log("CARE_ASSIGNMENT_DENIALS_VERIFIED=True");
+
+    const initialConsent = await authority.read(visitorId);
+
+    const assigned = await authority.appendStaffCareAssignment(
+      visitorId, command
+    );
+
+    assert.equal(assigned.status, "committed");
+
+    if (assigned.status !== "committed") {
+      throw Error("Expected committed care assignment");
+    }
+
+    assert.equal(assigned.assignment.actorId, command.actorId);
+    assert.equal(assigned.assignment.assigneeId, command.assigneeId);
+
+    assert.deepEqual(
+      await authority.read(visitorId),
+      initialConsent
+    );
+
+    const observed = await repo(c, true)
+      .readCommittedCareAssignment(
+        visitorId, command.operationId
+      );
+
+    assert.deepEqual(observed, {
+      status: "found",
+      assignment: assigned.assignment
+    });
+
+    const replay = await authority.appendStaffCareAssignment(
+      visitorId, command
+    );
+
+    assert.deepEqual(replay, {
+      status: "replayed",
+      assignment: assigned.assignment
+    });
+
+    assert.equal((await authority.appendStaffCareAssignment(
+      visitorId, {
+        ...command,
+        assigneeId: "synthetic-different-owner"
+      }
+    )).status, "conflict");
+
+    console.log("EXACT_CARE_ASSIGNMENT_PERSISTED=True");
+    console.log("CARE_ASSIGNMENT_REPLAY_AND_CONFLICT_VERIFIED=True");
+
+    let raced = false;
+
+    const racingRepository = repo(port(c, async actions => {
+      assert.equal(raced, false);
+      raced = true;
+
+      assert.equal((await authority.apply(
+        racingId, no(1)
+      )).status, "committed");
+
+      return c.submitTransaction(actions);
+    }), true);
+
+    const race = await racingRepository.appendStaffCareAssignment(
+      racingId, command
+    );
+
+    assert.equal(raced, true);
+    assert.equal(race.status, "stale");
+
+    assert.deepEqual(
+      await authority.readCommittedCareAssignment(
+        racingId, command.operationId
+      ),
+      { status: "not_found" }
+    );
+
+    console.log("CONCURRENT_WITHDRAWAL_BLOCKS_CARE_ASSIGNMENT=True");
+
+    const recoveryRepository = repo(port(c, async actions => {
+      await c.submitTransaction(actions);
+      throw Error("Synthetic response loss after commit");
+    }), true);
+
+    const recovered = await recoveryRepository.appendStaffCareAssignment(
+      recoveryId, command
+    );
+
+    assert.equal(recovered.status, "replayed");
+
+    assert.equal(
+      (await authority.readCommittedCareAssignment(
+        recoveryId, command.operationId
+      )).status,
+      "found"
+    );
+
+    console.log("LOST_ASSIGNMENT_RESPONSE_RECOVERED=True");
+
+    assert.equal((await authority.apply(
+      visitorId, no(1)
+    )).status, "committed");
+
+    const historical = await authority.readCommittedCareAssignment(
+      visitorId, command.operationId
+    );
+
+    assert.deepEqual(historical, observed);
+
+    const newAssignment = await authority.appendStaffCareAssignment(
+      visitorId, {
+        ...command,
+        operationId: "synthetic-new-assignment",
+        expectedRevision: 2
+      }
+    );
+
+    assert.equal(newAssignment.status, "blocked");
+
+    console.log("HISTORICAL_EVIDENCE_NOT_NEW_PERMISSION=True");
+  })
+);

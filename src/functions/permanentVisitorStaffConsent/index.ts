@@ -8,7 +8,15 @@ import {
   createPermanentVisitorConsentRepository
 } from "../../repositories/permanentVisitorConsentRepository";
 
+import {
+  createLegacyVisitorConsentMigration
+} from "../../services/followups/permanentVisitorLegacyConsentMigration";
+
 type Dependencies = {
+  historicalMigration?: Pick<
+    ReturnType<typeof createLegacyVisitorConsentMigration>,
+    "assess" | "execute"
+  >;
   readStaff?: Parameters<
     typeof requireAdminStaffActorForFunction
   >[1];
@@ -169,6 +177,94 @@ export async function permanentVisitorStaffConsent(
     }
 
     const value = body as Record<string, unknown>;
+
+    if (value.action === "initialize_historical_consent") {
+      // Initialization is a separately approved cutover
+      // operation. Existing administrator authorization
+      // and consent authority checks have already passed.
+      const disabled = (flag: string | undefined) =>
+        flag === undefined || flag === "" || flag === "false";
+
+      if (
+        process.env.FEATURE_PERMANENT_VISITOR_HISTORICAL_INITIALIZATION
+          !== "true" ||
+        !disabled(process.env.FEATURE_PERMANENT_PUBLIC_VISIT) ||
+        !disabled(process.env.FEATURE_PERMANENT_VISITOR_PRODUCTION_ACTIVATION) ||
+        Date.parse(cutover) > Date.now()
+      ) {
+        unavailable();
+        return;
+      }
+
+      if (
+        Object.keys(value).length !== 2 ||
+        value.confirmation !== "initialize_unknown_only"
+      ) {
+        reply(400, {
+          ok: false,
+          error: "EXACT_HISTORICAL_INITIALIZATION_REQUIRED"
+        });
+        return;
+      }
+
+      // Operational prerequisite: legacy consent writers
+      // must be quiescent during the approved cutover.
+      // A feature flag alone is not proof of quiescence.
+      const migration = deps.historicalMigration ??
+        createLegacyVisitorConsentMigration({
+          visitors: getTableClient("Visitors"),
+          repository,
+          cutoff: cutover
+        });
+
+      const assessment = await migration.assess(visitorId);
+
+      if (assessment.status === "preserved") {
+        reply(200, { ok: true, status: "preserved" });
+        return;
+      }
+
+      if (assessment.status === "not_legacy") {
+        reply(409, {
+          ok: false,
+          error: "NOT_HISTORICAL_VISITOR"
+        });
+        return;
+      }
+
+      if (assessment.status !== "candidate") {
+        unavailable();
+        return;
+      }
+
+      const outcome = await migration.execute(
+        visitorId, assessment.evidenceId
+      );
+
+      if (outcome.status === "migrated") {
+        reply(200, { ok: true, status: "initialized" });
+        return;
+      }
+
+      if (outcome.status === "preserved") {
+        reply(200, { ok: true, status: "preserved" });
+        return;
+      }
+
+      if (
+        outcome.status === "evidence_changed" ||
+        outcome.status === "not_legacy"
+      ) {
+        reply(409, {
+          ok: false,
+          error: "HISTORICAL_EVIDENCE_CHANGED"
+        });
+        return;
+      }
+
+      unavailable();
+      return;
+    }
 
     const keys = [
       "expectedRevision",

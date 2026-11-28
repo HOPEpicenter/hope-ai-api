@@ -17,7 +17,7 @@
         @{ File='tests/visitorPermanentLegacyConsentMigrationStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=$null; Authority='true' }
         @{ File='tests/visitorPermanentPreAttendanceWithdrawalStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=14; Authority='true' }
         @{ File='tests/visitorPermanentRegistrationConsentAdapterStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=$null; Authority='true' }
-        @{ File='tests/visitorPermanentStaffConsentAuthorityStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=20; Authority='true' }
+        @{ File='tests/visitorPermanentStaffConsentAuthorityStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=21; Authority='true' }
         @{ File='tests/visitorPermanentStaffContactIntentStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=$null; Authority='true' }
         @{ File='tests/visitorPermanentStaffOwnerClaimStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=9; Authority='true' }
         @{ File='tests/visitorUnifiedConsentStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=5; Authority='true' }

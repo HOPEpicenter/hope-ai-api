@@ -1332,3 +1332,232 @@ test("historical initialization preserves canonical Staff plan", () =>
     console.log("SUBSEQUENT_WITHDRAWAL_PROTECTED=True");
   })
 );
+
+
+test("authorized historical initialization preserves existing ministry work and grants no permission", () =>
+  fixture(async (c, v) => {
+    const { permanentVisitorStaffConsent } =
+      await import("../src/functions/permanentVisitorStaffConsent");
+
+    const { createLegacyVisitorConsentMigration } =
+      await import("../src/services/followups/permanentVisitorLegacyConsentMigration");
+
+    const { permitsContactWork } =
+      await import("../src/domain/followups/permanentVisitorConsentAuthority");
+
+    const visitorId = "synthetic-historical-init-visitor";
+    const adminId = "synthetic-historical-init-admin";
+    const adminKey = "synthetic-historical-init-admin-key";
+    const migrationCutoff = "2020-01-01T00:00:00.000Z";
+
+    const feature =
+      "FEATURE_PERMANENT_VISITOR_HISTORICAL_INITIALIZATION";
+
+    const decisionFeature =
+      "FEATURE_PERMANENT_VISITOR_STAFF_CONSENT_DECISION";
+
+    const repository = baseRepository(c, true);
+
+    const historicalMigration =
+      createLegacyVisitorConsentMigration({
+        visitors: v,
+        repository,
+        cutoff: migrationCutoff
+      });
+
+    const readStaff = async (
+      staffId: string
+    ): Promise<CanonicalStaffIdentity | null> => {
+      if (staffId !== adminId) return null;
+
+      return {
+        staffId,
+        displayName: "Synthetic Administrator",
+        roleLabel: "Administrator",
+        status: "active",
+        createdAt: stamp,
+        updatedAt: stamp,
+        lastEventId: "synthetic-historical-admin-event",
+        entraTenantId: null,
+        entraObjectId: null,
+        email: null,
+        phone: null,
+        ministryAreaId: null
+      };
+    };
+
+    await v.createEntity({
+      partitionKey: "VISITOR",
+      rowKey: visitorId,
+      createdAt: "2019-01-01T00:00:00.000Z",
+      name: "Synthetic Historical Visitor"
+    });
+
+    await c.createEntity({
+      partitionKey: visitorId,
+      rowKey: "0000__plan-started",
+      eventId: "synthetic-existing-plan",
+      visitorId,
+      type: "six_week_followup.plan_started",
+      occurredAt: "2019-01-02T00:00:00.000Z",
+      actorId: "synthetic-existing-staff",
+      dataJson: JSON.stringify({
+        firstVisitDate: "2019-01-01",
+        ownerStaffId: "synthetic-existing-owner",
+        contactConsent: true,
+        preferredContactMethod: "call"
+      })
+    });
+
+    const originalProfile = await v.getEntity(
+      "VISITOR", visitorId
+    );
+
+    const originalPlan = await c.getEntity(
+      visitorId, "0000__plan-started"
+    );
+
+    const command = {
+      action: "initialize_historical_consent",
+      confirmation: "initialize_unknown_only"
+    };
+
+    async function invoke(
+      method = "POST",
+      body: Record<string, unknown> = command,
+      suppliedKey = adminKey,
+      actorId = adminId
+    ) {
+      const context: any = {};
+
+      await permanentVisitorStaffConsent(context, {
+        method,
+        params: { visitorId },
+        headers: {
+          "x-admin-api-key": suppliedKey,
+          "x-hope-admin-actor-id": actorId
+        },
+        body
+      }, {
+        readStaff,
+        repository,
+        historicalMigration
+      });
+
+      return context.res;
+    }
+
+    await environment({
+      [decisionFeature]: "true",
+      [feature]: "false",
+      [authority]: "true",
+      [cutoff]: migrationCutoff,
+      HOPE_ADMIN_API_KEY: adminKey,
+      HOPE_ADMIN_STAFF_IDS: adminId,
+      HOPE_API_KEY: "synthetic-distinct-staff-key",
+      FEATURE_PERMANENT_PUBLIC_VISIT: "false",
+      FEATURE_PERMANENT_VISITOR_PRODUCTION_ACTIVATION: "false"
+    }, async () => {
+      assert.equal((await invoke()).status, 503);
+      assert.equal(
+        (await repository.read(visitorId)).status,
+        "not_initialized"
+      );
+
+      console.log("HISTORICAL_INITIALIZATION_DEFAULT_OFF=True");
+
+      await environment({
+        [feature]: "true"
+      }, async () => {
+        for (const denied of [
+          await invoke("POST", command, "wrong-key"),
+          await invoke("POST", command, adminKey, "unknown-admin")
+        ]) {
+          assert.ok([401, 403].includes(denied.status));
+        }
+
+        assert.equal((await invoke("POST", {
+          ...command,
+          consent: true
+        })).status, 400);
+
+        assert.equal((await invoke("POST", {
+          ...command,
+          confirmation: "grant_contact"
+        })).status, 400);
+
+        assert.equal((await invoke("GET")).status, 409);
+
+        await environment({
+          FEATURE_PERMANENT_PUBLIC_VISIT: "true"
+        }, async () => {
+          assert.equal((await invoke()).status, 503);
+        });
+
+        await environment({
+          FEATURE_PERMANENT_VISITOR_PRODUCTION_ACTIVATION: "true"
+        }, async () => {
+          assert.equal((await invoke()).status, 503);
+        });
+
+        assert.equal(
+          (await repository.read(visitorId)).status,
+          "not_initialized"
+        );
+
+        console.log("UNAUTHORIZED_INITIALIZATION_DENIED=True");
+        console.log("ACTIVE_PUBLIC_REGISTRATION_INITIALIZATION_DENIED=True");
+
+        const initialized = await invoke();
+
+        assert.equal(initialized.status, 200);
+        assert.equal(initialized.body.status, "initialized");
+
+        const current = await repository.read(visitorId);
+
+        assert.equal(current.status, "ready");
+
+        if (current.status !== "ready") {
+          throw Error("Consent head required");
+        }
+
+        assert.equal(current.state.effective, "unknown");
+        assert.equal(current.state.revision, 1);
+        assert.equal(current.state.pending, null);
+        assert.equal(permitsContactWork(current.state), false);
+
+        const review = await invoke("GET");
+
+        assert.equal(review.status, 200);
+        assert.equal(review.body.effective, "unknown");
+        assert.equal(review.body.revision, 1);
+
+        const retry = await invoke();
+
+        assert.equal(retry.status, 200);
+        assert.equal(retry.body.status, "preserved");
+
+        assert.deepEqual(
+          await repository.read(visitorId),
+          current
+        );
+
+        assert.deepEqual(
+          await v.getEntity("VISITOR", visitorId),
+          originalProfile
+        );
+
+        assert.deepEqual(
+          await c.getEntity(visitorId, "0000__plan-started"),
+          originalPlan
+        );
+
+        console.log("HISTORICAL_UNKNOWN_INITIALIZATION_VERIFIED=True");
+        console.log("EXISTING_VISITOR_AND_PLAN_PRESERVED=True");
+        console.log("INITIALIZATION_REPLAY_PRESERVED=True");
+        console.log("NO_CONTACT_PERMISSION_GRANTED=True");
+        console.log("EXISTING_ADMIN_REVIEW_AVAILABLE=True");
+      });
+    });
+  })
+);

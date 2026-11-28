@@ -148,3 +148,195 @@ test("both endpoints reject non-pilot authority before runtime access", async ()
     }
   }
 });
+
+import {
+  postPermanentPublicVisitSession as sessionEndpoint
+} from "../src/functions/postPermanentPublicVisitSession";
+
+// Synthetic credential only. No Azure credential or
+// network access is used by these configuration tests.
+const syntheticKey = Buffer.alloc(64, 7).toString("base64");
+
+const productionConnection =
+  "DefaultEndpointsProtocol=https;" +
+  "AccountName=hopeproddatafbafd6e4;" +
+  `AccountKey=${syntheticKey};` +
+  "EndpointSuffix=core.windows.net";
+
+const production: NodeJS.ProcessEnv = {
+  FEATURE_PERMANENT_VISITOR_PRODUCTION_ACTIVATION: "true",
+  FEATURE_PERMANENT_VISITOR_ISOLATED_PILOT: "false",
+  FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY: "true",
+  FEATURE_PERMANENT_VISITOR_CONSENT_GUARD: "true",
+  WEBSITE_SITE_NAME: "hope-ai-api-prod",
+  WEBSITE_RESOURCE_GROUP: "rg-hope-ai-api-prod",
+  WEBSITE_SLOT_NAME: "Production",
+  HOPE_TABLE_AUTH_MODE: "connection-string",
+  HOPE_TABLE_ENDPOINT: undefined,
+  HOPE_TABLE_MANAGED_IDENTITY_CLIENT_ID: undefined,
+  STORAGE_CONNECTION_STRING: productionConnection,
+  HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER:
+    "2020-01-01T00:00:00.000Z"
+};
+
+test("production requires explicit activation and exact consent authority", () => {
+  assert.equal(permitted(production), true);
+
+  for (const changes of [
+    { FEATURE_PERMANENT_VISITOR_PRODUCTION_ACTIVATION: undefined },
+    { FEATURE_PERMANENT_VISITOR_PRODUCTION_ACTIVATION: "false" },
+    { FEATURE_PERMANENT_VISITOR_PRODUCTION_ACTIVATION: "TRUE" },
+    { FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY: "false" },
+    { FEATURE_PERMANENT_VISITOR_CONSENT_GUARD: "false" },
+    { FEATURE_PERMANENT_VISITOR_ISOLATED_PILOT: "true" },
+    { WEBSITE_SITE_NAME: "synthetic-wrong-app" },
+    { WEBSITE_RESOURCE_GROUP: "synthetic-wrong-group" },
+    { WEBSITE_SLOT_NAME: "staging" },
+    { HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER: undefined },
+    { HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER: "invalid" },
+    { HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER:
+        "9999-01-01T00:00:00.000Z" }
+  ]) {
+    assert.equal(permitted({
+      ...production, ...changes
+    }), false);
+  }
+
+  assert.equal(permitted({
+    WEBSITE_SITE_NAME: "hope-ai-api-prod",
+    WEBSITE_RESOURCE_GROUP: "rg-hope-ai-api-prod"
+  }), false);
+
+  assert.equal(permitted({
+    ...valid,
+    FEATURE_PERMANENT_VISITOR_PRODUCTION_ACTIVATION: "true"
+  }), false);
+
+  assert.equal(permitted(valid), true);
+
+  console.log("PRODUCTION_DEFAULT_OFF_BOUNDARY_VERIFIED=True");
+  console.log("PRODUCTION_LEGACY_FALLBACK_DENIED=True");
+  console.log("ISOLATED_ACTIVATION_PRESERVED=True");
+});
+
+test("production requires its exact canonical operational storage configuration", () => {
+  assert.equal(permitted(production), true);
+
+  assert.equal(permitted({
+    ...production,
+    STORAGE_CONNECTION_STRING: productionConnection +
+      ";TableEndpoint=https://hopeproddatafbafd6e4.table.core.windows.net/"
+  }), true);
+
+  for (const changes of [
+    { STORAGE_CONNECTION_STRING: undefined },
+    { STORAGE_CONNECTION_STRING: "UseDevelopmentStorage=true" },
+    { STORAGE_CONNECTION_STRING:
+        productionConnection.replace(
+          "hopeproddatafbafd6e4",
+          "sthopekiad20261122"
+        ) },
+    { STORAGE_CONNECTION_STRING:
+        productionConnection.replace(
+          "DefaultEndpointsProtocol=https",
+          "DefaultEndpointsProtocol=http"
+        ) },
+    { STORAGE_CONNECTION_STRING:
+        productionConnection.replace(
+          "core.windows.net", "example.invalid"
+        ) },
+    { STORAGE_CONNECTION_STRING:
+        productionConnection +
+        ";TableEndpoint=https://sthopekiad20261122.table.core.windows.net" },
+    { STORAGE_CONNECTION_STRING:
+        productionConnection +
+        ";AccountName=sthopekiad20261122" },
+    { STORAGE_CONNECTION_STRING:
+        productionConnection.replace(
+          syntheticKey, "invalid-key"
+        ) },
+    { HOPE_TABLE_AUTH_MODE: "managed-identity" },
+    { HOPE_TABLE_ENDPOINT:
+        "https://sthopekiad20261122.table.core.windows.net" },
+    { HOPE_TABLE_MANAGED_IDENTITY_CLIENT_ID:
+        "11111111-1111-1111-1111-111111111111" }
+  ]) {
+    assert.equal(permitted({
+      ...production, ...changes
+    }), false);
+  }
+
+  console.log("CANONICAL_PRODUCTION_STORAGE_CONTRACT_VERIFIED=True");
+  console.log("ALTERNATE_STORAGE_AND_AUTHENTICATION_DENIED=True");
+});
+
+test("session issuance shares the production activation boundary", async () => {
+  const settings: NodeJS.ProcessEnv = {
+    ...production,
+    FEATURE_PERMANENT_VISITOR_PRODUCTION_ACTIVATION: "false",
+    FEATURE_PERMANENT_PUBLIC_VISIT: "true",
+    FEATURE_PERMANENT_PUBLIC_VISIT_REQUEST_BUDGET: "true",
+    FEATURE_PERMANENT_VISITOR_AUTOMATIC_FOLLOWUP: "true",
+    FEATURE_PERMANENT_VISIT_RECOVERY_RECONCILIATION: "true",
+    FEATURE_PERMANENT_VISIT_RECOVERY_INSPECTION: "true"
+  };
+
+  const previous = Object.fromEntries(
+    Object.keys(settings).map(key => [
+      key, process.env[key]
+    ])
+  );
+
+  let accesses = 0;
+
+  try {
+    for (const [key, value] of Object.entries(settings)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+
+    const session: Parameters<typeof sessionEndpoint>[0] = {};
+    const registration: Parameters<typeof publicEndpoint>[0] = {};
+    const recovery: { res?: { status: number } } = {};
+
+    await sessionEndpoint(session, {
+      method: "POST"
+    }, {
+      reserveRequest: async () => {
+        accesses++;
+        throw Error("Unexpected session budget access");
+      }
+    });
+
+    await publicEndpoint(registration, {
+      method: "POST"
+    }, {
+      runtime: async () => {
+        accesses++;
+        throw Error("Unexpected registration runtime");
+      }
+    });
+
+    await recoveryEndpoint(recovery, {
+      method: "POST"
+    }, {
+      readStaff: async () => {
+        accesses++;
+        throw Error("Unexpected Staff lookup");
+      }
+    });
+
+    assert.equal(session.res?.status, 503);
+    assert.equal(registration.res?.status, 503);
+    assert.equal(recovery.res?.status, 503);
+    assert.equal(accesses, 0);
+
+    console.log("ALL_THREE_ACTIVATION_BOUNDARIES_VERIFIED=True");
+    console.log("DISABLED_PRODUCTION_DENIED_BEFORE_STORAGE=True");
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});

@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { permanentVisitorActivationPermitted } from "../../services/visitors/permanentVisitorPilotActivation";
 import { DateTime } from "luxon";
 
 import {
@@ -137,6 +138,11 @@ export async function postPermanentPublicVisitSession(
       process.env.FEATURE_PERMANENT_VISITOR_AUTOMATIC_FOLLOWUP
         !== "true") {
     reply(context, 404, { status: "unavailable" });
+    return;
+  }
+
+  if (!permanentVisitorActivationPermitted()) {
+    reply(context, 503, { status: "unavailable" });
     return;
   }
 

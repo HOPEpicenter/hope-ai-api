@@ -37,7 +37,72 @@ test("conflicting and missing intent evidence never authorizes cross-store write
 test("corrupt intent and unavailable evidence fail closed without rewriting",()=>fixture(async c=>{const r=repo(c);await r.recordContactIntent(id,intent);await c.updateEntity({partitionKey:id,rowKey:"consent-v1:contact:"+intent.operationId,intentJson:"{}"},"Merge");const before=await rows(c);assert.deepEqual(await assess(r,id,intent),result("unavailable"));assert.deepEqual(await rows(c),before);assert.deepEqual(await assess(repo(createIsolatedVisitorTestTable("Missing"+randomUUID().replace(/-/g,""))),id,intent),result("unavailable"));}));
 test("granted Staff permission remains held even with old guard disabled",()=>fixture(async c=>{assert.equal((await guard(id))?.status,503);assert.equal((await guard(id))?.error,message);assert.equal(await expose(id),false);let writes=0;const response=await start({visitorId:id,firstVisitDate:"2026-11-24",contactConsent:true,actorId:actor},{start:async()=>{writes++;throw Error("must not write");}});assert.equal(response.accepted,false);assert.equal(writes,0);await repo(c).apply(id,withdrawal);assert.equal((await guard(id))?.status,409);assert.equal(await expose(id),false);}));
 test("care contact mutations held but closure attendance and notes are not held",()=>fixture(async()=>{for(const type of ["FOLLOWUP_ASSIGNED","FOLLOWUP_CONTACTED","NEXT_STEP_SELECTED"]){assert.equal(held("care",type,{}),true);assert.equal((await eventGuard(id,type,{}))?.error,message);}assert.equal(held("care","FOLLOWUP_OUTCOME_RECORDED",{outcome:"connected",nextAction:"call"}),true);assert.equal(await eventGuard(id,"FOLLOWUP_OUTCOME_RECORDED",{outcome:"closed",nextAction:"none"}),null);for(const type of ["FOLLOWUP_UNASSIGNED","ATTENDANCE_RECORDED","note.add"])assert.equal(held("care",type,{}),false);}));
-test("six-week queue suppresses even a granted plan before profile enrichment",()=>fixture(async()=>{let reads=0;const value=await queue(stamp,{repository:{listAll:async()=>[plan],listByVisitor:async()=>[plan]},getVisitor:async()=>{reads++;return null;}});assert.equal(value.count,0);assert.equal(value.due,0);assert.equal(reads,0);}));
+test("verified Staff plan is visible but withdrawal suppresses it before enrichment", () =>
+  fixture(async c => {
+    let reads = 0;
+
+    const dependencies = {
+      repository: {
+        listAll: async () => [plan],
+        listByVisitor: async () => [plan]
+      },
+      getVisitor: async (visitorId: string) => {
+        assert.equal(visitorId, id);
+        reads++;
+        return {
+          visitorId,
+          name: "Synthetic visitor",
+          createdAt: stamp,
+          updatedAt: stamp
+        };
+      }
+    };
+
+    // The narrow coordinated six-week workflow is
+    // visible with independently verified permission.
+    const visible = await queue(stamp, dependencies);
+
+    assert.equal(visible.count, 1);
+    assert.equal(reads, 1);
+    assert.equal(visible.items[0].visitorId, id);
+    assert.equal(visible.items[0].plan.startedBy, actor);
+
+    assert.deepEqual(visible.consentReview, {
+      restrictedCount: 0,
+      unverifiedCount: 0
+    });
+
+    console.log("VERIFIED_STAFF_PLAN_VISIBLE=True");
+
+    // Queue visibility does not release the general writer hold.
+    assert.equal(await expose(id), false);
+    assert.equal((await guard(id))?.error, message);
+    assert.equal(held("six_week", plan.type, plan.data), true);
+
+    console.log("GENERAL_WRITER_HOLD_PRESERVED=True");
+
+    assert.equal(
+      (await repo(c).apply(id, withdrawal)).status,
+      "committed"
+    );
+
+    reads = 0;
+
+    const restricted = await queue(stamp, dependencies);
+
+    assert.equal(restricted.count, 0);
+    assert.equal(restricted.due, 0);
+    assert.equal(restricted.overdue, 0);
+    assert.equal(reads, 0);
+
+    assert.deepEqual(restricted.consentReview, {
+      restrictedCount: 1,
+      unverifiedCount: 0
+    });
+
+    console.log("WITHDRAWAL_SUPPRESSES_PLAN_BEFORE_ENRICHMENT=True");
+  })
+);
 test("canonical six-week writer refuses active work but permits restrictive records and historical reads",()=>fixture(async c=>{const table=createIsolatedVisitorTestTable("HoldSixWeek"+randomUUID().replace(/-/g,""));await table.createTable();try{const writer=new SixWeekFollowupEventsRepository(table);await env({[flag]:undefined},async()=>assert.equal(await writer.append(plan),true));const before=await writer.listByVisitor(id);await repo(c).recordContactIntent(id,intent);for(const event of [plan,{...plan,eventId:"resume",type:"six_week_followup.plan_resumed" as const},{...plan,eventId:"assign",type:"six_week_followup.owner_assigned" as const,data:{ownerStaffId:actor}},{...plan,eventId:"task",type:"six_week_followup.task_completed" as const,data:{weekNumber:1}}])await assert.rejects(writer.append(event),denied);assert.deepEqual(await writer.listByVisitor(id),before);for(const event of [{...plan,eventId:"pause",type:"six_week_followup.plan_paused" as const,data:{reason:"synthetic"}},{...plan,eventId:"unassign",type:"six_week_followup.owner_assigned" as const,data:{ownerStaffId:null}},{...plan,eventId:"cancel",type:"six_week_followup.plan_cancelled" as const,data:{reason:"synthetic"}}])assert.equal(await writer.append(event),true);assert.equal((await writer.listByVisitor(id)).length,4);}finally{await table.deleteTable();}}));
 test("canonical ministry writer blocks grant and intent but permits restrictive history",()=>fixture(async()=>{const table=createIsolatedVisitorTestTable("MinistryCommunicationEvents");await table.createTable();try{const writer=new MinistryCommunicationEventsRepository();const pref:MinistryCommunicationEvent={eventId:"synthetic-pref",visitorId:id,actorId:actor,occurredAt:stamp,type:"ministry_communication.preference_recorded",data:{visitorId:id,channel:"email",state:"granted",recordedAt:stamp,recordedBy:actor}};const contact:MinistryCommunicationEvent={eventId:"synthetic-contact",visitorId:id,actorId:actor,occurredAt:stamp,type:"ministry_communication.intent_recorded",data:{communicationId:"synthetic-message",visitorId:id,channel:"email",intent:"follow_up",requestedAt:stamp,requestedBy:actor,context:"care",relatedFollowupPlanId:null,notes:null}};await env({[flag]:undefined},async()=>{assert.equal(await writer.append(pref),true);assert.equal(await writer.append(contact),true);});const before=await writer.listByVisitor(id);await assert.rejects(writer.append({...pref,eventId:"new-grant"}),denied);await assert.rejects(writer.append({...contact,eventId:"new-intent"}),denied);assert.deepEqual(await writer.listByVisitor(id),before);assert.equal(await writer.append({...pref,eventId:"deny",data:{visitorId:id,channel:"email",state:"denied",recordedAt:stamp,recordedBy:actor}}),true);assert.equal(await writer.append({...contact,eventId:"cancel",type:"ministry_communication.cancelled",data:{communicationId:"synthetic-message",reason:"synthetic closure"}}),true);assert.equal((await writer.listByVisitor(id)).length,4);}finally{await table.deleteTable();}}));
 test("engagement repository refuses known contact mutations before storage",()=>fixture(async()=>{const writer=new EngagementEventsRepository();for(const type of ["FOLLOWUP_ASSIGNED","FOLLOWUP_CONTACTED","NEXT_STEP_SELECTED","FOLLOWUP_OUTCOME_RECORDED"])await assert.rejects(writer.appendEvent({v:1,eventId:randomUUID(),visitorId:id,type,occurredAt:stamp,source:{system:"synthetic",actorId:actor},data:{outcome:"pending",nextAction:"call"}}),denied);}));

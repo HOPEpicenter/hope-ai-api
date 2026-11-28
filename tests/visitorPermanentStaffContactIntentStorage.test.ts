@@ -509,3 +509,380 @@ test("committed Care assignment synchronizes and preserves newer ownership", asy
     }
   }
 });
+
+test("authenticated Care endpoint preserves consent authorization and recovery", async () => {
+  const { postCareCandidateAssign } =
+    await import("../src/functions/postCareCandidateAssign");
+
+  const {
+    requireCareOwnerActor,
+    requireCareOwnerAssignee
+  } = await import("../src/functions/_shared/careOwnerStaffActor");
+
+  const {
+    getFormationEventsTableClient,
+    getFormationProfilesTableClient,
+    getFormationProfileByVisitorId
+  } = await import("../src/functions/_shared/formation");
+
+  const consentTable =
+    createIsolatedVisitorTestTable("VisitorFollowupEvents");
+
+  const visitors = createIsolatedVisitorTestTable("Visitors");
+  const care = getFormationEventsTableClient();
+  const profiles = getFormationProfilesTableClient();
+
+  const created: TableClient[] = [];
+  const flag = "FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT";
+  const previousFlag = process.env[flag];
+
+  try {
+    for (const client of [
+      consentTable, visitors, care, profiles
+    ]) {
+      const endpoint = new URL(client.url);
+
+      assert.equal(endpoint.hostname, "127.0.0.1");
+      assert.equal(
+        endpoint.port, process.env.HOPE_VISITOR_133_PORT
+      );
+
+      await client.createTable();
+      created.push(client);
+    }
+
+    const authority = repo(consentTable, true);
+
+    const visitorId = "synthetic-endpoint-care";
+    const recoveryId = "synthetic-endpoint-recovery";
+    const declinedId = "synthetic-endpoint-declined";
+    const pendingId = "synthetic-endpoint-pending";
+
+    const actorId = "synthetic-pastor";
+    const ownerId = "synthetic-ministry-leader";
+    const stamp = "2026-11-24T12:00:00.000Z";
+
+    type Staff = NonNullable<
+      Awaited<ReturnType<
+        NonNullable<Parameters<typeof requireCareOwnerActor>[1]>
+      >>
+    >;
+
+    function staff(
+      staffId: string,
+      roleLabel: string,
+      status: Staff["status"] = "active"
+    ): Staff {
+      return {
+        staffId,
+        roleLabel,
+        status,
+        displayName: "Synthetic Staff",
+        createdAt: stamp,
+        updatedAt: stamp,
+        lastEventId: "synthetic-staff-event",
+        entraTenantId: null,
+        entraObjectId: null,
+        email: null,
+        phone: null,
+        ministryAreaId: null
+      };
+    }
+
+    const directory = new Map<string, Staff>([
+      [actorId, staff(actorId, "Pastor")],
+      [ownerId, staff(ownerId, "Ministry Leader")],
+      ["synthetic-ordinary-staff",
+        staff("synthetic-ordinary-staff", "Care Team")],
+      ["synthetic-inactive-pastor",
+        staff("synthetic-inactive-pastor", "Pastor", "inactive")]
+    ]);
+
+    const readStaff = async (staffId: string) =>
+      directory.get(staffId) ?? null;
+
+    for (const target of [
+      visitorId, recoveryId, declinedId, pendingId
+    ]) {
+      await visitors.createEntity({
+        partitionKey: "VISITOR",
+        rowKey: target,
+        name: "Synthetic visitor",
+        createdAt: stamp,
+        updatedAt: stamp
+      });
+
+      await profiles.createEntity({
+        partitionKey: "VISITOR",
+        rowKey: target,
+        visitorId: target,
+        displayName: "Synthetic visitor"
+      });
+
+      assert.equal((await authority.apply(target, {
+        kind: "new_profile",
+        evidenceId: "synthetic-initial-consent",
+        initialConsent: target !== declinedId
+      })).status, "committed");
+    }
+
+    assert.equal((await authority.apply(
+      pendingId, no(1)
+    )).status, "committed");
+
+    const operationId = randomUUID();
+
+    const command = {
+      assignedTo: ownerId,
+      eventId: operationId,
+      expectedConsentRevision: 1
+    };
+
+    const apiKey = process.env.HOPE_API_KEY;
+
+    assert.ok(apiKey);
+
+    async function invoke(
+      target = visitorId,
+      body: Record<string, unknown> = command,
+      actor = actorId,
+      suppliedKey = apiKey
+    ) {
+      const context: any = {
+        log: {
+          warn() {},
+          error() {},
+          info() {}
+        }
+      };
+
+      await postCareCandidateAssign(context, {
+        method: "POST",
+        params: { visitorId: target },
+        headers: {
+          "x-api-key": suppliedKey,
+          "x-hope-staff-actor-id": actor
+        },
+        body
+      }, {
+        requireActor: req =>
+          requireCareOwnerActor(req, readStaff),
+        requireAssignee: assignee =>
+          requireCareOwnerAssignee(assignee, readStaff)
+      });
+
+      return context.res;
+    }
+
+    delete process.env[flag];
+
+    assert.equal((await invoke()).status, 503);
+
+    assert.equal((
+      await authority.readCommittedCareAssignment(
+        visitorId, operationId
+      )
+    ).status, "not_found");
+
+    console.log("DEFAULT_OFF_CARE_GATE_VERIFIED=True");
+
+    process.env[flag] = "true";
+
+    assert.equal((await invoke(
+      visitorId, command, actorId, "incorrect-synthetic-key"
+    )).status, 401);
+
+    for (const deniedActor of [
+      "synthetic-ordinary-staff",
+      "synthetic-inactive-pastor",
+      "synthetic-missing-staff"
+    ]) {
+      assert.equal((await invoke(
+        visitorId, command, deniedActor
+      )).status, 403);
+    }
+
+    assert.equal((await invoke(visitorId, {
+      ...command,
+      assignedTo: "synthetic-inactive-pastor"
+    })).status, 400);
+
+    assert.equal((await invoke(visitorId, {
+      ...command,
+      assignedTo: "synthetic-ordinary-staff"
+    })).status, 400);
+
+    console.log("PASTORAL_AND_ASSIGNEE_AUTHORIZATION_VERIFIED=True");
+
+    assert.equal((await invoke(visitorId, {
+      assignedTo: ownerId,
+      expectedConsentRevision: 1
+    })).status, 400);
+
+    assert.equal((await invoke(visitorId, {
+      ...command,
+      expectedConsentRevision: 2
+    })).status, 409);
+
+    assert.equal((await invoke(declinedId)).status, 409);
+
+    assert.equal((await invoke(pendingId, {
+      ...command,
+      expectedConsentRevision: 2
+    })).status, 409);
+
+    assert.equal((await invoke(
+      "synthetic-nonexistent-visitor"
+    )).status, 404);
+
+    assert.equal((
+      await authority.readCommittedCareAssignment(
+        visitorId, operationId
+      )
+    ).status, "not_found");
+
+    console.log("INVALID_AND_UNVERIFIED_REQUESTS_DENIED=True");
+
+    const success = await invoke();
+
+    assert.equal(success.status, 200);
+    assert.equal(success.body.ok, true);
+    assert.equal(success.body.operationId, operationId);
+
+    const committed =
+      await authority.readCommittedCareAssignment(
+        visitorId, operationId
+      );
+
+    assert.equal(committed.status, "found");
+
+    if (committed.status !== "found") {
+      throw Error("Missing committed Care assignment");
+    }
+
+    assert.equal(committed.assignment.actorId, actorId);
+    assert.equal(committed.assignment.assigneeId, ownerId);
+
+    assert.equal((
+      await getFormationProfileByVisitorId(
+        profiles, visitorId
+      )
+    )?.assignedTo, ownerId);
+
+    console.log("AUTHENTICATED_ASSIGNMENT_PERSISTED=True");
+
+    const replay = await invoke();
+
+    assert.equal(replay.status, 200);
+    assert.equal(replay.body.operationId, operationId);
+
+    assert.deepEqual(
+      await authority.readCommittedCareAssignment(
+        visitorId, operationId
+      ),
+      committed
+    );
+
+    assert.equal((await invoke(visitorId, {
+      ...command,
+      assignedTo: actorId
+    })).status, 409);
+
+    console.log("ENDPOINT_REPLAY_AND_CONFLICT_VERIFIED=True");
+
+    const recoveryCommand = {
+      ...command,
+      eventId: randomUUID()
+    };
+
+    const prototype = Object.getPrototypeOf(
+      profiles
+    ) as typeof profiles;
+
+    const originalUpdate = prototype.updateEntity;
+    let injected = false;
+
+    prototype.updateEntity = async function (
+      this: typeof profiles,
+      ...args: Parameters<typeof originalUpdate>
+    ) {
+      if (!injected &&
+          this.url === profiles.url &&
+          args[0].partitionKey === "VISITOR" &&
+          args[0].rowKey === recoveryId) {
+        injected = true;
+        throw Error("Synthetic interrupted projection");
+      }
+
+      return originalUpdate.apply(this, args);
+    };
+
+    try {
+      const interrupted = await invoke(
+        recoveryId, recoveryCommand
+      );
+
+      assert.equal(interrupted.status, 503);
+      assert.equal(interrupted.body.ok, false);
+      assert.equal(
+        interrupted.body.operationId,
+        recoveryCommand.eventId
+      );
+      assert.equal(injected, true);
+    } finally {
+      prototype.updateEntity = originalUpdate;
+    }
+
+    const durable =
+      await authority.readCommittedCareAssignment(
+        recoveryId, recoveryCommand.eventId
+      );
+
+    assert.equal(durable.status, "found");
+
+    const recovered = await invoke(
+      recoveryId, recoveryCommand
+    );
+
+    assert.equal(recovered.status, 200);
+
+    assert.deepEqual(
+      await authority.readCommittedCareAssignment(
+        recoveryId, recoveryCommand.eventId
+      ),
+      durable
+    );
+
+    assert.equal((
+      await getFormationProfileByVisitorId(
+        profiles, recoveryId
+      )
+    )?.assignedTo, ownerId);
+
+    console.log("ENDPOINT_INCOMPLETE_PROJECTION_RECOVERED=True");
+
+    assert.equal((await authority.apply(
+      visitorId, no(1)
+    )).status, "committed");
+
+    assert.equal((await invoke()).status, 409);
+
+    assert.equal((await invoke(visitorId, {
+      ...command,
+      eventId: randomUUID(),
+      expectedConsentRevision: 2
+    })).status, 409);
+
+    console.log("WITHDRAWN_PERMISSION_BLOCKS_ENDPOINT_WORK=True");
+  } finally {
+    if (previousFlag === undefined) {
+      delete process.env[flag];
+    } else {
+      process.env[flag] = previousFlag;
+    }
+
+    for (const client of created.reverse()) {
+      await client.deleteTable();
+    }
+  }
+});

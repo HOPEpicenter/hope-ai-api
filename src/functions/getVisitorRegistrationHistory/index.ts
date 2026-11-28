@@ -84,6 +84,9 @@ export async function getVisitorRegistrationHistory(
     });
     reply(200, {
       ok: true, visitorId, currentConsent,
+      ...(contactWriterHoldEnabled() && decision === "granted"
+        ? { sixWeekEnrollment: "consent_protected_staff" }
+        : {}),
       childDetailsVisible: visibility.canViewHighRiskAlerts,
       history: { status: "ready", registrationCount: history.registrationCount, truncated: history.truncated, items }
     });

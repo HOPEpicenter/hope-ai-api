@@ -1041,3 +1041,115 @@ test("atomic Staff enrollment preserves authorization consent and existing plans
     console.log("CONCURRENT_WITHDRAWAL_BLOCKS_ENROLLMENT=True");
   })
 );
+
+test("enrollment capability requires verified consent and active Staff", async () =>
+  environment({
+    [authority]: "true",
+    [oldGuard]: "true",
+    [cutoff]: stamp,
+    FEATURE_PERMANENT_VISITOR_REGISTRATION_HISTORY: "true",
+    HOPE_API_KEY: key
+  }, async () => {
+    const staff: CanonicalStaffIdentity = {
+      staffId: actor,
+      displayName: "Synthetic Staff",
+      roleLabel: "Care Team",
+      status: "active",
+      createdAt: stamp,
+      updatedAt: stamp,
+      lastEventId: "synthetic-event",
+      entraTenantId: null,
+      entraObjectId: null,
+      email: null,
+      phone: null,
+      ministryAreaId: null
+    };
+
+    async function invoke(
+      consent: Awaited<ReturnType<typeof read>>,
+      active = true,
+      suppliedKey = key
+    ) {
+      const ctx: any = {};
+
+      await history(ctx, {
+        method: "GET",
+        params: { id },
+        headers: {
+          "x-api-key": suppliedKey,
+          "x-hope-staff-actor-id": actor
+        }
+      }, {
+        readStaff: async () => ({
+          ...staff,
+          status: active ? "active" : "inactive"
+        }),
+        readHistory: async () => ({
+          status: "ready",
+          registrationCount: 0,
+          truncated: false,
+          items: []
+        }),
+        readConsent: async () => consent
+      });
+
+      return ctx.res;
+    }
+
+    const granted = await invoke("granted");
+
+    assert.equal(granted.status, 200);
+    assert.equal(
+      granted.body.sixWeekEnrollment,
+      "consent_protected_staff"
+    );
+    assert.equal(granted.body.currentConsent, "unavailable");
+    assert.equal(granted.body.history.registrationCount, 0);
+    assert.equal(granted.headers["cache-control"], "no-store");
+
+    console.log("VERIFIED_ENROLLMENT_CAPABILITY_EXPOSED=True");
+    console.log("GENERAL_CONTACT_HOLD_PRESERVED=True");
+
+    for (const consent of [
+      "declined",
+      "pending_verification",
+      "unavailable",
+      "legacy_no_evidence"
+    ] as const) {
+      const denied = await invoke(consent);
+
+      assert.equal(denied.status, 200);
+      assert.equal(denied.body.sixWeekEnrollment, undefined);
+    }
+
+    console.log("UNVERIFIED_ENROLLMENT_CAPABILITY_DENIED=True");
+
+    const inactive = await invoke("granted", false);
+    assert.equal(inactive.status, 403);
+    assert.equal(inactive.body.sixWeekEnrollment, undefined);
+
+    const unauthorized = await invoke(
+      "granted", true, "synthetic-wrong-key"
+    );
+
+    assert.ok([401, 403].includes(unauthorized.status));
+    assert.equal(
+      unauthorized.body.sixWeekEnrollment,
+      undefined
+    );
+
+    console.log("STAFF_READ_AUTHORIZATION_PRESERVED=True");
+
+    await environment({
+      [authority]: "false"
+    }, async () => {
+      const legacy = await invoke("granted");
+
+      assert.equal(legacy.status, 200);
+      assert.equal(legacy.body.currentConsent, "granted");
+      assert.equal(legacy.body.sixWeekEnrollment, undefined);
+    });
+
+    console.log("LEGACY_MODE_RESPONSE_PRESERVED=True");
+  })
+);

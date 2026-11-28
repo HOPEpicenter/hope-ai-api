@@ -1,8 +1,10 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
+import { contactWriterHoldEnabled } from "../../services/followups/permanentVisitorContactWriterHold";
 import { mayExposeRegistrationContactWork } from "../../services/followups/mayExposeRegistrationContactWork";
 import { isTerminalFollowupOutcome } from "../../services/followups/isTerminalFollowupOutcome";
 import {
   getFormationProfilesTableClient,
+  mayExposeCommittedCareAssignment,
   listFormationProfiles,
   ensureTable,
   type FunctionFormationProfileEntity,
@@ -41,7 +43,22 @@ function isOpenAssignedFollowup(profile: FunctionFormationProfileEntity): boolea
   return !!profile.assignedTo && !(!!profile.lastFollowupOutcomeAt && isTerminalFollowupOutcome(profile.lastFollowupOutcome));
 }
 
-export async function getDashboardFollowups(context: any, req: any): Promise<void> {
+type DashboardFollowupDependencies = {
+  readStaff?: Parameters<typeof readHighRiskStaffVisibility>[1];
+  readPage?: (
+    input: Parameters<typeof listFormationProfiles>[1]
+  ) => ReturnType<typeof listFormationProfiles>;
+  readVisitor?: typeof getVisitorById;
+  readCard?: typeof readCanonicalVisitorDashboardCard;
+  mayExposeProtected?: typeof mayExposeCommittedCareAssignment;
+  mayExposeLegacy?: typeof mayExposeRegistrationContactWork;
+};
+
+export async function getDashboardFollowups(
+  context: any,
+  req: any,
+  deps: DashboardFollowupDependencies = {}
+): Promise<void> {
   const auth = requireApiKeyForFunction(req);
 
   if (!auth.ok) {
@@ -57,7 +74,7 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
 
   try {
     const visibility =
-      await readHighRiskStaffVisibility(req);
+      await readHighRiskStaffVisibility(req, deps.readStaff);
 
     if (!visibility.ok) {
       context.res = {
@@ -73,9 +90,27 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
     const limit = parseLimit(req?.query?.limit, 200);
     const requestedCursor = parseCursor(req?.query?.cursor);
 
-    const table = getFormationProfilesTableClient();
+    const protectedCareView =
+      req?.query?.careOwnershipOnly === "true" &&
+      contactWriterHoldEnabled() &&
+      process.env.FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT === "true";
 
-    await ensureTable(table);
+    const table = deps.readPage
+      ? null
+      : getFormationProfilesTableClient();
+
+    if (table) await ensureTable(table);
+
+    const readPage = deps.readPage ??
+      (input => listFormationProfiles(table!, input));
+
+    const readVisitor = deps.readVisitor ?? getVisitorById;
+    const readCard = deps.readCard ?? readCanonicalVisitorDashboardCard;
+
+    const protectedCards = new Map<
+      string,
+      Awaited<ReturnType<typeof readCanonicalVisitorDashboardCard>>
+    >();
 
     const collected: FunctionFormationProfileEntity[] = [];
     let orphanFollowupsExcluded = 0;
@@ -83,7 +118,7 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
     let sourceHasMore = true;
 
     while (collected.length < (limit + 1) && sourceHasMore) {
-      const page = await listFormationProfiles(table, {
+      const page = await readPage({
         limit: 200,
         cursor: sourceCursor
       });
@@ -98,13 +133,35 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
           continue;
         }
 
-        if (!(await mayExposeRegistrationContactWork(visitorId))) continue;
+        if (!protectedCareView &&
+            !(await (
+              deps.mayExposeLegacy ?? mayExposeRegistrationContactWork
+            )(visitorId))) {
+          continue;
+        }
 
-        const visitor = await getVisitorById(visitorId);
+        const visitor = await readVisitor(visitorId);
 
         if (!visitor) {
           orphanFollowupsExcluded++;
           continue;
+        }
+
+        if (protectedCareView) {
+          const card = await readCard(visitorId);
+
+          if (card.visitorId !== visitorId ||
+              card.assignedTo !== profile.assignedTo ||
+              card.lastFollowupAssignedAt !== profile.lastFollowupAssignedAt ||
+              card.followupResolved ||
+              !(await (
+                deps.mayExposeProtected ??
+                mayExposeCommittedCareAssignment
+              )(profile))) {
+            continue;
+          }
+
+          protectedCards.set(visitorId, card);
         }
 
         collected.push(profile);
@@ -138,7 +195,7 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
         const visitorId = String(p.visitorId ?? "").trim();
         if (!visitorId || visitorIdentityById.has(visitorId)) return;
 
-        const visitor = await getVisitorById(visitorId);
+        const visitor = await readVisitor(visitorId);
 
         visitorIdentityById.set(
           visitorId,
@@ -162,7 +219,7 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
 
         dashboardCardByVisitorId.set(
           visitorId,
-          await readCanonicalVisitorDashboardCard(visitorId)
+          protectedCards.get(visitorId) ?? await readCard(visitorId)
         );
       })
     );
@@ -196,7 +253,10 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
           visitorId,
           displayName,
           name: displayName,
-          email: visitorIdentity.email,
+          email: protectedCareView ? null : visitorIdentity.email,
+          ...(protectedCareView ? {
+            careWorkflow: "consent_protected_care_ownership" as const
+          } : {}),
           assignedTo:
             card.assignedTo ??
             projection.assignedTo,
@@ -241,7 +301,10 @@ export async function getDashboardFollowups(context: any, req: any): Promise<voi
 
     context.res = {
       status: 200,
-      headers: { "content-type": "application/json; charset=utf-8" },
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store"
+      },
       body: {
         ok: true,
         requestId,

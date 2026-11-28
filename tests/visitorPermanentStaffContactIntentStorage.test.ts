@@ -1683,3 +1683,225 @@ test("Care queue exposes only synchronized current committed ownership", async (
     }
   }
 });
+
+test("dashboard followups exposes protected ownership only for explicit Care view", async () => {
+  const { getDashboardFollowups } =
+    await import("../src/functions/getDashboardFollowups");
+
+  type Profile = import(
+    "../src/functions/_shared/formation"
+  ).FunctionFormationProfileEntity;
+
+  type Staff = import(
+    "../src/domain/staff/projectStaffDirectory"
+  ).CanonicalStaffIdentity;
+
+  type Card = import(
+    "../src/services/dashboard/canonicalDashboardContracts"
+  ).CanonicalVisitorDashboardCard;
+
+  const keys = [
+    "FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY",
+    "FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT",
+    "HOPE_API_KEY"
+  ];
+
+  const previous = Object.fromEntries(
+    keys.map(key => [key, process.env[key]])
+  );
+
+  const stamp = "2026-11-24T12:00:00.000Z";
+  const visitorId = "synthetic-dashboard-care";
+  const ownerId = "synthetic-care-owner";
+  const apiKey = "synthetic-dashboard-care-key";
+
+  const staff: Staff = {
+    staffId: "synthetic-pastor",
+    displayName: "Synthetic Staff",
+    roleLabel: "Pastor",
+    status: "active",
+    createdAt: stamp,
+    updatedAt: stamp,
+    lastEventId: "synthetic-staff-event",
+    entraTenantId: null,
+    entraObjectId: null,
+    email: null,
+    phone: null,
+    ministryAreaId: null
+  };
+
+  const profile: Profile = {
+    partitionKey: "VISITOR",
+    rowKey: visitorId,
+    visitorId,
+    displayName: "Synthetic visitor",
+    assignedTo: ownerId,
+    lastFollowupAssignedAt: stamp
+  };
+
+  const card: Card = {
+    visitorId,
+    displayName: "Synthetic visitor",
+    lastActivityAt: stamp,
+    lastActivitySummary: null,
+    stage: "Guest",
+    stageReason: null,
+    stageUpdatedAt: null,
+    stageUpdatedBy: null,
+    lastNextStep: null,
+    lastNextStepAt: null,
+    lastNextStepCompletedAt: null,
+    lastFollowupAssignedAt: stamp,
+    lastFollowupOutcome: null,
+    lastFollowupOutcomeAt: null,
+    lastPrayerRequestedAt: null,
+    followupStatus: "action_needed",
+    assignedTo: ownerId,
+    assignedToName: "Synthetic owner",
+    attentionState: "needs_attention",
+    followupUrgency: "ON_TRACK",
+    followupOverdue: false,
+    riskLevel: null,
+    riskScore: null,
+    needsFollowup: true,
+    followupResolved: false,
+    recommendedAction: null,
+    priorityBand: "normal",
+    priorityScore: 0,
+    priorityReason: "Synthetic"
+  };
+
+  let protectedReads = 0;
+  let legacyReads = 0;
+
+  try {
+    process.env.HOPE_API_KEY = apiKey;
+    process.env.FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY =
+      "true";
+    process.env.FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT =
+      "true";
+
+    async function invoke(
+      careView: boolean,
+      ownershipVerified = true,
+      currentCard: Card = card,
+      actor: Staff = staff,
+      key = apiKey
+    ) {
+      const context: any = {
+        log: {
+          warn() {},
+          error() {},
+          info() {}
+        }
+      };
+
+      await getDashboardFollowups(context, {
+        method: "GET",
+        query: careView
+          ? { careOwnershipOnly: "true" }
+          : {},
+        headers: {
+          "x-api-key": key,
+          "x-hope-staff-actor-id": actor.staffId
+        }
+      }, {
+        readStaff: async () => actor,
+        readPage: async () => ({
+          items: [profile],
+          cursor: null
+        }),
+        readVisitor: async id => ({
+          visitorId: id,
+          name: "Synthetic visitor",
+          email: "synthetic@example.invalid",
+          createdAt: stamp,
+          updatedAt: stamp
+        }),
+        readCard: async () => currentCard,
+        mayExposeProtected: async p => {
+          assert.equal(p.visitorId, visitorId);
+          protectedReads++;
+          return ownershipVerified;
+        },
+        mayExposeLegacy: async () => {
+          legacyReads++;
+          return false;
+        }
+      });
+
+      return context.res;
+    }
+
+    const result = await invoke(true);
+
+    assert.equal(result.status, 200);
+    assert.equal(result.body.count, 1);
+    assert.equal(result.body.items[0].assignedTo, ownerId);
+
+    assert.equal(
+      result.body.items[0].careWorkflow,
+      "consent_protected_care_ownership"
+    );
+
+    assert.equal(result.body.items[0].email, null);
+    assert.equal(protectedReads, 1);
+    assert.equal(legacyReads, 0);
+
+    console.log("EXPLICIT_CARE_DASHBOARD_VIEW_VERIFIED=True");
+
+    const normal = await invoke(false);
+
+    assert.equal(normal.body.count, 0);
+    assert.equal(protectedReads, 1);
+    assert.equal(legacyReads, 1);
+
+    console.log("EXISTING_TODAY_FEED_HOLD_PRESERVED=True");
+
+    assert.equal((await invoke(true, false)).body.count, 0);
+
+    assert.equal((await invoke(true, true, {
+      ...card,
+      assignedTo: "synthetic-other-owner"
+    })).body.count, 0);
+
+    assert.equal((await invoke(true, true, {
+      ...card,
+      followupResolved: true
+    })).body.count, 0);
+
+    console.log("UNVERIFIED_AND_CONFLICTING_OWNERSHIP_HIDDEN=True");
+
+    const before = protectedReads;
+
+    assert.equal((await invoke(
+      true, true, card,
+      { ...staff, status: "inactive" }
+    )).status, 403);
+
+    assert.equal((await invoke(
+      true, true, card, staff, "incorrect-key"
+    )).status, 401);
+
+    assert.equal(protectedReads, before);
+
+    console.log("DASHBOARD_STAFF_AUTHORIZATION_PRESERVED=True");
+
+    delete process.env.FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT;
+
+    const disabled = await invoke(true);
+
+    assert.equal(disabled.body.count, 0);
+    assert.equal(protectedReads, before);
+
+    console.log("DEFAULT_OFF_DASHBOARD_HOLD_PRESERVED=True");
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});

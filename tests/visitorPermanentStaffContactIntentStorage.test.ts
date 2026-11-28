@@ -1091,3 +1091,190 @@ test("Care assignment capability requires pastoral authority and verified consen
     }
   }
 });
+
+test("protected Care assignment never falls back to legacy mutation", async () => {
+  const { postCareCandidateAssign } =
+    await import("../src/functions/postCareCandidateAssign");
+
+  const {
+    requireCareOwnerActor,
+    requireCareOwnerAssignee
+  } = await import("../src/functions/_shared/careOwnerStaffActor");
+
+  type Staff = import(
+    "../src/domain/staff/projectStaffDirectory"
+  ).CanonicalStaffIdentity;
+
+  const keys = [
+    "FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY",
+    "FEATURE_PERMANENT_VISITOR_CONSENT_GUARD",
+    "FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT",
+    "HOPE_API_KEY"
+  ];
+
+  const previous = Object.fromEntries(
+    keys.map(key => [key, process.env[key]])
+  );
+
+  const actorId = "synthetic-pastor";
+  const ownerId = "synthetic-ministry-leader";
+  const apiKey = "synthetic-fallback-test-key";
+  const stamp = "2026-11-24T12:00:00.000Z";
+
+  const pastor: Staff = {
+    staffId: actorId,
+    roleLabel: "Pastor",
+    status: "active",
+    displayName: "Synthetic Pastor",
+    createdAt: stamp,
+    updatedAt: stamp,
+    lastEventId: "synthetic-staff-event",
+    entraTenantId: null,
+    entraObjectId: null,
+    email: null,
+    phone: null,
+    ministryAreaId: null
+  };
+
+  const owner: Staff = {
+    ...pastor,
+    staffId: ownerId,
+    roleLabel: "Ministry Leader"
+  };
+
+  const readStaff = async (id: string) =>
+    id === actorId ? pastor :
+    id === ownerId ? owner : null;
+
+  let consentReads = 0;
+  let visitorReads = 0;
+
+  const eventId = randomUUID();
+
+  async function invoke(body: Record<string, unknown>) {
+    const context: any = {
+      log: {
+        warn() {},
+        error() {},
+        info() {}
+      }
+    };
+
+    await postCareCandidateAssign(context, {
+      method: "POST",
+      params: { visitorId: "synthetic-fallback-visitor" },
+      headers: {
+        "x-api-key": apiKey,
+        "x-hope-staff-actor-id": actorId
+      },
+      body
+    }, {
+      requireActor: req =>
+        requireCareOwnerActor(req, readStaff),
+      requireAssignee: id =>
+        requireCareOwnerAssignee(id, readStaff),
+      readRegistrationConsent: async () => {
+        consentReads++;
+        return "declined";
+      },
+      getVisitor: async () => {
+        visitorReads++;
+        throw Error("Unexpected visitor lookup");
+      }
+    });
+
+    return context.res;
+  }
+
+  try {
+    process.env.HOPE_API_KEY = apiKey;
+
+    const command = {
+      assignedTo: ownerId,
+      eventId,
+      expectedConsentRevision: 1
+    };
+
+    for (const [authority, gate] of [
+      ["false", "true"],
+      ["true", "false"],
+      ["false", "false"]
+    ]) {
+      process.env.FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY =
+        authority;
+
+      process.env.FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT =
+        gate;
+
+      process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD =
+        "false";
+
+      const result = await invoke(command);
+
+      assert.equal(result.status, 503);
+      assert.equal(result.body.ok, false);
+
+      assert.equal(
+        result.body.error,
+        "Protected Care assignment unavailable"
+      );
+    }
+
+    assert.equal(consentReads, 0);
+    assert.equal(visitorReads, 0);
+
+    console.log("PROTECTED_ASSIGNMENT_FALLBACK_DENIED=True");
+
+    // Malformed protected commands also cannot fall back.
+    const malformed = await invoke({
+      assignedTo: ownerId,
+      expectedConsentRevision: null
+    });
+
+    assert.equal(malformed.status, 503);
+    assert.equal(consentReads, 0);
+    assert.equal(visitorReads, 0);
+
+    console.log("MALFORMED_PROTECTED_FALLBACK_DENIED=True");
+
+    // A genuine legacy request retains its original
+    // consent guard and optional event ID.
+    process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD =
+      "true";
+
+    const legacy = await invoke({
+      assignedTo: ownerId,
+      eventId
+    });
+
+    assert.equal(legacy.status, 409);
+    assert.equal(consentReads, 1);
+    assert.equal(visitorReads, 0);
+
+    console.log("EXISTING_LEGACY_CONSENT_GUARD_PRESERVED=True");
+
+    process.env.FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY =
+      "true";
+
+    process.env.FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT =
+      "true";
+
+    const missingRevision = await invoke({
+      assignedTo: ownerId,
+      eventId
+    });
+
+    assert.equal(missingRevision.status, 400);
+    assert.equal(visitorReads, 0);
+
+    console.log("PROTECTED_MODE_REQUIRES_CONSENT_REVISION=True");
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});

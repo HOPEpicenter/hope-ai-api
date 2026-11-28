@@ -115,8 +115,34 @@ export async function postCareCandidateAssign(
 
     const actorId = actorAuthorization.actor.staffId;
 
-    if (contactWriterHoldEnabled() &&
-        process.env.FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT === "true") {
+    const protectedAssignmentEnabled =
+      contactWriterHoldEnabled() &&
+      process.env.FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT === "true";
+
+    // Legacy event IDs existed before protected assignments.
+    // The consent revision distinguishes a protected command.
+    // Never reinterpret that command as a legacy mutation.
+    const protectedRequest = Object.prototype.hasOwnProperty.call(
+      req?.body ?? {}, "expectedConsentRevision"
+    );
+
+    if (protectedRequest && !protectedAssignmentEnabled) {
+      context.res = {
+        status: 503,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "no-store"
+        },
+        body: {
+          ok: false,
+          requestId,
+          error: "Protected Care assignment unavailable"
+        }
+      };
+      return;
+    }
+
+    if (protectedAssignmentEnabled) {
 
       const reply = (
         status: number,

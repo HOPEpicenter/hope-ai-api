@@ -897,6 +897,57 @@ export async function recordCommittedStaffCareAssignment(
   return synchronized;
 }
 
+/** Historical ownership check, never a contact authorization. */
+async function assertCareAssignmentNotSuperseded(
+  eventsTable: TableClient,
+  visitorId: string,
+  occurredAt: string,
+  eventId: string
+): Promise<void> {
+  const filter =
+    `PartitionKey eq '${escapeOData(visitorId)}' and ` +
+    "(type eq 'FOLLOWUP_ASSIGNED' or " +
+    "type eq 'FOLLOWUP_UNASSIGNED')";
+
+  let inspected = 0;
+
+  for await (const row of eventsTable.listEntities<{
+    visitorId: string;
+    type: string;
+    occurredAt: string;
+    idempotencyKey: string;
+  }>({
+    queryOptions: { filter }
+  })) {
+    inspected++;
+
+    if (inspected > 2000 ||
+        row.partitionKey !== visitorId ||
+        row.visitorId !== visitorId ||
+        (row.type !== "FOLLOWUP_ASSIGNED" &&
+         row.type !== "FOLLOWUP_UNASSIGNED") ||
+        typeof row.occurredAt !== "string" ||
+        !Number.isFinite(Date.parse(row.occurredAt)) ||
+        typeof row.idempotencyKey !== "string" ||
+        !row.idempotencyKey.trim()) {
+      throw new Error(
+        "Care ownership history requires reconciliation"
+      );
+    }
+
+    if (compareEventOrder(
+      row.occurredAt,
+      row.idempotencyKey,
+      occurredAt,
+      eventId
+    ) > 0) {
+      throw new Error(
+        "Historical Care assignment ownership superseded"
+      );
+    }
+  }
+}
+
 async function recordFormationEventV1Internal(
   body: unknown,
   verifiedHistorical = false
@@ -1073,46 +1124,9 @@ async function recordFormationEventV1Internal(
         );
       }
 
-      const filter =
-        `PartitionKey eq '${escapeOData(visitorId)}' and ` +
-        "(type eq 'FOLLOWUP_ASSIGNED' or " +
-        "type eq 'FOLLOWUP_UNASSIGNED')";
-
-      let inspected = 0;
-
-      for await (const row of eventsTable.listEntities<{
-        visitorId: string;
-        type: string;
-        occurredAt: string;
-        idempotencyKey: string;
-      }>({
-        queryOptions: { filter }
-      })) {
-        inspected++;
-
-        if (inspected > 2000 ||
-            row.partitionKey !== visitorId ||
-            row.visitorId !== visitorId ||
-            typeof row.occurredAt !== "string" ||
-            !Number.isFinite(Date.parse(row.occurredAt)) ||
-            typeof row.idempotencyKey !== "string" ||
-            !row.idempotencyKey.trim()) {
-          throw new Error(
-            "Care ownership history requires reconciliation"
-          );
-        }
-
-        if (compareEventOrder(
-          row.occurredAt,
-          row.idempotencyKey,
-          occurredAt,
-          eventId
-        ) > 0) {
-          throw new Error(
-            "Historical Care assignment ownership superseded"
-          );
-        }
-      }
+      await assertCareAssignmentNotSuperseded(
+        eventsTable, visitorId, occurredAt, eventId
+      );
     }
 
     await applyFormationEventToProfile({
@@ -1147,6 +1161,15 @@ async function recordFormationEventV1Internal(
       } else {
         await profilesTable.createEntity(entity);
       }
+    }
+
+    // A release may have been recorded after the initial
+    // ownership check, including during the profile write.
+    // Do not acknowledge a superseded assignment as successful.
+    if (type === "FOLLOWUP_ASSIGNED") {
+      await assertCareAssignmentNotSuperseded(
+        eventsTable, visitorId, occurredAt, eventId
+      );
     }
 
     return {

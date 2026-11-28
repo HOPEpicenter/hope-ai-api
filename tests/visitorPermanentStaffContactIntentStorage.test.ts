@@ -1278,3 +1278,174 @@ test("protected Care assignment never falls back to legacy mutation", async () =
     }
   }
 });
+
+test("concurrent Care release prevents stale assignment confirmation", async () => {
+  const {
+    getFormationEventsTableClient,
+    getFormationProfilesTableClient,
+    recordCommittedStaffCareAssignment
+  } = await import("../src/functions/_shared/formation");
+
+  const consentTable =
+    createIsolatedVisitorTestTable("VisitorFollowupEvents");
+
+  const care = getFormationEventsTableClient();
+  const profiles = getFormationProfilesTableClient();
+
+  const created: TableClient[] = [];
+
+  try {
+    for (const client of [consentTable, care, profiles]) {
+      const endpoint = new URL(client.url);
+
+      assert.equal(endpoint.hostname, "127.0.0.1");
+      assert.equal(
+        endpoint.port, process.env.HOPE_VISITOR_133_PORT
+      );
+
+      await client.createTable();
+      created.push(client);
+    }
+
+    const visitorId = "synthetic-concurrent-care-release";
+    const authority = repo(consentTable, true);
+
+    const command = {
+      operationId: "synthetic-concurrent-assignment",
+      actorId: "synthetic-pastor",
+      assigneeId: "synthetic-care-owner",
+      expectedRevision: 1
+    };
+
+    await profiles.createEntity({
+      partitionKey: "VISITOR",
+      rowKey: visitorId,
+      visitorId,
+      displayName: "Synthetic visitor"
+    });
+
+    assert.equal((await authority.apply(visitorId, {
+      kind: "new_profile",
+      evidenceId: "synthetic-initial-consent",
+      initialConsent: true
+    })).status, "committed");
+
+    const committed =
+      await authority.appendStaffCareAssignment(
+        visitorId, command
+      );
+
+    if (committed.status !== "committed") {
+      throw Error("Expected committed Care assignment");
+    }
+
+    const releaseAt = new Date(
+      Date.parse(committed.assignment.occurredAt) + 1000
+    ).toISOString();
+
+    const releaseId = "synthetic-concurrent-release";
+
+    const release = {
+      partitionKey: visitorId,
+      rowKey: `${releaseAt}__${releaseId}`,
+      visitorId,
+      type: "FOLLOWUP_UNASSIGNED",
+      occurredAt: releaseAt,
+      recordedAt: releaseAt,
+      idempotencyKey: releaseId,
+      channel: "api",
+      summary: "FOLLOWUP_UNASSIGNED",
+      metadata: JSON.stringify({
+        source: {
+          system: "hope-dashboard-next",
+          actorId: command.actorId
+        },
+        data: {}
+      })
+    };
+
+    const prototype = Object.getPrototypeOf(
+      profiles
+    ) as typeof profiles;
+
+    const originalUpdate = prototype.updateEntity;
+    let injected = false;
+
+    prototype.updateEntity = async function (
+      this: typeof profiles,
+      ...args: Parameters<typeof originalUpdate>
+    ) {
+      if (!injected &&
+          this.url === profiles.url &&
+          args[0].partitionKey === "VISITOR" &&
+          args[0].rowKey === visitorId) {
+        injected = true;
+
+        // Simulate the release event becoming durable
+        // while its separate profile projection is delayed.
+        await care.createEntity(release);
+      }
+
+      return originalUpdate.apply(this, args);
+    };
+
+    try {
+      await assert.rejects(
+        recordCommittedStaffCareAssignment(
+          visitorId, command.operationId
+        ),
+        /Historical Care assignment ownership superseded/
+      );
+
+      assert.equal(injected, true);
+    } finally {
+      prototype.updateEntity = originalUpdate;
+    }
+
+    console.log("CONCURRENT_RELEASE_INTERLEAVING_VERIFIED=True");
+    console.log("STALE_ASSIGNMENT_CONFIRMATION_DENIED=True");
+
+    const durableRelease = await care.getEntity(
+      visitorId, release.rowKey
+    );
+
+    assert.equal(durableRelease.type, "FOLLOWUP_UNASSIGNED");
+
+    const durableAssignment =
+      await authority.readCommittedCareAssignment(
+        visitorId, command.operationId
+      );
+
+    assert.deepEqual(durableAssignment, {
+      status: "found",
+      assignment: committed.assignment
+    });
+
+    await assert.rejects(
+      recordCommittedStaffCareAssignment(
+        visitorId, command.operationId
+      ),
+      /Historical Care assignment/
+    );
+
+    const history: unknown[] = [];
+
+    for await (const row of care.listEntities({
+      queryOptions: {
+        filter: `PartitionKey eq '${visitorId}'`
+      }
+    })) {
+      history.push(row);
+    }
+
+    assert.equal(history.length, 2);
+
+    console.log("DURABLE_RELEASE_AND_ASSIGNMENT_PRESERVED=True");
+    console.log("SUPERSEDED_ASSIGNMENT_RETRY_DENIED=True");
+    console.log("NO_DUPLICATE_FORMATION_EVENT=True");
+  } finally {
+    for (const client of created.reverse()) {
+      await client.deleteTable();
+    }
+  }
+});

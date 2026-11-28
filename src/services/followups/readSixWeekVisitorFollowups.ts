@@ -31,8 +31,7 @@ async function assessPlanVisibility(
   if (consent === "granted") {
     if (!contactWriterHoldEnabled()) return "visible";
 
-    return registrationConsentAuthorityEnabled() &&
-      plan.startedBy === "system:permanent-visitor-registration"
+    return registrationConsentAuthorityEnabled()
       ? "visible"
       : "restricted";
   }
@@ -108,7 +107,7 @@ export async function readSixWeekVisitorFollowup(
   asOf?: string,
   dependencies: SixWeekFollowupReadDependencies = {}
 ): Promise<(SixWeekVisitorFollowupPlan & {
-  staffWorkflow?: "consent_protected_public";
+  staffWorkflow?: "consent_protected_public" | "consent_protected_staff";
 }) | null> {
   const normalizedVisitorId = String(visitorId ?? "").trim();
   if (!normalizedVisitorId) return null;
@@ -133,12 +132,13 @@ export async function readSixWeekVisitorFollowup(
     registrationConsentAuthorityEnabled() &&
     registrationConsentGuardEnabled() &&
     contactWriterHoldEnabled() &&
-    (plan.status === "active" || plan.status === "paused") &&
-    plan.startedBy === "system:permanent-visitor-registration"
+    (plan.status === "active" || plan.status === "paused")
   ) {
     return {
       ...plan,
-      staffWorkflow: "consent_protected_public"
+      staffWorkflow: plan.startedBy === "system:permanent-visitor-registration"
+        ? "consent_protected_public"
+        : "consent_protected_staff"
     };
   }
 

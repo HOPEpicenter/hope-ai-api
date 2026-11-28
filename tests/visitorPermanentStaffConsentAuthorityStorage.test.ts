@@ -8,7 +8,7 @@ import { requireCurrentRegistrationContactPermission as guard } from "../src/ser
 import { requireRegistrationEventContactPermission as eventGuard } from "../src/services/followups/requireRegistrationEventContactPermission";
 import { mayExposeRegistrationContactWork as expose } from "../src/services/followups/mayExposeRegistrationContactWork";
 import { startConsentProtectedSixWeekFollowup as start } from "../src/services/followups/startConsentProtectedSixWeekFollowup";
-import { readSixWeekVisitorFollowupQueue as queue } from "../src/services/followups/readSixWeekVisitorFollowups";
+import { readSixWeekVisitorFollowupQueue as queue, readSixWeekVisitorFollowup as readPlan } from "../src/services/followups/readSixWeekVisitorFollowups";
 import type { SixWeekFollowupEvent } from "../src/domain/followups/projectSixWeekVisitorFollowup";
 import { getVisitorRegistrationHistory as history } from "../src/functions/getVisitorRegistrationHistory";
 import type { CanonicalStaffIdentity } from "../src/domain/staff/projectStaffDirectory";
@@ -70,7 +70,7 @@ function createPermanentVisitorConsentRepository(
 }
 
 
-test("mixed queue preserves verified public work without releasing legacy or unverified plans", () =>
+test("mixed queue preserves verified public and Staff work", () =>
   fixture(async c => {
     await init(c, true);
 
@@ -88,9 +88,24 @@ test("mixed queue preserves verified public work without releasing legacy or unv
     })).status, "committed");
 
     assert.equal((await authority.apply(heldId, {
-      kind: "new_profile",
-      evidenceId: "synthetic-held-init",
-      initialConsent: true
+      kind: "existing_profile",
+      evidenceId: "synthetic-held-init"
+    })).status, "committed");
+
+    assert.equal((await authority.apply(heldId, {
+      kind: "public_request",
+      expectedRevision: 1,
+      requestId: "synthetic-staff-grant-request",
+      requestedConsent: true
+    })).status, "committed");
+
+    assert.equal((await authority.apply(heldId, {
+      kind: "verified_staff_decision",
+      expectedRevision: 2,
+      decisionId: "synthetic-staff-grant-decision",
+      pendingRequestId: "synthetic-staff-grant-request",
+      actorId: actor,
+      decision: "granted"
     })).status, "committed");
 
     const publicActor =
@@ -142,16 +157,65 @@ test("mixed queue preserves verified public work without releasing legacy or unv
       }
     });
 
-    assert.equal(result.count, 1);
-    assert.equal(result.items.length, 1);
-    assert.equal(result.items[0].visitorId, id);
+    assert.equal(result.count, 2);
+    assert.equal(result.items.length, 2);
+
+    assert.deepEqual(
+      result.items.map(item => item.visitorId).sort(),
+      [id, heldId].sort()
+    );
 
     assert.deepEqual(result.consentReview, {
-      restrictedCount: 2,
+      restrictedCount: 1,
       unverifiedCount: 1
     });
 
-    assert.deepEqual(enriched, [id]);
+    assert.deepEqual(enriched.sort(), [id, heldId].sort());
+
+    const detailRepository = {
+      listAll: async () => events,
+      listByVisitor: async (visitorId: string) =>
+        events.filter(event => event.visitorId === visitorId)
+    };
+
+    const publicPlan = await readPlan(
+      id, stamp, { repository: detailRepository }
+    );
+
+    const staffPlan = await readPlan(
+      heldId, stamp, { repository: detailRepository }
+    );
+
+    assert.equal(
+      publicPlan?.staffWorkflow,
+      "consent_protected_public"
+    );
+
+    assert.equal(
+      staffPlan?.staffWorkflow,
+      "consent_protected_staff"
+    );
+
+    for (const denied of [missingId, declinedId]) {
+      await assert.rejects(() => readPlan(
+        denied, stamp, { repository: detailRepository }
+      ));
+    }
+
+    assert.equal((await authority.apply(heldId, {
+      kind: "public_request",
+      expectedRevision: 3,
+      requestId: "synthetic-staff-withdrawal",
+      requestedConsent: false
+    })).status, "committed");
+
+    await assert.rejects(() => readPlan(
+      heldId, stamp, { repository: detailRepository }
+    ));
+
+    console.log("PUBLIC_AND_STAFF_QUEUE_VISIBILITY_VERIFIED=True");
+    console.log("PERSON_360_WORKFLOW_MARKERS_VERIFIED=True");
+    console.log("MISSING_DECLINED_PENDING_CONSENT_DENIED=True");
     assert.equal(events.length, 4);
 
     console.log("MIXED_QUEUE_VERIFIED_WORK_PRESERVED=True");

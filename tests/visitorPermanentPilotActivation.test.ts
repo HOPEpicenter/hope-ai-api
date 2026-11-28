@@ -340,3 +340,91 @@ test("session issuance shares the production activation boundary", async () => {
     }
   }
 });
+
+test("canonical production accepts standard Azure service endpoints and default storage mode", () => {
+  const account = "hopeproddatafbafd6e4";
+
+  const blob =
+    `https://${account}.blob.core.windows.net/`;
+
+  const queue =
+    `https://${account}.queue.core.windows.net/`;
+
+  const file =
+    `https://${account}.file.core.windows.net/`;
+
+  const table =
+    `https://${account}.table.core.windows.net/`;
+
+  const fullConnection =
+    productionConnection +
+    `;BlobEndpoint=${blob}` +
+    `;QueueEndpoint=${queue}` +
+    `;FileEndpoint=${file}` +
+    `;TableEndpoint=${table}`;
+
+  for (const mode of [
+    undefined, "", "connection-string"
+  ]) {
+    assert.equal(permitted({
+      ...production,
+      HOPE_TABLE_AUTH_MODE: mode,
+      STORAGE_CONNECTION_STRING: fullConnection
+    }), true);
+  }
+
+  console.log("STANDARD_AZURE_ENDPOINTS_ACCEPTED=True");
+  console.log("EXISTING_DEFAULT_STORAGE_MODE_ACCEPTED=True");
+
+  for (const [original, service] of [
+    [blob, "blob"],
+    [queue, "queue"],
+    [file, "file"],
+    [table, "table"]
+  ]) {
+    for (const replacement of [
+      original.replace("https:", "http:"),
+      original.replace(account, "sthopekiad20261122"),
+      original.replace(account, "syntheticwrongaccount"),
+      `https://${account}.${service}.example.invalid/`,
+      original + "unexpected-path",
+      original + "?unexpected=value",
+      original + "#unexpected",
+      original.replace(".net/", ".net:8443/")
+    ]) {
+      assert.equal(permitted({
+        ...production,
+        STORAGE_CONNECTION_STRING:
+          fullConnection.replace(original, replacement)
+      }), false);
+    }
+  }
+
+  assert.equal(permitted({
+    ...production,
+    STORAGE_CONNECTION_STRING:
+      fullConnection + `;BlobEndpoint=${blob}`
+  }), false);
+
+  assert.equal(permitted({
+    ...production,
+    STORAGE_CONNECTION_STRING:
+      fullConnection + ";UnknownField=synthetic"
+  }), false);
+
+  assert.equal(permitted({
+    ...production,
+    HOPE_TABLE_AUTH_MODE: "managed-identity",
+    STORAGE_CONNECTION_STRING: fullConnection
+  }), false);
+
+  assert.equal(permitted({
+    ...production,
+    FEATURE_PERMANENT_VISITOR_PRODUCTION_ACTIVATION: "false",
+    STORAGE_CONNECTION_STRING: fullConnection
+  }), false);
+
+  console.log("ALTERNATE_SERVICE_ENDPOINTS_DENIED=True");
+  console.log("DUPLICATE_AND_UNKNOWN_FIELDS_DENIED=True");
+  console.log("PRODUCTION_DEFAULT_OFF_PRESERVED=True");
+});

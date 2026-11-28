@@ -28,7 +28,10 @@ function validCutover(value: string | undefined): boolean {
 function productionStorageMatches(
   env: Readonly<NodeJS.ProcessEnv>
 ): boolean {
-  if (env.HOPE_TABLE_AUTH_MODE !== "connection-string" ||
+  const mode =
+    env.HOPE_TABLE_AUTH_MODE?.trim() || "connection-string";
+
+  if (mode !== "connection-string" ||
       env.HOPE_TABLE_ENDPOINT ||
       env.HOPE_TABLE_MANAGED_IDENTITY_CLIENT_ID) {
     return false;
@@ -55,7 +58,10 @@ function productionStorageMatches(
     "AccountName",
     "AccountKey",
     "EndpointSuffix",
-    "TableEndpoint"
+    "TableEndpoint",
+    "BlobEndpoint",
+    "QueueEndpoint",
+    "FileEndpoint"
   ]);
 
   for (const part of parts) {
@@ -88,6 +94,23 @@ function productionStorageMatches(
       tableEndpoint !== PRODUCTION_TABLE_ENDPOINT &&
       tableEndpoint !== `${PRODUCTION_TABLE_ENDPOINT}/`) {
     return false;
+  }
+
+  for (const [field, service] of [
+    ["BlobEndpoint", "blob"],
+    ["QueueEndpoint", "queue"],
+    ["FileEndpoint", "file"]
+  ] as const) {
+    const endpoint = fields.get(field);
+
+    const expected =
+      `https://${PRODUCTION_ACCOUNT}.${service}.core.windows.net`;
+
+    if (endpoint !== undefined &&
+        endpoint !== expected &&
+        endpoint !== `${expected}/`) {
+      return false;
+    }
   }
 
   const key = fields.get("AccountKey");

@@ -1,6 +1,8 @@
-import type {
-  FunctionFormationProfileEntity
+import {
+  mayExposeCommittedCareAssignment,
+  type FunctionFormationProfileEntity
 } from "../../functions/_shared/formation";
+import { contactWriterHoldEnabled } from "../followups/permanentVisitorContactWriterHold";
 import type {
   CanonicalVisitorDashboardCard
 } from "../dashboard/canonicalDashboardContracts";
@@ -51,12 +53,19 @@ export async function readCanonicalCareProjection(
     input.readDashboardCard ??
     readCanonicalVisitorDashboardCard;
 
+  const protectedMode = contactWriterHoldEnabled() &&
+    process.env.FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT === "true";
+
   const eligibleProfiles: FunctionFormationProfileEntity[] = [];
+
   for (const profile of input.profiles) {
-    if (isOpenAssignedFollowup(profile) &&
+    if (protectedMode) {
+      if (!isOpenAssignedFollowup(profile)) continue;
+    } else if (isOpenAssignedFollowup(profile) &&
         !(await mayExposeRegistrationContactWork(String(profile.visitorId ?? "").trim()))) {
       continue;
     }
+
     eligibleProfiles.push(profile);
   }
 
@@ -85,7 +94,26 @@ export async function readCanonicalCareProjection(
     })
   );
 
-  const summaryProfiles = eligibleProfiles
+  const verifiedProfiles: FunctionFormationProfileEntity[] = [];
+
+  for (const profile of eligibleProfiles) {
+    if (protectedMode) {
+      const card = canonicalCardsByVisitorId.get(profile.visitorId);
+
+      if (!card ||
+          card.visitorId !== profile.visitorId ||
+          card.assignedTo !== profile.assignedTo ||
+          card.lastFollowupAssignedAt !== profile.lastFollowupAssignedAt ||
+          card.followupResolved ||
+          !(await mayExposeCommittedCareAssignment(profile))) {
+        continue;
+      }
+    }
+
+    verifiedProfiles.push(profile);
+  }
+
+  const summaryProfiles = verifiedProfiles
     .filter(isOpenAssignedFollowup)
     .map((profile) => {
       const visitorId = String(

@@ -948,6 +948,200 @@ async function assertCareAssignmentNotSuperseded(
   }
 }
 
+/**
+ * Read-only protected Care queue eligibility.
+ * Never grants permission to execute a contact mutation.
+ */
+export async function mayExposeCommittedCareAssignment(
+  profile: FunctionFormationProfileEntity
+): Promise<boolean> {
+  if (!contactWriterHoldEnabled() ||
+      process.env.FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT !== "true") {
+    return false;
+  }
+
+  const visitorId = profile.visitorId;
+  const validId = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+  if (!validId.test(visitorId) ||
+      typeof profile.assignedTo !== "string" ||
+      !validId.test(profile.assignedTo)) {
+    return false;
+  }
+
+  const cutover =
+    process.env.HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER;
+
+  if (!cutover ||
+      !Number.isFinite(Date.parse(cutover)) ||
+      new Date(cutover).toISOString() !== cutover) {
+    throw new Error("Care consent authority unavailable");
+  }
+
+  const { createPermanentVisitorConsentRepository } =
+    await import("../../repositories/permanentVisitorConsentRepository");
+
+  const table = getHopeTableClient("VisitorFollowupEvents");
+
+  const authority = createPermanentVisitorConsentRepository(
+    table, true
+  );
+
+  const initial = await authority.read(visitorId);
+
+  if (initial.status === "unavailable") {
+    throw new Error("Care consent authority unavailable");
+  }
+
+  if (initial.status !== "ready" ||
+      initial.state.effective !== "granted" ||
+      initial.state.pending !== null) {
+    return false;
+  }
+
+  const prefix = "consent-v1:care-assignment:";
+
+  const filter =
+    `PartitionKey eq '${escapeOData(visitorId)}' and ` +
+    `RowKey ge '${prefix}' and ` +
+    "RowKey lt 'consent-v1:care-assignment;'";
+
+  let latest: {
+    operationId: string;
+    occurredAt: string;
+  } | null = null;
+
+  let inspected = 0;
+  let ambiguous = false;
+
+  for await (const row of table.listEntities<{
+    occurredAt: string;
+    schemaVersion: number;
+  }>({ queryOptions: { filter } })) {
+    inspected++;
+
+    if (inspected > 2000 ||
+        row.partitionKey !== visitorId ||
+        typeof row.rowKey !== "string" ||
+        !row.rowKey.startsWith(prefix) ||
+        row.schemaVersion !== 1 ||
+        typeof row.occurredAt !== "string" ||
+        !Number.isFinite(Date.parse(row.occurredAt)) ||
+        new Date(row.occurredAt).toISOString() !== row.occurredAt) {
+      throw new Error("Care assignment history unavailable");
+    }
+
+    const operationId = row.rowKey.slice(prefix.length);
+
+    if (!validId.test(operationId)) {
+      throw new Error("Care assignment identity unavailable");
+    }
+
+    if (!latest || row.occurredAt > latest.occurredAt) {
+      latest = {
+        operationId,
+        occurredAt: row.occurredAt
+      };
+
+      ambiguous = false;
+    } else if (row.occurredAt === latest.occurredAt) {
+      // Do not guess ownership when distinct operations
+      // have identical recorded timestamps.
+      ambiguous = true;
+    }
+  }
+
+  if (!latest || ambiguous) return false;
+
+  const committed = await authority.readCommittedCareAssignment(
+    visitorId, latest.operationId
+  );
+
+  if (committed.status !== "found") {
+    throw new Error("Committed Care assignment unavailable");
+  }
+
+  const assignment = committed.assignment;
+
+  if (assignment.occurredAt !== latest.occurredAt ||
+      assignment.assigneeId !== profile.assignedTo ||
+      assignment.occurredAt !== profile.lastFollowupAssignedAt ||
+      assignment.expectedRevision !== initial.state.revision) {
+    return false;
+  }
+
+  const eventId =
+    `care-assignment:${visitorId.length}:${visitorId}:${latest.operationId}`;
+
+  const events = getFormationEventsTableClient();
+
+  let event;
+
+  try {
+    event = await events.getEntity<{
+      visitorId: string;
+      type: string;
+      occurredAt: string;
+      idempotencyKey: string;
+      metadata: string;
+    }>(
+      visitorId,
+      buildEventRowKey(assignment.occurredAt, eventId)
+    );
+  } catch (error: any) {
+    if (error?.statusCode === 404) return false;
+    throw error;
+  }
+
+  const expectedMetadata = {
+    source: resolveMutationSource({
+      system: "hope-dashboard-next",
+      actorId: assignment.actorId
+    }),
+    data: {
+      assigneeId: assignment.assigneeId
+    }
+  };
+
+  if (event.partitionKey !== visitorId ||
+      event.rowKey !==
+        buildEventRowKey(assignment.occurredAt, eventId) ||
+      event.visitorId !== visitorId ||
+      event.type !== "FOLLOWUP_ASSIGNED" ||
+      event.occurredAt !== assignment.occurredAt ||
+      event.idempotencyKey !== eventId ||
+      !sameHistoricalJson(
+        JSON.parse(event.metadata), expectedMetadata
+      )) {
+    throw new Error("Care formation evidence unavailable");
+  }
+
+  try {
+    await assertCareAssignmentNotSuperseded(
+      events, visitorId, assignment.occurredAt, eventId
+    );
+  } catch (error) {
+    if (error instanceof Error &&
+        error.message ===
+          "Historical Care assignment ownership superseded") {
+      return false;
+    }
+
+    throw error;
+  }
+
+  const current = await authority.read(visitorId);
+
+  if (current.status === "unavailable") {
+    throw new Error("Care consent authority unavailable");
+  }
+
+  return current.status === "ready" &&
+    current.state.effective === "granted" &&
+    current.state.pending === null &&
+    current.state.revision === assignment.expectedRevision;
+}
+
 async function recordFormationEventV1Internal(
   body: unknown,
   verifiedHistorical = false

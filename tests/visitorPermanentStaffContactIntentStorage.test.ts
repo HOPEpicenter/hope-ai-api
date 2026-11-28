@@ -1449,3 +1449,237 @@ test("concurrent Care release prevents stale assignment confirmation", async () 
     }
   }
 });
+
+test("Care queue exposes only synchronized current committed ownership", async () => {
+  const {
+    getFormationEventsTableClient,
+    getFormationProfilesTableClient,
+    getFormationProfileByVisitorId,
+    recordCommittedStaffCareAssignment
+  } = await import("../src/functions/_shared/formation");
+
+  const { readCanonicalCareProjection } =
+    await import("../src/services/care/readCanonicalCareProjection");
+
+  type Card = import(
+    "../src/services/dashboard/canonicalDashboardContracts"
+  ).CanonicalVisitorDashboardCard;
+
+  const consentTable =
+    createIsolatedVisitorTestTable("VisitorFollowupEvents");
+
+  const care = getFormationEventsTableClient();
+  const profiles = getFormationProfilesTableClient();
+
+  const created: TableClient[] = [];
+
+  const flag = "FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT";
+  const previousFlag = process.env[flag];
+
+  try {
+    process.env[flag] = "true";
+
+    for (const client of [consentTable, care, profiles]) {
+      const endpoint = new URL(client.url);
+
+      assert.equal(endpoint.hostname, "127.0.0.1");
+      assert.equal(
+        endpoint.port, process.env.HOPE_VISITOR_133_PORT
+      );
+
+      await client.createTable();
+      created.push(client);
+    }
+
+    const authority = repo(consentTable, true);
+
+    const command = {
+      operationId: "synthetic-queue-assignment",
+      actorId: "synthetic-pastor",
+      assigneeId: "synthetic-care-owner",
+      expectedRevision: 1
+    };
+
+    async function prepare(visitorId: string) {
+      await profiles.createEntity({
+        partitionKey: "VISITOR",
+        rowKey: visitorId,
+        visitorId,
+        displayName: "Synthetic visitor"
+      });
+
+      assert.equal((await authority.apply(visitorId, {
+        kind: "new_profile",
+        evidenceId: "synthetic-initial-consent",
+        initialConsent: true
+      })).status, "committed");
+
+      const committed =
+        await authority.appendStaffCareAssignment(
+          visitorId, command
+        );
+
+      if (committed.status !== "committed") {
+        throw Error("Expected committed assignment");
+      }
+
+      await recordCommittedStaffCareAssignment(
+        visitorId, command.operationId
+      );
+
+      const profile = await getFormationProfileByVisitorId(
+        profiles, visitorId
+      );
+
+      assert.ok(profile);
+
+      const card: Card = {
+        visitorId,
+        displayName: "Synthetic visitor",
+        lastActivityAt: committed.assignment.occurredAt,
+        lastActivitySummary: null,
+        stage: "Guest",
+        stageReason: null,
+        stageUpdatedAt: null,
+        stageUpdatedBy: null,
+        lastNextStep: null,
+        lastNextStepAt: null,
+        lastNextStepCompletedAt: null,
+        lastFollowupAssignedAt: committed.assignment.occurredAt,
+        lastFollowupOutcome: null,
+        lastFollowupOutcomeAt: null,
+        lastPrayerRequestedAt: null,
+        followupStatus: "action_needed",
+        assignedTo: command.assigneeId,
+        assignedToName: "Synthetic owner",
+        attentionState: "needs_attention",
+        followupUrgency: "ON_TRACK",
+        followupOverdue: false,
+        riskLevel: null,
+        riskScore: null,
+        needsFollowup: true,
+        followupResolved: false,
+        recommendedAction: null,
+        priorityBand: "normal",
+        priorityScore: 0,
+        priorityReason: "Synthetic"
+      };
+
+      return { profile, card, assignment: committed.assignment };
+    }
+
+    const releasedId = "synthetic-queue-release";
+    const replacedId = "synthetic-queue-replacement";
+    const withdrawnId = "synthetic-queue-withdrawal";
+
+    const released = await prepare(releasedId);
+    const replaced = await prepare(replacedId);
+    const withdrawn = await prepare(withdrawnId);
+
+    async function queue(
+      fixture: typeof released,
+      card: Card = fixture.card
+    ) {
+      return readCanonicalCareProjection({
+        profiles: [fixture.profile],
+        readDashboardCard: async id => {
+          assert.equal(id, card.visitorId);
+          return card;
+        }
+      });
+    }
+
+    const visible = await queue(released);
+
+    assert.equal(visible.count, 1);
+    assert.equal(
+      visible.items[0].assignedTo, command.assigneeId
+    );
+
+    console.log("VERIFIED_CARE_ASSIGNMENT_VISIBLE=True");
+
+    assert.equal((await queue(released, {
+      ...released.card,
+      assignedTo: "synthetic-different-owner"
+    })).count, 0);
+
+    assert.equal((await queue(released, {
+      ...released.card,
+      followupResolved: true
+    })).count, 0);
+
+    console.log("CONFLICTING_OR_RESOLVED_CARE_CARD_HIDDEN=True");
+
+    const releaseAt = new Date(
+      Date.parse(released.assignment.occurredAt) + 1000
+    ).toISOString();
+
+    // Persist the release without applying its profile update.
+    // This simulates the outstanding cross-storage gap.
+    await care.createEntity({
+      partitionKey: releasedId,
+      rowKey: `${releaseAt}__synthetic-queue-release`,
+      visitorId: releasedId,
+      type: "FOLLOWUP_UNASSIGNED",
+      occurredAt: releaseAt,
+      recordedAt: releaseAt,
+      idempotencyKey: "synthetic-queue-release",
+      channel: "api",
+      summary: "FOLLOWUP_UNASSIGNED",
+      metadata: JSON.stringify({
+        source: {
+          system: "hope-dashboard-next",
+          actorId: command.actorId
+        },
+        data: {}
+      })
+    });
+
+    assert.equal((await queue(released)).count, 0);
+
+    console.log("DURABLE_RELEASE_HIDES_STALE_CARE_OWNER=True");
+
+    const replacement =
+      await authority.appendStaffCareAssignment(
+        replacedId, {
+          ...command,
+          operationId: "synthetic-new-owner-command",
+          assigneeId: "synthetic-new-owner"
+        }
+      );
+
+    assert.equal(replacement.status, "committed");
+
+    // The newer assignment is durable but not synchronized.
+    assert.equal((await queue(replaced)).count, 0);
+
+    console.log("UNPROJECTED_REPLACEMENT_HIDES_OLD_OWNER=True");
+
+    assert.equal((await queue(withdrawn)).count, 1);
+
+    assert.equal((await authority.apply(
+      withdrawnId, no(1)
+    )).status, "committed");
+
+    assert.equal((await queue(withdrawn)).count, 0);
+
+    console.log("CONSENT_WITHDRAWAL_HIDES_CARE_ASSIGNMENT=True");
+
+    delete process.env[flag];
+
+    assert.equal((await queue(released)).count, 0);
+    assert.equal((await queue(replaced)).count, 0);
+
+    console.log("DEFAULT_OFF_CARE_QUEUE_HOLD_PRESERVED=True");
+  } finally {
+    if (previousFlag === undefined) {
+      delete process.env[flag];
+    } else {
+      process.env[flag] = previousFlag;
+    }
+
+    for (const client of created.reverse()) {
+      await client.deleteTable();
+    }
+  }
+});

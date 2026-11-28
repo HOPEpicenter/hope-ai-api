@@ -1153,3 +1153,182 @@ test("enrollment capability requires verified consent and active Staff", async (
     console.log("LEGACY_MODE_RESPONSE_PRESERVED=True");
   })
 );
+
+test("historical initialization preserves canonical Staff plan", () =>
+  fixture(async (c, v) => {
+    const { createLegacyVisitorConsentMigration } =
+      await import("../src/services/followups/permanentVisitorLegacyConsentMigration");
+
+    const {
+      SixWeekFollowupEventsRepository,
+      toSixWeekFollowupEventEntity
+    } = await import("../src/repositories/sixWeekFollowupEventsRepository");
+
+    const { readSixWeekVisitorFollowup } =
+      await import("../src/services/followups/readSixWeekVisitorFollowups");
+
+    const historicalId = "synthetic-unified-historical-visitor";
+    const historicalDate = "2026-10-01T12:00:00.000Z";
+
+    const repository = new SixWeekFollowupEventsRepository(c);
+    const consent = createPermanentVisitorConsentRepository(c);
+
+    const profile = {
+      partitionKey: "VISITOR",
+      rowKey: historicalId,
+      name: "Synthetic historical visitor",
+      createdAt: historicalDate
+    };
+
+    await v.createEntity(profile);
+
+    const originalProfile = await v.getEntity(
+      "VISITOR", historicalId
+    );
+
+    const originalPlan: SixWeekFollowupEvent = {
+      visitorId: historicalId,
+      eventId: "synthetic-original-staff-plan",
+      type: "six_week_followup.plan_started",
+      actorId: actor,
+      occurredAt: historicalDate,
+      data: {
+        firstVisitDate: "2026-10-01",
+        ownerStaffId: actor,
+        contactConsent: true,
+        preferredContactMethod: "call"
+      }
+    };
+
+    // Historical fixture only. This represents a plan
+    // already present before the authority cutover.
+    await c.createEntity(
+      toSixWeekFollowupEventEntity(originalPlan)
+    );
+
+    const originalEvents =
+      await repository.listByVisitor(historicalId);
+
+    assert.equal(originalEvents.length, 1);
+    assert.equal(
+      (await consent.read(historicalId)).status,
+      "not_initialized"
+    );
+
+    await assert.rejects(
+      readSixWeekVisitorFollowup(
+        historicalId, stamp, { repository }
+      )
+    );
+
+    const migration = createLegacyVisitorConsentMigration({
+      visitors: v,
+      repository: consent,
+      cutoff: stamp
+    });
+
+    const assessment = await migration.assess(historicalId);
+
+    assert.equal(assessment.status, "candidate");
+
+    if (assessment.status !== "candidate") {
+      throw Error("Expected historical migration candidate");
+    }
+
+    assert.equal(assessment.classification, "no_evidence");
+
+    assert.deepEqual(
+      await migration.execute(
+        historicalId, assessment.evidenceId
+      ),
+      { status: "migrated" }
+    );
+
+    const initialized = await consent.read(historicalId);
+
+    assert.equal(initialized.status, "ready");
+
+    if (initialized.status !== "ready") {
+      throw Error("Missing initialized authority");
+    }
+
+    assert.equal(initialized.state.effective, "unknown");
+    assert.equal(initialized.state.revision, 1);
+
+    await assert.rejects(
+      readSixWeekVisitorFollowup(
+        historicalId, stamp, { repository }
+      )
+    );
+
+    assert.deepEqual(
+      await repository.listByVisitor(historicalId),
+      originalEvents
+    );
+
+    console.log("SHARED_CANONICAL_INITIALIZATION_VERIFIED=True");
+    console.log("NO_AUTOMATIC_CONSENT_GRANTED=True");
+
+    const verified = await consent.apply(historicalId, {
+      kind: "verified_staff_decision",
+      expectedRevision: 1,
+      decisionId: "synthetic-historical-verification",
+      pendingRequestId: null,
+      actorId: "synthetic-authorized-admin",
+      decision: "granted"
+    });
+
+    assert.equal(verified.status, "committed");
+
+    const plan = await readSixWeekVisitorFollowup(
+      historicalId, stamp, { repository }
+    );
+
+    assert.ok(plan);
+    assert.equal(plan.staffWorkflow, "consent_protected_staff");
+    assert.equal(plan.startedBy, actor);
+    assert.equal(plan.ownerStaffId, actor);
+    assert.equal(plan.firstVisitDate, "2026-10-01");
+    assert.equal(plan.tasks.length, 6);
+
+    assert.deepEqual(
+      await migration.execute(
+        historicalId, assessment.evidenceId
+      ),
+      { status: "preserved" }
+    );
+
+    assert.deepEqual(
+      await repository.listByVisitor(historicalId),
+      originalEvents
+    );
+
+    assert.deepEqual(
+      await v.getEntity("VISITOR", historicalId),
+      originalProfile
+    );
+
+    console.log("EXISTING_STAFF_WORKFLOW_RESTORED=True");
+    console.log("HISTORICAL_PROFILE_AND_PLAN_PRESERVED=True");
+
+    assert.equal((await consent.apply(historicalId, {
+      kind: "public_request",
+      expectedRevision: 2,
+      requestId: "synthetic-historical-withdrawal",
+      requestedConsent: false
+    })).status, "committed");
+
+    await assert.rejects(
+      readSixWeekVisitorFollowup(
+        historicalId, stamp, { repository }
+      )
+    );
+
+    assert.deepEqual(
+      await repository.listByVisitor(historicalId),
+      originalEvents
+    );
+
+    console.log("SUBSEQUENT_WITHDRAWAL_PROTECTED=True");
+  })
+);

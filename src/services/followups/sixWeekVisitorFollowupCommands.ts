@@ -40,7 +40,7 @@ type FollowupRepository = Pick<
   "append" | "listByVisitor"
 > & Partial<Pick<
   SixWeekFollowupEventsRepository,
-  "claimConsentProtectedOwner" | "recordConsentProtectedTaskOutcome" | "resumeConsentProtectedPlan"
+  "startConsentProtectedPlan" | "claimConsentProtectedOwner" | "recordConsentProtectedTaskOutcome" | "resumeConsentProtectedPlan"
 >>;
 
 type StaffIdentity = {
@@ -365,30 +365,74 @@ export async function startSixWeekVisitorFollowup(
     if (assigneeFailure) return assigneeFailure;
   }
 
-  const consentFailure = await requireCurrentRegistrationConsent(visitorId, dependencies);
+  const repository = repositoryFor(dependencies);
+
+  const coordinatedStart =
+    contactWriterHoldEnabled() &&
+    typeof repository.startConsentProtectedPlan === "function";
+
+  const consentFailure = await requireCurrentRegistrationConsent(
+    visitorId, dependencies, coordinatedStart
+  );
+
   if (consentFailure) return consentFailure;
 
   const occurredAt = (
     dependencies.now ?? (() => new Date().toISOString())
   )();
 
+  const event: SixWeekFollowupEvent = {
+    eventId: (dependencies.newEventId ?? defaultEventId)(),
+    visitorId,
+    type: "six_week_followup.plan_started",
+    occurredAt,
+    actorId,
+    data: {
+      firstVisitDate,
+      ownerStaffId,
+      contactConsent: true,
+      preferredContactMethod
+    }
+  };
+
+  if (coordinatedStart && repository.startConsentProtectedPlan) {
+    const result = await repository.startConsentProtectedPlan(event);
+
+    if (result === "blocked") {
+      return commandFailure(409, "Visitor follow-up permission unavailable");
+    }
+
+    if (result === "conflict") {
+      return commandFailure(409, "A follow-up plan already exists");
+    }
+
+    if (result !== "created") {
+      return commandFailure(503, "Follow-up creation could not be confirmed");
+    }
+
+    const plan = projectSixWeekVisitorFollowup(
+      await repository.listByVisitor(visitorId), occurredAt
+    );
+
+    if (!plan) {
+      return commandFailure(503, "Follow-up projection could not be confirmed");
+    }
+
+    return {
+      accepted: true,
+      status: 201,
+      created: true,
+      eventId: event.eventId,
+      eventType: event.type,
+      plan
+    };
+  }
+
   return appendAndProject({
-    repository: repositoryFor(dependencies),
+    repository,
     asOf: occurredAt,
     successStatus: 201,
-    event: {
-      eventId: (dependencies.newEventId ?? defaultEventId)(),
-      visitorId,
-      type: "six_week_followup.plan_started",
-      occurredAt,
-      actorId,
-      data: {
-        firstVisitDate,
-        ownerStaffId,
-        contactConsent: true,
-        preferredContactMethod
-      }
-    }
+    event
   });
 }
 

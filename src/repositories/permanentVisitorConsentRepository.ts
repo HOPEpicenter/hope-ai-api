@@ -293,6 +293,99 @@ export function createPermanentVisitorConsentRepository(
    * Consent and plan creation share one atomic transaction.
    * Historical intent evidence is never execution authority.
    */
+  /**
+   * Trusted Staff enrollment after existing actor,
+   * visitor and assignee authorization.
+   * Consent and plan creation commit together.
+   */
+  async function appendStaffEnrollment(
+    event: SixWeekFollowupEvent
+  ): Promise<"created" | "conflict" | "blocked" | "unavailable"> {
+    try {
+      if (!sharedSixWeek ||
+          event.type !== "six_week_followup.plan_started" ||
+          !validId(event.visitorId) ||
+          !validId(event.eventId) ||
+          !validId(event.actorId) ||
+          event.actorId === PUBLIC_VISITOR_SYSTEM_ORIGIN ||
+          !validTime(event.occurredAt) ||
+          Object.keys(event.data).length !== 4 ||
+          event.data.contactConsent !== true ||
+          (event.data.ownerStaffId !== null &&
+           !validId(event.data.ownerStaffId)) ||
+          (event.data.preferredContactMethod !== null &&
+           !["call", "email", "in_person", "none"].includes(
+             String(event.data.preferredContactMethod)
+           ))) {
+        return "unavailable";
+      }
+
+      const firstVisitDate = event.data.firstVisitDate;
+
+      if (typeof firstVisitDate !== "string" ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(firstVisitDate)) {
+        return "unavailable";
+      }
+
+      const parsed = new Date(`${firstVisitDate}T00:00:00.000Z`);
+
+      if (!Number.isFinite(parsed.getTime()) ||
+          parsed.toISOString().slice(0, 10) !== firstVisitDate) {
+        return "unavailable";
+      }
+
+      const pk = partition(event.visitorId);
+      const current = await head(pk);
+
+      if (!current) return "unavailable";
+      if (!contactPermitted(current.state)) return "blocked";
+
+      const entity = toSixWeekFollowupEventEntity(event);
+
+      if (await get<typeof entity>(pk, entity.rowKey)) {
+        return "conflict";
+      }
+
+      const unchanged = {
+        partitionKey: pk,
+        rowKey: HEAD,
+        schemaVersion: 1,
+        stateJson: json(current.state),
+        lastOperationId: current.lastOperationId
+      };
+
+      try {
+        await table.submitTransaction([
+          ["update", unchanged, "Replace", { etag: current.etag }],
+          ["create", entity]
+        ]);
+
+        return "created";
+      } catch {
+        const observed = await head(pk);
+
+        if (!observed) return "unavailable";
+        if (!contactPermitted(observed.state)) return "blocked";
+
+        const existing = await get<typeof entity>(pk, entity.rowKey);
+
+        if (existing) {
+          return existing.eventId === entity.eventId &&
+            existing.visitorId === entity.visitorId &&
+            existing.actorId === entity.actorId &&
+            existing.type === entity.type &&
+            existing.occurredAt === entity.occurredAt &&
+            existing.dataJson === entity.dataJson
+            ? "created" : "conflict";
+        }
+
+        return "unavailable";
+      }
+    } catch {
+      return "unavailable";
+    }
+  }
+
   async function appendPublicEnrollment(
     evidence: RecordedPublicVisitEvidence,
     event: SixWeekFollowupEvent
@@ -567,6 +660,7 @@ export function createPermanentVisitorConsentRepository(
     read, apply, inspectOperation,
     recordContactIntent, inspectContactIntent,
     appendPublicEnrollment,
+    appendStaffEnrollment,
     appendStaffOwnerClaim,
     appendStaffTaskOutcome,
     appendStaffPlanResume

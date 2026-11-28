@@ -95,6 +95,21 @@ export class SixWeekFollowupEventsRepository {
    * Trusted Staff command boundary.
    * Ordinary append remains subject to the existing writer hold.
    */
+  async startConsentProtectedPlan(
+    event: SixWeekFollowupEvent
+  ): Promise<"created" | "conflict" | "blocked" | "unavailable"> {
+    if (!contactWriterHoldEnabled()) return "unavailable";
+
+    const table = await this.tableFor();
+
+    const { createPermanentVisitorConsentRepository } =
+      await import("./permanentVisitorConsentRepository");
+
+    return createPermanentVisitorConsentRepository(
+      table, true
+    ).appendStaffEnrollment(event);
+  }
+
   async claimConsentProtectedOwner(
     event: SixWeekFollowupEvent
   ): Promise<"claimed" | "conflict" | "blocked" | "unavailable"> {

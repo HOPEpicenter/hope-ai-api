@@ -852,3 +852,192 @@ test("administrator consent decisions are authorized durable and revision bound"
     });
   })
 );
+
+test("atomic Staff enrollment preserves authorization consent and existing plans", () =>
+  fixture(async c => {
+    const { SixWeekFollowupEventsRepository } =
+      await import("../src/repositories/sixWeekFollowupEventsRepository");
+
+    const { startSixWeekVisitorFollowup } =
+      await import("../src/services/followups/sixWeekVisitorFollowupCommands");
+
+    const authority = createPermanentVisitorConsentRepository(c);
+    const repository = new SixWeekFollowupEventsRepository(c);
+
+    const grantedId = "synthetic-staff-enrollment-granted";
+    const declinedId = "synthetic-staff-enrollment-declined";
+    const pendingId = "synthetic-staff-enrollment-pending";
+    const missingId = "synthetic-staff-enrollment-missing";
+    const racingId = "synthetic-staff-enrollment-race";
+
+    async function initialize(
+      visitorId: string,
+      decision: "granted" | "declined"
+    ) {
+      assert.equal((await authority.apply(visitorId, {
+        kind: "existing_profile",
+        evidenceId: "synthetic-historical-init"
+      })).status, "committed");
+
+      assert.equal((await authority.apply(visitorId, {
+        kind: "verified_staff_decision",
+        expectedRevision: 1,
+        decisionId: "synthetic-verified-decision",
+        pendingRequestId: null,
+        actorId: "synthetic-authorized-admin",
+        decision
+      })).status, "committed");
+    }
+
+    await initialize(grantedId, "granted");
+    await initialize(declinedId, "declined");
+    await initialize(pendingId, "granted");
+    await initialize(racingId, "granted");
+
+    assert.equal((await authority.apply(pendingId, {
+      kind: "public_request",
+      expectedRevision: 2,
+      requestId: "synthetic-pending-withdrawal",
+      requestedConsent: false
+    })).status, "committed");
+
+    const dependencies = {
+      repository,
+      visitorExists: async () => true,
+      readActor: async (staffId: string) => ({
+        staffId,
+        status: "active" as const
+      }),
+      readAssignee: async (staffId: string) => ({
+        staffId,
+        status: "active" as const
+      }),
+      now: () => stamp,
+      newEventId: () => `synthetic-start-${randomUUID()}`
+    };
+
+    function input(visitorId: string) {
+      return {
+        visitorId,
+        actorId: actor,
+        firstVisitDate: "2026-11-24",
+        contactConsent: true,
+        ownerStaffId: actor
+      };
+    }
+
+    const inactive = await startSixWeekVisitorFollowup(
+      input(grantedId), {
+        ...dependencies,
+        readActor: async staffId => ({
+          staffId,
+          status: "inactive" as const
+        })
+      }
+    );
+
+    assert.equal(inactive.accepted, false);
+
+    const inactiveOwner = await startSixWeekVisitorFollowup(
+      input(grantedId), {
+        ...dependencies,
+        readAssignee: async staffId => ({
+          staffId,
+          status: "inactive" as const
+        })
+      }
+    );
+
+    assert.equal(inactiveOwner.accepted, false);
+    assert.equal((await repository.listByVisitor(grantedId)).length, 0);
+
+    for (const [visitorId, status] of [
+      [declinedId, 409],
+      [pendingId, 409],
+      [missingId, 503]
+    ] as const) {
+      const denied = await startSixWeekVisitorFollowup(
+        input(visitorId), dependencies
+      );
+
+      assert.equal(denied.accepted, false);
+      assert.equal(denied.status, status);
+      assert.equal((await repository.listByVisitor(visitorId)).length, 0);
+    }
+
+    console.log("STAFF_ENROLLMENT_DENIALS_VERIFIED=True");
+
+    const result = await startSixWeekVisitorFollowup(
+      input(grantedId), dependencies
+    );
+
+    assert.equal(result.accepted, true);
+    assert.equal(result.status, 201);
+
+    if (!result.accepted) {
+      throw Error("Expected Staff enrollment");
+    }
+
+    assert.equal(result.plan.startedBy, actor);
+    assert.equal(result.plan.ownerStaffId, actor);
+    assert.equal(result.plan.tasks.length, 6);
+
+    const original = await repository.listByVisitor(grantedId);
+
+    assert.equal(original.length, 1);
+
+    const duplicate = await startSixWeekVisitorFollowup(
+      input(grantedId), dependencies
+    );
+
+    assert.equal(duplicate.accepted, false);
+    assert.equal(duplicate.status, 409);
+
+    assert.deepEqual(
+      await repository.listByVisitor(grantedId),
+      original
+    );
+
+    console.log("VERIFIED_STAFF_ENROLLMENT_PERSISTED=True");
+    console.log("EXISTING_PLAN_NOT_RESET=True");
+
+    let injected = false;
+
+    const racingAuthority = baseRepository({
+      getEntity: c.getEntity.bind(c),
+      listEntities: c.listEntities.bind(c),
+      submitTransaction: async actions => {
+        assert.equal(injected, false);
+        injected = true;
+
+        assert.equal((await authority.apply(racingId, {
+          kind: "public_request",
+          expectedRevision: 2,
+          requestId: "synthetic-concurrent-withdrawal",
+          requestedConsent: false
+        })).status, "committed");
+
+        return c.submitTransaction(actions);
+      }
+    }, true);
+
+    const raced = await startSixWeekVisitorFollowup(
+      input(racingId), {
+        ...dependencies,
+        repository: {
+          append: repository.append.bind(repository),
+          listByVisitor: repository.listByVisitor.bind(repository),
+          startConsentProtectedPlan: event =>
+            racingAuthority.appendStaffEnrollment(event)
+        }
+      }
+    );
+
+    assert.equal(injected, true);
+    assert.equal(raced.accepted, false);
+    assert.equal(raced.status, 409);
+    assert.equal((await repository.listByVisitor(racingId)).length, 0);
+
+    console.log("CONCURRENT_WITHDRAWAL_BLOCKS_ENROLLMENT=True");
+  })
+);

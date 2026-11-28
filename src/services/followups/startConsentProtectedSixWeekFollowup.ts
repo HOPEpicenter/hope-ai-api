@@ -75,7 +75,7 @@ export async function startConsentProtectedSixWeekFollowup(
       };
     }
 
-    if (consent === "granted" && contactWriterHoldEnabled()) {
+    if (consent === "granted" && contactWriterHoldEnabled() && deps.start) {
       return { accepted: false, status: 503, error: CONTACT_WRITER_HOLD_MESSAGE };
     }
     if (consent !== "granted" &&

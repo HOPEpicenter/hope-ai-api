@@ -28,6 +28,10 @@ import {
   redactDashboardPastoralRisk
 } from "../../services/authorization/redactDashboardPastoralRisk";
 
+export function careProfileFallbackAllowed(): boolean {
+  return !contactWriterHoldEnabled();
+}
+
 function parseLimit(val: unknown, fallback = 200): number {
   const n = typeof val === "string" ? Number(val) : fallback;
   if (!Number.isFinite(n)) return fallback;
@@ -308,6 +312,12 @@ export async function getDashboardFollowups(
       body: {
         ok: true,
         requestId,
+        ...(req?.query?.careOwnershipOnly === "true"
+          ? {
+              careProfileFallbackAllowed:
+                careProfileFallbackAllowed()
+            }
+          : {}),
         count: items.length,
         limit,
         cursor: nextCursor,

@@ -886,3 +886,208 @@ test("authenticated Care endpoint preserves consent authorization and recovery",
     }
   }
 });
+
+test("Care assignment capability requires pastoral authority and verified consent", async () => {
+  const { getVisitorRegistrationHistory } =
+    await import("../src/functions/getVisitorRegistrationHistory");
+
+  type AuthorityRead = import(
+    "../src/repositories/permanentVisitorConsentRepository"
+  ).ConsentAuthorityRead;
+
+  type Staff = import(
+    "../src/domain/staff/projectStaffDirectory"
+  ).CanonicalStaffIdentity;
+
+  const settings: Record<string, string> = {
+    FEATURE_PERMANENT_VISITOR_REGISTRATION_HISTORY: "true",
+    FEATURE_PERMANENT_VISITOR_CONSENT_AUTHORITY: "true",
+    FEATURE_PERMANENT_VISITOR_CONSENT_GUARD: "true",
+    FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT: "true",
+    HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER:
+      "2026-11-24T00:00:00.000Z",
+    HOPE_API_KEY: "synthetic-history-key"
+  };
+
+  const previous = Object.fromEntries(
+    Object.keys(settings).map(key => [
+      key, process.env[key]
+    ])
+  );
+
+  Object.assign(process.env, settings);
+
+  const granted: AuthorityRead = {
+    status: "ready",
+    state: {
+      version: 1,
+      revision: 3,
+      effective: "granted",
+      pending: null,
+      evidenceId: "synthetic-verified-consent"
+    }
+  };
+
+  const stamp = "2026-11-24T12:00:00.000Z";
+  const visitorId = "synthetic-care-capability";
+
+  try {
+    async function invoke(
+      roleLabel = "Pastor",
+      status: Staff["status"] = "active",
+      decision: "granted" | "declined" |
+        "pending_verification" | "unavailable" = "granted",
+      authority: AuthorityRead = granted,
+      key = settings.HOPE_API_KEY
+    ) {
+      const staff: Staff = {
+        staffId: "synthetic-staff",
+        displayName: "Synthetic Staff",
+        status,
+        roleLabel,
+        createdAt: stamp,
+        updatedAt: stamp,
+        lastEventId: "synthetic-staff-event",
+        entraTenantId: null,
+        entraObjectId: null,
+        email: null,
+        phone: null,
+        ministryAreaId: null
+      };
+
+      let authorityReads = 0;
+      const context: any = {};
+
+      await getVisitorRegistrationHistory(context, {
+        method: "GET",
+        params: { id: visitorId },
+        headers: {
+          "x-api-key": key,
+          "x-hope-staff-actor-id": staff.staffId
+        }
+      }, {
+        readStaff: async () => staff,
+        readHistory: async () => ({
+          status: "ready",
+          registrationCount: 0,
+          truncated: false,
+          items: []
+        }),
+        readConsent: async () => decision,
+        readCareAuthority: async id => {
+          assert.equal(id, visitorId);
+          authorityReads++;
+          return authority;
+        }
+      });
+
+      return { ...context.res, authorityReads };
+    }
+
+    const allowed = await invoke();
+
+    assert.equal(allowed.status, 200);
+
+    assert.deepEqual(allowed.body.careAssignment, {
+      workflow: "consent_protected_care_assignment",
+      expectedConsentRevision: 3
+    });
+
+    assert.equal(allowed.body.currentConsent, "unavailable");
+
+    assert.equal(
+      allowed.body.sixWeekEnrollment,
+      "consent_protected_staff"
+    );
+
+    assert.equal(allowed.authorityReads, 1);
+
+    const leader = await invoke("Ministry Leader");
+
+    assert.deepEqual(
+      leader.body.careAssignment,
+      allowed.body.careAssignment
+    );
+
+    console.log("PASTORAL_CARE_CAPABILITY_VERIFIED=True");
+    console.log("GENERAL_CONTACT_HOLD_PRESERVED=True");
+
+    const ordinary = await invoke("Care Team");
+
+    assert.equal(ordinary.status, 200);
+    assert.equal(ordinary.body.careAssignment, undefined);
+    assert.equal(ordinary.authorityReads, 0);
+
+    const inactive = await invoke("Pastor", "inactive");
+
+    assert.equal(inactive.status, 403);
+    assert.equal(inactive.authorityReads, 0);
+
+    const wrongKey = await invoke(
+      "Pastor", "active", "granted",
+      granted, "incorrect-key"
+    );
+
+    assert.equal(wrongKey.status, 401);
+    assert.equal(wrongKey.authorityReads, 0);
+
+    console.log("UNAUTHORIZED_CARE_CAPABILITY_DENIED=True");
+
+    for (const decision of [
+      "declined", "pending_verification", "unavailable"
+    ] as const) {
+      const denied = await invoke(
+        "Pastor", "active", decision
+      );
+
+      assert.equal(denied.body.careAssignment, undefined);
+      assert.equal(denied.authorityReads, 0);
+    }
+
+    for (const authority of [
+      { status: "not_initialized" },
+      { status: "unavailable" },
+      {
+        status: "ready",
+        state: {
+          ...granted.state,
+          revision: 4,
+          pending: {
+            kind: "withdrawal",
+            requestId: "synthetic-withdrawal"
+          }
+        }
+      }
+    ] as AuthorityRead[]) {
+      const denied = await invoke(
+        "Pastor", "active", "granted", authority
+      );
+
+      assert.equal(denied.body.careAssignment, undefined);
+    }
+
+    console.log("UNVERIFIED_AND_WITHDRAWN_CONSENT_DENIED=True");
+
+    delete process.env.FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT;
+
+    const disabled = await invoke();
+
+    assert.equal(disabled.body.careAssignment, undefined);
+    assert.equal(disabled.authorityReads, 0);
+
+    assert.equal(
+      disabled.body.sixWeekEnrollment,
+      "consent_protected_staff"
+    );
+
+    console.log("DEFAULT_OFF_GATE_AND_SIX_WEEK_COMPATIBILITY_VERIFIED=True");
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+  }
+});

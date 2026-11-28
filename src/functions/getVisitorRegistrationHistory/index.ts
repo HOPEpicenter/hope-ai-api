@@ -1,4 +1,11 @@
 import { requireApiKeyForFunction } from "../_shared/apiKey";
+import { canAssignCareOwner } from "../../services/authorization/pastoralAuthorization";
+import {
+  createPermanentVisitorConsentRepository,
+  type ConsentAuthorityRead
+} from "../../repositories/permanentVisitorConsentRepository";
+import { permitsContactWork } from "../../domain/followups/permanentVisitorConsentAuthority";
+import { getTableClient } from "../_shared/tableClient";
 import { readHighRiskStaffVisibility } from "../_shared/highRiskStaffActor";
 import { readCanonicalVisitorRegistrationFamilyHistory } from "../../services/visitors/readCanonicalVisitorRegistrationFamilyHistory";
 import { contactWriterHoldEnabled } from "../../services/followups/permanentVisitorContactWriterHold";
@@ -8,6 +15,9 @@ type Dependencies = {
   readStaff?: Parameters<typeof readHighRiskStaffVisibility>[1];
   readHistory?: typeof readCanonicalVisitorRegistrationFamilyHistory;
   readConsent?: typeof readLatestRegistrationConsent;
+  readCareAuthority?: (
+    visitorId: string
+  ) => Promise<ConsentAuthorityRead>;
 };
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
@@ -82,8 +92,51 @@ export async function getVisitorRegistrationHistory(
         } : { status: "not_confirmed" }
       };
     });
+    let careAssignment:
+      | {
+          workflow: "consent_protected_care_assignment";
+          expectedConsentRevision: number;
+        }
+      | undefined;
+
+    if (contactWriterHoldEnabled() &&
+        process.env.FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT === "true" &&
+        decision === "granted" &&
+        canAssignCareOwner(visibility.actor)) {
+
+      const cutover =
+        process.env.HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER;
+
+      if (cutover &&
+          Number.isFinite(Date.parse(cutover)) &&
+          new Date(cutover).toISOString() === cutover) {
+
+        try {
+          const authority = await (
+            deps.readCareAuthority ??
+            (async (id: string) =>
+              createPermanentVisitorConsentRepository(
+                getTableClient("VisitorFollowupEvents"), true
+              ).read(id))
+          )(visitorId);
+
+          if (authority.status === "ready" &&
+              permitsContactWork(authority.state)) {
+            careAssignment = {
+              workflow: "consent_protected_care_assignment",
+              expectedConsentRevision: authority.state.revision
+            };
+          }
+        } catch {
+          // Preserve history while withholding unavailable
+          // assignment capability.
+        }
+      }
+    }
+
     reply(200, {
       ok: true, visitorId, currentConsent,
+      ...(careAssignment ? { careAssignment } : {}),
       ...(contactWriterHoldEnabled() && decision === "granted"
         ? { sixWeekEnrollment: "consent_protected_staff" }
         : {}),

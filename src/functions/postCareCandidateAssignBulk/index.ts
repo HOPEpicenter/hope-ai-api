@@ -1,3 +1,7 @@
+import {
+  requireCurrentRegistrationContactPermission,
+  type RegistrationConsentReader
+} from "../../services/followups/requireCurrentRegistrationContactPermission";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
   ensureTable,
@@ -23,6 +27,7 @@ export type CareBulkAssignDependencies = {
   requireApiKey?: typeof requireApiKeyForFunction;
   requireActor?: typeof requireCareOwnerActor;
   requireAssignee?: typeof requireCareOwnerAssignee;
+  readRegistrationConsent?: RegistrationConsentReader;
   getTable?: typeof getFormationProfilesTableClient;
   ensureTable?: typeof ensureTable;
   getVisitor?: typeof getVisitorById;
@@ -110,6 +115,22 @@ export async function postCareCandidateAssignBulk(
       return;
     }
 
+    // Preflight every requested visitor before creating or changing
+    // any formation profile. Mixed-consent batches fail before writes.
+    for (const visitorId of new Set<string>(visitorIds)) {
+      const consentFailure = await requireCurrentRegistrationContactPermission(
+        visitorId, dependencies.readRegistrationConsent
+      );
+      if (consentFailure) {
+        context.res = {
+          status: consentFailure.status,
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+          body: { ok: false, requestId, error: consentFailure.error }
+        };
+        return;
+      }
+    }
+
     const table = (
       dependencies.getTable ?? getFormationProfilesTableClient
     )();
@@ -149,6 +170,20 @@ export async function postCareCandidateAssignBulk(
         assignedTo,
         updatedAt: new Date().toISOString()
       };
+
+      const currentConsentFailure = await requireCurrentRegistrationContactPermission(
+        visitorId, dependencies.readRegistrationConsent
+      );
+      if (currentConsentFailure) {
+        results.push({
+          visitorId,
+          found: true,
+          assigned: false,
+          status: currentConsentFailure.status,
+          error: currentConsentFailure.error
+        });
+        continue;
+      }
 
       await (
         dependencies.upsertProfile ?? upsertFormationProfile

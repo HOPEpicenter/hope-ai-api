@@ -153,6 +153,21 @@ function pendingStatus(
   return "upcoming";
 }
 
+export const PUBLIC_VISITOR_SYSTEM_ORIGIN =
+  "system:permanent-visitor-registration";
+
+export const PUBLIC_VISITOR_CONSENT_WITHDRAWAL_REASON =
+  "Visitor withdrew follow-up permission";
+
+export function isPublicVisitorConsentWithdrawal(
+  event: SixWeekFollowupEvent
+): boolean {
+  return event.type === "six_week_followup.plan_cancelled" &&
+    event.actorId === PUBLIC_VISITOR_SYSTEM_ORIGIN &&
+    event.data.reason ===
+      PUBLIC_VISITOR_CONSENT_WITHDRAWAL_REASON;
+}
+
 export function projectSixWeekVisitorFollowup(
   events: SixWeekFollowupEvent[],
   asOf = new Date().toISOString()
@@ -236,6 +251,21 @@ export function projectSixWeekVisitorFollowup(
         taskCareOutcomeEvents.set(weekNumber, event);
       }
     }
+  }
+
+  // A recorded public consent withdrawal cannot be
+  // overridden by a later ordinary resume event.
+  // Existing historical task outcomes remain intact.
+  const withdrawal = ordered.find(
+    isPublicVisitorConsentWithdrawal
+  );
+
+  if (withdrawal) {
+    status = "cancelled";
+    cancelledAt = withdrawal.occurredAt;
+    cancellationReason =
+      PUBLIC_VISITOR_CONSENT_WITHDRAWAL_REASON;
+    pausedAt = null;
   }
 
   const asOfDate = dateOnly(asOf);

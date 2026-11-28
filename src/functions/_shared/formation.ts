@@ -1,3 +1,9 @@
+import { isDeepStrictEqual } from "node:util";
+import {
+  PUBLIC_VISITOR_SYSTEM_ORIGIN
+} from "../../domain/followups/projectSixWeekVisitorFollowup";
+
+import { assertContactWriterNotHeld, contactWriterHoldEnabled } from "../../services/followups/permanentVisitorContactWriterHold";
 import { getTableClient as getHopeTableClient } from "./tableClient";
 import { compareTimelineNewestFirst } from "../../shared/timeline/timelineOrdering";
 import { TableClient } from "@azure/data-tables";
@@ -667,7 +673,479 @@ async function applyFormationEventToProfile(params: {
     });
   }
 }
-export async function recordFormationEventV1(body: unknown): Promise<{
+export async function recordFormationEventV1(body: unknown) {
+  return recordFormationEventV1Internal(body);
+}
+
+function sameHistoricalJson(a: unknown, b: unknown): boolean {
+  return isDeepStrictEqual(
+    JSON.parse(JSON.stringify(a)),
+    JSON.parse(JSON.stringify(b))
+  );
+}
+
+/**
+ * Internal historical synchronization only.
+ * The caller's envelope must exactly match data derived from
+ * an existing committed six-week event.
+ */
+export async function recordCommittedSixWeekCareEvent(body: unknown) {
+  if (!contactWriterHoldEnabled()) {
+    throw new Error("Historical Care synchronization unavailable");
+  }
+
+  const envelope = validateFormationEventEnvelopeV1Strict(body);
+  const visitorId = String(envelope.visitorId).trim();
+  const data = asObject(envelope.data);
+  const type = String(envelope.type).trim();
+  const sourceId = String(data.sixWeekEventId ?? "").trim();
+
+  const validId = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+  if (!validId.test(visitorId) || !validId.test(sourceId)) {
+    throw new Error("Invalid historical Care evidence");
+  }
+
+  const { SixWeekFollowupEventsRepository } =
+    await import("../../repositories/sixWeekFollowupEventsRepository");
+
+  const events = await new SixWeekFollowupEventsRepository()
+    .listByVisitor(visitorId);
+
+  const matching = events.filter(
+    event => event.eventId === sourceId
+  );
+
+  if (matching.length !== 1) {
+    throw new Error("Committed six-week evidence not found");
+  }
+
+  const event = matching[0];
+
+  if (event.visitorId !== visitorId ||
+      !validId.test(event.actorId) ||
+      event.actorId === PUBLIC_VISITOR_SYSTEM_ORIGIN) {
+    throw new Error("Invalid historical Care actor evidence");
+  }
+
+  const historical = event.type ===
+    "six_week_followup.task_care_outcome_recorded";
+
+  const tasks = historical
+    ? events.filter(item =>
+        item.eventId === data.sixWeekSourceTaskEventId
+      )
+    : [event];
+
+  if (tasks.length !== 1) {
+    throw new Error("Historical task evidence not found");
+  }
+
+  const task = tasks[0];
+  const weekNumber = Number(task.data.weekNumber);
+
+  if (task.visitorId !== visitorId ||
+      task.type !== "six_week_followup.task_completed" ||
+      !Number.isInteger(weekNumber) ||
+      weekNumber < 1 || weekNumber > 6 ||
+      !["call", "email", "in_person"].includes(
+        String(task.data.contactMethod)
+      ) ||
+      typeof task.data.outcome !== "string" ||
+      !task.data.outcome.trim()) {
+    throw new Error("Committed contact evidence is invalid");
+  }
+
+  const source = resolveMutationSource({
+    system: "six_week_followup",
+    actorId: event.actorId
+  });
+
+  let expected: Record<string, unknown>;
+
+  if (type === "FOLLOWUP_CONTACTED" && !historical) {
+    expected = {
+      v: 1,
+      eventId: `${event.eventId}:care-contact`,
+      visitorId,
+      type,
+      occurredAt: event.occurredAt,
+      source,
+      data: {
+        method: task.data.contactMethod,
+        result: task.data.outcome,
+        notes: task.data.notes ?? null,
+        sixWeekWeekNumber: weekNumber,
+        sixWeekEventId: event.eventId
+      }
+    };
+  } else if (type === "FOLLOWUP_OUTCOME_RECORDED" &&
+             weekNumber === 6 &&
+             Number(event.data.weekNumber) === 6 &&
+             (event.data.careOutcome === "connected" ||
+              event.data.careOutcome === "closed")) {
+    const notes = [
+      task.data.outcome,
+      task.data.notes,
+      ...(historical ? [event.data.notes] : [])
+    ].map(value => String(value ?? "").trim())
+      .filter(Boolean).join("\n\n");
+
+    expected = {
+      v: 1,
+      eventId: `${event.eventId}:care-outcome`,
+      visitorId,
+      type,
+      occurredAt: event.occurredAt,
+      source,
+      data: {
+        outcome: event.data.careOutcome,
+        notes,
+        sixWeekWeekNumber: 6,
+        sixWeekEventId: event.eventId,
+        ...(historical
+          ? { sixWeekSourceTaskEventId: task.eventId }
+          : {})
+      }
+    };
+  } else {
+    throw new Error("Historical Care operation not supported");
+  }
+
+  if (String(envelope.eventId) !== expected.eventId ||
+      normalizeIso(envelope.occurredAt, "occurredAt") !==
+        expected.occurredAt ||
+      !sameHistoricalJson(asObject(envelope.source), expected.source) ||
+      !sameHistoricalJson(data, expected.data)) {
+    throw new Error("Historical Care evidence does not match");
+  }
+
+  // This private path receives reconstructed durable evidence,
+  // never an unverified caller-provided execution permission.
+  return recordFormationEventV1Internal(expected, true);
+}
+
+/**
+ * Synchronize an already committed Staff care assignment.
+ * Reconstruct the formation event exclusively from durable
+ * consent-authorized storage evidence.
+ *
+ * This does not authorize new contact work.
+ */
+export async function recordCommittedStaffCareAssignment(
+  visitorId: string,
+  operationId: string
+) {
+  if (!contactWriterHoldEnabled()) {
+    throw new Error("Committed Care synchronization unavailable");
+  }
+
+  const validId = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+  if (!validId.test(visitorId) ||
+      !validId.test(operationId)) {
+    throw new Error("Invalid committed Care reference");
+  }
+
+  const { createPermanentVisitorConsentRepository } =
+    await import("../../repositories/permanentVisitorConsentRepository");
+
+  const repository = createPermanentVisitorConsentRepository(
+    getHopeTableClient("VisitorFollowupEvents"), true
+  );
+
+  const committed = await repository.readCommittedCareAssignment(
+    visitorId, operationId
+  );
+
+  if (committed.status !== "found") {
+    throw new Error("Committed Care assignment unavailable");
+  }
+
+  const assignment = committed.assignment;
+
+  // Operation IDs are visitor-scoped. Include the visitor
+  // reference in the formation and global timeline identity.
+  const eventId =
+    `care-assignment:${visitorId.length}:${visitorId}:${operationId}`;
+
+  const expected = {
+    v: 1,
+    eventId,
+    visitorId,
+    type: "FOLLOWUP_ASSIGNED",
+    occurredAt: assignment.occurredAt,
+    source: resolveMutationSource({
+      system: "hope-dashboard-next",
+      actorId: assignment.actorId
+    }),
+    data: {
+      assigneeId: assignment.assigneeId
+    }
+  };
+
+  const synchronized =
+    await recordFormationEventV1Internal(expected, true);
+
+  if (synchronized.profile.assignedTo !==
+      assignment.assigneeId) {
+    throw new Error(
+      "Committed Care assignment projection requires reconciliation"
+    );
+  }
+
+  return synchronized;
+}
+
+/** Historical ownership check, never a contact authorization. */
+async function assertCareAssignmentNotSuperseded(
+  eventsTable: TableClient,
+  visitorId: string,
+  occurredAt: string,
+  eventId: string
+): Promise<void> {
+  const filter =
+    `PartitionKey eq '${escapeOData(visitorId)}' and ` +
+    "(type eq 'FOLLOWUP_ASSIGNED' or " +
+    "type eq 'FOLLOWUP_UNASSIGNED')";
+
+  let inspected = 0;
+
+  for await (const row of eventsTable.listEntities<{
+    visitorId: string;
+    type: string;
+    occurredAt: string;
+    idempotencyKey: string;
+  }>({
+    queryOptions: { filter }
+  })) {
+    inspected++;
+
+    if (inspected > 2000 ||
+        row.partitionKey !== visitorId ||
+        row.visitorId !== visitorId ||
+        (row.type !== "FOLLOWUP_ASSIGNED" &&
+         row.type !== "FOLLOWUP_UNASSIGNED") ||
+        typeof row.occurredAt !== "string" ||
+        !Number.isFinite(Date.parse(row.occurredAt)) ||
+        typeof row.idempotencyKey !== "string" ||
+        !row.idempotencyKey.trim()) {
+      throw new Error(
+        "Care ownership history requires reconciliation"
+      );
+    }
+
+    if (compareEventOrder(
+      row.occurredAt,
+      row.idempotencyKey,
+      occurredAt,
+      eventId
+    ) > 0) {
+      throw new Error(
+        "Historical Care assignment ownership superseded"
+      );
+    }
+  }
+}
+
+/**
+ * Read-only protected Care queue eligibility.
+ * Never grants permission to execute a contact mutation.
+ */
+export async function mayExposeCommittedCareAssignment(
+  profile: FunctionFormationProfileEntity
+): Promise<boolean> {
+  if (!contactWriterHoldEnabled() ||
+      process.env.FEATURE_PERMANENT_VISITOR_CARE_ASSIGNMENT !== "true") {
+    return false;
+  }
+
+  const visitorId = profile.visitorId;
+  const validId = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+  if (!validId.test(visitorId) ||
+      typeof profile.assignedTo !== "string" ||
+      !validId.test(profile.assignedTo)) {
+    return false;
+  }
+
+  const cutover =
+    process.env.HOPE_PERMANENT_VISITOR_CONSENT_CUTOVER;
+
+  if (!cutover ||
+      !Number.isFinite(Date.parse(cutover)) ||
+      new Date(cutover).toISOString() !== cutover) {
+    throw new Error("Care consent authority unavailable");
+  }
+
+  const { createPermanentVisitorConsentRepository } =
+    await import("../../repositories/permanentVisitorConsentRepository");
+
+  const table = getHopeTableClient("VisitorFollowupEvents");
+
+  const authority = createPermanentVisitorConsentRepository(
+    table, true
+  );
+
+  const initial = await authority.read(visitorId);
+
+  if (initial.status === "unavailable") {
+    throw new Error("Care consent authority unavailable");
+  }
+
+  if (initial.status !== "ready" ||
+      initial.state.effective !== "granted" ||
+      initial.state.pending !== null) {
+    return false;
+  }
+
+  const prefix = "consent-v1:care-assignment:";
+
+  const filter =
+    `PartitionKey eq '${escapeOData(visitorId)}' and ` +
+    `RowKey ge '${prefix}' and ` +
+    "RowKey lt 'consent-v1:care-assignment;'";
+
+  let latest: {
+    operationId: string;
+    occurredAt: string;
+  } | null = null;
+
+  let inspected = 0;
+  let ambiguous = false;
+
+  for await (const row of table.listEntities<{
+    occurredAt: string;
+    schemaVersion: number;
+  }>({ queryOptions: { filter } })) {
+    inspected++;
+
+    if (inspected > 2000 ||
+        row.partitionKey !== visitorId ||
+        typeof row.rowKey !== "string" ||
+        !row.rowKey.startsWith(prefix) ||
+        row.schemaVersion !== 1 ||
+        typeof row.occurredAt !== "string" ||
+        !Number.isFinite(Date.parse(row.occurredAt)) ||
+        new Date(row.occurredAt).toISOString() !== row.occurredAt) {
+      throw new Error("Care assignment history unavailable");
+    }
+
+    const operationId = row.rowKey.slice(prefix.length);
+
+    if (!validId.test(operationId)) {
+      throw new Error("Care assignment identity unavailable");
+    }
+
+    if (!latest || row.occurredAt > latest.occurredAt) {
+      latest = {
+        operationId,
+        occurredAt: row.occurredAt
+      };
+
+      ambiguous = false;
+    } else if (row.occurredAt === latest.occurredAt) {
+      // Do not guess ownership when distinct operations
+      // have identical recorded timestamps.
+      ambiguous = true;
+    }
+  }
+
+  if (!latest || ambiguous) return false;
+
+  const committed = await authority.readCommittedCareAssignment(
+    visitorId, latest.operationId
+  );
+
+  if (committed.status !== "found") {
+    throw new Error("Committed Care assignment unavailable");
+  }
+
+  const assignment = committed.assignment;
+
+  if (assignment.occurredAt !== latest.occurredAt ||
+      assignment.assigneeId !== profile.assignedTo ||
+      assignment.occurredAt !== profile.lastFollowupAssignedAt ||
+      assignment.expectedRevision !== initial.state.revision) {
+    return false;
+  }
+
+  const eventId =
+    `care-assignment:${visitorId.length}:${visitorId}:${latest.operationId}`;
+
+  const events = getFormationEventsTableClient();
+
+  let event;
+
+  try {
+    event = await events.getEntity<{
+      visitorId: string;
+      type: string;
+      occurredAt: string;
+      idempotencyKey: string;
+      metadata: string;
+    }>(
+      visitorId,
+      buildEventRowKey(assignment.occurredAt, eventId)
+    );
+  } catch (error: any) {
+    if (error?.statusCode === 404) return false;
+    throw error;
+  }
+
+  const expectedMetadata = {
+    source: resolveMutationSource({
+      system: "hope-dashboard-next",
+      actorId: assignment.actorId
+    }),
+    data: {
+      assigneeId: assignment.assigneeId
+    }
+  };
+
+  if (event.partitionKey !== visitorId ||
+      event.rowKey !==
+        buildEventRowKey(assignment.occurredAt, eventId) ||
+      event.visitorId !== visitorId ||
+      event.type !== "FOLLOWUP_ASSIGNED" ||
+      event.occurredAt !== assignment.occurredAt ||
+      event.idempotencyKey !== eventId ||
+      !sameHistoricalJson(
+        JSON.parse(event.metadata), expectedMetadata
+      )) {
+    throw new Error("Care formation evidence unavailable");
+  }
+
+  try {
+    await assertCareAssignmentNotSuperseded(
+      events, visitorId, assignment.occurredAt, eventId
+    );
+  } catch (error) {
+    if (error instanceof Error &&
+        error.message ===
+          "Historical Care assignment ownership superseded") {
+      return false;
+    }
+
+    throw error;
+  }
+
+  const current = await authority.read(visitorId);
+
+  if (current.status === "unavailable") {
+    throw new Error("Care consent authority unavailable");
+  }
+
+  return current.status === "ready" &&
+    current.state.effective === "granted" &&
+    current.state.pending === null &&
+    current.state.revision === assignment.expectedRevision;
+}
+
+async function recordFormationEventV1Internal(
+  body: unknown,
+  verifiedHistorical = false
+): Promise<{
   accepted: boolean;
   id: string;
   visitorId: string;
@@ -684,11 +1162,14 @@ export async function recordFormationEventV1(body: unknown): Promise<{
   const source = asObject(envelope.source);
   const data = asObject(envelope.data);
 
-  await requireActiveFormationMutationActor(
-    type,
-    source.actorId
-  );
+  if (!verifiedHistorical) {
+    await requireActiveFormationMutationActor(
+      type,
+      source.actorId
+    );
 
+    assertContactWriterNotHeld("care", type, data);
+  }
   const eventsTable = getFormationEventsTableClient();
   const profilesTable = getFormationProfilesTableClient();
 
@@ -743,6 +1224,157 @@ export async function recordFormationEventV1(body: unknown): Promise<{
       };
       break;
     }
+  }
+
+  if (verifiedHistorical) {
+    const expectedEvent = {
+      partitionKey: visitorId,
+      rowKey,
+      visitorId,
+      type,
+      occurredAt,
+      recordedAt: new Date().toISOString(),
+      idempotencyKey: eventId,
+      metadata: JSON.stringify({ source, data }),
+      channel: "api",
+      summary: type
+    };
+
+    let inserted = false;
+
+    if (!existingEvent) {
+      try {
+        await eventsTable.createEntity(expectedEvent);
+        existingEvent = expectedEvent;
+        inserted = true;
+      } catch (error: any) {
+        if (error?.statusCode !== 409) throw error;
+
+        existingEvent = await eventsTable.getEntity<any>(
+          visitorId, rowKey
+        );
+      }
+    }
+
+    if (existingEvent.partitionKey !== visitorId ||
+        existingEvent.rowKey !== rowKey ||
+        existingEvent.visitorId !== visitorId ||
+        existingEvent.type !== type ||
+        existingEvent.occurredAt !== occurredAt ||
+        existingEvent.idempotencyKey !== eventId ||
+        !sameHistoricalJson(
+          JSON.parse(existingEvent.metadata),
+          { source, data }
+        )) {
+      throw new Error("Conflicting historical Care record");
+    }
+
+    // Repeat the existing idempotent timeline insertion even
+    // when the Care event already exists.
+    await new GlobalTimelineRepository().append({
+      eventId,
+      visitorId,
+      stream: "formation",
+      type,
+      occurredAt,
+      summary: existingEvent.summary ?? null,
+      source: resolveMutationSource({
+        system: existingEvent.channel
+      }).system,
+      raw: {
+        ...expectedEvent,
+        recordedAt: existingEvent.recordedAt
+      }
+    });
+
+    // Repair missing projection effects without replacing a
+    // profile that changed after the read.
+    const existingProfile =
+      await getFormationProfileByVisitorId(
+        profilesTable, visitorId
+      );
+
+    const profile: FunctionFormationProfileEntity = {
+      ...(existingProfile ?? {}),
+      partitionKey: "VISITOR",
+      rowKey: visitorId,
+      visitorId
+    };
+
+    const shouldAdvance = shouldAdvanceEventState(
+      occurredAt,
+      eventId,
+      existingProfile?.lastEventAt,
+      (existingProfile as any)?.lastEventId
+    );
+
+    if (type === "FOLLOWUP_ASSIGNED") {
+      // Fail closed when a newer profile checkpoint exists.
+      // A historical assignment must not restore an owner
+      // after a subsequent release or replacement.
+      if (!shouldAdvance) {
+        throw new Error(
+          "Historical Care assignment checkpoint superseded"
+        );
+      }
+
+      await assertCareAssignmentNotSuperseded(
+        eventsTable, visitorId, occurredAt, eventId
+      );
+    }
+
+    await applyFormationEventToProfile({
+      profile,
+      visitorId,
+      type,
+      occurredAt,
+      eventId,
+      data,
+      source,
+      shouldAdvance
+    });
+
+    if (toComparableProfileState(existingProfile) !==
+        toComparableProfileState(profile)) {
+      profile.updatedAt = new Date().toISOString();
+
+      const serialized = serializeGroups(profile);
+      const { etag, timestamp, ...entity } = serialized;
+
+      if (existingProfile) {
+        const currentEtag = (existingProfile as any).etag;
+
+        if (typeof currentEtag !== "string" ||
+            !currentEtag || currentEtag === "*") {
+          throw new Error("Historical profile checkpoint unavailable");
+        }
+
+        await profilesTable.updateEntity(
+          entity, "Merge", { etag: currentEtag }
+        );
+      } else {
+        await profilesTable.createEntity(entity);
+      }
+    }
+
+    // A release may have been recorded after the initial
+    // ownership check, including during the profile write.
+    // Do not acknowledge a superseded assignment as successful.
+    if (type === "FOLLOWUP_ASSIGNED") {
+      await assertCareAssignmentNotSuperseded(
+        eventsTable, visitorId, occurredAt, eventId
+      );
+    }
+
+    return {
+      accepted: inserted,
+      id: eventId,
+      visitorId,
+      type,
+      occurredAt,
+      rowKey,
+      profile
+    };
   }
 
   if (!existingEvent) {

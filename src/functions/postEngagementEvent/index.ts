@@ -1,3 +1,5 @@
+import { requireRegistrationEventContactPermission } from "../../services/followups/requireRegistrationEventContactPermission";
+import type { RegistrationConsentReader } from "../../services/followups/requireCurrentRegistrationContactPermission";
 import { validateEngagementEventEnvelopeV1Strict } from "../../contracts/engagementEvent.v1";
 import { EngagementEventsRepository } from "../../repositories/engagementEventsRepository";
 import { EngagementsService } from "../../services/engagements/engagementsService";
@@ -15,7 +17,14 @@ import {
 
 const service = new EngagementsService(new EngagementEventsRepository());
 
-export async function postEngagementEvent(context: any, req: any): Promise<void> {
+export type EngagementEventConsentDependencies = {
+  authorizeActor?: typeof resolveFormationMutationActorAuthorization;
+  readRegistrationConsent?: RegistrationConsentReader;
+  recordFormation?: typeof recordFormationEventV1;
+  appendEngagement?: typeof service.appendEvent;
+};
+
+export async function postEngagementEvent(context: any, req: any, dependencies: EngagementEventConsentDependencies = {}): Promise<void> {
   const requestId = getRequestId(req);
 
   try {
@@ -77,7 +86,7 @@ export async function postEngagementEvent(context: any, req: any): Promise<void>
     const type = String(evt.type ?? "").trim();
 
     const actorAuth =
-      await resolveFormationMutationActorAuthorization(
+      await (dependencies.authorizeActor ?? resolveFormationMutationActorAuthorization)(
         req,
         type,
         evt.source.actorId
@@ -102,10 +111,22 @@ export async function postEngagementEvent(context: any, req: any): Promise<void>
       "FOLLOWUP_UNASSIGNED"
     ];
 
-    await service.appendEvent(evt);
+    const consentFailure = await requireRegistrationEventContactPermission(
+      evt?.visitorId, type, evt?.data, dependencies.readRegistrationConsent
+    );
+    if (consentFailure) {
+      context.res = {
+        status: consentFailure.status,
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: { ok: false, requestId, error: consentFailure.error }
+      };
+      return;
+    }
+
+    await (dependencies.appendEngagement ?? ((event) => service.appendEvent(event)))(evt);
 
     if (formationTypes.includes(type)) {
-      await recordFormationEventV1({
+      await (dependencies.recordFormation ?? recordFormationEventV1)({
         v: 1,
         eventId: evt.eventId,
         visitorId: evt.visitorId,

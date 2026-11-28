@@ -1,3 +1,4 @@
+import { assertContactWriterNotHeld } from "../services/followups/permanentVisitorContactWriterHold";
 import { EngagementEventEnvelopeV1 } from "../contracts/engagementEvent.v1";
 import { normalizeEventSource } from "../services/events/normalizeEventSource";
 import { decodeCursorV1, encodeCursorV1 } from "../contracts/timeline.v1";
@@ -41,6 +42,7 @@ export class EngagementEventsRepository {
     evt: EngagementEventEnvelopeV1,
     opts?: { idempotencyKey?: string }
   ): Promise<void> {
+    assertContactWriterNotHeld("care", evt.type, evt.data);
     const table = await getTableClient(TABLE_NAME);
 
     // Idempotency dedupe (best-effort): if caller provides Idempotency-Key, route generates deterministic eventId.

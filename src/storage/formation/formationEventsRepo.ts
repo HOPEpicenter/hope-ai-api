@@ -1,3 +1,4 @@
+import { assertContactWriterNotHeld, contactWriterHoldEnabled } from "../../services/followups/permanentVisitorContactWriterHold";
 import { TableClient } from "@azure/data-tables";
 import { NEXT_STEP_CORRECTION_GUARD_ROW_PREFIX } from "../../domain/formation/effectiveNextStepCompletionEvents";
 
@@ -28,6 +29,12 @@ export async function insertFormationEvent(
   table: TableClient,
   entity: FormationEventEntity
 ): Promise<{ inserted: boolean }> {
+  // Do not interpret malformed contact metadata as a safe closure.
+  let data: unknown = undefined;
+  if (contactWriterHoldEnabled() && entity.type.trim().toUpperCase() === "FOLLOWUP_OUTCOME_RECORDED") {
+    try { data = JSON.parse(entity.metadata ?? "{}").data; } catch { data = undefined; }
+  }
+  assertContactWriterNotHeld("care", entity.type, data);
   try {
     await table.createEntity(entity as any);
     return { inserted: true };

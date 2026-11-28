@@ -52,6 +52,7 @@ type VisitorEntity = {
   postalCode?: string;
   birthday?: string;
   provenanceJson?: string;
+  checkInCreationId?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -433,6 +434,241 @@ export async function createVisitorRecord(input: {
     created: true
   };
 }
+/**
+ * Create a new dual-contact visitor under an existing
+ * durable arrival claim.
+ *
+ * Email and phone indexes occupy different partitions.
+ * They cannot be committed in one Table transaction.
+ *
+ * Reserve both before publishing the profile. Never
+ * transfer another visitor's index or blindly delete
+ * a reservation after an uncertain storage outcome.
+ */
+async function createDualContactVisitorFromCheckIn(
+  table: TableClient,
+  input: {
+    visitorId: string;
+    submissionId: string;
+    name: string;
+    email: string;
+    phone: string;
+    now: string;
+  }
+): Promise<boolean> {
+  const {
+    visitorId, submissionId, name,
+    email, phone, now
+  } = input;
+
+  if (!name ||
+      email !== email.trim().toLowerCase() ||
+      email.length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      !/^\d{7,15}$/.test(phone)) {
+    return false;
+  }
+
+  const identities = [
+    {
+      kind: "EMAIL" as const,
+      value: email
+    },
+    {
+      kind: "PHONE" as const,
+      value: phone
+    }
+  ];
+
+  function isMissing(error: unknown): boolean {
+    const value = error as {
+      statusCode?: number;
+      code?: string;
+      details?: {
+        errorCode?: string;
+        odataError?: { code?: string };
+      };
+    } | null;
+
+    if (value?.statusCode !== 404) return false;
+
+    const codes = [
+      value.code,
+      value.details?.errorCode,
+      value.details?.odataError?.code
+    ].filter(code => code !== undefined);
+
+    return codes.length > 0 &&
+      codes.every(code =>
+        code === "ResourceNotFound" ||
+        code === "EntityNotFound"
+      );
+  }
+
+  async function readProfile(): Promise<VisitorEntity | null> {
+    try {
+      return await table.getEntity<VisitorEntity>(
+        VISITOR_PK, visitorId
+      );
+    } catch (error) {
+      if (isMissing(error)) return null;
+      throw error;
+    }
+  }
+
+  function matchesProfile(entity: VisitorEntity): boolean {
+    return entity.partitionKey === VISITOR_PK &&
+      entity.rowKey === visitorId &&
+      entity.checkInCreationId === submissionId &&
+      entity.name === name &&
+      entity.email === email &&
+      entity.emailLower === email &&
+      entity.phone === phone &&
+      entity.phoneCanonical === phone;
+  }
+
+  const previous = await readProfile();
+
+  if (previous && !matchesProfile(previous)) {
+    return false;
+  }
+
+  // Preflight both indexes before creating anything.
+  // A concurrent change is still guarded by create-only
+  // index reservations below.
+  const missing: typeof identities = [];
+
+  for (const identity of identities) {
+    const key = encodeURIComponent(identity.value);
+
+    try {
+      const row = await table.getEntity<{
+        visitorId: string;
+      }>(identity.kind, key);
+
+      if (row.partitionKey !== identity.kind ||
+          row.rowKey !== key ||
+          row.visitorId !== visitorId) {
+        return false;
+      }
+    } catch (error) {
+      if (!isMissing(error)) throw error;
+      missing.push(identity);
+    }
+  }
+
+  // An existing profile must already own both indexes.
+  // Do not silently repair or modify a published profile.
+  if (previous) {
+    return missing.length === 0;
+  }
+
+  for (const identity of missing) {
+    const reservation = await reserveIdentity(
+      table,
+      identity.kind,
+      encodeURIComponent(identity.value),
+      visitorId,
+      now
+    );
+
+    if (!reservation.created &&
+        reservation.visitorId !== visitorId) {
+      return false;
+    }
+  }
+
+  const entity: VisitorEntity = {
+    partitionKey: VISITOR_PK,
+    rowKey: visitorId,
+    checkInCreationId: submissionId,
+    name,
+    email,
+    emailLower: email,
+    phone,
+    phoneCanonical: phone,
+    provenanceJson: serializeVisitorProvenance(
+      createOperationalVisitorProvenance(now)
+    ),
+    createdAt: now,
+    updatedAt: now
+  };
+
+  try {
+    await table.createEntity(entity);
+  } catch (error) {
+    // Recover only the exact profile owned by this claim.
+    const committed = await readProfile();
+
+    if (!committed || !matchesProfile(committed)) {
+      throw error;
+    }
+  }
+
+  return true;
+}
+
+/** Create only for a previously claimed check-in, using the canonical contact index. */
+export async function createVisitorFromCheckIn(
+  table: TableClient,
+  input: {
+    visitorId: string;
+    submissionId: string;
+    name: string;
+    contact: { kind: "EMAIL" | "PHONE"; value: string };
+    secondaryPhone?: string;
+    now: string;
+  }
+): Promise<boolean> {
+  const { visitorId, submissionId, name, contact, now } = input;
+
+  if (input.secondaryPhone !== undefined) {
+    if (contact.kind !== "EMAIL") return false;
+
+    return createDualContactVisitorFromCheckIn(table, {
+      visitorId,
+      submissionId,
+      name,
+      email: contact.value,
+      phone: input.secondaryPhone,
+      now
+    });
+  }
+
+  try {
+    const existing = await table.getEntity<VisitorEntity>(VISITOR_PK, visitorId);
+    return existing.checkInCreationId === submissionId;
+  } catch (error) {
+    if ((error as { statusCode?: number } | null)?.statusCode !== 404) throw error;
+  }
+  const reservation = await reserveIdentity(
+    table, contact.kind, encodeURIComponent(contact.value), visitorId, now
+  );
+  if (!reservation.created && reservation.visitorId !== visitorId) return false;
+
+  const entity: VisitorEntity = {
+    partitionKey: VISITOR_PK,
+    rowKey: visitorId,
+    checkInCreationId: submissionId,
+    name,
+    ...(contact.kind === "EMAIL"
+      ? { email: contact.value, emailLower: contact.value }
+      : { phone: contact.value, phoneCanonical: contact.value }),
+    provenanceJson: serializeVisitorProvenance(createOperationalVisitorProvenance(now)),
+    createdAt: now,
+    updatedAt: now
+  };
+  try {
+    await table.createEntity(entity);
+  } catch (error) {
+    // Leave the reservation in place so an interrupted attempt can resume.
+    // A matching marker proves this attempt owns the profile.
+    const existing = await table.getEntity<VisitorEntity>(VISITOR_PK, visitorId).catch(() => null);
+    if (existing?.checkInCreationId !== submissionId) throw error;
+  }
+  return true;
+}
+
 export async function updateVisitorRecord(
   visitorId: string,
   input: {

@@ -1,3 +1,4 @@
+import { assertContactWriterNotHeld } from "../services/followups/permanentVisitorContactWriterHold";
 import type { TableClient } from "@azure/data-tables";
 import type {
   MinistryCommunicationEvent,
@@ -46,6 +47,7 @@ function isConflict(error: any): boolean {
  */
 export class MinistryCommunicationEventsRepository {
   async append(event: MinistryCommunicationEvent): Promise<boolean> {
+    assertContactWriterNotHeld("ministry_communication", event.type, event.data);
     const table: TableClient = await getTableClient(TABLE_NAME);
 
     try {

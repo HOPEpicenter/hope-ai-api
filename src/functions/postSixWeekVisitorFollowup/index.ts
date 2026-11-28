@@ -1,3 +1,6 @@
+import {
+  startConsentProtectedSixWeekFollowup
+} from "../../services/followups/startConsentProtectedSixWeekFollowup";
 import { requireApiKeyForFunction } from "../_shared/apiKey";
 import {
   resolveSixWeekActorAuthorization
@@ -47,7 +50,15 @@ export async function postSixWeekVisitorFollowup(
     }
 
     const body = req?.body ?? {};
-    const result = await (dependencies.startFollowup ?? startSixWeekVisitorFollowup)({
+    // Independently controlled rollout. Once public
+    // registration is released, keep consent protection
+    // enabled even when public intake is temporarily off.
+    const startFollowup = dependencies.startFollowup ??
+      (process.env.FEATURE_PERMANENT_VISITOR_CONSENT_GUARD === "true"
+        ? startConsentProtectedSixWeekFollowup
+        : startSixWeekVisitorFollowup);
+
+    const result = await startFollowup({
       visitorId: req?.params?.visitorId,
       firstVisitDate: body.firstVisitDate,
       ownerStaffId: body.ownerStaffId,

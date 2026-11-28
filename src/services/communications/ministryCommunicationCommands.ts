@@ -1,3 +1,7 @@
+import {
+  requireCurrentRegistrationContactPermission,
+  type RegistrationConsentReader
+} from "../followups/requireCurrentRegistrationContactPermission";
 import { randomUUID } from "node:crypto";
 import {
   projectMinistryCommunications,
@@ -21,6 +25,7 @@ export type MinistryCommunicationCommandDependencies = {
   now?: () => string;
   newEventId?: () => string;
   readActor?: (staffId: string) => Promise<StaffIdentity | null>;
+  readRegistrationConsent?: RegistrationConsentReader;
 };
 
 export type MinistryCommunicationCommandResult =
@@ -94,6 +99,14 @@ export async function recordMinistryCommunicationPreference(input: {
   if (!CHANNELS.has(input.channel) || !PREFERENCES.has(input.state)) return { accepted: false, status: 400, error: "channel and state are required" };
   const actorFailure = await requireActor(actorId, dependencies);
   if (actorFailure) return actorFailure;
+  // A channel preference cannot override a canonical registration decline.
+  // Restrictive preferences remain recordable.
+  if (input.state === "granted") {
+    const failure = await requireCurrentRegistrationContactPermission(
+      visitorId, dependencies.readRegistrationConsent
+    );
+    if (failure) return failure;
+  }
   const occurredAt = (dependencies.now ?? (() => new Date().toISOString()))();
   return append({
     eventId: (dependencies.newEventId ?? eventId)(), visitorId,
@@ -114,6 +127,10 @@ export async function recordMinistryCommunicationIntent(input: {
   if (!CHANNELS.has(input.channel) || !INTENTS.has(input.intent)) return { accepted: false, status: 400, error: "channel and intent are required" };
   const actorFailure = await requireActor(actorId, dependencies);
   if (actorFailure) return actorFailure;
+  const failure = await requireCurrentRegistrationContactPermission(
+    visitorId, dependencies.readRegistrationConsent
+  );
+  if (failure) return failure;
   const repository = repositoryFor(dependencies);
   const existing = projectMinistryCommunications(visitorId, await repository.listByVisitor(visitorId));
   if (existing.items.some(item => item.communicationId === communicationId)) {
@@ -121,6 +138,10 @@ export async function recordMinistryCommunicationIntent(input: {
   }
   const preference = existing.preferences.find(item => item.channel === input.channel);
   if (preference?.state !== "granted") return { accepted: false, status: 409, error: "Recorded consent is required for this communication channel" };
+  const latestFailure = await requireCurrentRegistrationContactPermission(
+    visitorId, dependencies.readRegistrationConsent
+  );
+  if (latestFailure) return latestFailure;
   const occurredAt = (dependencies.now ?? (() => new Date().toISOString()))();
   return append({
     eventId: (dependencies.newEventId ?? eventId)(), visitorId,

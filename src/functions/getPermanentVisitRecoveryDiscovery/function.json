@@ -1,0 +1,21 @@
+{
+  "bindings": [
+    {
+      "authLevel": "anonymous",
+      "type": "httpTrigger",
+      "direction": "in",
+      "name": "req",
+      "methods": [
+        "get"
+      ],
+      "route": "admin/visitor-registration-recovery-discovery"
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "res"
+    }
+  ],
+  "scriptFile": "../dist/functions/getPermanentVisitRecoveryDiscovery/index.js",
+  "entryPoint": "getPermanentVisitRecoveryDiscovery"
+}

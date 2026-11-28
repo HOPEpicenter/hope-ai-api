@@ -1,3 +1,11 @@
+import { contactWriterHoldEnabled, CONTACT_WRITER_HOLD_MESSAGE } from "./permanentVisitorContactWriterHold";
+import {
+  readLatestRegistrationConsent,
+  registrationConsentAuthorityEnabled,
+  registrationConsentGuardEnabled,
+  type RegistrationConsent
+} from "./readLatestRegistrationConsent";
+
 import { randomUUID } from "node:crypto";
 import type {
   SixWeekCareOutcome,
@@ -30,7 +38,10 @@ import {
 type FollowupRepository = Pick<
   SixWeekFollowupEventsRepository,
   "append" | "listByVisitor"
->;
+> & Partial<Pick<
+  SixWeekFollowupEventsRepository,
+  "startConsentProtectedPlan" | "claimConsentProtectedOwner" | "recordConsentProtectedTaskOutcome" | "resumeConsentProtectedPlan"
+>>;
 
 type StaffIdentity = {
   staffId: string;
@@ -46,6 +57,9 @@ export type SixWeekFollowupCommandDependencies = {
   readActor?: (actorId: string) => Promise<StaffIdentity | null>;
   readAssignee?: (staffId: string) => Promise<StaffIdentity | null>;
   recordCareEvent?: SixWeekCareEventRecorder;
+  readRegistrationConsent?: (
+    visitorId: string
+  ) => Promise<RegistrationConsent>;
 };
 
 export type SixWeekFollowupCommandSuccess = {
@@ -195,6 +209,58 @@ function commandFailure(
   return { accepted: false, status, error };
 }
 
+/**
+ * Independently enforce durable public consent before
+ * creating new contact-followup work.
+ *
+ * This flag is independent of the public intake flag.
+ * No administrator override can bypass a recorded decline.
+ */
+async function requireCurrentRegistrationConsent(
+  visitorId: string,
+  dependencies: SixWeekFollowupCommandDependencies,
+  coordinatedSixWeekWrite = false
+): Promise<SixWeekFollowupCommandFailure | null> {
+  if (!registrationConsentGuardEnabled()) {
+    return null;
+  }
+
+  try {
+    const consent = await (
+      dependencies.readRegistrationConsent ??
+      readLatestRegistrationConsent
+    )(visitorId);
+
+    if (consent === "pending_verification") {
+      return commandFailure(409, "Visitor consent verification pending");
+    }
+    if (consent === "declined") {
+      return commandFailure(
+        409,
+        "Visitor declined follow-up permission"
+      );
+    }
+
+    if (consent === "granted" && contactWriterHoldEnabled() && !coordinatedSixWeekWrite) {
+      return commandFailure(503, CONTACT_WRITER_HOLD_MESSAGE);
+    }
+    if (consent !== "granted" &&
+        (consent !== "legacy_no_evidence" || registrationConsentAuthorityEnabled())) {
+      return commandFailure(
+        503,
+        "Follow-up consent could not be verified"
+      );
+    }
+
+    return null;
+  } catch {
+    return commandFailure(
+      503,
+      "Follow-up consent could not be verified"
+    );
+  }
+}
+
 function requirePlanOwnerAuthorization(
   plan: SixWeekVisitorFollowupPlan,
   actor: StaffIdentity,
@@ -299,27 +365,74 @@ export async function startSixWeekVisitorFollowup(
     if (assigneeFailure) return assigneeFailure;
   }
 
+  const repository = repositoryFor(dependencies);
+
+  const coordinatedStart =
+    contactWriterHoldEnabled() &&
+    typeof repository.startConsentProtectedPlan === "function";
+
+  const consentFailure = await requireCurrentRegistrationConsent(
+    visitorId, dependencies, coordinatedStart
+  );
+
+  if (consentFailure) return consentFailure;
+
   const occurredAt = (
     dependencies.now ?? (() => new Date().toISOString())
   )();
 
+  const event: SixWeekFollowupEvent = {
+    eventId: (dependencies.newEventId ?? defaultEventId)(),
+    visitorId,
+    type: "six_week_followup.plan_started",
+    occurredAt,
+    actorId,
+    data: {
+      firstVisitDate,
+      ownerStaffId,
+      contactConsent: true,
+      preferredContactMethod
+    }
+  };
+
+  if (coordinatedStart && repository.startConsentProtectedPlan) {
+    const result = await repository.startConsentProtectedPlan(event);
+
+    if (result === "blocked") {
+      return commandFailure(409, "Visitor follow-up permission unavailable");
+    }
+
+    if (result === "conflict") {
+      return commandFailure(409, "A follow-up plan already exists");
+    }
+
+    if (result !== "created") {
+      return commandFailure(503, "Follow-up creation could not be confirmed");
+    }
+
+    const plan = projectSixWeekVisitorFollowup(
+      await repository.listByVisitor(visitorId), occurredAt
+    );
+
+    if (!plan) {
+      return commandFailure(503, "Follow-up projection could not be confirmed");
+    }
+
+    return {
+      accepted: true,
+      status: 201,
+      created: true,
+      eventId: event.eventId,
+      eventType: event.type,
+      plan
+    };
+  }
+
   return appendAndProject({
-    repository: repositoryFor(dependencies),
+    repository,
     asOf: occurredAt,
     successStatus: 201,
-    event: {
-      eventId: (dependencies.newEventId ?? defaultEventId)(),
-      visitorId,
-      type: "six_week_followup.plan_started",
-      occurredAt,
-      actorId,
-      data: {
-        firstVisitDate,
-        ownerStaffId,
-        contactConsent: true,
-        preferredContactMethod
-      }
-    }
+    event
   });
 }
 
@@ -376,9 +489,64 @@ export async function assignSixWeekFollowupOwner(
     );
   }
 
+  const coordinatedClaim =
+    contactWriterHoldEnabled() &&
+    !existing.ownerStaffId &&
+    ownerStaffId === actorId &&
+    typeof repository.claimConsentProtectedOwner === "function";
+
+  const consentFailure =
+    await requireCurrentRegistrationConsent(
+      visitorId, dependencies, coordinatedClaim
+    );
+
+  if (consentFailure) return consentFailure;
+
   const occurredAt = (
     dependencies.now ?? (() => new Date().toISOString())
   )();
+
+  if (coordinatedClaim && repository.claimConsentProtectedOwner) {
+    const event: SixWeekFollowupEvent = {
+      eventId: (dependencies.newEventId ?? defaultEventId)(),
+      visitorId,
+      type: "six_week_followup.owner_assigned",
+      occurredAt,
+      actorId,
+      data: { ownerStaffId }
+    };
+
+    const result = await repository.claimConsentProtectedOwner(event);
+
+    if (result === "blocked") {
+      return commandFailure(409, "Visitor follow-up permission unavailable");
+    }
+
+    if (result === "conflict") {
+      return commandFailure(409, "Follow-up plan or consent changed");
+    }
+
+    if (result !== "claimed") {
+      return commandFailure(503, "Owner claim could not be confirmed");
+    }
+
+    const plan = projectSixWeekVisitorFollowup(
+      await repository.listByVisitor(visitorId), occurredAt
+    );
+
+    if (!plan || plan.ownerStaffId !== actorId) {
+      return commandFailure(503, "Owner claim projection could not be confirmed");
+    }
+
+    return {
+      accepted: true,
+      status: 202,
+      created: true,
+      eventId: event.eventId,
+      eventType: event.type,
+      plan
+    };
+  }
 
   return appendAndProject({
     repository,
@@ -464,16 +632,21 @@ export async function recordSixWeekTaskOutcome(
     input.administrativeOverrideVerified
   );
   if (authorizationFailure) return authorizationFailure;
-  if (existing.status === "paused") {
-    return commandFailure(409, "Follow-up plan is paused");
-  }
-  if (existing.status === "completed" || existing.status === "cancelled") {
-    return commandFailure(409, "Follow-up plan is closed");
-  }
-
   const task = existing.tasks.find(
     item => item.weekNumber === input.weekNumber
   );
+
+  const historicalRetry =
+    contactWriterHoldEnabled() &&
+    (task?.status === "completed" || task?.status === "skipped");
+
+  if (!historicalRetry && existing.status === "paused") {
+    return commandFailure(409, "Follow-up plan is paused");
+  }
+  if (!historicalRetry &&
+      (existing.status === "completed" || existing.status === "cancelled")) {
+    return commandFailure(409, "Follow-up plan is closed");
+  }
 
   if (!task) return commandFailure(404, "Follow-up task not found");
   if (task.status === "completed" || task.status === "skipped") {
@@ -485,6 +658,37 @@ export async function recordSixWeekTaskOutcome(
           event.type === "six_week_followup.task_skipped") &&
         Number(event.data.weekNumber) === input.weekNumber
     );
+
+    if (contactWriterHoldEnabled()) {
+      if (!storedTaskEvent ||
+          task.status !== input.disposition ||
+          storedTaskEvent.data.contactMethod !== input.contactMethod ||
+          storedTaskEvent.data.outcome !== outcome ||
+          (storedTaskEvent.data.notes ?? null) !== notes ||
+          (storedTaskEvent.data.careOutcome ?? null) !==
+            (isSixWeekCareOutcome(careOutcome) ? careOutcome : null)) {
+        return commandFailure(409, "Recorded task outcome differs");
+      }
+
+      try {
+        await syncSixWeekTaskToCare(storedTaskEvent, {
+          recordCareEvent: dependencies.recordCareEvent
+        });
+      } catch {
+        return commandFailure(
+          503, "Task recorded; Care synchronization pending"
+        );
+      }
+
+      return {
+        accepted: true,
+        status: 200,
+        created: false,
+        eventId: storedTaskEvent.eventId,
+        eventType: storedTaskEvent.type,
+        plan: existing
+      };
+    }
 
     if (storedTaskEvent) {
       await syncSixWeekTaskToCare(storedTaskEvent, {
@@ -504,6 +708,21 @@ export async function recordSixWeekTaskOutcome(
       plan: existing
     };
   }
+
+  const coordinatedTask =
+    contactWriterHoldEnabled() &&
+    existing.ownerStaffId === actorId &&
+    ((input.contactMethod === "none" && !careOutcome) ||
+      (input.disposition === "completed" &&
+       input.contactMethod !== "none")) &&
+    typeof repository.recordConsentProtectedTaskOutcome === "function";
+
+  const consentFailure =
+    await requireCurrentRegistrationConsent(
+      visitorId, dependencies, coordinatedTask
+    );
+
+  if (consentFailure) return consentFailure;
 
   const occurredAt = (
     dependencies.now ?? (() => new Date().toISOString())
@@ -530,6 +749,56 @@ export async function recordSixWeekTaskOutcome(
       notes
     }
   };
+
+  if (coordinatedTask &&
+      repository.recordConsentProtectedTaskOutcome) {
+    const write =
+      await repository.recordConsentProtectedTaskOutcome(event);
+
+    if (write === "blocked") {
+      return commandFailure(409, "Visitor follow-up permission unavailable");
+    }
+
+    if (write === "conflict") {
+      return commandFailure(409, "Follow-up plan or consent changed");
+    }
+
+    if (write !== "recorded") {
+      return commandFailure(503, "Task outcome could not be confirmed");
+    }
+
+    const plan = projectSixWeekVisitorFollowup(
+      await repository.listByVisitor(visitorId), occurredAt
+    );
+
+    const recorded = plan?.tasks.find(
+      item => item.weekNumber === input.weekNumber
+    );
+
+    if (!plan ||
+        recorded?.status !== input.disposition) {
+      return commandFailure(503, "Task outcome projection could not be confirmed");
+    }
+
+    try {
+      await syncSixWeekTaskToCare(event, {
+        recordCareEvent: dependencies.recordCareEvent
+      });
+    } catch {
+      return commandFailure(
+        503, "Task recorded; Care synchronization pending"
+      );
+    }
+
+    return {
+      accepted: true,
+      status: 202,
+      created: true,
+      eventId: event.eventId,
+      eventType: event.type,
+      plan
+    };
+  }
 
   const result = await appendAndProject({
     repository,
@@ -715,6 +984,23 @@ export async function changeSixWeekFollowupStatus(
     return commandFailure(409, "Only a paused follow-up plan can resume");
   }
 
+  // Restrictive actions remain available. Resuming requires
+  // canonical consent and an atomic transition by the owner.
+  const coordinatedResume =
+    input.action === "resume" &&
+    contactWriterHoldEnabled() &&
+    existing.ownerStaffId === actorId &&
+    typeof repository.resumeConsentProtectedPlan === "function";
+
+  if (input.action === "resume") {
+    const consentFailure =
+      await requireCurrentRegistrationConsent(
+        visitorId, dependencies, coordinatedResume
+      );
+
+    if (consentFailure) return consentFailure;
+  }
+
   const occurredAt = (
     dependencies.now ?? (() => new Date().toISOString())
   )();
@@ -726,17 +1012,53 @@ export async function changeSixWeekFollowupStatus(
         ? "six_week_followup.plan_resumed"
         : "six_week_followup.plan_cancelled";
 
+  const event: SixWeekFollowupEvent = {
+    eventId: (dependencies.newEventId ?? defaultEventId)(),
+    visitorId,
+    type: eventType,
+    occurredAt,
+    actorId,
+    data: { reason }
+  };
+
+  if (coordinatedResume && repository.resumeConsentProtectedPlan) {
+    const result = await repository.resumeConsentProtectedPlan(event);
+
+    if (result === "blocked") {
+      return commandFailure(409, "Current visitor consent does not permit resumption");
+    }
+
+    if (result === "conflict") {
+      return commandFailure(409, "Follow-up plan changed; reload before resuming");
+    }
+
+    if (result !== "recorded") {
+      return commandFailure(503, "Follow-up resumption unavailable");
+    }
+
+    const plan = projectSixWeekVisitorFollowup(
+      await repository.listByVisitor(visitorId),
+      occurredAt
+    );
+
+    if (!plan || plan.status !== "active") {
+      return commandFailure(503, "Follow-up resumption requires reconciliation");
+    }
+
+    return {
+      accepted: true,
+      status: 202,
+      created: true,
+      eventId: event.eventId,
+      eventType: event.type,
+      plan
+    };
+  }
+
   return appendAndProject({
     repository,
     asOf: occurredAt,
     successStatus: 202,
-    event: {
-      eventId: (dependencies.newEventId ?? defaultEventId)(),
-      visitorId,
-      type: eventType,
-      occurredAt,
-      actorId,
-      data: { reason }
-    }
+    event
   });
 }

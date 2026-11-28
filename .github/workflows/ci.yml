@@ -443,6 +443,19 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx --no-install ts-node tests/visitors/isSyntheticVisitorRecord.test.ts
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install ts-node tests/visitors/recordVisitorCheckIn.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install ts-node tests/visitors/recordReturningVisitorCheckIn.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install ts-node tests/visitors/recordVisitorArrival.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Sunday visitor check-in HTTP regressions
+        shell: pwsh
+        env:
+          STORAGE_CONNECTION_STRING: UseDevelopmentStorage=true
+        run: |
+          npx --no-install ts-node tests/visitors/visitorSundayCheckInHttp.test.ts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Dashboard visitor identity regression
         shell: pwsh
@@ -698,6 +711,14 @@ jobs:
               Get-Content -LiteralPath $stderr -Tail 30 -ErrorAction SilentlyContinue
             }
           }
+
+      - name: Permanent visitor backend regressions
+        shell: pwsh
+        run: ./scripts/test-permanent-visitor-backend.ps1
+
+      - name: Permanent visitor isolated storage regressions
+        shell: pwsh
+        run: ./scripts/test-permanent-visitor-storage.ps1
 
       - name: Express smoke (Azurite owned by script)
         shell: pwsh

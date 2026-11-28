@@ -1,4 +1,5 @@
 import { isTerminalFollowupOutcome } from "./isTerminalFollowupOutcome";
+import { mayExposeRegistrationContactWork } from "./mayExposeRegistrationContactWork";
 import { paginateOffsetItems } from "../../shared/timeline/offsetPaginator";
 import {
   compareBooleanDesc,
@@ -330,6 +331,16 @@ export async function buildOpsFollowupsQueue(opts: BuildOpsFollowupsQueueOptions
       state.lastFollowupOutcome = profileOutcome;
     } else if (!state.lastFollowupOutcome && profileOutcome) {
       state.lastFollowupOutcome = profileOutcome;
+    }
+  }
+
+  // Filter before identity enrichment, pagination, owner totals and stats.
+  // Historical resolved work is still available through includeResolved.
+  for (const [visitorId, state] of stateByVisitor) {
+    const signals = deriveQueueSignals(state);
+    if (signals.needsFollowup && !signals.followupResolved &&
+        !(await mayExposeRegistrationContactWork(visitorId))) {
+      stateByVisitor.delete(visitorId);
     }
   }
 

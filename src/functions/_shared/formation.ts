@@ -825,6 +825,78 @@ export async function recordCommittedSixWeekCareEvent(body: unknown) {
   return recordFormationEventV1Internal(expected, true);
 }
 
+/**
+ * Synchronize an already committed Staff care assignment.
+ * Reconstruct the formation event exclusively from durable
+ * consent-authorized storage evidence.
+ *
+ * This does not authorize new contact work.
+ */
+export async function recordCommittedStaffCareAssignment(
+  visitorId: string,
+  operationId: string
+) {
+  if (!contactWriterHoldEnabled()) {
+    throw new Error("Committed Care synchronization unavailable");
+  }
+
+  const validId = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+  if (!validId.test(visitorId) ||
+      !validId.test(operationId)) {
+    throw new Error("Invalid committed Care reference");
+  }
+
+  const { createPermanentVisitorConsentRepository } =
+    await import("../../repositories/permanentVisitorConsentRepository");
+
+  const repository = createPermanentVisitorConsentRepository(
+    getHopeTableClient("VisitorFollowupEvents"), true
+  );
+
+  const committed = await repository.readCommittedCareAssignment(
+    visitorId, operationId
+  );
+
+  if (committed.status !== "found") {
+    throw new Error("Committed Care assignment unavailable");
+  }
+
+  const assignment = committed.assignment;
+
+  // Operation IDs are visitor-scoped. Include the visitor
+  // reference in the formation and global timeline identity.
+  const eventId =
+    `care-assignment:${visitorId.length}:${visitorId}:${operationId}`;
+
+  const expected = {
+    v: 1,
+    eventId,
+    visitorId,
+    type: "FOLLOWUP_ASSIGNED",
+    occurredAt: assignment.occurredAt,
+    source: resolveMutationSource({
+      system: "hope-dashboard-next",
+      actorId: assignment.actorId
+    }),
+    data: {
+      assigneeId: assignment.assigneeId
+    }
+  };
+
+  const synchronized =
+    await recordFormationEventV1Internal(expected, true);
+
+  if (synchronized.profile.assignedTo !==
+      assignment.assigneeId) {
+    throw new Error(
+      "Committed Care assignment projection requires reconciliation"
+    );
+  }
+
+  return synchronized;
+}
+
 async function recordFormationEventV1Internal(
   body: unknown,
   verifiedHistorical = false
@@ -990,6 +1062,58 @@ async function recordFormationEventV1Internal(
       existingProfile?.lastEventAt,
       (existingProfile as any)?.lastEventId
     );
+
+    if (type === "FOLLOWUP_ASSIGNED") {
+      // Fail closed when a newer profile checkpoint exists.
+      // A historical assignment must not restore an owner
+      // after a subsequent release or replacement.
+      if (!shouldAdvance) {
+        throw new Error(
+          "Historical Care assignment checkpoint superseded"
+        );
+      }
+
+      const filter =
+        `PartitionKey eq '${escapeOData(visitorId)}' and ` +
+        "(type eq 'FOLLOWUP_ASSIGNED' or " +
+        "type eq 'FOLLOWUP_UNASSIGNED')";
+
+      let inspected = 0;
+
+      for await (const row of eventsTable.listEntities<{
+        visitorId: string;
+        type: string;
+        occurredAt: string;
+        idempotencyKey: string;
+      }>({
+        queryOptions: { filter }
+      })) {
+        inspected++;
+
+        if (inspected > 2000 ||
+            row.partitionKey !== visitorId ||
+            row.visitorId !== visitorId ||
+            typeof row.occurredAt !== "string" ||
+            !Number.isFinite(Date.parse(row.occurredAt)) ||
+            typeof row.idempotencyKey !== "string" ||
+            !row.idempotencyKey.trim()) {
+          throw new Error(
+            "Care ownership history requires reconciliation"
+          );
+        }
+
+        if (compareEventOrder(
+          row.occurredAt,
+          row.idempotencyKey,
+          occurredAt,
+          eventId
+        ) > 0) {
+          throw new Error(
+            "Historical Care assignment ownership superseded"
+          );
+        }
+      }
+    }
 
     await applyFormationEventToProfile({
       profile,

@@ -216,3 +216,296 @@ test("atomic pastoral care assignment commits exact historical evidence", () =>
     console.log("HISTORICAL_EVIDENCE_NOT_NEW_PERMISSION=True");
   })
 );
+
+test("committed Care assignment synchronizes and preserves newer ownership", async () => {
+  const {
+    getFormationEventsTableClient,
+    getFormationProfilesTableClient,
+    getFormationProfileByVisitorId,
+    recordCommittedStaffCareAssignment
+  } = await import("../src/functions/_shared/formation");
+
+  const { GlobalTimelineRepository } =
+    await import("../src/repositories/globalTimelineRepository");
+
+  const consentTable =
+    createIsolatedVisitorTestTable("VisitorFollowupEvents");
+
+  const care = getFormationEventsTableClient();
+  const profiles = getFormationProfilesTableClient();
+
+  for (const client of [consentTable, care, profiles]) {
+    const endpoint = new URL(client.url);
+    assert.equal(endpoint.hostname, "127.0.0.1");
+    assert.equal(
+      endpoint.port, process.env.HOPE_VISITOR_133_PORT
+    );
+  }
+
+  const created: TableClient[] = [];
+
+  try {
+    for (const client of [consentTable, care, profiles]) {
+      await client.createTable();
+      created.push(client);
+    }
+
+    const authority = repo(consentTable, true);
+
+    const visitorId = "synthetic-care-projection";
+    const recoveryId = "synthetic-care-projection-recovery";
+    const releasedId = "synthetic-care-projection-released";
+
+    const command = {
+      operationId: "synthetic-care-projection-command",
+      actorId: "synthetic-authorized-staff",
+      assigneeId: "synthetic-care-owner",
+      expectedRevision: 1
+    };
+
+    async function prepare(target: string) {
+      await profiles.createEntity({
+        partitionKey: "VISITOR",
+        rowKey: target,
+        visitorId: target,
+        displayName: "Synthetic visitor"
+      });
+
+      assert.equal((await authority.apply(target, {
+        kind: "new_profile",
+        evidenceId: "synthetic-initial-consent",
+        initialConsent: true
+      })).status, "committed");
+
+      const result = await authority.appendStaffCareAssignment(
+        target, command
+      );
+
+      if (result.status !== "committed") {
+        throw Error("Expected committed assignment");
+      }
+
+      return result.assignment;
+    }
+
+    async function careEvents(target: string) {
+      const events: unknown[] = [];
+
+      for await (const row of care.listEntities({
+        queryOptions: {
+          filter: `PartitionKey eq '${target}'`
+        }
+      })) {
+        events.push(row);
+      }
+
+      return events;
+    }
+
+    await prepare(visitorId);
+
+    await assert.rejects(
+      recordCommittedStaffCareAssignment(
+        visitorId, "synthetic-missing-operation"
+      )
+    );
+
+    assert.equal((await careEvents(visitorId)).length, 0);
+
+    console.log("MISSING_COMMITTED_EVIDENCE_DENIED=True");
+
+    const first = await recordCommittedStaffCareAssignment(
+      visitorId, command.operationId
+    );
+
+    assert.equal(first.accepted, true);
+    assert.equal(first.profile.assignedTo, command.assigneeId);
+
+    const persisted = await getFormationProfileByVisitorId(
+      profiles, visitorId
+    );
+
+    assert.equal(persisted?.assignedTo, command.assigneeId);
+    assert.equal((await careEvents(visitorId)).length, 1);
+
+    const replay = await recordCommittedStaffCareAssignment(
+      visitorId, command.operationId
+    );
+
+    assert.equal(replay.accepted, false);
+    assert.equal(replay.id, first.id);
+    assert.equal((await careEvents(visitorId)).length, 1);
+
+    const timeline = await new GlobalTimelineRepository().read(100);
+
+    assert.equal(timeline.items.filter(
+      event => event.eventId === first.id &&
+        event.visitorId === visitorId &&
+        event.type === "FOLLOWUP_ASSIGNED"
+    ).length, 1);
+
+    console.log("CARE_PROFILE_AND_TIMELINE_PERSISTED=True");
+    console.log("FORMATION_REPLAY_IDEMPOTENT=True");
+
+    await prepare(recoveryId);
+
+    const prototype = Object.getPrototypeOf(
+      profiles
+    ) as typeof profiles;
+
+    const originalUpdate = prototype.updateEntity;
+    let injected = false;
+
+    prototype.updateEntity = async function (
+      this: typeof profiles,
+      ...args: Parameters<typeof originalUpdate>
+    ) {
+      if (!injected &&
+          this.url === profiles.url &&
+          args[0].partitionKey === "VISITOR" &&
+          args[0].rowKey === recoveryId) {
+        injected = true;
+
+        const concurrentEdit = {
+          partitionKey: "VISITOR",
+          rowKey: recoveryId,
+          displayName: "Concurrent synthetic edit"
+        };
+
+        await originalUpdate.call(
+          profiles, concurrentEdit, "Merge"
+        );
+      }
+
+      return originalUpdate.apply(this, args);
+    };
+
+    try {
+      await assert.rejects(
+        recordCommittedStaffCareAssignment(
+          recoveryId, command.operationId
+        )
+      );
+
+      assert.equal(injected, true);
+    } finally {
+      prototype.updateEntity = originalUpdate;
+    }
+
+    assert.equal((await careEvents(recoveryId)).length, 1);
+
+    const interrupted = await getFormationProfileByVisitorId(
+      profiles, recoveryId
+    );
+
+    assert.equal(interrupted?.assignedTo ?? null, null);
+    assert.equal(
+      interrupted?.displayName,
+      "Concurrent synthetic edit"
+    );
+
+    const recovered = await recordCommittedStaffCareAssignment(
+      recoveryId, command.operationId
+    );
+
+    assert.equal(recovered.accepted, false);
+    assert.equal(recovered.profile.assignedTo, command.assigneeId);
+    assert.equal(
+      recovered.profile.displayName,
+      "Concurrent synthetic edit"
+    );
+
+    assert.equal((await careEvents(recoveryId)).length, 1);
+
+    console.log("PROFILE_ETAG_CONFLICT_PROTECTED=True");
+    console.log("INTERRUPTED_PROJECTION_RECOVERED=True");
+
+    const older = await prepare(releasedId);
+
+    const releaseAt = new Date(
+      Date.parse(older.occurredAt) + 1000
+    ).toISOString();
+
+    // Synthetic pre-existing release fixture.
+    // No real Staff or visitor records are used.
+    await care.createEntity({
+      partitionKey: releasedId,
+      rowKey: `${releaseAt}__synthetic-release`,
+      visitorId: releasedId,
+      type: "FOLLOWUP_UNASSIGNED",
+      occurredAt: releaseAt,
+      recordedAt: releaseAt,
+      idempotencyKey: "synthetic-release",
+      channel: "api",
+      summary: "FOLLOWUP_UNASSIGNED",
+      metadata: JSON.stringify({
+        source: {
+          system: "hope-dashboard-next",
+          actorId: command.actorId
+        },
+        data: {}
+      })
+    });
+
+    await profiles.updateEntity({
+      partitionKey: "VISITOR",
+      rowKey: releasedId,
+      lastEventType: "FOLLOWUP_UNASSIGNED",
+      lastEventAt: releaseAt,
+      lastEventId: "synthetic-release"
+    }, "Merge");
+
+    const beforeReleaseRecovery =
+      await getFormationProfileByVisitorId(
+        profiles, releasedId
+      );
+
+    await assert.rejects(
+      recordCommittedStaffCareAssignment(
+        releasedId, command.operationId
+      )
+    );
+
+    assert.deepEqual(
+      await getFormationProfileByVisitorId(
+        profiles, releasedId
+      ),
+      beforeReleaseRecovery
+    );
+
+    assert.equal(
+      beforeReleaseRecovery?.assignedTo ?? null,
+      null
+    );
+
+    console.log("SUPERSEDED_ASSIGNMENT_CANNOT_RESTORE_OWNER=True");
+
+    assert.equal((await authority.apply(
+      visitorId, no(1)
+    )).status, "committed");
+
+    const blocked = await authority.appendStaffCareAssignment(
+      visitorId, {
+        ...command,
+        operationId: "synthetic-post-withdrawal",
+        expectedRevision: 2
+      }
+    );
+
+    assert.equal(blocked.status, "blocked");
+
+    const historicalReplay =
+      await recordCommittedStaffCareAssignment(
+        visitorId, command.operationId
+      );
+
+    assert.equal(historicalReplay.accepted, false);
+    assert.equal((await careEvents(visitorId)).length, 1);
+
+    console.log("WITHDRAWAL_BLOCKS_NEW_CARE_WORK=True");
+  } finally {
+    for (const client of created.reverse()) {
+      await client.deleteTable();
+    }
+  }
+});

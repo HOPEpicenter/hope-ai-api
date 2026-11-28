@@ -487,8 +487,7 @@ export function createPermanentVisitorConsentRepository(
       if (mode === "resume") {
         if (
           plan.status !== "paused" ||
-          plan.ownerStaffId !== event.actorId ||
-          plan.startedBy !== PUBLIC_VISITOR_SYSTEM_ORIGIN
+          plan.ownerStaffId !== event.actorId
         ) {
           return "conflict";
         }

@@ -27,6 +27,7 @@
         'tests/visitorPermanentQrGrant.test.ts'
         'tests/visitorPermanentRegistrationAdapter.test.ts'
         'tests/visitorPermanentStaffConsentGuard.test.ts'
+        'tests/visitorUnifiedConsentCompatibility.test.ts'
         'tests/visitorRegistrationHistory.test.ts'
         'tests/visitors/createVisitorEvent.test.ts'
         'tests/visitors/listApprovedVisitorEvents.test.ts'
@@ -209,7 +210,7 @@
                 Reset-TestStorageEnvironment
             }
         }
-        Write-Output 'THIRTY_SEVEN_REQUIRED_BACKEND_TEST_FILES_PASSED=True'
+        Write-Output 'THIRTY_EIGHT_REQUIRED_BACKEND_TEST_FILES_PASSED=True'
         Write-Output "BACKEND_CI_FOCUSED_PASS_COUNT=$total"
         Write-Output 'FIVE_ISOLATED_STORAGE_TEST_FILES_PASSED=True'
         Write-Output 'NO_REQUIRED_TEST_SKIPPED=True'

@@ -20,6 +20,7 @@
         @{ File='tests/visitorPermanentStaffConsentAuthorityStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=17; Authority='true' }
         @{ File='tests/visitorPermanentStaffContactIntentStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=$null; Authority='true' }
         @{ File='tests/visitorPermanentStaffOwnerClaimStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=9; Authority='true' }
+        @{ File='tests/visitorUnifiedConsentStorage.test.ts'; Account='hopevisitor133'; Prefix='HOPE_VISITOR_133'; Count=5; Authority='true' }
     )
     $temp = Join-Path $root ('node_modules/.hope-visitor-storage-ci-' + [guid]::NewGuid().ToString('N'))
     $build = Join-Path $temp 'build'

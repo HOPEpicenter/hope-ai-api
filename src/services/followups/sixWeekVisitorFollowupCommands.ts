@@ -945,7 +945,6 @@ export async function changeSixWeekFollowupStatus(
   const coordinatedResume =
     input.action === "resume" &&
     contactWriterHoldEnabled() &&
-    existing.startedBy === "system:permanent-visitor-registration" &&
     existing.ownerStaffId === actorId &&
     typeof repository.resumeConsentProtectedPlan === "function";
 

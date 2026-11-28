@@ -40,7 +40,7 @@ export type ConsentCommand =
       kind: "verified_staff_decision";
       expectedRevision: number;
       decisionId: string;
-      pendingRequestId: string;
+      pendingRequestId: string | null;
       actorId: string;
       decision: "granted" | "declined";
     }>;
@@ -248,7 +248,7 @@ export function transitionConsentAuthority(
       "pendingRequestId", "actorId", "decision"
     ]) ||
         !validId(input.decisionId) ||
-        !validId(input.pendingRequestId) ||
+        (input.pendingRequestId !== null && !validId(input.pendingRequestId)) ||
         !validId(input.actorId) ||
         (input.decision !== "granted" &&
          input.decision !== "declined")) {
@@ -306,9 +306,17 @@ export function transitionConsentAuthority(
 
   // Trusted Staff decision classification does NOT
   // itself prove Staff identity or authorization.
-  if (!current.pending ||
-      current.pending.requestId !==
-        input.pendingRequestId) {
+  const initialStaffVerification =
+    input.pendingRequestId === null &&
+    current.effective === "unknown" &&
+    current.pending === null &&
+    current.revision === 1;
+
+  const matchingPendingRequest =
+    current.pending !== null &&
+    current.pending.requestId === input.pendingRequestId;
+
+  if (!initialStaffVerification && !matchingPendingRequest) {
     return rejected("pending_request_mismatch");
   }
 

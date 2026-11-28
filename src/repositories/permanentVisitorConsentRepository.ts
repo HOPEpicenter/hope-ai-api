@@ -54,7 +54,7 @@ function normalize(input: unknown): Operation | null {
     return { kind: v.kind, evidenceId: v.evidenceId };
   if (v.kind === "public_request" && exact(v, ["kind", "expectedRevision", "requestId", "requestedConsent"]) && revision(v.expectedRevision) && validId(v.requestId) && typeof v.requestedConsent === "boolean")
     return { kind: v.kind, expectedRevision: v.expectedRevision, requestId: v.requestId, requestedConsent: v.requestedConsent };
-  if (v.kind === "verified_staff_decision" && exact(v, ["kind", "expectedRevision", "decisionId", "pendingRequestId", "actorId", "decision"]) && revision(v.expectedRevision) && validId(v.decisionId) && validId(v.pendingRequestId) && validId(v.actorId) && (v.decision === "granted" || v.decision === "declined"))
+  if (v.kind === "verified_staff_decision" && exact(v, ["kind", "expectedRevision", "decisionId", "pendingRequestId", "actorId", "decision"]) && revision(v.expectedRevision) && validId(v.decisionId) && (v.pendingRequestId === null || validId(v.pendingRequestId)) && validId(v.actorId) && (v.decision === "granted" || v.decision === "declined"))
     return { kind: v.kind, expectedRevision: v.expectedRevision, decisionId: v.decisionId, pendingRequestId: v.pendingRequestId, actorId: v.actorId, decision: v.decision };
   return null;
 }

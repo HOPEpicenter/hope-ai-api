@@ -195,3 +195,161 @@ test("invalid input and missing storage never authorize work", async () => {
   assert.deepEqual(await repo.read(visitor), { status: "unavailable" });
   assert.deepEqual(await repo.apply(visitor, init), denied("unavailable"));
 });
+
+test("historical verified grant persists with an immutable receipt and exact replay", async () =>
+  fixture(async (table, name) => {
+    const repo = repository(table, true);
+
+    assert.deepEqual(await repo.apply(visitor, {
+      kind: "existing_profile",
+      evidenceId: "synthetic-historical-init"
+    }), done(1));
+
+    const operation = {
+      kind: "verified_staff_decision",
+      expectedRevision: 1,
+      decisionId: "synthetic-historical-grant",
+      pendingRequestId: null,
+      actorId: "synthetic-authorized-admin",
+      decision: "granted"
+    };
+
+    assert.deepEqual(
+      await repo.apply(visitor, operation),
+      done(2)
+    );
+
+    const restarted = repository(
+      createIsolatedVisitorTestTable(name), true
+    );
+
+    assert.deepEqual(
+      await restarted.apply(visitor, operation),
+      replay(2)
+    );
+
+    const current = await restarted.read(visitor);
+
+    assert.equal(current.status, "ready");
+
+    if (current.status !== "ready") {
+      throw Error("Expected durable authority");
+    }
+
+    assert.equal(permitsContactWork(current.state), true);
+
+    assert.deepEqual(await rows(table, visitor), [
+      "consent-v1:head",
+      "consent-v1:op:synthetic-historical-grant",
+      "consent-v1:op:synthetic-historical-init"
+    ]);
+
+    assert.deepEqual(await restarted.apply(visitor, {
+      ...operation,
+      decision: "declined"
+    }), denied("conflict"));
+
+    console.log("HISTORICAL_GRANT_RECEIPT_REPLAY_VERIFIED=True");
+  })
+);
+
+test("historical verified decline remains denied and cannot be overwritten", async () =>
+  fixture(async table => {
+    const repo = repository(table, true);
+
+    assert.deepEqual(await repo.apply(visitor, {
+      kind: "existing_profile",
+      evidenceId: "synthetic-historical-init"
+    }), done(1));
+
+    const operation = {
+      kind: "verified_staff_decision",
+      expectedRevision: 1,
+      decisionId: "synthetic-historical-decline",
+      pendingRequestId: null,
+      actorId: "synthetic-authorized-admin",
+      decision: "declined"
+    };
+
+    assert.deepEqual(
+      await repo.apply(visitor, operation),
+      done(2)
+    );
+
+    assert.deepEqual(await repo.apply(visitor, {
+      ...operation,
+      expectedRevision: 2,
+      decisionId: "synthetic-forbidden-overwrite",
+      decision: "granted"
+    }), denied("transition_rejected"));
+
+    const current = await repo.read(visitor);
+
+    assert.equal(current.status, "ready");
+
+    if (current.status !== "ready") {
+      throw Error("Expected durable authority");
+    }
+
+    assert.equal(current.state.effective, "declined");
+    assert.equal(permitsContactWork(current.state), false);
+
+    console.log("HISTORICAL_DECLINE_PROTECTED=True");
+  })
+);
+
+test("historical verification loses atomically to concurrent withdrawal", async () =>
+  fixture(async table => {
+    const repo = repository(table, true);
+
+    assert.deepEqual(await repo.apply(visitor, {
+      kind: "existing_profile",
+      evidenceId: "synthetic-historical-init"
+    }), done(1));
+
+    let injected = false;
+
+    const racing = repository(port(table, async actions => {
+      assert.equal(injected, false);
+      injected = true;
+
+      assert.deepEqual(await repo.apply(
+        visitor,
+        publicOp("synthetic-concurrent-withdrawal", 1, false)
+      ), done(2));
+
+      return table.submitTransaction(actions);
+    }), true);
+
+    assert.deepEqual(await racing.apply(visitor, {
+      kind: "verified_staff_decision",
+      expectedRevision: 1,
+      decisionId: "synthetic-racing-grant",
+      pendingRequestId: null,
+      actorId: "synthetic-authorized-admin",
+      decision: "granted"
+    }), denied("stale_revision"));
+
+    assert.equal(injected, true);
+
+    const current = await repo.read(visitor);
+
+    assert.equal(current.status, "ready");
+
+    if (current.status !== "ready") {
+      throw Error("Expected durable authority");
+    }
+
+    assert.equal(current.state.pending?.kind, "withdrawal");
+    assert.equal(permitsContactWork(current.state), false);
+
+    assert.equal(
+      (await rows(table, visitor)).includes(
+        "consent-v1:op:synthetic-racing-grant"
+      ),
+      false
+    );
+
+    console.log("CONCURRENT_WITHDRAWAL_ATOMICALLY_PROTECTED=True");
+  })
+);

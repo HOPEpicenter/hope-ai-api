@@ -243,3 +243,72 @@ test("transition does not mutate original authority state", () => {
   assert.equal(state.revision, 1);
   assert.equal(next.revision, 2);
 });
+
+function historicalDecision(
+  state: ConsentAuthority,
+  decision: "granted" | "declined",
+  expectedRevision = state.revision
+): ConsentTransition {
+  return transitionConsentAuthority(state, {
+    kind: "verified_staff_decision",
+    expectedRevision,
+    decisionId: "synthetic-historical-decision",
+    pendingRequestId: null,
+    actorId: "synthetic-authorized-admin",
+    decision
+  });
+}
+
+test("historical unknown consent permits explicitly verified Staff grant", () => {
+  const state = applied(historicalDecision(existing(), "granted"));
+  assert.equal(state.effective, "granted");
+  assert.equal(state.revision, 2);
+  assert.equal(state.pending, null);
+  assert.equal(permitsContactWork(state), true);
+});
+
+test("historical verified decline never permits contact work", () => {
+  const state = applied(historicalDecision(existing(), "declined"));
+  assert.equal(state.effective, "declined");
+  assert.equal(permitsContactWork(state), false);
+});
+
+test("direct historical decision cannot overwrite established consent", () => {
+  for (const state of [initial(true), initial(false)]) {
+    assert.equal(
+      historicalDecision(state, "granted").status,
+      "rejected"
+    );
+  }
+});
+
+test("direct historical grant cannot bypass pending withdrawal or grant", () => {
+  for (const choice of [true, false]) {
+    const pending = applied(publicRequest(existing(), choice));
+
+    assert.equal(
+      historicalDecision(pending, "granted").status,
+      "rejected"
+    );
+
+    assert.equal(permitsContactWork(pending), false);
+  }
+});
+
+test("historical verification rejects stale revision and missing actor", () => {
+  const state = existing();
+
+  assert.equal(
+    historicalDecision(state, "granted", 2).status,
+    "rejected"
+  );
+
+  assert.equal(transitionConsentAuthority(state, {
+    kind: "verified_staff_decision",
+    expectedRevision: 1,
+    decisionId: "synthetic-invalid",
+    pendingRequestId: null,
+    actorId: "",
+    decision: "granted"
+  }).status, "rejected");
+});

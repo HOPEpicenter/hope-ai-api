@@ -568,13 +568,14 @@ test("administrator consent decisions are authorized durable and revision bound"
       method: string,
       body?: Record<string, unknown>,
       suppliedKey = adminKey,
-      actorId = adminId
+      actorId = adminId,
+      targetVisitorId = visitorId
     ) {
       const ctx: any = {};
 
       await permanentVisitorStaffConsent(ctx, {
         method,
-        params: { visitorId },
+        params: { visitorId: targetVisitorId },
         headers: {
           "x-admin-api-key": suppliedKey,
           "x-hope-admin-actor-id": actorId
@@ -731,6 +732,117 @@ test("administrator consent decisions are authorized durable and revision bound"
         (await plans.listByVisitor(visitorId)).length,
         0
       );
+
+      const historicalId = "synthetic-historical-admin-visitor";
+
+      const historicalDecision = {
+        expectedRevision: 1,
+        decisionId: "synthetic-historical-admin-decision",
+        pendingRequestId: null,
+        decision: "granted",
+        confirmation: "visitor_choice_verified"
+      };
+
+      // The decision endpoint cannot initialize missing authority.
+      assert.equal((await invoke(
+        "POST", historicalDecision, adminKey, adminId, historicalId
+      )).status, 503);
+
+      assert.equal(
+        (await repository.read(historicalId)).status,
+        "not_initialized"
+      );
+
+      assert.equal((await repository.apply(historicalId, {
+        kind: "existing_profile",
+        evidenceId: "synthetic-historical-admin-init"
+      })).status, "committed");
+
+      const historicalBefore = await repository.read(historicalId);
+
+      for (const [key, staff] of [
+        ["wrong-key", adminId],
+        [adminKey, "unknown-admin"],
+        [adminKey, "synthetic-inactive-admin"]
+      ]) {
+        const response = await invoke(
+          "POST", historicalDecision, key, staff, historicalId
+        );
+
+        assert.ok([401, 403].includes(response.status));
+      }
+
+      assert.deepEqual(
+        await repository.read(historicalId),
+        historicalBefore
+      );
+
+      assert.equal((await invoke("POST", {
+        ...historicalDecision,
+        confirmation: "unverified"
+      }, adminKey, adminId, historicalId)).status, 400);
+
+      assert.equal((await invoke("POST", {
+        ...historicalDecision,
+        actorId: "forged-actor"
+      }, adminKey, adminId, historicalId)).status, 400);
+
+      const firstDecision = await invoke(
+        "POST", historicalDecision, adminKey, adminId, historicalId
+      );
+
+      assert.equal(firstDecision.status, 200);
+      assert.equal(firstDecision.body.status, "committed");
+      assert.equal(firstDecision.body.recordedRevision, 2);
+
+      const historicalReceipt = await repository.inspectOperation(
+        historicalId, historicalDecision.decisionId
+      );
+
+      assert.equal(historicalReceipt.status, "found");
+
+      if (historicalReceipt.status !== "found" ||
+          historicalReceipt.operation.kind !== "verified_staff_decision") {
+        throw Error("Missing canonical Staff decision receipt");
+      }
+
+      assert.equal(historicalReceipt.operation.actorId, adminId);
+      assert.equal(historicalReceipt.operation.pendingRequestId, null);
+
+      const exactReplay = await invoke(
+        "POST", historicalDecision, adminKey, adminId, historicalId
+      );
+
+      assert.equal(exactReplay.status, 200);
+      assert.equal(exactReplay.body.status, "replayed");
+
+      assert.equal((await repository.apply(historicalId, {
+        kind: "public_request",
+        expectedRevision: 2,
+        requestId: "synthetic-historical-withdrawal",
+        requestedConsent: false
+      })).status, "committed");
+
+      assert.equal((await invoke("POST", {
+        ...historicalDecision,
+        expectedRevision: 3,
+        decisionId: "synthetic-forbidden-historical-grant"
+      }, adminKey, adminId, historicalId)).status, 409);
+
+      const currentHistorical = await invoke(
+        "GET", undefined, adminKey, adminId, historicalId
+      );
+
+      assert.equal(currentHistorical.body.pending.kind, "withdrawal");
+      assert.equal(
+        (await plans.listByVisitor(historicalId)).length,
+        0
+      );
+
+      console.log("HISTORICAL_ADMIN_AUTHORIZATION_VERIFIED=True");
+      console.log("HISTORICAL_DECISION_RECEIPT_VERIFIED=True");
+      console.log("HISTORICAL_WITHDRAWAL_PROTECTED=True");
+      console.log("NO_AUTOMATIC_HISTORICAL_ENROLLMENT=True");
 
       console.log("ADMIN_CONSENT_DECISION_VERIFIED=True");
       console.log("EXACT_DECISION_REPLAY_VERIFIED=True");

@@ -186,7 +186,7 @@ export async function permanentVisitorStaffConsent(
         !Number.isSafeInteger(value.expectedRevision) ||
         value.expectedRevision < 1 ||
         !validId(value.decisionId) ||
-        !validId(value.pendingRequestId) ||
+        (value.pendingRequestId !== null && !validId(value.pendingRequestId)) ||
         (value.decision !== "granted" &&
          value.decision !== "declined") ||
         value.confirmation !== "visitor_choice_verified") {

@@ -85,13 +85,14 @@ jobs:
             '905a2f388a4656ed2f18b7f4ffe996f7b19a665b'
             '66d44a65abe091fb8290bb96a957b985e8d90044'
             '1522cd48e3fd69479efa5f062e657628e8a298fd'
+            'fb01925c214e06e4c613d0a7f22c8f6497c3a673'
           )
           if ($ciBlob -cnotin $trustedCiBlobs) {
             throw 'The target commit does not contain an approved CI workflow definition.'
           }
 
           $stagingBlob = (git rev-parse "$($env:TARGET_SHA):.github/workflows/deploy-staging.yml").Trim()
-          if ($LASTEXITCODE -ne 0 -or $stagingBlob -cne '5ad2a92535f4d89a8cfd7ec8b35666c1e871d896') {
+          if ($LASTEXITCODE -ne 0 -or $stagingBlob -cne '3ecb79ce195d0b02923fe23998879ddadeb6ce46') {
             throw 'The target commit does not contain the approved staging workflow definition.'
           }
 
@@ -141,22 +142,24 @@ jobs:
             param(
               [long]$WorkflowId,
               [string]$WorkflowPath,
+              [ValidateSet("push", "workflow_dispatch")]
+              [string]$ExpectedEvent,
               [string[]]$ExpectedJobs
             )
 
             Assert-WorkflowIdentity -WorkflowId $WorkflowId -ExpectedPath $WorkflowPath
-            $runsUri = "$api/actions/workflows/$WorkflowId/runs?branch=main&event=push&head_sha=$($env:TARGET_SHA)&per_page=100&page=1"
+            $runsUri = "$api/actions/workflows/$WorkflowId/runs?branch=main&event=$ExpectedEvent&head_sha=$($env:TARGET_SHA)&per_page=100&page=1"
             $runPage = Invoke-GitHubApiJson $runsUri
             $runs = @($runPage.workflow_runs)
             if ([int]$runPage.total_count -ne 1 -or $runs.Count -ne 1) {
-              throw "Expected exactly one push run for $WorkflowPath at target_sha."
+              throw "Expected exactly one $ExpectedEvent run for $WorkflowPath at target_sha."
             }
 
             $run = $runs[0]
             if (
               [long]$run.workflow_id -ne $WorkflowId -or
               $run.path -cne $WorkflowPath -or
-              $run.event -cne 'push' -or
+              $run.event -cne $ExpectedEvent -or
               $run.head_branch -cne 'main' -or
               $run.head_sha -cne $env:TARGET_SHA -or
               [long]$run.repository.id -ne [long]$env:REPOSITORY_ID -or
@@ -200,10 +203,12 @@ jobs:
           $ciRun = Get-VerifiedRun `
             -WorkflowId 223378627 `
             -WorkflowPath '.github/workflows/ci.yml' `
+            -ExpectedEvent 'push' `
             -ExpectedJobs @('build-and-smoke')
           $stagingRun = Get-VerifiedRun `
             -WorkflowId 240733052 `
             -WorkflowPath '.github/workflows/deploy-staging.yml' `
+            -ExpectedEvent 'workflow_dispatch' `
             -ExpectedJobs @('build-and-deploy', 'record-staging-evidence')
 
           $latestStagingPage = Invoke-GitHubApiJson `
@@ -214,7 +219,7 @@ jobs:
             $latestStagingRuns.Count -ne 1 -or
             [long]$latestStagingRuns[0].id -ne [long]$stagingRun.id -or
             [long]$latestStagingRuns[0].run_attempt -ne [long]$stagingRun.run_attempt -or
-            $latestStagingRuns[0].event -cne 'push' -or
+            $latestStagingRuns[0].event -cne 'workflow_dispatch' -or
             $latestStagingRuns[0].head_branch -cne 'main' -or
             $latestStagingRuns[0].head_sha -cne $env:TARGET_SHA -or
             $latestStagingRuns[0].status -cne 'completed' -or
@@ -329,7 +334,7 @@ jobs:
             $manifest.workflow_sha -cne $env:TARGET_SHA -or
             [long]$manifest.run_id -ne [long]$env:STAGING_RUN_ID -or
             [int]$manifest.run_attempt -ne [int]$env:STAGING_RUN_ATTEMPT -or
-            $manifest.event -cne 'push' -or
+            $manifest.event -cne 'workflow_dispatch' -or
             $manifest.ref -cne 'refs/heads/main' -or
             $manifest.head_sha -cne $env:TARGET_SHA -or
             $manifest.github_environment -cne 'Preview' -or
